@@ -1,0 +1,10 @@
+Running the provided install script will setup the dshield client to parse APF
+iptable logs daily and submit a summary report to dshield.org for inclusion
+into global attack trends. This feature is directly related to the dsheild drop
+list as such list is possible by providing the dshield.org site with live world
+firewall event logs.
+
+Simply execute the install script and a preconfigured setup of dshield's python
+client will be installed; as well, a cronjob will be placed in:
+/etc/cron.daily/ds
+

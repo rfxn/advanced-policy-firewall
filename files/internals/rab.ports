@@ -1,0 +1,8 @@
+# Low security ports
+RAB_PSCAN_LEVEL_1="1,7,9,11,15,69,70"
+
+# Medium security ports
+RAB_PSCAN_LEVEL_2="$RAB_PSCAN_LEVEL_1,79,109,119,512,513,517,518"
+
+# High security ports
+RAB_PSCAN_LEVEL_3="$RAB_PSCAN_LEVEL_2,13,17,19,540,635,640,641,666,700"

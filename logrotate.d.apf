@@ -1,0 +1,6 @@
+/var/log/apfados_log /var/log/apf_log {
+    missingok
+    postrotate
+    endscript
+}
+

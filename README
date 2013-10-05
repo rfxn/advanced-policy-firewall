@@ -1,0 +1,760 @@
+[disclaimer: work in progress still]
+APF (Advanced Policy Firewall) - 9.7 [apf@r-fx.org]
+ Copyright (C) 2002-2011, R-fx Networks <proj@r-fx.org>
+ Copyright (C) 2011, Ryan MacDonald <ryan@r-fx.org>
+
+    This program is free software; you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation; either version 2 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program; if not, write to the Free Software
+    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+
+Contents:
+1 ............. Introduction
+1.1 ........... Introduction: Supported Systems & Requirements
+2 ............. Installation
+2.1 ........... Installation: Boot Loading
+3 ............. Configuration
+3.1 ........... Configuration: Basic Options
+3.2 ........... Configuration: Advanced Options
+3.3 ........... Configuration: Reactive Address Blocking
+3.4 ........... Configuration: Virtual Network Files
+3.5 ........... Configuration: Global Variables & Custom Rules
+4 ............. General Usage
+4.1 ........... General Usage: Trust System
+4.2 ........... General Usage: Global Trust System
+4.3 ........... General Usage: Advanced Trust Syntax
+4.4 ........... General Usage: Dynamic Trust Files
+5 ............. License
+6 ............. Support Information
+
+1) Introduction:
+Advanced Policy Firewall (APF) is an iptables(netfilter) based firewall system
+designed around the essential needs of today's Internet deployed servers and the
+unique needs of custom deployed Linux installations. The configuration of APF
+is designed to be very informative and present the user with an easy to follow
+process, from top to bottom of the configuration file. The management of APF on
+a day-to-day basis is conducted from the command line with the 'apf' command,
+which includes detailed usage information and all the features one would expect
+from a current and forward thinking firewall solution.
+
+The technical side of APF is such that it embraces the latest stable features
+put forward by the iptables(netfilter) project to provide a very robust and
+powerful firewall. The filtering performed by APF is three fold:
+   1) Static rule based policies (not to be confused with a "static firewall")
+   2) Connection based stateful policies
+   3) Sanity based policies
+
+The first, static rule based policies, is the most traditional method of
+firewalling. This is when the firewall has an unchanging set of instructions
+(rules) on how traffic should be handled in certain conditions. An example of
+a static rule based policy would be when you allow/deny an address access to the
+server with the trust system or open a new port with conf.apf. So the short of
+it is rules that infrequently or never change while the firewall is running.
+
+The second, connection based stateful policies, is a means to distinguish
+legitimate packets for different types of connections. Only packets matching a
+known connection will be allowed by the firewall; others will be rejected. An
+example of this would be FTP data transfers, in an older era of firewalling
+you would have to define a complex set of static policies to allow FTA data
+transfers to flow without a problem. That is not so with stateful policies,
+the firewall can see that an address has established a connection to port 21
+then "relate" that address to the data transfer portion of the connection and
+dynamically alter the firewall to allow the traffic.
+
+The third, sanity based policies, is the ability of the firewall to match
+various traffic patterns to known attack methods or scrutinize traffic to
+conform to Internet standards. An example of this would be when a would-be
+attacker attempts to forge the source IP address of data they are sending to
+you, APF can simply discard this traffic or optionally log it then discard it.
+To the same extent another example would be when a broken router on the
+Internet begins to relay malformed packets to you, APF can simply discard them
+or in other situations reply to the router and have it stop sending you new
+packets (TCP Reset).
+
+These three key filtering methods employed by APF are simply a generalization
+of how the firewall is constructed on a technical design level, there are a
+great many more features in APF that can be put to use. For a detailed
+description of all APF features you should review the configuration file
+/etc/apf/conf.apf which has well outlined captions above all options. Below is
+a point form summary of most APF features for reference and review:
+
+- detailed and well commented configuration file
+- granular inbound and outbound network filtering
+- user id based outbound network filtering
+- application based network filtering
+- trust based rule files with an optional advanced syntax
+- global trust system where rules can be downloaded from a central management
+  server
+- reactive address blocking (RAB), next generation in-line intrusion prevention
+- debug mode provided for testing new features and configuration setups
+- fast load feature that allows for 1000+ rules to load in under 1 second
+- inbound and outbound network interfaces can be independently configured
+- global tcp/udp port & icmp type filtering with multiple methods of executing
+  filters (drop, reject, prohibit)
+- configurable policies for each ip on the system with convenience variables to
+  import settings
+- packet flow rate limiting that prevents abuse on the most widely abused
+  protocol, icmp
+- prerouting and postrouting rules for optimal network performance
+- dshield.org block list support to ban networks exhibiting suspicious activity
+- spamhaus Don't Route Or Peer List support to ban known "hijacked zombie" IP
+  blocks
+- any number of additional interfaces may be configured as firewalled
+  (untrusted) or trusted (not firewalled)
+- additional firewalled interfaces can have there own unique firewall policies
+  applied
+- intelligent route verification to prevent embarrassing configuration errors
+- advanced packet sanity checks to make sure traffic coming and going meets
+  the strictest of standards
+- filter attacks such as fragmented UDP, port zero floods, stuffed routing,
+  arp poisoning and more
+- configurable type of service options to dictate the priority of different types
+  of network traffic
+- intelligent default settings to meet every day server setups
+- dynamic configuration of your servers local DNS revolvers into the firewall
+- optional filtering of common p2p applications
+- optional filtering of private & reserved IP address space
+- optional implicit blocks of the ident service 
+- configurable connection tracking settings to scale the firewall to the size of
+  your network
+- configurable kernel hooks (ties) to harden the system further to syn-flood
+  attacks & routing abuses
+- advanced network control such as explicit congestion notification and overflow
+  control
+- special chains that are aware of the state of FTP DATA and SSH connections to
+  prevent client side issues
+- control over the rate of logged events, want only 30 filter events a minute?
+  300 a minute? - you are the boss
+- logging subsystem that allows for logging data to user space programs or
+  standard syslog files
+- logging that details every rule added and a comprehensive set of error checks
+  to prevent config errors
+- if you are familiar with netfilter you can create your own rules in any of
+  the policy files
+- pluggable and ready advanced use of QoS algorithms provided by the Linux
+- 3rd party add-on projects that compliment APF features
+
+Still on the feature todo list is:
+- full support for NAT/MASQ including port forwarding
+- cluster oriented round-robin packet or port forwarding
+- in-line firewall reactive address blocking of connction floods
+- and much more...
+
+1.1) Introduction: Supported Systems & Requirements
+The APF package is designed to run on Linux based operating systems that have
+an operational version of the iptables (netfilter) package installed. The 
+iptables (netfilter) package is supported on Linux kernels 2.4 and above,
+you can find out more details on the netfilter project at:
+
+http://www.netfilter.org/
+
+If the version of Linux you are using already has an included copy of
+iptables then chances are very high it has all the iptables modules that APF
+will need. If you are configuring iptables in your own custom kernel then you
+should be sure that the following modules are compiled with the kernel for
+modular support: 
+
+ip_tables
+iptable_filter
+iptable_mangle
+ip_conntrack
+ip_conntrack_irc
+ip_conntrack_ftp
+ipt_state 
+ipt_multiport
+ipt_limit
+ipt_recent
+ipt_LOG
+ipt_REJECT
+ipt_ecn
+ipt_length
+ipt_mac
+ipt_multiport
+ipt_owner
+ipt_state
+ipt_ttl
+ipt_TOS
+ipt_TCPMSS
+ipt_ULOG
+
+If you would like to make sure you support these modules then you can take a
+look inside of /lib/modules/kernelver/kernel/net/ipv4/netfilter/ directory.
+
+# ls /lib/modules/$(uname -r)/kernel/net/ipv4/netfilter/
+
+The known Linux platforms that APF will run on are very diverse and it is hard
+to keep track but here is a short summary:
+
+Redhat Enterprise AS/ES 2+
+CentOS Any
+Fedora Core Any
+Slackware 8.0+
+Debian GNU/Linux 3.0+
+Suse Linux 8.1+
+Unbuntu Any
+TurboLinux Server 9+
+TurboLinux Fuji (Desktop)
+RedHat Linux 7.3,8,9
+
+The base system specs for APF operating as intended are not set in stone and
+you can easily scale the package into almost any situation that has a Linux
+2.4+ kernel, iptables and bash shell with standard set of gnu-utils (grep,
+awk, sed and the like). Below is a short table of what is recommended:
+DEVICE      MIN       RECOMMENDED
+CPU:        300Mhz    600Mhz
+MEM:        64MB      96MB
+DISK:       OS        OS
+NETWORK:    Any       Any
+
+2) Installation
+The installation setup of APF is very straight forward, there is an included
+install.sh script that will perform all the tasks of installing APF for you.
+
+Begin Install:
+# sh install.sh
+
+If one so desires they may customize the setup of APF by editing the variables
+inside the install.sh script followed by also editing the path variables in
+the conf.apf and internals.conf files. This is however not recommends and the 
+default paths should meet all user needs, they are:
+
+Install Path: /etc/apf
+Bin Path: /usr/local/sbin/apf
+
+The package includes two convenience scripts, the first is importconf which will
+import all the variable settings from your previous version of APF into the
+new installation. The second is get_ports, a script which will output the 
+systems currently in use 'server' ports for the user during the installation
+process in an effort to aid in configuring port settings. 
+
+All previous versions of APF are saved upon the installation of newer
+versions and stored in /etc/apf.bkDDMMYY-UTIME format. In addition, there is a 
+/etc/apf.bk.last sym-link created to the last version of APF you had installed.
+
+After installation is completed the documentation and convenience scripts are
+copied to /etc/apf/docs and /etc/apf/extras respective.
+
+2.1) Installation: Boot Loading
+On installation APF will install an init script to /etc/init.d/apf
+and configure it to load on boot. If you are setting up APF in a more
+custom situation then you may follow the below instructions.
+
+There is really 3 modes of operation for having APF firewall our system
+and each has no real benifit except tailoring itself to your needs.
+
+The first is to setup APF in the init system with chkconfig (done by
+default during install), as detailed below:
+
+chkconfig --add apf
+chkconfig --level 345 apf on
+
+Secondly, you can add the following string too the bottom of the
+/etc/rc.local file:
+
+sh -c "/etc/apf/apf -s" &
+
+It is NOT recommended that you use both of these startup methods together,
+for most systems the init script via chkconfig should be fine.
+
+The third and final approuch is to simply run APF in an on-demand fashion. That
+is, enable it with the 'apf -s' command when desired and disable it with the
+'apf -f' when desired.
+
+3) Configuration:
+On your first installation of APF it will come pretty bare in the way of 
+preconfigured options, this is intentional. The most common issue with many
+firewalls is that they come configured with so many options that a user may
+never use or disable, that it leaves systems riddled with firewall holes.
+
+Now with that said, APF comes configured with only a single incoming port
+enabled by default and that is port 22 SSH. Along with a set of common practice
+filtering options preset in the most compatible fashion for all users. All the
+real advanced options APF has to offer are by default disabled including
+outbound (egress) port filtering, reactive address blocking (rab) and the
+virtual network subsystem to name a few.
+ 
+The main APF configuration file is located at /etc/apf/conf.apf and has 
+detailed usage information above all configuration variables. The file uses
+integer based values for setting configuration options and they are
+0 = disabled
+1 = enabled
+
+All configuration options use this integer value system unless otherwise
+indicated in the description of that option.
+
+You should put aside 5 minutes and review the configuration file from top to
+bottom taking the time to read all the captions for the options that are 
+provided. This may seem like a daunting task but a firewall is only as good
+as it is configured and that requires you, the administrator, to take a few
+minutes to understand what it is you are setting up. 
+
+APF is a very powerful firewall that when setup to make use of all the advanced
+features, will provide a sophisticated and robust level of protection. Please
+continue reading further along this file for more information or see the
+support options at the bottom of this file for further assistance if you find
+yourself lost in the configuration process. 
+
+3.1) Configuration: Basic Options
+This section will cover some of the basic configuration options found inside
+of the conf.apf configuration file. These options, despite how basic, are the
+most vital in the proper operation of your firewall. 
+
+Option: DEVEL_MODE
+Description: This tells APF to run in a development mode which in short means
+that the firewall will shut itself off every 5 minutes from a cronjob. When
+you install any version of APF, upgrade or new install, this feature is by 
+default enabled to make sure the user does not lock themself out of the 
+system with configuration errors. Once you are satisfied that you have the
+firewall configured and operating as intended then you must disable it.
+
+Option: INSTALL_PATH
+Description: As it implies, this is the installation path for APF and unless 
+you have become a brave surgeon it is unlikely you will ever need to reconfigure
+this option - on we go.
+
+Option: IFACE_IN & IFACE_OUT
+Description: These variables instruct the firewall as to what interfaces you
+use for main network communication, such as to the Internet. In most cases these
+variables are configured to the same values such as eth0 or ppp0. In a more
+technical capacity these variables control what the firewall considers as the
+untrusted network interfaces, those which are far beyond the reasonable realm
+of control of an administrator.
+
+Option: IFACE_TRUSTED
+Description: It is common that you may want to set a specific interface as
+trusted to be excluded from the firewall, these may be administrative private
+links, virtualized VPN interfaces or a local area network that is contains
+trusted resources. This feature is similar to what some term as demilitarized
+zone or DMZ for short, any interfaces set in this option will be excempt from 
+all firewall rules with an implicit trust rule set early in the firewall load.
+
+Option: SET_VERBOSE
+Description: This option tells the apf script to print very detailed event logs
+to the screen as you are conducting firewall operations from the command line.
+This will allow for easier trouble shooting of firewall issues or to assist the
+user in better understanding what the firewall is doing rule-by-rule. Although
+the SET_VERBOSE option is new to APF, this level of logging has long been
+provided in the /var/log/apf_log file and still remains as such.
+
+Option: SET_FASTLOAD
+Description:  This tells APF to use a special feature to take saved snap shots
+of the running firewall. Instead of regenerating every single firewall rule
+when we stop/start the firewall, APF will use these snap shots to "fast load"
+the rules in bulk. There are internal features in APF that will detect when 
+configuration has changed and then expire the snap shot forcing a full reload
+of the firewall.
+
+Option: SET_VNET
+Description: The ever curious option called SET_VNET, to put it brief this
+option controls the virtual network subsystem of APF also known as VNET. This
+is a subsystem that generates policy files for all aliased addresses on the 
+IFACE_IN/OUT interfaces. In general this option is not needed for the normal
+operation of APF but is provided should you want to easily configured unique
+policies for the aliased addresses on an Interface. Please see topic 3.4 of
+this document for more advanced details related to this option.
+
+Option: SET_ADDIFACE
+Description: This allows you to have additional untrusted interfaces firewalled
+by APF and this is done through the VNET system. So for example let assume you 
+have a datacenter provided eth2 interface for local network backups but you
+know hundreds of other Internet facing servers are also on this network. In 
+such a situation it would be the best course to enable this option (along with 
+SET_VNET) so that the interface is firewalled. Please see topic 3.4 of this 
+document for more advanced details related to this option.
+
+Option: IG_TCP_CPORTS
+Description: This controls what TCP ports are allowed for incoming traffic, this
+is also known as the "server" or "listening services" ports. You would for
+example configure here the ports 21,25,80,110,443 if you were operating the
+FTP, SMTP, HTTP, POP3 & HTTPS services from this host. This is a global context
+rule and will apply to all addresses on this host unless virtual net rules are
+set to operate in another fashion.
+
+Option: IG_UDP_CPORTS
+Description: This controls what UDP ports are allowed for incoming traffic, this
+is also known as the "server" or "listening services" ports. You would for
+example configure here the ports 20,53 if you were operating the FTP & DNS
+services from this host. This is a global context rule and will apply to all
+addresses on this host unless virtual net rules are set to operate in another
+fashion.
+
+Option: IG_ICMP_TYPES
+Description: This controls what ICMP types are allowed for incoming traffic, 
+these are control messages that the Internet uses to communicate any number of
+error messages during communication between hosts and networks. The default
+options should meet most needs however if you wish to filter a specific set
+of ICMP types you should review the 'internals/icmp.types' file. This is a
+global context rule and will apply to all addresses on this host unless virtual
+net rules are set to operate in another fashion.
+
+Option: EGF
+Description: This is a top level control feature for enabling or disabling all
+the outbound (egress) filtering features of the firewall. In the most basic
+setup of the firewall from install, this will be set to disabled and we will be
+operating in a mostly inbound (ingress) only filtering fashion. It is however
+recommended that you enable the outbound (egress) filtering as it provides a
+very robust level of protection and is a common practice to filtering outbound
+traffic.
+
+Option: EG_TCP_CPORTS
+Description: This controls what TCP ports are allowed for outgoing traffic, this
+is also known as the "client side" communication on a host. Here we would set
+any ports we wish to communicate with on the Internet, for example if you use
+many remote RSS feeds on websites then you will want to make sure port 80,443
+is defined here so you can access the HTTP/HTTPS service on Internet servers.
+This is a global context rule and will apply to all addresses on this host
+unless virtual net rules are set to operate in another fashion.
+
+Option: EG_UDP_CPORTS
+Description: This controls what UDP ports are allowed for outgoing traffic, this
+is also known as the "client side" communication on a host. Here we would set
+any ports we wish to communicate with on the Internet, for example if you use
+many remote RSYNC servers then you will want to make sure port 873 is defined
+here so you can properly access the RSYNC service on Internet servers. This is
+a global context rule and will apply to all addresses on this host unless 
+virtual net rules are set to operate in another fashion.
+
+Option: EG_ICMP_TYPES
+Description: This controls what ICMP types are allowed for outgoing traffic,
+these are control messages that the Internet uses to communicate any number of
+error messages during communication between hosts and networks. The default
+options should meet most needs however if you wish to filter a specific set
+of ICMP types you should review the 'internals/icmp.types' file. This is a
+global context rule and will apply to all addresses on this host unless virtual
+net rules are set to operate in another fashion.
+
+Option: LOG_DROP
+Description: The use of this option allows to firewall to perform very detailed
+firewall logging of packets as they are filtered by the firewall. This can help
+identify issues with the firewall or provide insightful information on who is
+taking pokes at the host. Typically however this option is left disabled on
+production systems as it can get very noisy in the log files which also can
+increase i/o wait loads to the disk from the heavy logging.
+
+3.2) Configuration: Advanced Options
+The advanced options, although not required, are those which afford the firewall
+the ability to be a more robust and encompassing solution in protecting a host.
+These options should be reviewed on a case-by-case basis and enabled only as
+you determine there merit to meet a particular need on a host or network.
+
+
+Option: SET_MONOKERN
+Description: This option tells the system that instead of looking for iptables
+modules, that we should expect them to be compiled directly into the kernel. So
+unless you have a custom compiled kernel on your system where modular support
+is disabled or iptables (netfilter) is compiled in directly, you should not
+enable this option. There are also exceptions here if you have a unique system
+setup and APF is unable to find certain iptables modules but you know for a
+fact they are there, then enable this option.
+
+Option: VF_ROUTE
+Description: This option will make sure that the IP addressess associated to
+the IFACE_* variables do actually have route entries. If a route entry can not
+be found then APF will not load as it is likely a configuration error has been
+made with possible results being a locked-up server.
+
+Option: VF_CROND
+Description: This option will make sure that the cron service is running when
+the DEVEL_MODE option is enabled. If the cron service is not found to be running
+then APF will not load as if there is a configuration error it is likely that
+the server will lock-up.
+
+Option: VF_LGATE
+Description: This option will make sure that all traffic coming into this host
+is going through this defined MAC address. This is not something you will want
+enabled in most situations but it is something certain people will desire with
+servers residing behind a NAT/MASQ gateway for example.
+
+Option: RAB
+Description: This is a top level toggle for the reactive address blocking in
+APF and does nothing more than either enable or disable it.
+
+Option: RAB_SANITY
+Description: This enables RAB for sanity violations, which is when an address
+breaks a strict conformity standard such as trying to spoof an address or modify
+packet flags. When addresses are found to have made such violations they are
+temporarily banned for the duration of RAB_TIMER value in seconds.
+
+Option: RAB_PSCAN_LEVEL
+Description: This enables RAB for port scan violations, which is when an
+address attempts to connect to a port that has been classifed as malicious. 
+These types of are those which are not commonly used in today's Internet but are
+the subject of scrutiny by attackers, such as ports 1,7,9,11. The values for
+this option are broken into 4 intergers and they are 0 for disabled, 1 for
+low security, 2 for medium security and 3 for high security.
+
+Option: RAB_HITCOUNT
+Description: This controls the amount of violation hits an address must have
+before it is blocked. It is a good idea to keep this very low to prevent
+evasive measures. The default is 0 or 1, meaning instant block on first hit.
+
+Option: RAB_TIMER
+Description: This is the amount of time (in seconds) that an address gets
+blocked for if a violation is triggered, the default is 300s (5 minutes). This
+option has a max accepted value of 43200 seconds or 12 hours.
+
+Option: RAB_TRIP
+Description: This allows RAB to 'trip' the block timer back to 0 seconds if an
+address attempts ANY subsiquent communication while still on the inital block
+period. This option really is one of the more exciting features of the RAB
+system as it can cut off an attack at the legs before it ever mounts into
+something tangible against the system.
+
+Option: RAB_LOG_HIT
+Description: This controls if the firewall should log all violation hits from
+an address. It is recommended that this be enabled to provide insightful log
+data on addresses which are attempting to probe or conduct questionable actions
+against this host. The use of LOG_DROP variable set to 1 will override this to
+force logging. 
+
+Option: RAB_LOG_TRIP
+Description: This controls if the firewall should log all subsiquent traffic
+from an address that is already blocked for a violation hit, this can generate
+allot of logs. However, the use of this option despite the depth of log data it
+may generate could provide valuble information as to the intents of an attacker.
+The use of LOG_DROP variable set to 1 will override this to force logging.
+
+Option: TCP_STOP, UDP_STOP, ALL_STOP
+Description: These options tell the firewall in which way to go about filtering
+traffic, the supported values are DROP, RESET, REJECT and PROHIBIT. We will 
+review these options below in short and provide the pro/con's of their uses.
+
+ - The default is DROP which tells the firewall silently discard packets
+   and not reply to them at all, which some consider to be "stealth" firewall
+   behavoir. The direct benifit is that it saves system resources, especially 
+   during a DoS attack in not having to reply to every discarded packet. However
+   the problem is experienced attackers know the way TCP/IP works and it is such
+   that when you try to connect to a service that is unavailable, your server or
+   local router replies with an "icmp-port/host-unreachable" message. So when an
+   attacker probing your IP address receives no reply from the server or local
+   router to the scans, they will instantly know you are running a firewall, 
+   possibly peaking curiosity more.
+
+ - Then we have RESET which allows the firewall to reply to discarded packets
+   in such a way that it trys to make the remote host "reset/terminate" the
+   connection attempts to you. This option is more in-line with TCP/IP 
+   standards however in most situations will provide no real benifits or
+   drawbacks. In some really isolated situations you may find that using RESET
+   during DoS attacks will help terminate connections more promptly but in
+   general this does not serve to counter the system resources expended to 
+   send back replies to every single packet filtered.
+
+ - Then we have the REJECT value which is a more common alternative to DROP as
+   it allows the firewall to reply to packets with an error message. This
+   acomplishes the goal of filtering a packet while at the same time not
+   allowing the remote host to know that we are running a firewall, they just
+   think the port/service is closed/unavailable.
+
+ - Finally we have the PROHIBIT value which is specific for UDP_STOP but can
+   be used as other *_STOP values with similar effect. When we set PROHIBIT we
+   are telling the firewall to reply to the sender of packets with only ICMP
+   error messages instead of like the case with RESET, TCP packets. This is a
+   good alternative to reply to packets with as it does not load the system
+   as "much" during aggressive attacks. This is also the default expected
+   reply for UDP packets that are not accepted by a host, however APF will by
+   default use a DROP value on UDP packets.
+
+Option: PKT_SANITY
+Description: This option controls the way packets are scrutinized as they flow 
+through the firewall. The main PKT_SANITY option is a top level toggle for all
+SANITY options and provides general packet flag sanity as a pre-scrub for the
+other sanity options. In short, this makes sure that all packets coming and
+going conform to strict TCP/IP standards. In doing so we make it very difficult
+for attackers to inject raw/custom packets into this host.
+
+Now onto the sanity filters, these are options that allow APF to scrutinize
+traffic coming into and out of the server so it conforms to TCP/IP standards
+and also filters common attack characteristics. There are a number of sanity
+options and each one has a well detailed captain in hte configuration file. In
+addition, these options comes preconfigured to suite most situation needs and
+provide the best protection possible. With that, I will defer the PKT_SANITY
+details to the conf.apf file where you can find ample information on each
+option.
+
+Moving forward we now have the Type of Service (TOS) settings which provide a
+simple classification system to dictate traffic priority based on port numbers.
+The use of TOS in it respective capacities can have a wide ranging impact on the
+performance of your services, both positive and negative depending on settings.
+That is why it is very important that you understand and study the impact of any
+changes to TOS values and then act accordingly, as no two networks are alike. A 
+very good rule of thumb with TOS configuration is to look at the name of the TOS
+value and apply some good judgement to how that name applies to certain service
+based traffic on your network. For example the TOS value Minimize-Cost designed
+to minimize data transmission generally not be a good setting to improve the 
+responce time or throughput of HTTP connections. A more fitting setting for
+this would be "Maximum Throughput - Minimum Delay", as set to default for HTTP.
+The default TOS settings are designed to improve throughput and reliability for
+FTP,HTTP,SMTP,POP3 and IMAP, please review conf.apf under the TOS_ settings for
+further details on Type of Service (TOS).
+
+Following the TOS settings we find the traceroute settings TCR_ which tell the
+firewall if and how we should handle traceroute traffic. This is by default
+enabled in APF, mostly cause of popular demand but really there is no reason
+to have it enabled or disabled other than personal preference. The TCR_PASS
+option tells the firwall if we want to accept traceroutes and on the TCR_PORTS
+
+
+3.3) Configuration: Reactive Address Blocking
+3.4) Configuration: Virtual Network Files
+3.5) Configuration: Global Variables & Custom Rules
+
+4) General Usage:
+The /usr/local/sbin/apf command has a number of options that will ease the
+day-to-day use of your firewall. Here is a quick snap-shot of the options:
+
+usage /usr/local/sbin/apf [OPTION]
+-s|--start ......................... load the firewall rules
+-r|--restart ....................... stop (flush) & reload firewall rules
+-f|--stop .......................... stop (flush) all firewall rules
+-l|--list .......................... list chain rules
+-t|--status ........................ firewall status
+-e|--refresh ....................... refresh & resolve dns names in trust rules
+-a HOST CMT|--allow HOST COMMENT ... add host (IP/FQDN) to allow_hosts.rules and
+                                     immediately load new rule into firewall
+-d HOST CMT|--deny HOST COMMENT .... add host (IP/FQDN) to deny_hosts.rules and
+                                     immediately load new rule into firewall
+-u|--remove HOST ................... remove host from [glob_]deny_hosts.rules
+                                     and immediately remove rule from firewall
+-o|--ovars ......................... output all configuration options
+
+These options explain themselves very clearly such as the start/stop/restart
+operations. 
+
+The -l|--list option will list all the firewall rules you currently have loaded,
+this is more of a feature intended for experienced users but nevertheless can be
+insightful for any administrator to peak at. 
+
+As for the -t|--status option, this will simply show you page-by-page the APF
+status log that tracks any operations you perform with APF - if something is
+not working properly, this is what you want to run.
+
+The -e|--refresh option will flush the trust system chains and reload them from
+the rule files, this will also cause any dns names in the rules to re-resolve.
+This feature is ideal if you have dynamic dns names in the trust system, apart
+from that it has few other uses.
+
+If you need to quickly allow or deny someone access on the system then the
+-a|--allow and -d|--deny options are your champions. If you need to quickly
+remove an allow or deny entry from the firewall then the -u|--remove option
+is there for it. These options are immediate in action and do NOT require
+the firewall to be restarted. Please the below sections of this file for
+more information on the trust system.
+
+Finally the -o|--ovars options is a debug feature, if something is not working
+the way it was intended and you need help them please send me an email to
+apf@r-fx.org and be sure to include the output of this option with your email.
+
+4.1) General Usage: Trust System:
+The trust system in APF is a very traditional setup with two basic trust levels;
+allow and deny. These two basic trust levels are also extended with two global
+trust levels that can be imported from a remote server to assist with central
+trust management in a large scale deployment. We will first look at the basic
+trust levels then have a look at the extended global trust system in the
+following section 4.2 then the advanced trust syntax in 4.3.
+
+The two basic trust level files are located at:
+/etc/apf/allow_hosts.rules
+/etc/apf/deny_hosts.rules
+
+These files by nature are static, meaning that once you add an entry to them,
+they will remain in the files till you remove them yourself. The trust files
+accept both FQDN (fully qualified domain names) and IP addresses with optional
+bit masking. Examples of these formats are:
+
+yourhost.you.com (FQDN)
+192.168.2.102 (IP Address)
+192.168.1.0/24 (IP Address with 24 bit mask)
+
+The definition of IP bit masking is slightly out of the scope of this document
+but some common bit masks that are used would be:
+/24 (192.168.1.0 to 192.168.1.255)
+/16 (192.168.0.0 to 192.168.255.255)
+
+If you have common abuse from a network of addresses you can whois that address
+then determine the network operators assigned address space and ban the network
+with bit masking.
+
+There are two methods for adding entries to the trust files and they are first
+and formost by using an editor or interface of some type to edit the two files
+manually, such as nano (pico clone) or vi (old school editor). 
+
+The second is by using the 'apf' command with the options --allow (-a for 
+short), --deny (-d for short) and --remove (-u for short). The --allow|-a and 
+--deny|-d flags both accept a comment option which is simply a string at the
+end of the command that you would like added to the trust rule files for 
+reference. Here are some operating examples of these commands:
+
+Trust an address:
+apf -a ryanm.dynip.org "my home dynamic-ip"
+
+Deny an address:
+apf -d 192.168.3.111 "keeps trying to bruteforce"
+
+Remove an address:
+apf -u ryanm.dynip.org
+
+Please take note that the --remove|-u option does not accept a comment string
+for obvious reason and that it will remove entries that match from 
+allow_hosts.rules, deny_hosts.rules and the global extensions of these files.
+
+4.2) General Usage: Global Trust System
+
+4.3) General Usage: Advanced Trust Syntax
+Advanced trust usage; The trust rules can be made in advanced format with 4
+options (proto:flow:port:ip);
+ 1) protocol: [packet protocol tcp/udp]
+ 2) flow in/out: [packet direction, inbound or outbound]
+ 3) s/d=port: [packet source or destination port]
+ 4) s/d=ip(/xx) [packet source or destination address, masking supported]
+
+Flow assumed as Input if not defined. Protocol assumed as TCP if not defined.
+When defining rules with protocol, flow is required.
+
+Syntax:
+ proto:flow:[s/d]=port:[s/d]=ip(/mask)
+ s - source , d - destination , flow - packet flow in/out
+
+Examples:
+ inbound to destination port 22 from 24.202.16.11
+ tcp:in:d=22:s=24.202.16.11
+
+ outbound to destination port 23 to destination host 24.2.11.9
+ out:d=23:d=24.2.11.9
+
+ inbound to destination port 3306 from 24.202.11.0/24
+ d=3306:s=24.202.11.0/24
+
+4.4) General Usage: Dynamic Trust Files
+dyn_allow_hosts.rules
+dyn_deny_hosts.rules
+
+5) License:
+APF is developed and supported on a volunteer basis by Ryan MacDonald
+[ryan@r-fx.org]
+
+APF (Advanced policy firewall) is distributed under the GNU General Public
+License (GPL) without restrictions on usage or redistribution. The APF
+copyright statement, and GNU GPL, "COPYING.GPL" are included in the top-level
+directory of the distribution. Credit must be given for derivative works as
+required under GNU GPL.
+
+6) Support Information:
+If you require any assistance with APF you may refer to the R-fx Networks
+community forums located at http://forums.rfxnetworks.com. You may also send
+an e-mail to support@r-fx.org.
+
+The offical home page for APF is located at:
+http://www.rfxnetworks.com/apf.php
+
+All bugs or feature requests should be sent to apf@r-fx.org and please be sure
+to include as much information as possible or conceptual ideas of how you think
+a new feature should work.

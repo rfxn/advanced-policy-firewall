@@ -1,0 +1,48 @@
+#!/bin/bash
+#
+# APF 9.7 [apf@r-fx.org]
+###
+# Copyright (C) 2002-2011, R-fx Networks <proj@r-fx.org>
+# Copyright (C) 2011, Ryan MacDonald <ryan@r-fx.org>
+#
+#    This program is free software; you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation; either version 2 of the License, or
+#    (at your option) any later version.
+#
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License
+#    along with this program; if not, write to the Free Software
+#    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+###
+#
+tcp_ports=""
+udp_ports=""
+for ptcp in `netstat -napl | grep LISTEN | grep -v 127.0.0.1 | grep tcp | awk '{print$4}' | grep : | tr ':' ' ' | awk '{print$2}' | sort -n`; do
+if [ "$tcp_ports" == "" ]; then
+        tcp_ports="$ptcp"
+else
+        val=`echo $tcp_ports | grep -w $ptcp`
+        if [ "$val" == "" ]; then
+                tcp_ports="$tcp_ports,$ptcp"
+        fi
+fi
+done
+
+for pudp in `netstat -napl | grep -v 127.0.0.1 | grep udp | awk '{print$4}' | grep : | tr ':' ' ' | awk '{print$2}' | sort -n`; do
+if [ "$udp_ports" == "" ]; then
+        udp_ports="$pudp"
+else
+        val=`echo $udp_ports | grep -w $pudp`
+        if [ "$val" == "" ]; then
+                udp_ports="$udp_ports,$pudp"
+        fi
+fi
+done
+
+echo "  Listening TCP ports: $tcp_ports"
+echo "  Listening UDP ports: $udp_ports"

@@ -1,0 +1,10 @@
+#   The Internet Assigned Numbers Authority (IANA) has reserved the
+#   following three blocks of the IP address space for private internets:
+#
+#     10.0.0.0        -   10.255.255.255  (10/8 prefix)
+#     172.16.0.0      -   172.31.255.255  (172.16/12 prefix)
+#     192.168.0.0     -   192.168.255.255 (192.168/16 prefix)
+# http://www.faqs.org/rfcs/rfc1918.html
+10.0.0.0/8
+172.16.0.0/12
+192.168.0.0/16

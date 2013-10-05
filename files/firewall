@@ -1,0 +1,318 @@
+#!/bin/bash
+#
+# APF 9.7 [apf@r-fx.org]
+###
+# Copyright (C) 2002-2011, R-fx Networks <proj@r-fx.org>
+# Copyright (C) 2011, Ryan MacDonald <ryan@r-fx.org>
+#
+#    This program is free software; you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation; either version 2 of the License, or
+#    (at your option) any later version.
+#
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License
+#    along with this program; if not, write to the Free Software
+#    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+###
+#
+CNF="/etc/apf/conf.apf"
+
+if [ -f "$CNF" ] && [ ! "$CNF" == "" ]; then
+   source $CNF
+else
+   head
+   echo "\$CNF not found; aborting"
+   exit 1
+fi
+
+if [ ! -f "$ip" ] && [ ! -f "$ifconfig" ]; then
+	eout "{glob} $ip and $ifconfig not found; aborting"
+	exit 1
+fi
+
+# load our iptables modules
+modinit
+
+# Delete user made chains. Flush and zero the chains.
+flush 1
+
+if [ ! "$IF" == "" ]; then
+ for i in `echo $IF`; do
+  VAL_IF=`/sbin/route -n | grep -w $i`
+	if [ "$VAL_IF" == "" ]; then
+		eout "{glob} could not verify that interface $IF is routed to a network, aborting."
+	        if [ ! "$SET_VERBOSE" == "1" ]; then
+			echo "could not verify that interface $IF is routed to a network, aborting."
+		fi
+		exit 1
+	fi
+ done
+fi
+if [ ! "$IFACE_TRUSTED" == "" ]; then
+ for i in `echo $IFACE_TRUSTED`; do
+  VAL_IFACE_TRUSTED=`/sbin/route -n | grep -w $i`
+        if [ "$VAL_IFACE_TRUSTED" == "" ]; then
+                eout "{glob} could not verify that interface $IFACE_TRUSTED is routed to a network, aborting."
+	        if [ ! "$SET_VERBOSE" == "1" ]; then
+			echo "could not verify that interface $IFACE_TRUSTED is routed to a network, aborting."
+		fi
+                exit 1
+        fi
+ done
+fi
+
+if [ "$DLIST_PHP" == "1" ] || [ "$DLIST_SPAMHAUS" == "1" ] || [ "$DLIST_DSHIELD" == "1" ] || [ "$DLIST_RESERVED" == "1" ] || [ "$DLIST_ECNSHAME" == "1" ] || [ "$USE_RGT" == "1" ]; then
+	if [ ! -f "$WGET" ]; then
+		echo "DLIST_* or RGT enabled but wget binary not found, aborting"
+		exit 1
+	fi
+fi
+
+if [ "$RAB" == "0" ]; then
+	RAB_LOG_HIT=0
+fi
+
+eout "{glob} determined (IFACE_IN) $IFACE_IN has address $NET"
+eout "{glob} determined (IFACE_OUT) $IFACE_OUT has address $NET"
+
+# Allow all traffic on the loopback interface
+$IPT -A INPUT -i lo -s 0/0 -d 0/0 -j ACCEPT
+$IPT -A OUTPUT -o lo -s 0/0 -d 0/0 -j ACCEPT
+
+# Allow all traffic on trusted interfaces
+if [ ! "$IFACE_TRUSTED" == "" ]; then
+for i in `echo $IFACE_TRUSTED | tr ',' ' '`; do
+VAL_IF=`/sbin/ip addr list | grep -w $i`
+if [ "$VAL_IF" == "" ]; then
+        eout "{glob} unable to verify status of interface $i; assuming untrusted"
+else
+        eout "{glob} allow all to/from trusted interface $i"
+        $IPT -A INPUT -i $i -s 0/0 -d 0/0 -j ACCEPT
+        $IPT -A OUTPUT -o $i -s 0/0 -d 0/0 -j ACCEPT
+fi
+done
+fi
+
+# Create TCP RESET & UDP PROHIBIT chains
+$IPT -N RESET
+$IPT -A RESET -p tcp -j REJECT --reject-with tcp-reset
+$IPT -N PROHIBIT
+$IPT -A PROHIBIT -j REJECT --reject-with icmp-host-prohibited
+
+# Load our SYSCTL rules
+. $INSTALL_PATH/sysctl.rules >> /dev/null 2>&1
+
+# Fix MTU/MSS Problems
+$IPT -A OUTPUT -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu
+
+# Load our PREROUTE rules
+. $PRERT
+
+# Block common nonroutable IP networks
+if [ "$BLK_MCATNET" = "1" ]; then
+	dnet $MCATNET
+fi
+if [ "$BLK_PRVNET" = "1" ]; then
+	dnet $PRVNET
+fi
+if [ "$BLK_RESNET" = "1" ]; then
+	if [ "$DLIST_RESERVED" == "1" ]; then
+		dlist_resnet
+	fi
+	dnet $RESNET
+fi
+
+# Create (glob)trust system chains
+$IPT -N TALLOW
+$IPT -N TDENY
+$IPT -N TGALLOW
+$IPT -N TGDENY
+$IPT -N REFRESH_TEMP
+$IPT -A INPUT -j REFRESH_TEMP
+$IPT -A OUTPUT -j REFRESH_TEMP
+$IPT -A INPUT -j TALLOW
+$IPT -A OUTPUT -j TALLOW
+$IPT -A INPUT -j TDENY
+$IPT -A OUTPUT -j TDENY
+$IPT -A INPUT -j TGALLOW
+$IPT -A OUTPUT -j TGALLOW
+$IPT -A INPUT -j TGDENY
+$IPT -A OUTPUT -j TGDENY
+
+# Load our Blocked Traffic rules
+. $INSTALL_PATH/bt.rules
+
+# Set refresh cron
+cron_refresh
+
+# Load our Allow Hosts rules
+glob_allow_download
+glob_allow_hosts
+allow_hosts
+
+# RAB default drop for events
+check_rab
+if [ "$RAB" == "1" ]; then
+ eout "{rab} set active RAB"
+ if [ "$RAB_HITCOUNT" == "0" ]; then
+	RAB_HITCOUNT="1"
+ fi
+
+ if [ "$RAB_TRIP" == "0" ]; then
+	RAB_TRIP_FLAGS="--rcheck"
+ else
+	RAB_TRIP_FLAGS="--update"
+ fi
+ 
+ if [ "$LOG_DROP" == "1" ] || [ "$RAB_LOG_TRIP" == "1" ]; then
+	$IPT -A INPUT -p all -m recent --rcheck --hitcount $RAB_HITCOUNT --seconds $RAB_TIMER -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** RABTRIP ** "
+ fi
+ $IPT -A INPUT -p all -m recent $RAB_TRIP_FLAGS --hitcount $RAB_HITCOUNT --seconds $RAB_TIMER -j $ALL_STOP
+
+ # RAB portscan rules
+ if [ ! "$RAB_PSCAN_LEVEL" == "0" ] || [ ! "$RAB_PSCAN_LEVEL" == "" ]; then
+  eout "{rab} set active RAB_PSCAN"
+  case "$RAB_PSCAN_LEVEL" in
+  1)
+  RAB_PSCAN_PORTS="$RAB_PSCAN_LEVEL_1"
+  ;;
+  2)
+  RAB_PSCAN_PORTS="$RAB_PSCAN_LEVEL_2"
+  ;;
+  3)
+  RAB_PSCAN_PORTS="$RAB_PSCAN_LEVEL_3"
+  esac
+  eout "{rab} RAB_PSCAN monitored ports $RAB_PSCAN_PORTS"
+  $IPT -N RABPSCAN
+  for i in `echo $RAB_PSCAN_PORTS | tr ',' ' '`; do
+   if [ "$LOG_DROP" == "1" ] || [ "$RAB_LOG_HIT" == "1" ]; then
+	   $IPT -A RABPSCAN -p tcp --dport $i -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** RABHIT ** "
+	   $IPT -A RABPSCAN -p udp --dport $i -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** RABHIT ** "
+   fi
+   $IPT -A RABPSCAN -p tcp --dport $i -m recent --set -j $TCP_STOP
+   $IPT -A RABPSCAN -p udp --dport $i -m recent --set -j $UDP_STOP
+  done
+  $IPT -A INPUT -j RABPSCAN
+ fi
+fi
+
+trim $DENY_HOSTS $SET_TRIM
+trim $GDENY_HOSTS $SET_TRIM
+
+# Load our LOG rules
+. $INSTALL_PATH/log.rules
+
+# Virtual Adapters
+. $INSTALL_PATH/vnet/main.vnet
+
+# Clear any cport values
+cl_cports
+. $CNF
+
+# Load our main TCP/UDP rules
+if [ "$SET_VNET" == "1" ]; then
+	VNET="$NET"
+else
+	VNET="0/0"
+fi
+. $INSTALL_PATH/main.rules
+
+# Drop NEW tcp connections after this point
+$IPT -A INPUT  -p tcp ! --syn -m state --state NEW -j $ALL_STOP
+$IPT -A INPUT  -p tcp -m state --state ESTABLISHED,RELATED -j ACCEPT
+$IPT -A INPUT  -p udp -m state --state ESTABLISHED,RELATED -j ACCEPT
+$IPT -A OUTPUT  -p tcp --dport 1024:65535 -m state --state ESTABLISHED,RELATED -j ACCEPT
+$IPT -A OUTPUT  -p udp --dport 1024:65535 -m state --state ESTABLISHED,RELATED -j ACCEPT
+
+# DNS
+if [ -f "/etc/resolv.conf" ] && [ "$RESV_DNS" == "1" ]; then
+LDNS=`cat /etc/resolv.conf  | grep -v "#" | grep -w nameserver | awk '{print$2}' | grep -v 127.0.0.1`
+  if [ ! "$LDNS" == "" ]; then
+        for i in `echo $LDNS`; do
+        eout "{glob} resolv dns discovery for $i"
+        $IPT -A INPUT -p udp -s $i --sport 53 --dport 1023:65535 -j ACCEPT
+        $IPT -A INPUT -p tcp -s $i --sport 53 --dport 1023:65535 -j ACCEPT
+        $IPT -A OUTPUT -p udp -d $i --dport 53 --sport 1023:65535 -j ACCEPT
+        $IPT -A OUTPUT -p tcp -d $i --dport 53 --sport 1023:65535 -j ACCEPT
+        if [ "$RESV_DNS_DROP" == "1" ]; then
+                $IPT -A INPUT  -p tcp -s 0/0 --sport 53 --dport 1023:65535 -j $ALL_STOP
+                $IPT -A INPUT  -p udp -s 0/0 --sport 53 --dport 1023:65535 -j $ALL_STOP
+                $IPT -A OUTPUT -p udp -d $i --dport 53 --sport 1023:65535 -j ACCEPT
+                $IPT -A OUTPUT -p tcp -d $i --dport 53 --sport 1023:65535 -j ACCEPT
+        fi
+        done
+  fi
+else
+        $IPT -A INPUT  -p udp --sport 53 --dport 1023:65535 -j ACCEPT
+        $IPT -A INPUT  -p tcp --sport 53 --dport 1023:65535 -j ACCEPT
+        $IPT -A OUTPUT -p udp --dport 53 --sport 1023:65535 -j ACCEPT
+        $IPT -A OUTPUT -p tcp --dport 53 --sport 1023:65535 -j ACCEPT
+fi
+
+# FTP
+if [ "$HELPER_FTP" == "1" ]; then
+$IPT -A INPUT  -p tcp --sport 1023:65535 --dport $HELPER_FTP_PORT -m state --state RELATED,ESTABLISHED -j ACCEPT
+$IPT -A INPUT  -p tcp -m multiport --dport $HELPER_FTP_PORT,$HELPER_FTP_DATA -m state --state ESTABLISHED,RELATED -j ACCEPT
+$IPT -A INPUT  -p udp -m multiport --dport $HELPER_FTP_PORT,$HELPER_FTP_DATA -m state --state ESTABLISHED,RELATED -j ACCEPT
+$IPT -A OUTPUT  -p tcp --dport 1023:65535 --sport $HELPER_FTP_PORT -m state --state RELATED,ESTABLISHED -j ACCEPT
+$IPT -A OUTPUT  -p tcp -m multiport --dport $HELPER_FTP_PORT,$HELPER_FTP_DATA -m state --state ESTABLISHED,RELATED -j ACCEPT
+$IPT -A OUTPUT  -p udp -m multiport --dport $HELPER_FTP_PORT,$HELPER_FTP_DATA -m state --state ESTABLISHED,RELATED -j ACCEPT
+fi
+
+# SSH
+if [ "$HELPER_SSH" == "1" ]; then
+	$IPT -A INPUT  -p tcp --sport $HELPER_SSH_PORT --dport 513:65535 -m state --state ESTABLISHED,RELATED -j ACCEPT
+	$IPT -A INPUT  -p tcp --sport 1024:65535 --dport $HELPER_SSH_PORT --syn -m state --state ESTABLISHED,RELATED -j ACCEPT
+	$IPT -A INPUT  -p udp --dport $HELPER_SSH_PORT -m state --state ESTABLISHED -j ACCEPT
+fi
+
+# Traceroute
+if [ "$TCR_PASS" == "1" ]; then
+	$IPT -A INPUT  -p udp -m state --state NEW --dport $TCR_PORTS -j ACCEPT
+        $IPT -A OUTPUT  -p udp -m state --state NEW --dport $TCR_PORTS -j ACCEPT
+fi
+
+
+if [ "$LOG_DROP" == "1" ]; then
+# Default TCP/UDP INPUT log chain
+         $IPT -A INPUT -p tcp -m limit --limit $LOG_RATE/minute  -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** IN_TCP DROP ** "
+         $IPT -A INPUT -p udp -m limit --limit $LOG_RATE/minute  -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** IN_UDP DROP ** "
+fi
+
+if [ "$LOG_DROP" == "1" ] && [ "$EGF" == "1" ]; then
+# Default TCP/UDP OUTPUT log chain
+         $IPT -A OUTPUT -p tcp -m limit --limit $LOG_RATE/minute  -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** OUT_TCP DROP ** "
+         $IPT -A OUTPUT -p udp -m limit --limit $LOG_RATE/minute  -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** OUT_UDP DROP ** "
+fi
+
+
+# ECNSHAME
+if [ "$SYSCTL_ECN" == "1" ]; then
+	dlist_ecnshame
+	dlist_ecnshame_hosts
+fi
+
+# Load our POSTROUTE rules
+. $POSTRT
+
+# Default Output Policies
+if [ ! "$EGF" == "1" ] || [ "$EGF" == "" ]; then
+        $IPT -A OUTPUT -j ACCEPT
+        eout "{glob} default (egress) output accept"
+elif [ "$EGF" == "1" ]; then
+	$IPT -A OUTPUT -p tcp -j $TCP_STOP
+	$IPT -A OUTPUT -p udp -j $UDP_STOP
+        $IPT -A OUTPUT -p all -j $ALL_STOP
+        eout "{glob} default (egress) output drop"
+fi
+
+# Default Input Policies
+eout "{glob} default (ingress) input drop"
+$IPT -A INPUT -p tcp -j $TCP_STOP
+$IPT -A INPUT -p udp -j $UDP_STOP
+$IPT -A INPUT -p all -j $ALL_STOP

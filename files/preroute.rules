@@ -1,0 +1,7 @@
+eout "{glob} loading preroute.rules"
+
+# load TOS prerouting function
+# do not remove or TOS vars will not function
+tospreroute
+
+# place your custom routing rules below

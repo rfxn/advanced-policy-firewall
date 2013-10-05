@@ -1,0 +1,48 @@
+#!/bin/bash
+##
+# chkconfig: 345 55 25
+# description: Advanced Policy Firewall
+#
+
+# source function library
+. /etc/rc.d/init.d/functions
+# import variables
+. /etc/apf/conf.apf
+. /etc/apf/internals/internals.conf
+
+ipt="/sbin/iptables"
+inspath="/etc/apf"
+prog="apf"
+
+case "$1" in
+start)
+        echo -n "Starting APF:"
+        /usr/local/sbin/apf --start >> /dev/null 2>&1
+        echo_success
+        echo
+        ;;
+stop)
+        echo -n "Stopping APF:"
+        /usr/local/sbin/apf --stop >> /dev/null 2>&1
+        echo_success
+        echo
+        ;;
+restart)
+        $0 stop
+        $0 start
+        ;;
+condrestart)
+	if $ipt -n -L TALLOW > /dev/null 2>&1 && \
+	    $ipt -n -L TDENY > /dev/null 2>&1 && \
+	    $ipt -n -L TGALLOW > /dev/null 2>&1 && \
+	    $ipt -n -L TGDENY > /dev/null 2>&1; then
+	    $0 stop
+	    $0 start
+	else
+		echo "APF not running, doing nothing."
+	fi
+	;;
+*)
+        echo "usage: $0 [start|stop|restart|condrestart]"
+esac
+exit 0

@@ -1,0 +1,43 @@
+#!/bin/bash
+#
+# APF 9.7 [apf@r-fx.org]
+###
+# Copyright (C) 2002-2011, R-fx Networks <proj@r-fx.org>
+# Copyright (C) 2011, Ryan MacDonald <ryan@r-fx.org>
+#
+#    This program is free software; you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation; either version 2 of the License, or
+#    (at your option) any later version.
+#
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License
+#    along with this program; if not, write to the Free Software
+#    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+###
+#
+INSTALL_PATH="/etc/apf"
+DEF=".ca.def"
+DOUT=".conf.apf"
+
+if [ -d "/etc/apf.bk.last" ]; then
+# get all the vars from current release
+. /etc/apf/conf.apf
+# replace with any vars old release had
+. /etc/apf.bk.last/conf.apf
+# generate new conf
+. $DEF
+
+cp -f $INSTALL_PATH/conf.apf $INSTALL_PATH/conf.apf.orig
+cp -f $DOUT $INSTALL_PATH/conf.apf
+cp -f /etc/apf.bk.last/*_hosts.rules /etc/apf/
+cp -f /etc/apf.bk.last/vnet/*.rules /etc/apf/vnet/
+
+OV=`cat /etc/apf.bk.last/VERSION | awk '{print$2}'`
+NV=`cat /etc/apf/VERSION | awk '{print$2}'`
+        echo "  Imported options from $OV to $NV."
+fi

@@ -1,0 +1,38 @@
+# multicast
+#
+# http://www.iana.org/assignments/ipv4-address-space
+# http://www-itg.lbl.gov/mbone/www-itg.lbl.gov/mbone/
+#
+# 224/8   Sep 81   IANA - Multicast
+# 225/8   Sep 81   IANA - Multicast
+# 226/8   Sep 81   IANA - Multicast
+# 227/8   Sep 81   IANA - Multicast
+# 228/8   Sep 81   IANA - Multicast
+# 229/8   Sep 81   IANA - Multicast
+# 230/8   Sep 81   IANA - Multicast
+# 231/8   Sep 81   IANA - Multicast
+# 232/8   Sep 81   IANA - Multicast
+# 233/8   Sep 81   IANA - Multicast
+# 234/8   Sep 81   IANA - Multicast
+# 235/8   Sep 81   IANA - Multicast
+# 236/8   Sep 81   IANA - Multicast
+# 237/8   Sep 81   IANA - Multicast
+# 238/8   Sep 81   IANA - Multicast
+# 239/8   Sep 81   IANA - Multicast
+#
+224.0.0.0/8
+225.0.0.0/8
+226.0.0.0/8
+227.0.0.0/8
+228.0.0.0/8
+229.0.0.0/8
+230.0.0.0/8
+231.0.0.0/8
+232.0.0.0/8
+233.0.0.0/8
+234.0.0.0/8
+235.0.0.0/8
+236.0.0.0/8
+237.0.0.0/8
+238.0.0.0/8
+239.0.0.0/8

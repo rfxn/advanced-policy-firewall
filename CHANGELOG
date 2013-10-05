@@ -1,0 +1,750 @@
+- 9.7
+(rev:2)
+[Change] dshield, spamhaus and projecthoneypot drop lists now only filter traffic sourced
+         from addresses in the respective lists to reduce rule counts instead of to/from
+         (src & dst)
+[New] added SET_EXPIRE configuration option for controlling deny_hosts ban expiration time
+[Fix] xt/ipt_recent module path changed under RHEL/CentOS 6
+[Fix] kernel version tests for 2.4/2.6 kernel modules failed under kernel 3.x
+[Change] RAB should default to a minimal level of sensitivity; lowered RAB_PSCAN_LEVEL to 1
+[Change] flush() function now clears bans from xt/ipt_recent iptables module
+[Fix] removed disabling of tcp window scaling from SYSCTL_TCP; no longer the route breaking
+      feature it once was
+[Fix] check_rab() was not properly evaluating the status of the xt/ipt_recent kernel module
+[New] added condrestart to apf.init for conditional restart only if apf is already running,
+      thanks to mmckinst [at] nexcess.net for submission
+[Change] TOS mangling now applies to UDP traffic
+[Change] default conntrack limit increased to 65536
+
+(rev:1)
+[Fix] bt.rules and associated import of deny_hosts now loads into FW before allow rules
+[Fix] added stricter checking of local addresses in the trust system
+[Fix] if wget disappears while remote rules are being fetched it can cause apf
+      to panic and drop all packets
+[Change] removed stuffed routing sanity filtering
+[Change] set DLIST_RESERVED=1 to force reserved.networks updating; does not
+         change value of BLK_RESNET
+
+- 9.6
+(rev:5)
+[Change] refresh function now stores old rules in temporary chain while new
+         rules load, temporary chain is cleared upon completion of function
+[Change] renamed drop list related functions for better consistency
+[New] added projecthoneypot aggregated block list for harvesters, spammers and
+      dictionary attackers, see conf.apf option DLIST_PHP
+[Change] all remote drop lists in conf.apf have had variables renamed as DLIST_
+[Change] more changes to cli_trust_remove() to better handle rule deletion from
+         all trust chains relative to line number based removals
+[Fix] issue with cli_trust_remove() was not deleting trust rules in all 
+      situations
+
+(rev:4)
+[Change] install.sh will now check against init.d and rc.d/init.d and as a
+         last resort set apf to start from /etc/rc.local
+[Fix] changed the cron.daily entry to use /etc/apf/apf instead of init script
+[Fix] Ubntu Linux has changed default pointer of /bin/sh to /bin/dash instead
+      of the traditional /bin/bash, as such for POSIX standards and compat.
+      reasons, all internal pointers to /bin/sh have been updated to /bin/bash
+[New] Versioning scheme changed as follows:
+      - RELEASE#.VERSION#-REVISION#
+      - 0.9.6-3 becomes 9.6-4
+      - 5 revisions per version cycle
+      - 10 versions per release cycle
+      - The old versioning scheme had no real value and had become a never
+        ending release tree 
+
+- 0.9.6
+(rev:3)
+[Fix] the cli_trust_remove() function was not checking global trust rules
+      before passing allow/deny addresses onto the firewall which caused
+      conflicting trust data if the same address was present in more than
+      a single rule file
+[New] added SET_REFRESH to conf.apf which controls the rate at which trust
+      rules are automatically refreshed, defaults to 10 minutes
+[New] added SET_TRIM to conf.apf which controls the max allowed entries in the
+      deny trust system, defaults to 50 lines
+[New] added -e|--refresh flag to apf command that is used to flush & refresh the
+      (global)trust system chains, this will also re-download any global rules
+      and re-resolve any DNS names in the rules
+[Change] the cli_trust_remove() function has been updated to support the new
+         (global)trust system chains
+[Change] modified the trust system to load rules into specific chains to better
+         support dynamic refreshing of the rules, the new chains are as follows
+         TALLOW TDENY (standard trust)
+         TGALLOW TGDENY (global trust)
+[Fix] the cli_trust_remove() function was not using the ALL_STOP variable when
+      matching rules in the firewall for removal, would fail if ALL_STOP was set
+      to anything other than default value
+[Change] set SYSCTL_ROUTE to default off as it was causing issues with VPS
+         installations
+[Fix] RAB_LOG_HIT was being enabled even with RAB parent variable disabled
+      causing some noise in the logs
+[Fix] the p2p drop chains are now implicit that the client side ports must be
+      high ports (1024+) before a drop takes place
+[Fix] the HELPER_SSH and HELPER_FTP variables in conf.apf were not referenced
+      by the correct variable name in the back end
+[Change] more netfilter module renaming in 2.6.20+, the ip_conntrack_* modules
+         are now known as nf_conntract_* - compatibility support added
+         [this was a silent compatibility change in previous 0.9.6-2 release]
+[Change] more complete preload list for iptables modules added
+[Fix] cli_trust_remove() now better handles situations where addresses appear
+      in multiple trust files
+[Change] appended /dev/null stdout redirects onto apf calls in the init script
+         to prevent verbose output during boot/init operations
+[Fix] added a check routine to the fast load feature so snapshots are no longer
+      saved when there are no iptables chains loaded (i.e: double run apf -f)
+[Change] scrub of APF to remove all ties to antidos, the antidos subsystem has
+         been removed and will be replaced with expanded RAB features
+[Change] very extensive updates to the README.apf file
+[Change] a_cli_tr() and d_cli_tr() functions renamed to cli_trust_allow() and
+         cli_trust_deny()
+[Change] the --unban command flag has been changed to --remove with the former
+         silently being preserved for compatibility
+[Change] unban() function renamed to cli_trust_remove()
+[Fix] the optional comment string on --allow|-a and --deny|-d was being cut
+      short in certain circumstances
+[Change] force disable fast load when devel mode is enabled
+[Change] cron.daily entry for apf restart has been changed from 'fw' to 'apf',
+         the install.sh will now remove old file and replace with the new
+[New] added ability to log RAB HIT and TRIP events with variables RAB_LOG_HIT and
+      RAB_LOG_TRIP
+[Change] reserved.networks file now dynamically updated on the r-fx server daily
+         from http://www.iana.org/assignments/ipv4-address-space
+
+(rev:2)
+[New] added Reactive Address Blocking (RAB), see conf.apf RAB section for
+      detailed information
+[Change] removed BLK_P2P variable, BLK_P2P_PORTS now self activating string
+         where if no values defined then the feature is simply disabled
+[Change] modified clamp-mss-to-pmtu rule to load earlier in the firewall
+[Change] SYSCTL_TCP now sets tcp_sack, tcp_dsack and tcp_fack enabled for
+         more reliable connections, especially over otherwise unreliable links
+[Fix] SYSCTL_TCP was setting tcp_fin_timeout to an inordinately high value, 
+      this was not "that" dangerous as this value only controls FIN-WAIT-2
+      socket states which eat a maximum of 1.5k of memory - was just bad form
+[New] added USE_ECNSHAME to set postrouting rules to turn off ECN while
+      communicating with hosts that have known broken TCP/IP implementations
+      from the ECN SHAME list, dependant on SYSCTL_ECN being enabled
+[Change] structural format of conf.apf modified slightly along with a number
+         of the variable descriptions reworded or expanded
+[Change] reworded some of the usage descriptions on the apf command
+[Fix] dns discover chain expanded as some applications such as wget had issues
+      resolving hostnames in isolated situations - to compensate for the
+      relaxed security, packet states on DNS requests are more strictly enforced
+[Fix] extended tcp/ip packet header logging would only apply to the default
+      drop chains and not custom drop chains like dshield
+[New] md5sum validation of *.rule & *.networks files for fast load expiration
+      on detected file changes
+[New] added SET_VERBOSE option to conf.apf to allow for displaying of status
+      log to the console as firewall is used
+[Change] most rule restrictions against the in/out interfaces have been lifted
+         to better accommodate the SET_ADDIFACE feature
+[Change] the conf.apf description for the dshield block list has been expanded
+[New] added Spamhaus Don't Route Or Peer List (DROP), USE_DROP var added to
+      conf.apf with detailed description
+[Fix] bt.rules referenced an out of date drop target, replaced with ALL_STOP
+[Change] set BLK_RESNET enabled by default in conf.apf
+[Change] the conf.apf description of PKT_SANITY_STUFFED var has long been 
+         lacking, it has now been more clearly described
+[Change] set PKT_SANITY_STUFFED enabled by default in conf.apf
+[Change] set TOS 8 on ports 21,20,80, set TOS 16 on ports 25,110,143
+[Change] TOS_DEF_TOS variable changed to TOS_DEF
+[Fix] the dshield chain was not properly logging under certain circumstances
+[Change] created line spaces between (rev:#) statements under the same 
+         release tree in CHANGELOG file
+[Fix] install.sh would under certain circumstances create the apf.bk.last link
+      to the incorrect previous APF version causing importconf script to import
+      options from an earlier version than your last version
+[Fix] typo in the apf command usage help display of --ovars
+[Change] init script used an old custom flush routine on stops, now set to use
+         the apf flush() function
+[New] fast load feature added that allows APF to load rules from saved snapshot
+      using iptables-save/restore commands
+[Fix] some apf operations that would output data to the log file were not 
+      properly stating the subsystem they were called from
+[Fix] the VF_LGATE feature was trying to turn on even when disabled, this had
+      no real implication other than an empty chain being created - just messy
+[Fix] the P2P block rules were not part of a chain and had no capacity to log
+      like other block rules
+[Change] all custom filtering chains have been redesigned for more efficent 
+         packet flow patterns - this also makes the apf -l (iptables -L) output
+         MUCH cleaner and opens up more feature possibilities in the future
+[Change] LOG_IA chain updated to reflect HELPER_SSH_PORT value
+[New] vnet rules now created for addresses on interfaces other than those 
+      set by IFACE_* vars - added SET_ADDIFACE to conf.apf for toggling - 
+      detailed description of this feature in conf.apf caption for the var
+[Change] vnet rules now skipped for addresses no longer bound to interfaces
+[Fix] updated functions.apf to accommodate ipt_state/ipt_multiport now 
+      known as xt_ in kern 2.6.15+
+[Change] replace DSTOP target with ALL_STOP, antidos and conf.apf updated
+[Change] modified the statful connection helper chains for SSH and FTP to be
+	 togglable through conf.apf as HELPER_SSH/HELPER_FTP - also makes
+	 APF more portable when you desire to change these service ports
+[Fix] The variable naming scheme for interfaces was inconsistent in some rule
+      files, although the old variables for interfaces are backward compatible
+      - it just looks better when things appear as intended
+[Fix] removed default drops in reserved.networks for now in use networks, these
+      changes auto-propigate to APF installs from the US_RD feature:
+ 7/8 ARIN
+ 46/8 RELIST IANA RESERVED
+ 77/8 RIPE
+ 78/8 RIPE
+ 79/8 RIPE
+ 92/8 RIPE
+ 93/8 RIPE
+ 96/8 ARIN
+ 97/8 ARIN
+ 98/8 ARIN
+ 99/8 ARIN
+ 116/8 APNIC
+ 117/8 APNIC
+ 118/8 APNIC
+ 119/8 APNIC
+ 120/8 APNIC
+[Change] replace the common drop var CDPORTS with BLK_PORTS, conf.apf updated
+[Fix] added the missing LOG_DROP/LOG_ACCEPT log prefix onto LD/LA chain targets
+
+(rev:1)
+[New] added unban() function with -u|--unban run flag to unban hosts and remove
+      from rule files/active running firewall
+[Change] changed RESV_DNS to default enabled
+[New] added NETBLOCK/NETBLOCK_MASK to conf.antidos for toggling the already
+      in-place feature of banning all seen ip's on the same /24 subnet of an
+      attacking ip; default set to disabled now
+[Change] modified icmp rate limiting to have a disabled toggle
+[New] added resnet_download() function to keep reserved.networks updated
+[Change] modified sanity chains to be more granular for conf.apf toggles; as
+	 such the following variable options have been added:
+ PKT_SANITY
+ PKT_SANITY_INV
+ PKT_SANITY_FUDP
+ PKT_SANITY_PZERO
+ PKT_SANITY_STUFFED
+[Fix] trust system allow function a_cli_tr() for cli banning; rules added only
+      for tcp; removed protocol option from rule
+[Change] functions gd,ga renamed glob_allow|deny_download
+[Change] modified traceroute specific rules to have conf.apf toggle var TCR_*
+[Change] forced ip whois to search only for abuse address
+[Change] moved ip whois code in antidos; less repetitive
+[Fix] removed default drops in reserved.networks for now in use networks, these
+      changes auto-propigate to APF installs from the US_RD feature:
+ 041/8  AFRINIC
+ 058/8  APNIC
+ 059/8  APNIC
+ 073/8  ARIN
+ 074/8  ARIN
+ 075/8  ARIN
+ 076/8  ARIN
+ 189/8  LACNIC
+ 190/8  LACNIC 
+[New] added LOG_LEVEL var to conf.apf to denote logging level of firewall logs;
+      all log chains throughout the project have been updated to reflect this
+      feature as applicable
+[Change] DROP_LOG var in conf.apf changed to LOG_DROP
+[Change] LGATE_LOG var in conf.apf changed to LOG_LGATE
+[Change] EXLOG var in conf.apf changed to LOG_EXT
+[Change] IPTLOG var in conf.apf changed to LOG_APF
+[Change] LRATE var in conf.apf change to LOG_RATE
+[Change] renamed README to README.apf
+[Change] FWPATH var in conf.apf changed to INSTALL_PATH
+[Fix] removed default drops in reserved.networks for the following netblocks:
+ 089/8 RIPE NCC
+ 090/8 RIPE NCC
+ 091/8 RIPE NCC
+[Change] DEVM var in conf.apf changed to DEVEL_MODE
+[Change] EN_VNET var in conf.apf changed to SET_VNET
+[Change] MONOKERN var in conf.apf changed to SET_MONOKERN
+[Fix] more /tmp cleanups to prevent possible race conditions
+[Change] importconf script now copies itself to extras/ folder post-install
+[Change] changed short switch -st to -t; -st preserved for compat but no longer
+         documented or printed in help output
+[New] added -o|--ovars to output all configured variables for debug purposes
+[Fix] INVALID state check removed from postrouting chain
+[Change] modified a/d_cli_tr to keep comments within single line
+[New] expanded p2p blocks; conf.apf var BLK_P2P & BLK_P2P_PORTS
+[Change] increased verbosity of a number of rules to status log
+[Change] modified sanity bt filters, more verbose status log
+[Change] moved bulk of TOS declarations in pre/postrouting.rules into functions
+[New] expanded TOS routines, new TOS_* vars added to conf.apf
+[New] added conf.apf var to change the default log target; LOG_TARGET
+[Fix] dshield.org changed block list to feeds.dshield.org/top10-2.txt
+[Change] changed ordering of version history (this file); revisions now list
+         in reverse order from latest to oldest revision 
+[New] added chain targets GTA,GTD,TA,GD for allocating trust rules to more 
+      organized chain policies; will also facilitate features to reload trusts
+[Change] added OUTPUT reject targets for ident if not opened in *_TCP_CPORTS
+[New] added SF_TY var to conf.antidos in order to define tcp connection states
+      to look for as syn-flood attacks
+[Fix] removed default drop of 58-59/8 in reserved.networks
+ 058/8   Apr 04   APNIC
+ 059/8   Apr 04   APNIC
+
+- 0.9.5
+(rev:1)
+[Fix] removed default drop of 124-126/8 in reserved.networks
+ 124/8   Jan 05   APNIC        
+ 125/8   Jan 05   APNIC
+ 126/8   Jan 05   APNIC
+[New] added auto-commenting of all allow/deny trust rules with date & time
+      along with custom comment feature as an argument on bans
+      (i.e: apf -a 1.2.1.2 "home lan")
+[New] added postroute.rules to correspond with preroute.rules TOS settings
+[Change] modified *route.rules to declare in/out interface in rules
+[New] added in remote download feature for glob_allow/deny.rules
+[Change] changed many conf.apf default settings, reverted many options disabled
+         till end user reads/enables the options
+[New] created importconf script that imports critical conf.apf options from
+      previous install; also copy's trust rules and conf.antidos
+[Fix] modified RESV_DNS option to ignore # characters in /etc/resolv.conf
+
+- 0.9.4
+(rev:8)
+[New] added filter rules for edonky,kazaa,morpheus; recent php-injection
+      exploits install p2p pirating clients
+[Change] removed UID 0 checks from firewall/apf script, irrelivent as perms
+         enforce root-only access
+[Fix] chmod permissions on top-level /etc/apf were set 755; changed to 750
+[New] global trust rules created; glob_allow/deny.rules, appropriate for an
+      external/maintained ban list
+[Change] modified install.sh to symlink apf.bk.$UTIME too /etc/apf.bk.last/
+
+(rev:7)
+[New] added SYSCTL_CONNTRACK var to conf.apf; relative to ip_conntrack_max
+[Fix] removed default drop of 085-088/8 in reserved.networks
+071/8   Aug 04   ARIN                                (whois.arin.net)
+072/8   Aug 04   ARIN                                (whois.arin.net)
+085/8   Apr 04   RIPE NCC                            (whois.ripe.net)
+086/8   Apr 04   RIPE NCC                            (whois.ripe.net)
+087/8   Apr 04   RIPE NCC                            (whois.ripe.net)
+088/8   Apr 04   RIPE NCC                            (whois.ripe.net)
+
+(rev:6)
+[Fix] cports.common, EGF_UID; error in multi-port routine
+[Change] modified conf.antidos default values
+
+(rev:5)
+[Change] revised all log chains that did not conform too the DROP_LOG toggle
+[Change] revised invalid tcp flag order drop rules; into IN/OUT_SANITY chain
+[Change] merged ingress nmap style scan drop rules; into IN_SANITY chain
+[Change] revised install.sh script; more verbose install output
+[Fix] trust based CLI rule insertion cross validates trust files too prevent
+      duplicate/conflicting entries; previously only checked respective mode
+      file (deny file for deny insertions and allow for allow insertions) 
+[Fix] direct path too 'ip' binary was not specified in vnetgen script
+[Fix] 'stat' command not compatible with debian, replaced with use of 'ls'
+[Change] cleanup ifconfig/ip binary inconsistencies; revised fallback support
+	 between 'ip' & 'ifconfig'
+[Fix] vnetgen.def referenced invalid storage variable for ip information
+
+(rev:4)
+[Fix] removed default drop of 70/8 in reserved.networks
+070/8   Jan 04   ARIN                                (whois.arin.net)
+[Fix] fixed outgoing traceroute requests
+[New] added uid-match egress filtering routine
+
+(rev:3)
+[Fix] invalid wildcard destination address when EN_VNET=0 for cports routine
+[Fix] sysctl.rules output redirected to /dev/null
+[Fix] missing '"' (SYSCTL_ROUTE="0) in conf.apf
+[Change] revised LGATE_MAC routine; added run-time log output for successful
+         loading of the routine. revised logging options for the routine &
+         created an independent log/reject chain for forign MAC addresses.
+[New] added LGATE_LOG option to toggle forign gateway mac logging
+
+(rev:2)
+[Change] updated ad/tlog; structure cleanup
+[Change] revised ignore facility for antidos
+[Fix] corrected protocol missing error in untrusted name server drop chain
+[Change] added get_ports script to generate in-use ports list during install
+[Fix] corrected output redirect for antidos lock routine to antidos log file
+[Fix] set install script to set mode 750 ad/tlog
+[Fix] corrected log prefix for lock routine in antidos
+[Fix] identify IN/OUT_IF and declare identified ip in apf_log during init
+[Fix] addressed issues with local ip discovery on ipv6-enabled systems
+[Change] added fallback from 'ip' to 'ifconfig' binary for local ip discovery
+         of aliased interafaces in vnet/vnetgen
+[Change] moved get_ports into extras/ path
+[Change] added traceroute (33434_33450) to common drop ports
+[Fix] fixed egress established/related connection rules
+[New] added EN_VNET var to conf.apf for global toggle of vnet sub-system
+[Change] modified sysctl.rules; reorganized for tcp, syn, routing, & misc.
+         settings. Disabled syncookies; incrased ip_conntrack_mx.
+[Change] various entries added to sysctl.rules and/or modified entries.
+[New] added SYSCTL_TCP SYSCTL_SYN SYSCTL_ROUTE SYSCTL_LOGMARTIANS SYSCTL_ECN
+      SYSCTL_SYNCOOKIES SYSCTL_OVERFLOW vars to conf.apf for sysctl seperation.
+[Change] revised DEVM so when enabled; log and output warnings are issued.
+
+(rev:1)
+[Fix] modified internals.conf and vnetgen script to be explicit for ipv4 only
+      with ip-fetch routines
+[New] added multiple interface support with seperation of trusted and untrusted
+      interfaces
+[Change] revised majority of firewall rules to be explicit for untrusted
+         interface only
+[New] added extended logging support; logchains can output tcp/ip options
+      using EXLOG var in conf.apf
+[Fix] DET_SF routine was not parsing ignore file while fetching syn info.
+
+- 0.9.3
+(rev:5)
+[New] added tlog script to antidos; track log length; instead of 'tail -n'
+[New] added lockfile feature to antidos
+[Fix] added cl_cports function to clear any set cport values between rule files
+[Fix] export call to PATH var; typo as 'export $PATH' instead of 'export PATH'
+[New] added check routines for support of linux 2.6 module extentions (.ko);
+      thanks to mmontgomery@theplanet.com
+[Change] removed use of unclean module; deprecated and breaks ECN
+[Change] removed calls to 'vnetgen' from apf init script
+[Change] revised default drop policy rules
+[New] added RESV_DNS var to conf.apf for dns discovery routine
+
+(rev:4)
+[Change] removed fwmark preroute rules
+[Change] oversight typo in deny_hosts.rules
+[Change] reformated sysctl.conf; added GEN_SYSCTL & HARDEN_SYSCTL to conf.apf
+[Change] revised high port connection fixes
+[New] dynamic discovery of local resolv.conf nameservers/specific dns rules
+      to such resolv ip's
+[New] added load check/load 12 run-cap; antidos
+[Change] removed bandmin execution from cron.daily event; apf already has an
+         internal function to execute bandmin on start sequence
+[Change] added check-routines to --status for pico, nano and vi as editor
+
+(rev:3)
+[Fix] corrected ip mask in private.networks file; 128.66.0.0/8 -> /16
+
+(rev:2)
+[Fix] attempted fix of certian state connection fixes
+[Fix] misplaced '-i $IF' statment in certian rules; results 'lo' if being logged
+[Change] enforced log chains against $IF device
+[Fix] error in EG_ICMP_TYPES routine; failed to check if EGF is set
+[Change] modified default CDPORTS
+[Change] more sanity checks added to bd.rules; for smurf style attacks
+
+(rev:1)
+[Change] trimmed down firewall code, refined rules, removed duplicate rules
+[Fix] revised help() output
+[Fix] typo in the accepted cli arguments for stop & start
+[Change] all references to r-fx.net changed to r-fx.org
+[Fix] default drop of ports 137-139 set to tcp & udp (was only tcp by mistake)
+[Change] renamed addons/ folder to extras/
+[Change] added a bit more error checking to install script
+[Change] exported bulk of operations to functions in 'internals/functions.apf'
+[Change] removed unroutable net filtering rules; replaced with a more intuitive
+	 stand-in that has conf.apf options for mcast,private net, & reserved
+[Change] refined the cports code; exported to 'internals/cports.common'
+[New] reimplamented ICMP rate limiting; ICMP_LIM; conf.apf
+[New] IG/EG_ICMP_TYPES; similar to CPORTS only accepts ICMP types (0-255)
+[New] IG/EG_* options can now be defined in individual vnet rules
+[New] filter style for TCP/UDP packet filtering; TCP_STOP, UDP_STOP; conf.apf
+[New] added RESET/PROHIBIT chains
+[Change] log format revised; syslog style, eout() function created
+[Change] revised all rules to make use of applicable TCP/UDP_STOP filter vars
+[Change] revised all log output for use with eout()
+[Change] comments added to default vnet rule files
+[Change] revised invalid packet flag filters, bt.rules
+[Change] CDPORTS var added to drop/ignore logging of common ports (e.g: netbios)
+[Fix] corrected a few logic errors with flow control on trust rules syntax
+[Change] chopped down some of the comments in conf.apf and changed layout of file
+[Change] changed martian sources to on & ecn to off; sysctl.rules
+[Change] revised flush routine for init script and apf handler
+[Change] removed vnet.common; set vnet system to use 'internals/cports.common'
+[Change] revised antidos IPT_BL routine; use eout() for apf logging
+[Change] revised preroute.rules; changed TOS values for highports
+[Change] revised preroute.rules; removed qdisk routines
+[Change] added more module error checking
+[Change] revised antidos logging format; syslog style
+
+- 0.9.2
+(rev:11)
+[Change] added tcp port 43 to default EG_TCP_CPORTS options for whois
+[Fix]: removed default drop rules for the following three 8-bit ipv4 blocks
+060/8   Apr 03   APNIC                               (whois.apnic.net)
+221/8   Jul 02   APNIC                               (whois.apnic.net)
+222/8   Feb 03   APNIC                               (whois.apnic.net)
+[Fix] deprecated TCP_CPORTS option in ident routine
+
+(rev:10)
+[Change] exported trust routines to internals/trust.common
+[Change] moved main.common file to internals/ path
+[Change] moved internals.conf to internals/ path
+[Change] modified TOS vals for highport connections
+[Change] reverted rev:14 ACK,PSH+established fix to as-was in rev:13 
+[Change] packaging format changed to name-version_revision.extention
+[Change] changed all copyright & licensing headers; changed cli output headers
+[Change] changed cli flag assignment/usage for apf handler script
+[New] added -a/-d options to apf handler script for trust rules insertion
+[Change] changed antidos to insert ban rules rather than reload whole firewall
+[Change] reordered highport connection fix routines
+[Change] removed deprecated option $STOP
+[New] added INVALID output filtering for icmp
+[Change] modified dns(53) tcp output fixes
+[Change] modified main firewall script; remove '-t filter' usage
+[New] added more generalized (laxed?) est/rel connection fixes
+[Change] comment modifications to trust files
+[Change] exported more vars from conf.apf to internals.conf; smaller conf file
+[Change] comment modifications to conf.apf
+[New] range support added to trust rule system; underscore seperator (137_139)
+[New] added default drop of ports 137-139 to deny_hosts.rules
+[Change] modified install script; old install copied to /etc/apf.bkMMDDYY-UTIME
+         rather than old format of /etc/apf.bk$$
+[Change] removed deprecated option FWRST; antidos
+
+(rev:9)
+[Fix] corrected packet flag sanity checks; ACK,PSH+established issues
+[Change] set sysctl hook for martian sources to zero (0) value default (off)
+[Change] set use of reset chain for certian protocol abuses; as opposed to drop
+
+(rev:8)
+[Change] revised log chain routines; more descriptive prefixes
+[Fix] added egress log chain for default drops
+[Change] revised chain pattern file for antidos; conform to new prefixes
+[Change] rewrite to log chain routines; code cleanup
+
+(rev:7)
+[Fix] added PATH definition to vnetgen; fix file not found errors
+[Fix] made ipt_state & ipt_multiport required modules; fix lockup on init
+[Fix] modified routines to reload apf [if new bans] after ad() func.; antidos
+[Change] resorted configuration files setup to be more friendly
+[Change] more syn-flood routine changes and again tweaked default values
+[Change] README.antidos definition changes for conf.antidos vars
+
+(rev:6)
+[New] added syn-flood trigger ports option; antidos
+[Fix] revised syn-flood routine to prevent false positives; antidos
+[Change] revised config defaults; antidos
+
+(rev:5)
+[Fix] DET_SF error setting val SRC; antidos
+[Fix] usr.msg syntax error; antidos
+[Change] revised config defaults, comments and ordering; antidos
+[Fix] DET_SF error setting DST; antidos
+[Fix] line-break errors in usr/arin.msg
+[Change] permissions enforced on new files from last few releases
+
+(rev:4)
+[New] syn-flood detection routine created; antidos
+[Change] defaults changed in conf.antidos and new syn-flood options added; antidos
+[Change] revised README.antidos to reflext new options and config vars
+[Change] removed apf-m dialog menu system; implamentation will be made in 0.9.2 or later
+[Fix] revised validation routine to prevent duplicate emails; antidos
+
+(rev:3)
+[New] APF-M v0.2; apf-manager is a dialog menu based manager for APF; addon
+[Change] revised install script to detect ncurses and install apf-m
+[Change] reordered bt.rules and purged duplicate entries
+[New] added crafted drop chains to bt.rules to further slow/hinder nmap
+[Fix] permissions issue with install script for addon package apf-m
+[Fix] syntax error in rewrite routine for edit_apf.menu; apf-m
+[Fix] port zero drop chain - invalid flow order
+
+(rev:2)
+[Fix] outbound highport routine; syntax error
+[New] outbound udp dns routine
+[Fix] /tmp temp file creation cleanup fix for dshield block.txt parsing
+
+(rev:1)
+[Fix] corrected vnet common ports insertion; error prevented proper completion
+[Change] increased firewall init logging
+[Fix] added EGF value check before EG_*_CPORTS is loaded
+[Change] reordered certian init logging events
+[Change] various modifications to dshield parser client & install script
+[Fix] corrected VNET var issue in vnet.common
+[Change] revised apf.init to log stop sequences
+
+- 0.9.1:
+(rev:10)
+[New] 'addons/' directory added to apf base path
+[New] dshield client parser/reporter with install script placed in addons/ path
+
+(rev:9)
+[Change] modified README file to conform with new conf.apf options 
+[New] toggle for egress filtering in conf.apf
+
+(rev:8)
+[Change] modified main.common structure to conform with new CPORTS setup
+[Change] more commenting changes to conf.apf for new CPORTS setup
+[Change] egress specific highport fixes added
+
+(rev:7)
+[Change] modified CPORTS structure and conf.apf ordering of cports
+[Change] modified highport connection fixes to conform with new CPORTS setup
+[New] egress (outbound) filtering & common ports option added
+
+(rev:6)
+[New] LRATE var added to conf.apf for log rate limiting
+
+(rev:5)
+[New] added monolithic kernel toggle to conf.apf for disabling lkm checks
+[Change] modified default ignore ports; antidos
+[Change] modified attack IP/8 comparison to /16; antidos
+
+(rev:4)
+[Fix] bcast syntax error in main firewall script
+[Change] increased drop chain log limit
+
+(rev:3)
+[Change] reordered bt.rules entries
+[Change] modified default trust syntax to set bidirectional rules
+[Change] modified high port connection fixes for UDP
+
+(rev:2)
+[Change] modified log prefix strings in bt.rules; conform to apf log style
+[Fix] corrected tcp flag sanity check to be bidirectional
+
+(rev:1)
+[Change] modified README file to further explain rules setup
+
+- 0.9:
+(rev:10)
+[Change] export udp/tcp.rules to central main.rules
+[Change] exported CPORTS routine for main adapter to main.common
+
+(rev:9)
+[New] added logrotate.d check routine/rotate script for apf log files
+[New] added fragmented udp drop for input/output
+
+(rev:8)
+[Change] modified app. name output to log files
+
+(rev:7)
+[New] added port zero drop routine for input/output
+[New] added version/revision tagging to /etc/apf/VERSION
+[New] added vnetgen execution after install completion
+[Change] modified README feature list
+
+(rev:6)
+[Fix] CPORTS load routine, syntax error in tcp.rules
+[Change] exported CPORTS routine for vnet rules to vnet.common
+[Change] modified default vnet template
+
+(rev:5)
+[Fix] more tweaks to established ftp check in LP_SNORT; antidos
+[Change] text formating changes to usr.msg/arin.msg; antidos
+[Change] removed IPTSNORT feature; modified all relivent files
+[Change] removed ICMP/FTP packet rate limiting; modified all relivent files
+
+(rev:4)
+[Change] modified default udp/tcp drop log prefix
+[Change] modified default apf cmdline output; more verbose
+
+(rev:3)
+[Change] tweaks to the ident reject chain
+
+(rev:2)
+[Fix] tcp high port connection fixes
+
+(rev:1)
+[Change] modified noncrit.ports default values; antidos
+[Change] modified arin.msg to note 'whois' server in dynamic fashion; antidos
+[Fix] usr.msg/arin.msg log tail showing null output in some situations; antidos
+[Change] modified usr.msg to note whois contact for src attack host; antidos
+
+- 0.8.7:
+[Fix] fixed ml() in main firewall script to properly exit on failed module loads
+[Change] added comments to conf.apf and README regarding ipt_string.o module
+[Fix] fixed stdout redirect for trust files to log file
+[Change] removed stdout null output redirect for init script; show fatal errors
+[Change] exported misc. conf.apf vars to internals.conf
+[Fix] fixed ident check routine
+[Change] revised dshield url parser routine
+[New] added best-match ip whois for ARIN,RIPE,APNIC, & LACNIC to antidos script
+[Fix] modified $PREV var placment in antidos to fix looped ip checks
+[Change] moved certian temp file creation from /tmp to install path
+[New] added src ip/8 comparison to antidos; filter same network attacks quicker
+[Fix] DROP_IF function in antidos not ignoring eth0
+[Change] modified logging rate limit from 10/minute to 25 for TCP/UDP DROP 
+[New] noncrit.ports file to ignore IF drops based on destination port; antidos
+[New] src port/dst port loging for antidos events log
+[Fix] dropped interface log event not being sent with usr email; antidos
+[Fix] ignore FTP (pasv.) false positives for snort portscan log; antidos
+[New] ROUTE_REJ ignore routine if SRC attacker equals eth0 IP
+[New] config var for tcp/udp drop log chain toggling
+[Fix] suppresed main.vnet error output if no aliased ip's found
+[Fix] corrected source include path for main.vnet dynamic entries
+
+- 0.8.6:
+[Change] revised vnetgen.def and main.vnet
+[Change] removed routable network from default drop routes
+[Change] trust files revised, new syntax support for proto,flow,port,ip
+[New] ident check routine/reject chain
+[Change] moved CPORTS inclusions to bottom of respective files
+[Change] hourly restart cronjob of APF, set/moved to daily
+[Change] range support added for CPORTS and trust syntax
+[Fix] added missing escape to log var in vnetgen.def
+[Change] revised scipt header notes
+[New] added check routine for bandmin/load badmin ipt rules
+[Change] revised dns UDP fix in udp.rules
+
+- 0.8.5:
+[New] added default TCP log chain
+[Change] updated chains table for antidos
+[Change] added common irc proxy probed ports to antidos ignore file
+[Fix] fixed FWRST var in conf.antidos
+[New] set sysctl parm to double ip_conntrack_max
+[New] created user alert feature; seperated from arin alert
+[Change] revised arin.msg file; created usr.msg file
+[Change] added TMZ var to conf.antidos for GMT offset
+[Change] revised conf.antidos
+[New] set global ports to log during loading - for user debuging
+[New] set interface/ip to log during loading - for user debuging
+[Change] modified dshield.org block list feature; cleaner code
+[Change] rewrite of README file; moved GPL to COPYING.GPL
+[Change] rewrite of SRC/DST fetch function in antidos for snort/klog method
+[New] added hardset $PATH var too apf, firewall, & antidos scripts
+[Fix] fixed location reference to apf config file in antidos config file
+[Change] revised install.sh file
+[Fix] fixed log creation vars
+[Change] changed drop_hosts.rules to deny_hosts.rules
+
+- 0.8.4:
+[Change] moved default policy for udp to bottom of main firewall script
+[Change] removed header comments from vnetgen.def
+[New] added ipt_string.o verification check before loading iptsnort rules
+[Fix] fixed iptsnort and looping issues; causing init start to never complete
+[Change] revised whole iptsnort system; now logs chains before drop
+[Fix] added ipt_limit.o verfication for ftp port; otherwise default no ipt_limit
+[Fix] corrected typo in DEVM cronjob
+[Fix] revised DEVM feature to write directly to crontab; cron.d proved unreliable
+[Change] revised install.sh
+
+- 0.8.3:
+[New] added prelog.rules file; for addition of log chains
+[Fix] fixed preroute.rules and invalid APF log pointer
+[Change] disabled ICMP type 8, inbound; by default
+[Change] set all ports closed by default; 22 (SSH) left open (globally) in conf.apf
+[New] added ipchains check/removal code
+[Change] rewrote iptables module insertion code
+[Fix] fixed CPORTS option relating to FTP_LIM value
+[Change] made install.sh backup old APF install to /etc/apf.bk$$
+[Change] comments modified/changed in variouse files
+[Change] moved icmp.rules insertion after vnet rules insertion
+[Fix] fixed typo in global ports code that caused undesired results
+[Change] revised conf.apf; more comments and better organized
+[New] created DEVM setting to put APF into devel testing mode
+[Change] revised README, and install.sh to meet needs of DEVM feature
+[Fix] fixed cleanup issue with ds_hosts.rules file
+
+- 0.8.2:
+[Change] revised vnet system
+[Change] made TCP_CPORTS/UDP_CPORTS into for loop; 15+ ports support
+[Change] revised conf.apf
+[Change] variouse tweaks to snort string match signatures
+[Change] variouse tweaks to iptsnort structure
+[Change] readme file changes
+[Change] revised install.sh
+
+- 0.8.1:
+[Fix] fixed issues with vnetgen and the adapter variable
+[Change] changed cron.hourly job to use the init script
+[Change] reimplamented antidos system with snort portscan.log support
+[Fix] fixed argument order for ad() function
+[Change] readme file changes
+[Fix] changed colum location for src/dst address in kernel log [antidos]
+[Fix] permissions tightened on all files per default install
+[New] added rate limiting per/second on ICMP/FTP protocols, configurable via conf.apf
+[New] added iptables based rules for snort signatures; using string match rules
+[Fix] removed errored private network ban in main firewall script; was banning valid networks
+
+- 0.8:
+[New] first public release of APF, formerly known as FWMGR

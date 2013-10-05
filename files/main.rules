@@ -1,0 +1,8 @@
+eout "{glob} loading main.rules"
+
+# Policy configurable ports -- per policy file basis
+#
+
+#
+# conf.apf configurable common ports
+. /etc/apf/internals/cports.common

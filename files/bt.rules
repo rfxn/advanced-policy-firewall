@@ -1,0 +1,330 @@
+eout "{glob} loading bt.rules"
+
+# Load our Deny Hosts rules
+glob_deny_download
+glob_deny_hosts
+deny_hosts
+
+# Load our projecthoneypot drop list
+dlist_php
+dlist_php_hosts
+
+# Load our dshield drop list
+dlist_dshield
+dlist_dshield_hosts
+
+# Load our Spamhaus Don't Route Or Peer List
+dlist_spamhaus
+dlist_spamhaus_hosts
+
+# Block common drop ports
+cdports
+
+# Filter all traffic not from local gateway
+if [ ! "$VF_LGATE" == "" ]; then
+ lgate_mac
+fi
+
+if [ "$RAB" == "1" ] && [ "$RAB_SANITY" == "1" ]; then
+	eout "{rab} set active RAB_SANITY"
+	RAB_SANITY_FLAGS="-m recent --set"
+else
+	RAB_SANITY_FLAGS=""
+fi
+if [ "$PKT_SANITY" == "1" ]; then
+	eout "{pkt_sanity} set active PKT_SANITY"
+	# Drop packets With invalid flag order
+        eout "{pkt_sanity} deny inbound tcp-flag pairs ALL NONE"
+        eout "{pkt_sanity} deny inbound tcp-flag pairs SYN,FIN SYN,FIN"
+        eout "{pkt_sanity} deny inbound tcp-flag pairs SYN,RST SYN,RST"
+        eout "{pkt_sanity} deny inbound tcp-flag pairs FIN,RST FIN,RST"
+        eout "{pkt_sanity} deny inbound tcp-flag pairs ACK,FIN FIN"
+        eout "{pkt_sanity} deny inbound tcp-flag pairs ACK,URG URG"
+        eout "{pkt_sanity} deny inbound tcp-flag pairs ACK,PSH PSH"
+        eout "{pkt_sanity} deny inbound tcp-flag pairs ALL FIN,URG,PSH"
+        eout "{pkt_sanity} deny inbound tcp-flag pairs ALL SYN,RST,ACK,FIN,URG"
+        eout "{pkt_sanity} deny inbound tcp-flag pairs ALL ALL"
+        eout "{pkt_sanity} deny inbound tcp-flag pairs ALL FIN"
+        $IPT -N IN_SANITY
+        if [ "$LOG_DROP" == "1" ]; then
+         $IPT -A IN_SANITY  -p tcp --tcp-flags ALL NONE -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** SANITY ** "
+	fi
+        if [ "$RAB_LOG_HIT" == "1" ]; then
+         $IPT -A IN_SANITY  -p tcp --tcp-flags ALL NONE -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** RABHIT ** "
+	fi
+        $IPT -A IN_SANITY  -p tcp --tcp-flags ALL NONE $RAB_SANITY_FLAGS -j $TCP_STOP
+        if [ "$LOG_DROP" == "1" ]; then
+         $IPT -A IN_SANITY  -p tcp --tcp-flags SYN,FIN SYN,FIN -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** SANITY ** "
+	fi
+        if [ "$RAB_LOG_HIT" == "1" ]; then
+         $IPT -A IN_SANITY  -p tcp --tcp-flags SYN,FIN SYN,FIN -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** RABHIT ** "
+	fi
+        $IPT -A IN_SANITY  -p tcp --tcp-flags SYN,FIN SYN,FIN $RAB_SANITY_FLAGS -j $TCP_STOP
+        if [ "$LOG_DROP" == "1" ]; then
+         $IPT -A IN_SANITY  -p tcp --tcp-flags SYN,RST SYN,RST -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** SANITY ** "
+	fi
+        if [ "$RAB_LOG_HIT" == "1" ]; then
+         $IPT -A IN_SANITY  -p tcp --tcp-flags SYN,RST SYN,RST -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** RABHIT ** "
+	fi
+        $IPT -A IN_SANITY  -p tcp --tcp-flags SYN,RST SYN,RST $RAB_SANITY_FLAGS -j $TCP_STOP
+        if [ "$LOG_DROP" == "1" ]; then
+         $IPT -A IN_SANITY  -p tcp --tcp-flags FIN,RST FIN,RST -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** SANITY ** "
+	fi
+        if [ "$RAB_LOG_HIT" == "1" ]; then
+         $IPT -A IN_SANITY  -p tcp --tcp-flags FIN,RST FIN,RST -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** RABHIT ** "
+	fi
+        $IPT -A IN_SANITY  -p tcp --tcp-flags FIN,RST FIN,RST $RAB_SANITY_FLAGS -j $TCP_STOP
+        if [ "$LOG_DROP" == "1" ]; then
+         $IPT -A IN_SANITY  -p tcp --tcp-flags ACK,FIN FIN -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** SANITY ** "
+	fi
+        if [ "$RAB_LOG_HIT" == "1" ]; then
+         $IPT -A IN_SANITY  -p tcp --tcp-flags ACK,FIN FIN -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** RABHIT ** "
+	fi
+        $IPT -A IN_SANITY  -p tcp --tcp-flags ACK,FIN FIN $RAB_SANITY_FLAGS -j $TCP_STOP
+        if [ "$LOG_DROP" == "1" ]; then
+         $IPT -A IN_SANITY  -p tcp --tcp-flags ACK,URG URG -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** SANITY ** "
+	fi
+        if [ "$RAB_LOG_HIT" == "1" ]; then
+         $IPT -A IN_SANITY  -p tcp --tcp-flags ACK,URG URG -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** RABHIT ** "
+	fi
+        $IPT -A IN_SANITY  -p tcp --tcp-flags ACK,URG URG $RAB_SANITY_FLAGS -j $TCP_STOP
+        if [ "$LOG_DROP" == "1" ]; then
+         $IPT -A IN_SANITY  -p tcp --tcp-flags ACK,PSH PSH -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** SANITY ** "
+	fi
+        if [ "$RAB_LOG_HIT" == "1" ]; then
+         $IPT -A IN_SANITY  -p tcp --tcp-flags ACK,PSH PSH -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** RABHIT ** "
+	fi
+        $IPT -A IN_SANITY  -p tcp --tcp-flags ACK,PSH PSH $RAB_SANITY_FLAGS -j $TCP_STOP
+        if [ "$LOG_DROP" == "1" ]; then
+         $IPT -A IN_SANITY  -p tcp --tcp-flags ALL FIN,URG,PSH -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** SANITY ** "
+	fi
+        if [ "$RAB_LOG_HIT" == "1" ]; then
+         $IPT -A IN_SANITY  -p tcp --tcp-flags ALL FIN,URG,PSH -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** RABHIT ** "
+	fi
+        $IPT -A IN_SANITY  -p tcp --tcp-flags ALL FIN,URG,PSH $RAB_SANITY_FLAGS -j $TCP_STOP
+        if [ "$LOG_DROP" == "1" ]; then
+         $IPT -A IN_SANITY  -p tcp --tcp-flags ALL SYN,RST,ACK,FIN,URG -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** SANITY ** "
+	fi
+        if [ "$RAB_LOG_HIT" == "1" ]; then
+         $IPT -A IN_SANITY  -p tcp --tcp-flags ALL SYN,RST,ACK,FIN,URG -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** RABHIT ** "
+	fi
+        $IPT -A IN_SANITY  -p tcp --tcp-flags ALL SYN,RST,ACK,FIN,URG $RAB_SANITY_FLAGS -j $TCP_STOP
+        if [ "$LOG_DROP" == "1" ]; then
+         $IPT -A IN_SANITY  -p tcp --tcp-flags ALL ALL -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** SANITY ** "
+	fi
+        if [ "$RAB_LOG_HIT" == "1" ]; then
+         $IPT -A IN_SANITY  -p tcp --tcp-flags ALL ALL -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** RABHIT ** "
+	fi
+        $IPT -A IN_SANITY  -p tcp --tcp-flags ALL ALL $RAB_SANITY_FLAGS -j $TCP_STOP
+        if [ "$LOG_DROP" == "1" ]; then
+         $IPT -A IN_SANITY  -p tcp --tcp-flags ALL FIN -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** SANITY ** "
+	fi
+        if [ "$RAB_LOG_HIT" == "1" ]; then
+         $IPT -A IN_SANITY  -p tcp --tcp-flags ALL FIN -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** RABHIT ** "
+	fi
+        $IPT -A IN_SANITY  -p tcp --tcp-flags ALL FIN $RAB_SANITY_FLAGS -j $TCP_STOP
+
+        eout "{pkt_sanity} deny outbound tcp-flag pairs ALL NONE"
+        eout "{pkt_sanity} deny outbound tcp-flag pairs SYN,FIN SYN,FIN"
+        eout "{pkt_sanity} deny outbound tcp-flag pairs SYN,RST SYN,RST"
+        eout "{pkt_sanity} deny outbound tcp-flag pairs FIN,RST FIN,RST"
+        eout "{pkt_sanity} deny outbound tcp-flag pairs ACK,FIN FIN"
+        eout "{pkt_sanity} deny outbound tcp-flag pairs ACK,PSH PSH"
+        eout "{pkt_sanity} deny outbound tcp-flag pairs ACK,URG URG"
+	$IPT -N OUT_SANITY
+        if [ "$LOG_DROP" == "1" ]; then
+	 $IPT -A OUT_SANITY  -p tcp --tcp-flags ALL NONE -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** SANITY ** "
+	fi
+	$IPT -A OUT_SANITY  -p tcp --tcp-flags ALL NONE -j $TCP_STOP
+        if [ "$LOG_DROP" == "1" ]; then
+	 $IPT -A OUT_SANITY  -p tcp --tcp-flags SYN,FIN SYN,FIN -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** SANITY ** "
+	fi
+	$IPT -A OUT_SANITY  -p tcp --tcp-flags SYN,FIN SYN,FIN -j $TCP_STOP
+        if [ "$LOG_DROP" == "1" ]; then
+	 $IPT -A OUT_SANITY  -p tcp --tcp-flags SYN,RST SYN,RST -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** SANITY ** "
+	fi
+	$IPT -A OUT_SANITY  -p tcp --tcp-flags SYN,RST SYN,RST -j $TCP_STOP
+        if [ "$LOG_DROP" == "1" ]; then
+	 $IPT -A OUT_SANITY  -p tcp --tcp-flags FIN,RST FIN,RST -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** SANITY ** "
+	fi
+	$IPT -A OUT_SANITY  -p tcp --tcp-flags FIN,RST FIN,RST -j $TCP_STOP
+        if [ "$LOG_DROP" == "1" ]; then
+	 $IPT -A OUT_SANITY  -p tcp --tcp-flags ACK,FIN FIN -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** SANITY ** "
+	fi
+	$IPT -A OUT_SANITY  -p tcp --tcp-flags ACK,FIN FIN -j $TCP_STOP
+        if [ "$LOG_DROP" == "1" ]; then
+	 $IPT -A OUT_SANITY  -p tcp --tcp-flags ACK,PSH PSH -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** SANITY ** "
+	fi
+	$IPT -A OUT_SANITY -p tcp --tcp-flags ACK,PSH PSH -j $TCP_STOP
+        if [ "$LOG_DROP" == "1" ]; then
+	 $IPT -A OUT_SANITY -p tcp --tcp-flags ACK,URG URG -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** SANITY ** "
+	fi
+	$IPT -A OUT_SANITY -p tcp --tcp-flags ACK,URG URG -j $TCP_STOP
+
+	if [ "$PKT_SANITY_INV" == "1" ]; then
+	# Block Traffic With Invalid Flags
+	        eout "{pkt_sanity} check inbound for INVALID states"
+	        eout "{pkt_sanity} check outbound for INVALID states"
+	        eout "{pkt_sanity} deny inbound tcp-option 64"
+	        eout "{pkt_sanity} deny inbound tcp-option 128"
+	        if [ "$LOG_DROP" == "1" ]; then
+		 $IPT -A IN_SANITY -m state --state INVALID -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** SANITY ** "
+		fi
+		$IPT -A IN_SANITY -m state --state INVALID -j $ALL_STOP
+                if [ "$LOG_DROP" == "1" ]; then
+		 $IPT -A IN_SANITY -p tcp --tcp-option 64 -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** SANITY ** "
+		fi
+		$IPT -A IN_SANITY -p tcp --tcp-option 64 -j $TCP_STOP
+                if [ "$LOG_DROP" == "1" ]; then
+		 $IPT -A IN_SANITY -p tcp --tcp-option 128 -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** SANITY ** "
+		fi
+		$IPT -A IN_SANITY -p tcp --tcp-option 128 -j $TCP_STOP
+                if [ "$LOG_DROP" == "1" ]; then
+		 $IPT -A OUT_SANITY -m state --state INVALID -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** SANITY ** "
+		fi
+		$IPT -A OUT_SANITY -m state --state INVALID -j $ALL_STOP
+	fi
+
+        $IPT -A OUTPUT -j OUT_SANITY
+        $IPT -A INPUT -j IN_SANITY
+
+	if [ "$PKT_SANITY_FUDP" == "1" ]; then
+		# Block fragmented UDP
+	        eout "{pkt_sanity} deny all fragmented udp"
+		$IPT -N FRAG_UDP
+                if [ "$LOG_DROP" == "1" ]; then
+		 $IPT -A FRAG_UDP -p udp -f -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** UDP Frag ** "
+		fi
+                if [ "$RAB_LOG_HIT" == "1" ]; then
+		 $IPT -A FRAG_UDP -p udp -f -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** RABHIT ** "
+		fi
+		$IPT -A FRAG_UDP -p udp -f $RAB_SANITY_FLAGS -j $UDP_STOP
+		$IPT -A INPUT -j FRAG_UDP
+		$IPT -A OUTPUT -j FRAG_UDP
+	fi
+	if [ "$PKT_SANITY_PZERO" == "1" ]; then
+		# Block port zero traffic
+	        eout "{pkt_sanity} deny inbound tcp port 0"
+	        eout "{pkt_sanity} deny outbound tcp port 0"
+		$IPT -N PZERO
+                if [ "$LOG_DROP" == "1" ]; then
+		 $IPT -A PZERO -p tcp --dport 0 -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** Port Zero ** "
+		fi
+		$IPT -A PZERO -p tcp --dport 0 $RAB_SANITY_FLAGS -j $TCP_STOP
+                if [ "$LOG_DROP" == "1" ]; then
+		 $IPT -A PZERO -p udp --dport 0 -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** Port Zero ** "
+		fi
+		$IPT -A PZERO -p udp --dport 0 $RAB_SANITY_FLAGS -j $UDP_STOP
+                if [ "$LOG_DROP" == "1" ]; then
+		 $IPT -A PZERO -p tcp --sport 0 -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** Port Zero ** "
+		fi
+		$IPT -A PZERO -p tcp --sport 0 $RAB_SANITY_FLAGS -j $TCP_STOP
+                if [ "$LOG_DROP" == "1" ]; then
+		 $IPT -A PZERO -p udp --sport 0 -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** Port Zero ** "
+		fi
+		$IPT -A PZERO -p udp --sport 0 $RAB_SANITY_FLAGS -j $UDP_STOP
+		$IPT -A INPUT -j PZERO
+		$IPT -A OUTPUT -j PZERO
+	fi
+fi
+
+if [ "$BLK_IDENT" = "1" ]; then
+	eout "{blk_ident} set active BLK_IDENT"
+	# Reject ident request if not defined in IG_TCP_CPORTS
+	if [ "$(echo $IG_TCP_CPORTS | tr ',' '\n' | grep -w 113)" == "" ]; then
+		eout "{blk_ident} reject all to/from tcp port 113"
+		$IPT -N IDENT
+                if [ "$LOG_DROP" == "1" ]; then
+	         $IPT -A IDENT -p tcp -s 0/0 -d 0/0 --dport 113 -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** IDENT ** "
+		fi
+	        $IPT -A IDENT -p tcp -s 0/0 -d 0/0 --dport 113 -j REJECT
+                if [ "$LOG_DROP" == "1" ]; then
+	         $IPT -A IDENT -p tcp -s 0/0 -d 0/0 --sport 113 -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** IDENT ** "
+		fi
+	        $IPT -A IDENT -p tcp -s 0/0 -d 0/0 --sport 113 -j REJECT
+                if [ "$LOG_DROP" == "1" ]; then
+	         $IPT -A IDENT -p udp -s 0/0 -d 0/0 --dport 113 -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** IDENT ** "
+		fi
+	        $IPT -A IDENT -p udp -s 0/0 -d 0/0 --dport 113 -j REJECT
+                if [ "$LOG_DROP" == "1" ]; then
+	         $IPT -A IDENT -p udp -s 0/0 -d 0/0 --sport 113 -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** IDENT ** "
+		fi
+	        $IPT -A IDENT -p udp -s 0/0 -d 0/0 --sport 113 -j REJECT
+		$IPT -A INPUT -j IDENT
+		$IPT -A OUTPUT -j IDENT
+	fi
+fi
+
+if [ "$BLK_MCATNET" == "1" ]; then
+	eout "{blk_mcat} set active BLK_MCATNET"
+	# Block Multicast
+	eout "{blk_mcat} deny all from 224.0.0.0/8"
+	eout "{blk_mcat} deny all to 224.0.0.0/8"
+	$IPT -N MCAST
+        if [ "$LOG_DROP" == "1" ]; then
+	 $IPT -A MCAST -s 224.0.0.0/8 -d 0/0 -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** MCAST ** "
+	fi
+	$IPT -A MCAST -s 224.0.0.0/8 -d 0/0 -j $ALL_STOP
+        if [ "$LOG_DROP" == "1" ]; then
+	 $IPT -A MCAST -s 0/0 -d 224.0.0.0/8 -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** MCAST ** "
+	fi
+	$IPT -A MCAST -s 0/0 -d 224.0.0.0/8 -j $ALL_STOP
+	$IPT -A INPUT -j MCAST
+	$IPT -A OUTPUT -j MCAST
+fi
+
+if [ ! "$BLK_P2P_PORTS" == "" ]; then
+        eout "{blk_p2p} set active BLK_P2P"
+        # Drop traffic to/from common p2p networks
+        # winmx,napster,bittorrent,gnutella,edonkey,kazaa,morpheus
+        $IPT -N P2P
+        for i in `echo $BLK_P2P_PORTS | tr ',' ' '`; do
+                MVAL=`echo $i | grep "_"`
+                PORT=$i
+                if [ "$MVAL" == "" ]; then
+                        eout "{blk_p2p} deny all to/from tcp port $i"
+                        eout "{blk_p2p} deny all to/from udp port $i"
+                        if [ "$LOG_DROP" == "1" ]; then
+                         $IPT -A P2P  -p tcp -s 0/0 -d 0/0 --sport 1024:65534 --dport $PORT -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** P2P ** "
+                        fi
+                        $IPT -A P2P  -p tcp -s 0/0 -d 0/0 --dport $PORT -j REJECT
+                        if [ "$LOG_DROP" == "1" ]; then
+                         $IPT -A P2P  -p tcp -s 0/0 -d 0/0 --dport 1024:65534 --sport $PORT -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** P2P ** "
+                        fi
+                        $IPT -A P2P  -p tcp -s 0/0 -d 0/0 --dport 1024:65534 --sport $PORT -j REJECT
+                        if [ "$LOG_DROP" == "1" ]; then
+                         $IPT -A P2P  -p udp -s 0/0 -d 0/0 --sport 1024:65534 --dport $PORT -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** P2P ** "
+                        fi
+                        $IPT -A P2P  -p udp -s 0/0 -d 0/0 --sport 1024:65534 --dport $PORT -j REJECT
+                        if [ "$LOG_DROP" == "1" ]; then
+                         $IPT -A P2P  -p udp -s 0/0 -d 0/0 --dport 1024:65534 --sport $PORT -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** P2P ** "
+                        fi
+                        $IPT -A P2P  -p udp -s 0/0 -d 0/0 --dport 1024:65534 --sport $PORT -j REJECT
+                else
+                        PORT_BEG=`echo $i | tr '_' ' ' | awk '{print$1}'`
+                        PORT_END=`echo $i | tr '_' ' ' | awk '{print$2}'`
+                        PORTST="$PORT_BEG:$PORT_END"
+                        eout "{blk_p2p} deny all to/from tcp port $PORTST"
+                        eout "{blk_p2p} deny all to/from udp port $PORTST"
+                        if [ "$LOG_DROP" == "1" ]; then
+                         $IPT -A P2P  -p tcp -s 0/0 -d 0/0 --sport 1024:65534 --dport $PORTST -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** P2P ** "
+                        fi
+                        $IPT -A P2P  -p tcp -s 0/0 -d 0/0 --sport 1024:65534 --dport $PORTST -j REJECT
+                        if [ "$LOG_DROP" == "1" ]; then
+                         $IPT -A P2P  -p tcp -s 0/0 -d 0/0 --dport 1024:65534 --sport $PORTST -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** P2P ** "
+                        fi
+                        $IPT -A P2P  -p tcp -s 0/0 -d 0/0 --dport 1024:65534 --sport $PORTST -j REJECT
+                        if [ "$LOG_DROP" == "1" ]; then
+                         $IPT -A P2P  -p udp -s 0/0 -d 0/0 --sport 1024:65534 --dport $PORTST -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** P2P ** "
+                        fi
+                        $IPT -A P2P  -p udp -s 0/0 -d 0/0 --sport 1024:65534 --dport $PORTST -j REJECT
+                        if [ "$LOG_DROP" == "1" ]; then
+                         $IPT -A P2P  -p udp -s 0/0 -d 0/0 --dport 1024:65534 --sport $PORTST -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** P2P ** "
+                        fi
+                        $IPT -A P2P  -p udp -s 0/0 -d 0/0 --dport 1024:65534 --sport $PORTST -j REJECT
+                fi
+        done
+        $IPT -A INPUT -j P2P
+        $IPT -A OUTPUT -j P2P
+fi
+

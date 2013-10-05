@@ -1,0 +1,1591 @@
+#!/bin/bash
+#
+# APF 9.7 [apf@r-fx.org]
+###
+# Copyright (C) 2002-2011, R-fx Networks <proj@r-fx.org>
+# Copyright (C) 2011, Ryan MacDonald <ryan@r-fx.org>
+#
+#    This program is free software; you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation; either version 2 of the License, or
+#    (at your option) any later version.
+#
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License
+#    along with this program; if not, write to the Free Software
+#    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+###
+#
+
+eout() {
+arg=$1
+        if [ ! "$arg" == "" ]; then
+                echo "$(date +"%b %d %H:%M:%S") $(hostname -s) $APPN($$): $arg" >> $LOG_APF
+		if [ "$SET_VERBOSE" == "1" ]; then
+	                echo "$APPN($$): $arg"
+		fi
+        fi
+}
+
+devm() {
+# Is dev mode on or off ?
+TMP_CJ="$INSTALL_PATH/.cj"
+CRON="/etc/crontab"
+if [ "$DEVEL_MODE" == "1" ]; then
+ DEVEL_ON=1
+ if [ ! "$SET_VERBOSE" == "1" ]; then
+	eout "{glob} !!DEVELOPMENT MODE ENABLED!! - firewall will flush every 5 minutes."
+	echo "!!DEVELOPMENT MODE ENABLED!! - firewall will flush every 5 minutes."
+ fi
+APF_CJ=`cat $CRON | grep -w /etc/init.d/apf`
+        if [ "$APF_CJ" == "" ]; then
+                cp -f $CRON $CRON.bk
+                cat > $TMP_CJ <<EOF
+
+*/5 * * * * root /etc/init.d/apf stop >> /dev/null 2>&1
+EOF
+                cat $TMP_CJ >> $CRON
+                rm -f $TMP_CJ
+        fi
+elif [ "$DEVEL_MODE" == "0" ]; then
+APF_CJ=`cat $CRON | grep -w /etc/init.d/apf`
+        if [ ! "$APF_CJ" == "" ]; then
+                cat $CRON | grep -vw "/etc/init.d/apf" > $CRON.tmp
+                cp -f $CRON $CRON.bk
+                mv $CRON.tmp $CRON
+                chmod 644 $CRON
+        fi
+fi
+}
+
+ml() {
+MOD=$1
+VALMOD=$2
+if [ "$KREL" == "2.4" ]; then
+	MEXT="o"
+elif [ "$KREL" == "2.6" ]; then
+	MEXT="ko"
+elif [[ "$KREL" =~ "3." ]]; then
+	MEXT="ko"
+elif [ ! "$KREL" == "2.4" ] && [ ! "$KREL" == "2.6" ] && [[ ! "$KREL" =~ "3." ]]; then
+	if [ ! "$SET_VERBOSE" == "1" ]; then
+        	echo "kernel version not compatible or netfilter support missing, aborting."
+	fi
+        eout "{glob} kernel version not compatible or netfilter support missing, aborting."
+        exit 1
+else
+        if [ ! "$SET_VERBOSE" == "1" ]; then
+	        echo "kernel version not compatible or netfilter support missing, aborting."
+	fi
+        eout "{glob} kernel version not compatible or netfilter support missing, aborting."
+        exit 1
+fi
+
+if [ "$VALMOD" == "1" ] && [ ! -f "/lib/modules/$(uname -r)/kernel/net/ipv4/netfilter/$1.$MEXT" ]; then
+        if [ ! "$SET_VERBOSE" == "1" ]; then
+	        echo "Unable to load iptables module ($1), aborting."
+	fi
+        eout "{glob} unable to load iptables module ($1), aborting."
+        exit 1
+fi
+if [ -f "/lib/modules/$(uname -r)/kernel/net/ipv4/netfilter/$1.$MEXT" ] || [ -f "/lib/modules/$(uname -r)/kernel/net/netfilter/$1.$MEXT" ]; then
+        $MPB $1 >> /dev/null 2>&1 &
+fi
+}
+
+modinit() {
+# Remove ipchains module if loaded
+IPC_VAL=`$LSM | grep ipchains`
+if [ ! "$IPC_VAL" == "" ]; then
+        $RMM ipchains
+fi
+
+if [ ! "$SET_MONOKERN" == "1" ]; then
+# Loading Kernel Modules
+ml ip_tables 1
+ml iptable_filter
+ml iptable_mangle
+ml ip_conntrack
+ml ip_conntrack_irc
+ml ip_conntrack_ftp
+ml ipt_state
+ml ipt_multiport
+ml ipt_limit
+ml ipt_recent
+ml ipt_LOG
+ml ipt_REJECT
+ml ipt_ecn
+ml ipt_length
+ml ipt_mac
+ml ipt_multiport
+ml ipt_owner
+ml ipt_state
+ml ipt_ttl
+ml ipt_TOS
+ml ipt_TCPMSS
+ml ipt_ULOG
+ml xt_conntrack
+ml xt_conntrack_irc
+ml xt_conntrack_ftp
+ml xt_state
+ml xt_multiport
+ml xt_limit
+ml xt_recent
+ml xt_LOG
+ml xt_REJECT
+ml xt_ecn
+ml xt_length
+ml xt_mac
+ml xt_multiport
+ml xt_owner
+ml xt_state
+ml xt_ttl
+ml xt_TOS
+ml xt_TCPMSS
+ml xt_ULOG
+ml nf_conntrack
+ml nf_conntrack_irc
+ml nf_conntrack_ftp
+fi
+}
+
+check_rab() {
+if [ ! -f "/lib/modules/$(uname -r)/kernel/net/ipv4/netfilter/ipt_recent.$MEXT" ] && [ ! -f "/lib/modules/$(uname -r)/kernel/net/ipv4/netfilter/xt_recent.$MEXT" ]&& [ ! -f "/lib/modules/$(uname -r)/kernel/net/netfilter/xt_recent.$MEXT" ]; then
+ if [ "$RAB" == "1" ]; then
+	RAB="0"
+	eout "{rab} force set RAB disabled, kernel module xt/ipt_recent not found."
+ fi
+fi
+}
+
+get_state() {
+if [ -f "$LOCK" ]; then
+        OVAL=`cat $LOCK`
+        DIFF=$[UTIME-OVAL]
+        if [ "$DIFF" -gt "$LOCK_TIMEOUT" ]; then
+                echo "$UTIME" > $LOCK
+                eout "{glob} cleared stale lock file file."
+        else
+                eout "{glob} locked subsystem, already running ? ($LOCK is $DIFF seconds old), aborting."
+                exit 1
+        fi
+else
+        echo "$UTIME" > $LOCK
+fi
+}
+
+crondcheck() {
+	if [ "$VF_CROND" == "1" ]; then
+		if [ -f "/etc/crontab" ]; then
+			eout "{glob} /etc/crontab not found; unset VF_CROND or check setting for CRONTAB_PATH, aborting."
+			exit 1
+		fi
+		cron_psval=`grep -ri crond /proc/[0-9]*/status| sed 's/Name://'`
+		if [ "$cron_psval" == "" ]; then
+			eout "{glob} crond process not found; start crond, unset VF_CROND or check setting for CRONTAB_PS, aborting."
+			exit 1
+		fi
+	fi
+}
+
+trim() {
+FILE=$1
+MAXLINES=$2
+
+if [ "$MAXLINES" == "" ]; then
+	MAXLINES=0
+fi
+
+if [ ! "$MAXLINES" == "0" ] && [ -f "$FILE" ]; then
+	LINES=`cat $FILE | grep -v "#" | grep -c ""`
+        if [ "$LINES" -gt "$MAXLINES" ]; then
+                eout "{glob} triming $FILE to $MAXLINES lines"
+                CHK_CMT=`tail -n 50 $FILE | grep -c "#"`
+                MAXLINES=$[CHK_CMT+MAXLINES]
+                CHK_SCMT=`tail -n $MAXLINES $FILE | tac | tail -n 1 | grep "#"`
+                if [ "$CHK_SCMT" == "" ]; then
+                        MAXLINES=$[1+MAXLINES]
+                fi
+                tail -n $MAXLINES $FILE > $FILE.new
+                mv $FILE.new $FILE
+        fi
+fi
+}
+
+cli_trust_remove() {
+DIP=$1
+	$IPT -D INPUT -s $DIP -j ACCEPT
+	$IPT -D OUTPUT -d $DIP -j ACCEPT
+        $IPT -D INPUT -s $DIP -j $ALL_STOP
+        $IPT -D OUTPUT -d $DIP -j $ALL_STOP
+
+	$IPT -D TALLOW -s $DIP -j ACCEPT
+	$IPT -D TALLOW -d $DIP -j ACCEPT
+        $IPT -D TDENY -s $DIP -j $ALL_STOP
+        $IPT -D TDENY -d $DIP -j $ALL_STOP
+
+
+	$IPT -D TGALLOW -s $DIP -j ACCEPT
+	$IPT -D TGALLOW -d $DIP -j ACCEPT
+        $IPT -D TGDENY -s $DIP -j $ALL_STOP
+        $IPT -D TGDENY -d $DIP -j $ALL_STOP
+
+	val=`cat /etc/apf/allow_hosts.rules | grep "$DIP"`
+	if [ ! "$val" == "" ]; then
+		cat /etc/apf/allow_hosts.rules | grep -v "$DIP" > /etc/apf/allow_hosts.rules.new
+		mv /etc/apf/allow_hosts.rules.new /etc/apf/allow_hosts.rules
+	fi
+	val=`cat /etc/apf/deny_hosts.rules | grep "$DIP"`
+        if [ ! "$val" == "" ]; then
+        	cat /etc/apf/deny_hosts.rules | grep -v "$DIP" > /etc/apf/deny_hosts.rules.new
+	        mv /etc/apf/deny_hosts.rules.new /etc/apf/deny_hosts.rules
+	fi
+	val=`cat /etc/apf/glob_allow_hosts.rules | grep "$DIP"`
+        if [ ! "$val" == "" ]; then
+        	cat /etc/apf/glob_allow_hosts.rules | grep -v "$DIP" > /etc/apf/glob_allow_hosts.rules.new
+	        mv /etc/apf/glob_allow_hosts.rules.new /etc/apf/glob_allow_hosts.rules
+	fi
+	val=`cat /etc/apf/glob_deny_hosts.rules | grep "$DIP"`
+        if [ ! "$val" == "" ]; then
+        	cat /etc/apf/glob_deny_hosts.rules | grep -v "$DIP" > /etc/apf/glob_deny_hosts.rules.new
+	        mv /etc/apf/glob_deny_hosts.rules.new /etc/apf/glob_deny_hosts.rules
+	fi
+
+	dil=`$IPT --numeric --list INPUT --line-numbers | grep $DIP | awk '{print$1}'`
+	dol=`$IPT --numeric --list OUTPUT --line-numbers | grep $DIP | awk '{print$1}'`
+	$IPT -D INPUT $dil >> /dev/null 2>&1
+	$IPT -D OUTPUT $dol >> /dev/null 2>&1
+
+	dil=`$IPT --numeric --list TALLOW --line-numbers | grep $DIP | tac | awk '{print$1}'`
+	dol=`$IPT --numeric --list TDENY --line-numbers | grep $DIP | tac | awk '{print$1}'`
+	for i in `echo $dil`; do
+		$IPT -D TALLOW $i >> /dev/null 2>&1
+	done
+	for i in `echo $dol`; do
+		$IPT -D TDENY $i >> /dev/null 2>&1
+	done
+
+	dil=`$IPT --numeric --list TGALLOW --line-numbers | grep $DIP | tac | awk '{print$1}'`
+	dol=`$IPT --numeric --list TGDENY --line-numbers | grep $DIP | tac | awk '{print$1}'`
+	for i in `echo $dil`; do
+		$IPT -D TGALLOW $i >> /dev/null 2>&1
+	done
+	for i in `echo $dol`; do
+		$IPT -D TGDENY $i >> /dev/null 2>&1
+	done
+}
+
+cli_trust_allow() {
+HOST=$1
+CMT="$2 $3 $4 $5 $6 $7 $8 $9"
+if [ ! "$HOST" == "" ]; then
+        val=`cat $DENY_HOSTS | grep -w $HOST`
+        val_rev=`cat $ALLOW_HOSTS | grep -w $HOST`
+        val_rev2=`cat $GALLOW_HOSTS | grep -w $HOST`
+        val_rev3=`cat $GDENY_HOSTS | grep -w $HOST`
+        val_rev4=`/sbin/ip addr list $IFACE_IN | grep -w inet | grep -v inet6 | tr '/' ' ' | awk '{print$2}' | grep -w $HOST`
+        if [ ! "$val" == "" ]; then
+                echo "$HOST already exists in $DENY_HOSTS"
+        elif [ ! "$val_rev" == "" ]; then
+                echo "$HOST already exists in $ALLOW_HOSTS"
+        elif [ ! "$val_rev2" == "" ]; then
+                echo "$HOST already exists in $GALLOW_HOSTS"
+        elif [ ! "$val_rev3" == "" ]; then
+                echo "$HOST already exists in $GDENY_HOSTS"
+        elif [ ! "$val_rev4" == "" ]; then
+                echo "$HOST is a local address and can not be added to the trust system"
+        else
+	TIME=`date +"%D %H:%M:%S"`
+		echo -n "# added $HOST on $TIME" >> $ALLOW_HOSTS
+		if [ ! "$CMT" == "" ]; then
+			echo " with comment: $CMT" >> $ALLOW_HOSTS
+		else
+			echo "" >> $ALLOW_HOSTS
+		fi
+                echo "$HOST" >> $ALLOW_HOSTS
+		echo "" >> $ALLOW_HOSTS
+        $IPT -I TALLOW -s $HOST -j ACCEPT
+        $IPT -I TALLOW -d $HOST -j ACCEPT
+        eout "(trust) added allow all to/from $HOST"
+	 if [ ! "$SET_VERBOSE" == "1" ]; then
+          echo "Inserted into firewall: Allow all to/from $HOST"
+	 fi
+        fi
+else
+        echo "an FQDN or IP address is required for this option"
+fi
+}
+
+cli_trust_deny() {
+HOST=$1
+CMT="$2 $3 $4 $5 $6 $7 $8 $9"
+if [ ! "$HOST" == "" ]; then
+        val=`cat $DENY_HOSTS | grep -w $HOST`
+        val_rev=`cat $ALLOW_HOSTS | grep -w $HOST`
+	val_rev2=`cat $GALLOW_HOSTS | grep -w $HOST`
+	val_rev3=`cat $GDENY_HOSTS | grep -w $HOST`
+        val_rev4=`/sbin/ip addr list $IFACE_IN | grep -w inet | grep -v inet6 | tr '/' ' ' | awk '{print$2}' | grep -w $HOST`
+        if [ ! "$val" == "" ]; then
+               	echo "$HOST already exists in $DENY_HOSTS"
+	elif [ ! "$val_rev" == "" ]; then
+                echo "$HOST already exists in $ALLOW_HOSTS"
+	elif [ ! "$val_rev2" == "" ]; then
+                echo "$HOST already exists in $GALLOW_HOSTS"
+        elif [ ! "$val_rev2" == "" ]; then
+                echo "$HOST already exists in $GDENY_HOSTS"
+        elif [ ! "$val_rev4" == "" ]; then
+                echo "$HOST is a local address and can not be added to the trust system"
+        else
+        TIME=`date +"%D %H:%M:%S"`
+	echo -n "# added $HOST on $TIME" >> $DENY_HOSTS
+        if [ ! "$CMT" == "" ]; then
+           echo " with comment: $CMT" >> $DENY_HOSTS
+	else
+	   echo "" >> $DENY_HOSTS
+        fi
+        echo "$HOST" >> $DENY_HOSTS
+	        $IPT -I TDENY -s $HOST -j $ALL_STOP
+        	$IPT -I TDENY -d $HOST -j $ALL_STOP
+        eout "(trust) added deny all to/from $HOST"
+         if [ ! "$SET_VERBOSE" == "1" ]; then
+	        echo "Inserted into firewall: Deny all to/from $HOST"
+	 fi
+        fi
+else
+        echo "an FQDN or IP address is required for this option"
+fi
+}
+
+flush() {
+firewall_on=`iptables -L --numeric | grep -vE "Chain|destination"`
+if [ "$SET_FASTLOAD" == "1" ] && [ ! "$1" == "1" ] && [ ! "$DEVEL_ON" == "1" ] && [ ! "$firewall_on" == "" ]; then
+	$IPTS > $INSTALL_PATH/internals/.apf.restore
+	eout "{glob} fast load snapshot saved"
+fi
+if [ ! "$1" = "1" ]; then
+	eout "{glob} flushing & zeroing chain policies"
+fi
+chains=`cat /proc/net/ip_tables_names 2>/dev/null`
+for i in $chains; do $IPT -t $i -F; done
+for i in $chains; do $IPT -t $i -X; done
+$IPT -P INPUT ACCEPT
+$IPT -P OUTPUT ACCEPT
+$IPT -P FORWARD ACCEPT
+
+if [ -f "/proc/net/ipt_recent/DEFAULT" ]; then
+	eout "{glob} flushing xt/ipt_recent bans"
+	echo clear > /proc/net/ipt_recent/DEFAULT
+fi
+
+if [ ! "$1" = "1" ]; then
+	eout "{glob} firewall offline"
+fi
+}
+
+list() {
+echo "Loading chain rules..."
+iptc=/etc/apf/.ipt.chains
+:> $iptc ; chmod 600 $iptc
+$IPT --verbose --numeric --line-numbers --list >> $iptc
+echo "Opening editor"
+if [ -f "/usr/bin/pico" ]; then
+	/usr/bin/pico -w $iptc
+elif [ -f "/usr/bin/nano" ]; then
+	/usr/bin/nano -w $iptc
+elif [ -f "/bin/vi" ]; then
+	/bin/vi $iptc
+fi
+clear
+rm -f $iptc
+}
+
+status() {
+echo "$NAME Status Log:"
+tac $LOG_APF | more
+}
+
+help() {
+        echo "usage $0 [OPTION]"
+        echo "-s|--start ......................... load all firewall rules"
+        echo "-r|--restart ....................... stop (flush) & reload firewall rules"
+        echo "-f|--stop........................... stop (flush) all firewall rules"
+        echo "-l|--list .......................... list all firewall rules"
+        echo "-t|--status ........................ output firewall status log"
+	echo "-e|--refresh ....................... refresh & resolve dns names in trust rules"
+        echo "-a HOST CMT|--allow HOST COMMENT ... add host (IP/FQDN) to allow_hosts.rules and"
+        echo "                                     immediately load new rule into firewall"
+        echo "-d HOST CMT|--deny HOST COMMENT .... add host (IP/FQDN) to deny_hosts.rules and"
+        echo "                                     immediately load new rule into firewall"
+	echo "-u|--remove HOST ................... remove host from [glob]*_hosts.rules"
+	echo "                                     and immediately remove rule from firewall"
+	echo "-o|--ovars ......................... output all configuration options"
+}
+
+tospreroute() {
+# Type of Service (TOS) parameters
+# 0: Normal-Service
+# 2: Minimize-Cost
+# 4: Minimize Delay - Maximize Reliability
+# 8: Maximum Throughput - Minimum Delay
+# 16: No Delay - Moderate Throughput - High Reliability
+#
+
+if [ ! "$TOS_0" == "" ]; then
+        for i in `echo $TOS_0 | tr ',' ' '`; do
+                i=`echo $i | tr '_' ':'`
+                $IPT -t mangle  -A PREROUTING -p tcp --sport $i -j TOS --set-tos 0
+                $IPT -t mangle  -A PREROUTING -p udp --sport $i -j TOS --set-tos 0
+        done
+fi
+
+if [ ! "$TOS_2" == "" ]; then
+        for i in `echo $TOS_2 | tr ',' ' '`; do
+                i=`echo $i | tr '_' ':'`
+                $IPT -t mangle  -A PREROUTING -p tcp --sport $i -j TOS --set-tos 2
+                $IPT -t mangle  -A PREROUTING -p udp --sport $i -j TOS --set-tos 2
+        done
+fi
+
+if [ ! "$TOS_4" == "" ]; then
+        for i in `echo $TOS_4 | tr ',' ' '`; do
+                i=`echo $i | tr '_' ':'`
+                $IPT -t mangle  -A PREROUTING -p tcp --sport $i -j TOS --set-tos 4
+                $IPT -t mangle  -A PREROUTING -p udp --sport $i -j TOS --set-tos 4
+        done
+fi
+
+if [ ! "$TOS_8" == "" ]; then
+        for i in `echo $TOS_8 | tr ',' ' '`; do
+                i=`echo $i | tr '_' ':'`
+                $IPT -t mangle  -A PREROUTING -p tcp --sport $i -j TOS --set-tos 8
+                $IPT -t mangle  -A PREROUTING -p udp --sport $i -j TOS --set-tos 8
+        done
+fi
+
+if [ ! "$TOS_16" == "" ]; then
+        for i in `echo $TOS_16 | tr ',' ' '`; do
+                i=`echo $i | tr '_' ':'`
+                $IPT -t mangle  -A PREROUTING -p tcp --sport $i -j TOS --set-tos 16
+                $IPT -t mangle  -A PREROUTING -p udp --sport $i -j TOS --set-tos 16
+        done
+fi
+
+if [ ! "$TOS_DEF_RANGE" == "" ]; then
+        for i in `echo $TOS_DEF_RANGE | tr ',' ' '`; do
+                i=`echo $i | tr '_' ':'`
+                $IPT -t mangle  -A PREROUTING -p tcp --sport $i -j TOS --set-tos $TOS_DEF
+                $IPT -t mangle  -A PREROUTING -p udp --sport $i -j TOS --set-tos $TOS_DEF
+        done
+fi
+}
+
+tospostroute() {
+# Type of Service (TOS) parameters
+# 0: Normal-Service
+# 2: Minimize-Cost
+# 4: Minimize Delay - Maximize Reliability
+# 8: Maximum Throughput - Minimum Delay
+# 16: No Delay - Moderate Throughput - High Reliability
+#
+if [ ! "$TOS_0" == "" ]; then
+        for i in `echo $TOS_0 | tr ',' ' '`; do
+                i=`echo $i | tr '_' ':'`
+                $IPT -t mangle -A POSTROUTING -p tcp --dport $i -j TOS --set-tos 0
+                $IPT -t mangle -A POSTROUTING -p udp --dport $i -j TOS --set-tos 0
+        done
+fi
+
+if [ ! "$TOS_2" == "" ]; then
+        for i in `echo $TOS_2 | tr ',' ' '`; do
+                i=`echo $i | tr '_' ':'`
+                $IPT -t mangle -A POSTROUTING -p tcp --dport $i -j TOS --set-tos 2
+                $IPT -t mangle -A POSTROUTING -p udp --dport $i -j TOS --set-tos 2
+        done
+fi
+
+if [ ! "$TOS_4" == "" ]; then
+        for i in `echo $TOS_4 | tr ',' ' '`; do
+                i=`echo $i | tr '_' ':'`
+                $IPT -t mangle -A POSTROUTING -p tcp --dport $i -j TOS --set-tos 4
+                $IPT -t mangle -A POSTROUTING -p udp --dport $i -j TOS --set-tos 4
+        done
+fi
+
+if [ ! "$TOS_8" == "" ]; then
+        for i in `echo $TOS_8 | tr ',' ' '`; do
+                i=`echo $i | tr '_' ':'`
+                $IPT -t mangle -A POSTROUTING -p tcp --dport $i -j TOS --set-tos 8
+                $IPT -t mangle -A POSTROUTING -p udp --dport $i -j TOS --set-tos 8
+        done
+fi
+
+if [ ! "$TOS_16" == "" ]; then
+        for i in `echo $TOS_16 | tr ',' ' '`; do
+                i=`echo $i | tr '_' ':'`
+                $IPT -t mangle -A POSTROUTING -p tcp --dport $i -j TOS --set-tos 16
+                $IPT -t mangle -A POSTROUTING -p udp --dport $i -j TOS --set-tos 16
+        done
+fi
+
+if [ ! "$TOS_DEF_RANGE" == "" ]; then
+        for i in `echo $TOS_DEF_RANGE | tr ',' ' '`; do
+                i=`echo $i | tr '_' ':'`
+                $IPT -t mangle -A POSTROUTING -p tcp --dport $i -j TOS --set-tos $TOS_DEF
+                $IPT -t mangle -A POSTROUTING -p udp --dport $i -j TOS --set-tos $TOS_DEF
+        done
+fi
+}
+
+ovars() {
+	nice -n 16 cat /etc/apf/conf.apf /etc/apf/internals/internals.conf | grep -v "#" | grep "=" | tr '=' ' ' | awk '{print""$"$1"}'
+}
+
+allow_hosts() {
+if [ ! "`cat $ALLOW_HOSTS | grep -v "#"`" == "" ]; then
+        eout "{glob} loading allow_hosts.rules"
+        #
+        #
+        for i in `cat $ALLOW_HOSTS | grep -v "#" | grep -v ":" | grep -v "="`; do
+                val=`/sbin/ip addr list $IFACE_IN | grep -w inet | grep -v inet6 | tr '/' ' ' | awk '{print$2}' | grep -w $i`
+                if [ ! "$val" ]; then
+                 if [ ! "$i" == "" ] && [ -f "$ALLOW_HOSTS" ]; then
+                        eout "{trust} allow all to/from $i"
+                        $IPT -A TALLOW -s $i -d 0/0 -j ACCEPT
+                        $IPT -A TALLOW -d $i -s 0/0 -j ACCEPT
+                 fi
+		fi
+        done
+        #
+        #
+        for i in `cat $ALLOW_HOSTS | grep -v "#" | grep ":" | grep "=" | grep -vw in | grep -vw out | grep -v tcp | grep -v udp`; do
+                if [ ! "$i" == "" ] && [ -f "$ALLOW_HOSTS" ]; then
+
+                        PFLOW=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$1}'`
+                if [ "$PFLOW" == "s" ]; then
+                                PFLOW="sport"
+                                PFLOW_T="from"
+                        elif [ "$PFLOW" == "d" ]; then
+                                PFLOW="dport"
+                                PFLOW_T="to"
+                        fi
+                        PPORT=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$2}'`
+                        if [ ! "$(echo $PPORT | grep _)" == "" ]; then
+                                PPORT_BEG=`echo $PPORT | tr '_' ' ' | awk '{print$1}'`
+                                PPORT_END=`echo $PPORT | tr '_' ' ' | awk '{print$2}'`
+                                PPORT="$PPORT_BEG:$PPORT_END"
+                        fi
+
+                        IPFLOW=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$3}'`
+                        if [ "$IPFLOW" == "s" ]; then
+                                IPFLOW="s"
+                        elif [ "$IPFLOW" == "d" ]; then
+                                IPFLOW="d"
+                        fi
+                        PIP=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$4}'`
+
+                        if [ ! "$IPFLOW" == "" ] && [ ! "$PIP" == "" ] && [ ! "$IPFLOW" == "" ] && [ ! "$PPORT" == "" ]; then
+                                eout "{trust} allow $PIP $PFLOW_T port $PPORT"
+                                $IPT -A TALLOW -p tcp -$IPFLOW $PIP --$PFLOW $PPORT -j ACCEPT
+                        fi
+                fi
+        done
+        #
+        #
+        for i in `cat $ALLOW_HOSTS | grep -v "#" | grep ":" | grep "=" | grep -v "tcp" | grep -v "udp"`; do
+                if [ ! "$i" == "" ] && [ -f "$ALLOW_HOSTS" ]; then
+
+                        NFLOW=`echo $i | tr ':' ' ' | tr '=' ' '| awk '{print$1}'`
+                        if [ "$NFLOW" == "in" ]; then
+                                NFLOW="INPUT"
+                                NFLOW_T="inbound"
+                        elif [ "$NFLOW" == "out" ]; then
+                                NFLOW="OUTPUT"
+                                NFLOW_T="outbound"
+                        fi
+
+                        PFLOW=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$2}'`
+                        if [ "$PFLOW" == "s" ]; then
+                                PFLOW="sport"
+                                PFLOW_T="from"
+                        elif [ "$PFLOW" == "d" ]; then
+                                PFLOW="dport"
+                                PFLOW_T="to"
+                        fi
+
+                        PPORT=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$3}'`
+                        if [ ! "$(echo $PPORT | grep _)" == "" ]; then
+                                PPORT_BEG=`echo $PPORT | tr '_' ' ' | awk '{print$1}'`
+                                PPORT_END=`echo $PPORT | tr '_' ' ' | awk '{print$2}'`
+                                PPORT="$PPORT_BEG:$PPORT_END"
+                        fi
+
+                        IPFLOW=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$4}'`
+                        if [ "$IPFLOW" == "s" ]; then
+                                IPFLOW="s"
+                        elif [ "$IPFLOW" == "d" ]; then
+                                IPFLOW="d"
+                        fi
+                        PIP=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$5}'`
+
+                        if [ ! "$NFLOW" == "" ] && [ ! "$IPFLOW" == "" ] && [ ! "$PIP" == "" ] && [ ! "$IPFLOW" == "" ] && [ ! "$PPORT" == "" ]; then
+                         if [ "$IPFLOW" == "s" ] && [ "$NFLOW" == "INPUT" ] && [ "$(/sbin/ip addr list $IFACE_IN | grep -w inet | grep -v inet6 | tr '/' ' ' | awk '{print$2}' | grep -w $PIP)" ]; then
+                                eout "{trust} ignored local ip allow rule '$NFLOW_T $PIP $PFLOW_T port $PPORT'"
+                         elif [ "$IPFLOW" == "d" ] && [ "$NFLOW" == "OUTPUT" ] && [ "$(/sbin/ip addr list $IFACE_IN | grep -w inet | grep -v inet6 | tr '/' ' ' | awk '{print$2}' | grep -w $PIP)" ]; then
+                                eout "{trust} ignored local ip allow rule '$NFLOW_T $PIP $PFLOW_T port $PPORT'"
+                         else
+                                eout "{trust} allow $NFLOW_T $PIP $PFLOW_T port $PPORT"
+                                $IPT -A TALLOW -p tcp -$IPFLOW $PIP --$PFLOW $PPORT -j ACCEPT
+                         fi
+                        fi
+                fi
+        done
+        #
+        #
+        for i in `cat $ALLOW_HOSTS | grep -v "#" | grep ":" | grep "="`; do
+                if [ ! "$i" == "" ] && [ -f "$ALLOW_HOSTS" ]; then
+
+                        PTYPE=`echo $i | tr ':' ' ' | tr '=' ' '| awk '{print$1}'`
+                        if [ "$PTYPE" == "tcp" ]; then
+                                PTYPE="tcp"
+                        elif [ "$PTYPE" == "udp" ]; then
+                                PTYPE="udp"
+                        fi
+
+                        NFLOW=`echo $i | tr ':' ' ' | tr '=' ' '| awk '{print$2}'`
+                        if [ "$NFLOW" == "in" ]; then
+                                NFLOW="INPUT"
+                                NFLOW_T="inbound"
+                        elif [ "$NFLOW" == "out" ]; then
+                                NFLOW="OUTPUT"
+                                NFLOW_T="outbound"
+                        fi
+
+                        PFLOW=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$3}'`
+                        if [ "$PFLOW" == "s" ]; then
+                                PFLOW="sport"
+                                PFLOW_T="from"
+                        elif [ "$PFLOW" == "d" ]; then
+                                PFLOW="dport"
+                                PFLOW_T="to"
+                        fi
+
+                        PPORT=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$4}'`
+                        if [ ! "$(echo $PPORT | grep _)" == "" ]; then
+                                PPORT_BEG=`echo $PPORT | tr '_' ' ' | awk '{print$1}'`
+                                PPORT_END=`echo $PPORT | tr '_' ' ' | awk '{print$2}'`
+                                PPORT="$PPORT_BEG:$PPORT_END"
+                        fi
+
+                        IPFLOW=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$5}'`
+                        if [ "$IPFLOW" == "s" ]; then
+                                IPFLOW="s"
+                        elif [ "$IPFLOW" == "d" ]; then
+                                IPFLOW="d"
+                        fi
+                        PIP=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$6}'`
+
+
+                        if [ ! "$PTYPE" == "" ] && [ ! "$NFLOW" == "" ] && [ ! "$IPFLOW" == "" ] && [ ! "$PIP" == "" ] && [ ! "$IPFLOW" == "" ] && [ ! "$PPORT" == "" ]; then
+                         if [ "$IPFLOW" == "s" ] && [ "$NFLOW" == "INPUT" ] && [ "$(/sbin/ip addr list $IFACE_IN | grep -w inet | grep -v inet6 | tr '/' ' ' | awk '{print$2}' | grep -w $PIP)" ]; then
+                                eout "{trust} ignored local ip allow rule '$NFLOW_T $PIP $PFLOW_T port $PPORT'"
+                         elif [ "$IPFLOW" == "d" ] && [ "$NFLOW" == "OUTPUT" ] && [ "$(/sbin/ip addr list $IFACE_IN | grep -w inet | grep -v inet6 | tr '/' ' ' | awk '{print$2}' | grep -w $PIP)" ]; then
+                                eout "{trust} ignored local ip allow rule '$NFLOW_T $PIP $PFLOW_T port $PPORT'"
+                         else
+                                eout "{trust} allow $NFLOW_T $PTYPE $PIP $PFLOW_T port $PPORT"
+                                $IPT -A TALLOW -p $PTYPE -$IPFLOW $PIP --$PFLOW $PPORT -j ACCEPT
+                         fi
+                        fi
+                fi
+        done
+fi
+}
+
+
+glob_allow_hosts() {
+if [ ! "`cat $GALLOW_HOSTS | grep -v "#"`" == "" ]; then
+        eout "{glob} loading glob_allow.rules"
+        #
+        #
+        for i in `cat $GALLOW_HOSTS | grep -v "#" | grep -v ":" | grep -v "="`; do
+                if [ ! "$i" == "" ] && [ -f "$GALLOW_HOSTS" ]; then
+                        eout "{trust} allow all to/from $i"
+                        $IPT -A TGALLOW -s $i -d 0/0 -j ACCEPT
+                        $IPT -A TGALLOW -d $i -s 0/0 -j ACCEPT
+                fi
+        done
+        #
+        #
+        for i in `cat $GALLOW_HOSTS | grep -v "#" | grep ":" | grep "=" | grep -vw in | grep -vw out | grep -v tcp | grep -v udp`; do
+                if [ ! "$i" == "" ] && [ -f "$GALLOW_HOSTS" ]; then
+
+                        PFLOW=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$1}'`
+                        if [ "$PFLOW" == "s" ]; then
+                                PFLOW="sport"
+                                PFLOW_T="from"
+                        elif [ "$PFLOW" == "d" ]; then
+                                PFLOW="dport"
+                                PFLOW_T="to"
+                        fi
+                        PPORT=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$2}'`
+                        if [ ! "$(echo $PPORT | grep _)" == "" ]; then
+                                PPORT_BEG=`echo $PPORT | tr '_' ' ' | awk '{print$1}'`
+                                PPORT_END=`echo $PPORT | tr '_' ' ' | awk '{print$2}'`
+                                PPORT="$PPORT_BEG:$PPORT_END"
+                        fi
+
+                        IPFLOW=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$3}'`
+                        if [ "$IPFLOW" == "s" ]; then
+                                IPFLOW="s"
+                        elif [ "$IPFLOW" == "d" ]; then
+                                IPFLOW="d"
+                        fi
+                        PIP=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$4}'`
+
+                        if [ ! "$IPFLOW" == "" ] && [ ! "$PIP" == "" ] && [ ! "$IPFLOW" == "" ] && [ ! "$PPORT" == "" ]; then
+                                eout "{trust} allow $PIP $PFLOW_T port $PPORT"
+                                $IPT -A TGALLOW -p tcp -$IPFLOW $PIP --$PFLOW $PPORT -j ACCEPT
+                        fi
+                fi
+        done
+        #
+        #
+        for i in `cat $GALLOW_HOSTS | grep -v "#" | grep ":" | grep "=" | grep -v "tcp" | grep -v "udp"`; do
+                if [ ! "$i" == "" ] && [ -f "$GALLOW_HOSTS" ]; then
+
+                        NFLOW=`echo $i | tr ':' ' ' | tr '=' ' '| awk '{print$1}'`
+                        if [ "$NFLOW" == "in" ]; then
+                                NFLOW="INPUT"
+                                NFLOW_T="inbound"
+                        elif [ "$NFLOW" == "out" ]; then
+                                NFLOW="OUTPUT"
+                                NFLOW_T="outbound"
+                        fi
+
+                        PFLOW=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$2}'`
+                        if [ "$PFLOW" == "s" ]; then
+                                PFLOW="sport"
+                                PFLOW_T="from"
+                        elif [ "$PFLOW" == "d" ]; then
+                                PFLOW="dport"
+                                PFLOW_T="to"
+                        fi
+
+                        PPORT=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$3}'`
+                        if [ ! "$(echo $PPORT | grep _)" == "" ]; then
+                                PPORT_BEG=`echo $PPORT | tr '_' ' ' | awk '{print$1}'`
+                                PPORT_END=`echo $PPORT | tr '_' ' ' | awk '{print$2}'`
+                                PPORT="$PPORT_BEG:$PPORT_END"
+                        fi
+
+                        IPFLOW=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$4}'`
+                        if [ "$IPFLOW" == "s" ]; then
+                                IPFLOW="s"
+                        elif [ "$IPFLOW" == "d" ]; then
+                                IPFLOW="d"
+                        fi
+                        PIP=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$5}'`
+
+                        if [ ! "$NFLOW" == "" ] && [ ! "$IPFLOW" == "" ] && [ ! "$PIP" == "" ] && [ ! "$IPFLOW" == "" ] && [ ! "$PPORT" == "" ]; then
+                                eout "{trust} allow $NFLOW_T $PIP $PFLOW_T port $PPORT"
+                                $IPT -A TGALLOW -p tcp -$IPFLOW $PIP --$PFLOW $PPORT -j ACCEPT
+                        fi
+                fi
+        done
+        #
+        #
+        for i in `cat $GALLOW_HOSTS | grep -v "#" | grep ":" | grep "="`; do
+                if [ ! "$i" == "" ] && [ -f "$GALLOW_HOSTS" ]; then
+
+                        PTYPE=`echo $i | tr ':' ' ' | tr '=' ' '| awk '{print$1}'`
+                        if [ "$PTYPE" == "tcp" ]; then
+                                PTYPE="tcp"
+                        elif [ "$PTYPE" == "udp" ]; then
+                                PTYPE="udp"
+                        fi
+
+                        NFLOW=`echo $i | tr ':' ' ' | tr '=' ' '| awk '{print$2}'`
+                        if [ "$NFLOW" == "in" ]; then
+                                NFLOW="INPUT"
+                                NFLOW_T="inbound"
+                        elif [ "$NFLOW" == "out" ]; then
+                                NFLOW="OUTPUT"
+                                NFLOW_T="outbound"
+                        fi
+
+                        PFLOW=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$3}'`
+                        if [ "$PFLOW" == "s" ]; then
+                                PFLOW="sport"
+                                PFLOW_T="from"
+                        elif [ "$PFLOW" == "d" ]; then
+                                PFLOW="dport"
+                                PFLOW_T="to"
+                        fi
+
+                        PPORT=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$4}'`
+                        if [ ! "$(echo $PPORT | grep _)" == "" ]; then
+                                PPORT_BEG=`echo $PPORT | tr '_' ' ' | awk '{print$1}'`
+                                PPORT_END=`echo $PPORT | tr '_' ' ' | awk '{print$2}'`
+                                PPORT="$PPORT_BEG:$PPORT_END"
+                        fi
+
+                        IPFLOW=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$5}'`
+                        if [ "$IPFLOW" == "s" ]; then
+                                IPFLOW="s"
+                        elif [ "$IPFLOW" == "d" ]; then
+                                IPFLOW="d"
+                        fi
+                        PIP=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$6}'`
+
+                        if [ ! "$PTYPE" == "" ] && [ ! "$NFLOW" == "" ] && [ ! "$IPFLOW" == "" ] && [ ! "$PIP" == "" ] && [ ! "$IPFLOW" == "" ] && [ ! "$PPORT" == "" ]; then
+                                eout "{trust} allow $NFLOW_T $PTYPE $PIP $PFLOW_T port $PPORT"
+                                $IPT -A TGALLOW -p $PTYPE -$IPFLOW $PIP --$PFLOW $PPORT -j ACCEPT
+                        fi
+                fi
+        done
+fi
+}
+
+deny_hosts() {
+if [ ! "`cat $DENY_HOSTS | grep -v "#"`" == "" ]; then
+        eout "{glob} loading deny_hosts.rules"
+        #
+        #
+        for i in `cat $DENY_HOSTS | grep -v "#" | grep -v ":" | grep -v "="`; do
+                val=`/sbin/ip addr list $IFACE_IN | grep -w inet | grep -v inet6 | tr '/' ' ' | awk '{print$2}' | grep -w $i`
+                if [ ! "$val" ]; then
+                 if [ ! "$i" == "" ] && [ -f "$DENY_HOSTS" ]; then
+                        eout "{trust} deny all to/from $i"
+                        $IPT -A TDENY -s $i -d 0/0 -j $ALL_STOP
+                        $IPT -A TDENY -d $i -s 0/0 -j $ALL_STOP
+                 fi
+		fi
+        done
+        #
+        #
+	for i in `cat $DENY_HOSTS | grep -v "#" | grep ":" | grep "=" | grep -vw in | grep -vw out | grep -v tcp | grep -v udp`; do
+                if [ ! "$i" == "" ] && [ -f "$DENY_HOSTS" ]; then
+
+                        PFLOW=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$1}'`
+                        if [ "$PFLOW" == "s" ]; then
+                                PFLOW="sport"
+                                PFLOW_T="from"
+                        elif [ "$PFLOW" == "d" ]; then
+                                PFLOW="dport"
+                                PFLOW_T="to"
+                        fi
+                        PPORT=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$2}'`
+                        if [ ! "$(echo $PPORT | grep _)" == "" ]; then
+                                PPORT_BEG=`echo $PPORT | tr '_' ' ' | awk '{print$1}'`
+                                PPORT_END=`echo $PPORT | tr '_' ' ' | awk '{print$2}'`
+                                PPORT="$PPORT_BEG:$PPORT_END"
+                        fi
+
+                        IPFLOW=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$3}'`
+                        if [ "$IPFLOW" == "s" ]; then
+                                IPFLOW="s"
+                        elif [ "$IPFLOW" == "d" ]; then
+                                IPFLOW="d"
+                        fi
+                        PIP=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$4}'`
+
+                        if [ ! "$IPFLOW" == "" ] && [ ! "$PIP" == "" ] && [ ! "$IPFLOW" == "" ] && [ ! "$PPORT" == "" ]; then
+                                eout "{trust} deny $PIP $PFLOW_T port $PPORT"
+                                $IPT -A TDENY -p tcp -$IPFLOW $PIP --$PFLOW $PPORT -j $TCP_STOP
+				$IPT -A TDENY -p udp -$IPFLOW $PIP --$PFLOW $PPORT -j $UDP_STOP
+                        fi
+                fi
+        done
+        #
+        #
+        for i in `cat $DENY_HOSTS | grep -v "#" | grep ":" | grep "=" | grep -v "tcp" | grep -v "udp"`; do
+                if [ ! "$i" == "" ] && [ -f "$DENY_HOSTS" ]; then
+
+                        NFLOW=`echo $i | tr ':' ' ' | tr '=' ' '| awk '{print$1}'`
+                        if [ "$NFLOW" == "in" ]; then
+                                NFLOW="INPUT"
+                                NFLOW_T="inbound"
+                        elif [ "$NFLOW" == "out" ]; then
+                                NFLOW="OUTPUT"
+                                NFLOW_T="outbound"
+                        fi
+
+                        PFLOW=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$2}'`
+                        if [ "$PFLOW" == "s" ]; then
+                                PFLOW="sport"
+                                PFLOW_T="from"
+                        elif [ "$PFLOW" == "d" ]; then
+                                PFLOW="dport"
+                                PFLOW_T="to"
+                        fi
+
+                        PPORT=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$3}'`
+                        if [ ! "$(echo $PPORT | grep _)" == "" ]; then
+                                PPORT_BEG=`echo $PPORT | tr '_' ' ' | awk '{print$1}'`
+                                PPORT_END=`echo $PPORT | tr '_' ' ' | awk '{print$2}'`
+                                PPORT="$PPORT_BEG:$PPORT_END"
+                        fi
+
+                        IPFLOW=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$4}'`
+                        if [ "$IPFLOW" == "s" ]; then
+                                IPFLOW="s"
+                        elif [ "$IPFLOW" == "d" ]; then
+                                IPFLOW="d"
+                        fi
+                        PIP=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$5}'`
+
+                        if [ ! "$NFLOW" == "" ] && [ ! "$IPFLOW" == "" ] && [ ! "$PIP" == "" ] && [ ! "$IPFLOW" == "" ] && [ ! "$PPORT" == "" ]; then
+                                eout "{trust} deny ($NFLOW_T) $PIP $PFLOW_T port $PPORT"
+                                $IPT -A TDENY -p tcp -$IPFLOW $PIP --$PFLOW $PPORT -j $TCP_STOP
+				$IPT -A TDENY -p udp -$IPFLOW $PIP --$PFLOW $PPORT -j $UDP_STOP
+                        fi
+                fi
+        done
+        #
+        #
+        for i in `cat $DENY_HOSTS | grep -v "#" | grep ":" | grep "="`; do
+                if [ ! "$i" == "" ] && [ -f "$DENY_HOSTS" ]; then
+
+                        PTYPE=`echo $i | tr ':' ' ' | tr '=' ' '| awk '{print$1}'`
+                        if [ "$PTYPE" == "tcp" ]; then
+                                PTYPE="tcp"
+                        elif [ "$PTYPE" == "udp" ]; then
+                                PTYPE="udp"
+                        fi
+
+                        NFLOW=`echo $i | tr ':' ' ' | tr '=' ' '| awk '{print$2}'`
+                        if [ "$NFLOW" == "in" ]; then
+                                NFLOW="INPUT"
+                                NFLOW_T="inbound"
+                        elif [ "$NFLOW" == "out" ]; then
+                                NFLOW="OUTPUT"
+                                NFLOW_T="outbound"
+                        fi
+
+                        PFLOW=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$3}'`
+                        if [ "$PFLOW" == "s" ]; then
+                                PFLOW="sport"
+                                PFLOW_T="from"
+                        elif [ "$PFLOW" == "d" ]; then
+                                PFLOW="dport"
+                                PFLOW_T="to"
+                        fi
+
+                        PPORT=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$4}'`
+                        if [ ! "$(echo $PPORT | grep _)" == "" ]; then
+                                PPORT_BEG=`echo $PPORT | tr '_' ' ' | awk '{print$1}'`
+                                PPORT_END=`echo $PPORT | tr '_' ' ' | awk '{print$2}'`
+                                PPORT="$PPORT_BEG:$PPORT_END"
+                        fi
+
+                        IPFLOW=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$5}'`
+                        if [ "$IPFLOW" == "s" ]; then
+                                IPFLOW="s"
+                        elif [ "$IPFLOW" == "d" ]; then
+                                IPFLOW="d"
+                        fi
+                        PIP=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$6}'`
+
+                        if [ ! "$PTYPE" == "" ] && [ ! "$NFLOW" == "" ] && [ ! "$IPFLOW" == "" ] && [ ! "$PIP" == "" ] && [ ! "$IPFLOW" == "" ] && [ ! "$PPORT" == "" ]; then
+                                eout "{trust} deny $NFLOW_T $PTYPE $PIP $PFLOW_T port $PPORT"
+				if [ "$PTYPE" == "tcp" ]; then
+                                $IPT -A TDENY -p $PTYPE -$IPFLOW $PIP --$PFLOW $PPORT -j $TCP_STOP
+				elif [ "$PTYPE" == "udp" ]; then
+				$IPT -A TDENY -p $PTYPE -$IPFLOW $PIP --$PFLOW $PPORT -j $UDP_STOP
+				fi
+                        fi
+                fi
+        done
+fi
+}
+
+
+
+
+glob_deny_hosts() {
+if [ ! "`cat $GDENY_HOSTS | grep -v "#"`" == "" ]; then
+        eout "{glob} loading glob_deny.rules"
+        #
+        #
+        for i in `cat $GDENY_HOSTS | grep -v "#" | grep -v ":" | grep -v "="`; do
+                if [ ! "$i" == "" ] && [ -f "$GDENY_HOSTS" ]; then
+                        eout "{trust} deny all to/from $i"
+                        $IPT -A TGDENY -s $i -d 0/0 -j $ALL_STOP
+                        $IPT -A TGDENY -d $i -s 0/0 -j $ALL_STOP
+                fi
+        done
+        #
+        #
+	for i in `cat $GDENY_HOSTS | grep -v "#" | grep ":" | grep "=" | grep -vw in | grep -vw out | grep -v tcp | grep -v udp`; do
+                if [ ! "$i" == "" ] && [ -f "$GDENY_HOSTS" ]; then
+
+                        PFLOW=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$1}'`
+                        if [ "$PFLOW" == "s" ]; then
+                                PFLOW="sport"
+                                PFLOW_T="from"
+                        elif [ "$PFLOW" == "d" ]; then
+                                PFLOW="dport"
+                                PFLOW_T="to"
+                        fi
+                        PPORT=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$2}'`
+                        if [ ! "$(echo $PPORT | grep _)" == "" ]; then
+                                PPORT_BEG=`echo $PPORT | tr '_' ' ' | awk '{print$1}'`
+                                PPORT_END=`echo $PPORT | tr '_' ' ' | awk '{print$2}'`
+                                PPORT="$PPORT_BEG:$PPORT_END"
+                        fi
+
+                        IPFLOW=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$3}'`
+                        if [ "$IPFLOW" == "s" ]; then
+                                IPFLOW="s"
+                        elif [ "$IPFLOW" == "d" ]; then
+                                IPFLOW="d"
+                        fi
+                        PIP=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$4}'`
+
+                        if [ ! "$IPFLOW" == "" ] && [ ! "$PIP" == "" ] && [ ! "$IPFLOW" == "" ] && [ ! "$PPORT" == "" ]; then
+                                eout "{trust} deny $PIP $PFLOW_T port $PPORT"
+                                $IPT -A TGDENY -p tcp -$IPFLOW $PIP --$PFLOW $PPORT -j $TCP_STOP
+				$IPT -A TGDENY -p udp -$IPFLOW $PIP --$PFLOW $PPORT -j $UDP_STOP
+                        fi
+                fi
+        done
+        #
+        #
+        for i in `cat $GDENY_HOSTS | grep -v "#" | grep ":" | grep "=" | grep -v "tcp" | grep -v "udp"`; do
+                if [ ! "$i" == "" ] && [ -f "$GDENY_HOSTS" ]; then
+
+                        NFLOW=`echo $i | tr ':' ' ' | tr '=' ' '| awk '{print$1}'`
+                        if [ "$NFLOW" == "in" ]; then
+                                NFLOW="INPUT"
+                                NFLOW_T="inbound"
+                        elif [ "$NFLOW" == "out" ]; then
+                                NFLOW="OUTPUT"
+                                NFLOW_T="outbound"
+                        fi
+
+                        PFLOW=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$2}'`
+                        if [ "$PFLOW" == "s" ]; then
+                                PFLOW="sport"
+                                PFLOW_T="from"
+                        elif [ "$PFLOW" == "d" ]; then
+                                PFLOW="dport"
+                                PFLOW_T="to"
+                        fi
+
+                        PPORT=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$3}'`
+                        if [ ! "$(echo $PPORT | grep _)" == "" ]; then
+                                PPORT_BEG=`echo $PPORT | tr '_' ' ' | awk '{print$1}'`
+                                PPORT_END=`echo $PPORT | tr '_' ' ' | awk '{print$2}'`
+                                PPORT="$PPORT_BEG:$PPORT_END"
+                        fi
+
+                        IPFLOW=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$4}'`
+                        if [ "$IPFLOW" == "s" ]; then
+                                IPFLOW="s"
+                        elif [ "$IPFLOW" == "d" ]; then
+                                IPFLOW="d"
+                        fi
+                        PIP=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$5}'`
+
+                        if [ ! "$NFLOW" == "" ] && [ ! "$IPFLOW" == "" ] && [ ! "$PIP" == "" ] && [ ! "$IPFLOW" == "" ] && [ ! "$PPORT" == "" ]; then
+                                eout "{trust} deny ($NFLOW_T) $PIP $PFLOW_T port $PPORT"
+                                $IPT -A TGDENY -p tcp -$IPFLOW $PIP --$PFLOW $PPORT -j $TCP_STOP
+				$IPT -A TGDENY -p udp -$IPFLOW $PIP --$PFLOW $PPORT -j $UDP_STOP
+                        fi
+                fi
+        done
+        #
+        #
+        for i in `cat $GDENY_HOSTS | grep -v "#" | grep ":" | grep "="`; do
+                if [ ! "$i" == "" ] && [ -f "$GDENY_HOSTS" ]; then
+
+                        PTYPE=`echo $i | tr ':' ' ' | tr '=' ' '| awk '{print$1}'`
+                        if [ "$PTYPE" == "tcp" ]; then
+                                PTYPE="tcp"
+                        elif [ "$PTYPE" == "udp" ]; then
+                                PTYPE="udp"
+                        fi
+
+                        NFLOW=`echo $i | tr ':' ' ' | tr '=' ' '| awk '{print$2}'`
+                        if [ "$NFLOW" == "in" ]; then
+                                NFLOW="INPUT"
+                                NFLOW_T="inbound"
+                        elif [ "$NFLOW" == "out" ]; then
+                                NFLOW="OUTPUT"
+                                NFLOW_T="outbound"
+                        fi
+
+                        PFLOW=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$3}'`
+                        if [ "$PFLOW" == "s" ]; then
+                                PFLOW="sport"
+                                PFLOW_T="from"
+                        elif [ "$PFLOW" == "d" ]; then
+                                PFLOW="dport"
+                                PFLOW_T="to"
+                        fi
+
+                        PPORT=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$4}'`
+                        if [ ! "$(echo $PPORT | grep _)" == "" ]; then
+                                PPORT_BEG=`echo $PPORT | tr '_' ' ' | awk '{print$1}'`
+                                PPORT_END=`echo $PPORT | tr '_' ' ' | awk '{print$2}'`
+                                PPORT="$PPORT_BEG:$PPORT_END"
+                        fi
+
+                        IPFLOW=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$5}'`
+                        if [ "$IPFLOW" == "s" ]; then
+                                IPFLOW="s"
+                        elif [ "$IPFLOW" == "d" ]; then
+                                IPFLOW="d"
+                        fi
+                        PIP=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$6}'`
+
+                        if [ ! "$PTYPE" == "" ] && [ ! "$NFLOW" == "" ] && [ ! "$IPFLOW" == "" ] && [ ! "$PIP" == "" ] && [ ! "$IPFLOW" == "" ] && [ ! "$PPORT" == "" ]; then
+                                eout "{trust} deny $NFLOW_T $PTYPE $PIP $PFLOW_T port $PPORT"
+				if [ "$PTYPE" == "tcp" ]; then
+                                $IPT -A TGDENY -p $PTYPE -$IPFLOW $PIP --$PFLOW $PPORT -j $TCP_STOP
+				elif [ "$PTYPE" == "udp" ]; then
+				$IPT -A TGDENY -p $PTYPE -$IPFLOW $PIP --$PFLOW $PPORT -j $UDP_STOP
+				fi
+                        fi
+                fi
+        done
+fi
+}
+
+dlist_resnet() {
+ if [ -f "$RESNET" ]; then
+        cp $RESNET $RESNET.bk
+        chmod 600 $RESNET $RESNET.bk
+ fi
+if [ -f "$WGET" ] && [ -f "$RESNET" ]; then
+   URL_TMP="/etc/apf/.apf-$$"
+   rm -rf $URL_TMP
+   URL_FILE=`echo $DLIST_RESERVED_URL | tr '/' '\n' | grep "." | tail -n 1`
+   RD_CON="$DLIST_RESERVED_URL_PROT://$DLIST_RESERVED_URL"
+   mkdir $URL_TMP
+   cd $URL_TMP
+   eout "{resnet} downloading $DLIST_RESERVED_URL_PROT://$DLIST_RESERVED_URL"
+   $WGET -t 1 -T 4 $DLIST_RESERVED_URL_PROT://$DLIST_RESERVED_URL >> /dev/null 2>&1
+   if [ -f "$URL_TMP/$URL_FILE" ]; then
+        eout "{resnet} parsing $URL_FILE into $RESNET"
+        cat $URL_TMP/$URL_FILE > $RESNET
+   else
+        eout "{resnet} download of $DLIST_RESERVED_URL_PROT://$DLIST_RESERVED_URL failed"
+	 if [ -f "$RESNET" ]; then
+	     cp $RESNET.bk $RESNET
+   	     chmod 600 $RESNET $RESNET.bk
+	 fi
+   fi
+   rm -rf $URL_TMP
+   cd /etc/apf
+else
+ if [ -f "$RESNET" ]; then
+	cp $RESNET.bk $RESNET
+	chmod 600 $RESNET $RESNET.bk
+ fi
+fi
+}
+
+dlist_php() {
+if [ ! "$DLIST_PHP_URL_PROT" == "" ] && [ ! "$DLIST_PHP_URL" == "" ] && [ "$DLIST_PHP" == "1" ] && [ -f "$WGET" ]; then
+   URL_TMP="/etc/apf/.apf-$$"
+   rm -rf $URL_TMP /etc/apf/.apf-*
+   URL_FILE=`echo $DLIST_PHP_URL | tr '/' '\n' | grep "." | tail -n 1`
+   URL_CON="$DLIST_PHP_URL_PROT://$DLIST_PHP_URL"
+   mkdir $URL_TMP
+   cd $URL_TMP
+   eout "{php} downloading $DLIST_PHP_URL_PROT://$DLIST_PHP_URL"
+   $WGET -t 1 -T 4 $DLIST_PHP_URL_PROT://$DLIST_PHP_URL >> /dev/null 2>&1
+   if [ -f "$URL_TMP/$URL_FILE" ]; then
+        eout "{php} parsing $URL_FILE into $PHP_HOSTS"
+        if [ -f "$PHP_HOSTS" ]; then
+                :> $PHP_HOSTS
+        fi
+        for str in `cat $URL_TMP/$URL_FILE | grep -v "#" | grep -e '[0-9]' | awk '{print$1}'`; do
+                if [ ! "$str" == "" ]; then
+                    echo "$str" >> $PHP_HOSTS
+                fi
+        done
+   else
+        eout "{php} download of $DLIST_PHP_URL_PROT://$DLIST_PHP_URL failed"
+   fi
+   rm -rf $URL_TMP
+   cd /etc/apf
+else
+   rm -f $PHP_HOSTS
+   touch $PHP_HOSTS
+   chmod 600 $PHP_HOSTS
+fi
+}
+
+dlist_php_hosts() {
+if [ ! "`cat $PHP_HOSTS | grep -v "#"`" == "" ]; then
+        eout "{php} loading php_hosts.rules"
+        $IPT -N PHP
+        for i in `cat $PHP_HOSTS | grep -v "#"`; do
+                if [ ! "$i" == "" ] && [ -f "$PHP_HOSTS" ]; then
+		        if [ "$LOG_DROP" == "1" ]; then
+                         $IPT -A PHP -s $i -d 0/0 -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** PHP ** "
+			fi
+                        $IPT -A PHP -s $i -d 0/0 -j $ALL_STOP
+                fi
+        done
+        $IPT -A INPUT -j PHP
+        $IPT -A OUTPUT -j PHP
+fi
+}
+
+dlist_dshield() {
+if [ ! "$DLIST_DSHIELD_URL_PROT" == "" ] && [ ! "$DLIST_DSHIELD_URL" == "" ] && [ "$DLIST_DSHIELD" == "1" ] && [ -f "$WGET" ]; then
+   URL_TMP="/etc/apf/.apf-$$"
+   rm -rf $URL_TMP /etc/apf/.apf-*
+   URL_FILE=`echo $DLIST_DSHIELD_URL | tr '/' '\n' | grep "." | tail -n 1`
+   URL_CON="$DLIST_DSHIELD_URL_PROT://$DLIST_DSHIELD_URL"
+   mkdir $URL_TMP
+   cd $URL_TMP
+   eout "{dshield} downloading $DLIST_DSHIELD_URL_PROT://$DLIST_DSHIELD_URL"
+   $WGET -t 1 -T 4 $DLIST_DSHIELD_URL_PROT://$DLIST_DSHIELD_URL >> /dev/null 2>&1
+   if [ -f "$URL_TMP/$URL_FILE" ]; then
+        eout "{dshield} parsing $URL_FILE into $DS_HOSTS"
+        if [ -f "$DS_HOSTS" ]; then
+                :> $DS_HOSTS
+        fi
+        for str in `cat $URL_TMP/$URL_FILE | grep -v "#" | grep -e '[0-9]' | awk '{print$1}'`; do
+                if [ ! "$str" == "" ]; then
+                    echo "$str/24" >> $DS_HOSTS
+                fi
+        done
+   else
+        eout "{dshield} download of $DLIST_DSHIELD_URL_PROT://$DLIST_DSHIELD_URL failed"
+   fi
+   rm -rf $URL_TMP
+   cd /etc/apf
+else
+   rm -f $DS_HOSTS
+   touch $DS_HOSTS
+   chmod 600 $DS_HOSTS
+fi
+}
+
+dlist_dshield_hosts() {
+if [ ! "`cat $DS_HOSTS | grep -v "#"`" == "" ]; then
+        eout "{dshield} loading ds_hosts.rules"
+        $IPT -N DSHIELD
+        for i in `cat $DS_HOSTS | grep -v "#"`; do
+                if [ ! "$i" == "" ] && [ -f "$DS_HOSTS" ]; then
+		        if [ "$LOG_DROP" == "1" ]; then
+                         $IPT -A DSHIELD -s $i -d 0/0 -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** DSHIELD ** "
+			fi
+                        $IPT -A DSHIELD -s $i -d 0/0 -j $ALL_STOP
+                fi
+        done
+        $IPT -A INPUT -j DSHIELD
+        $IPT -A OUTPUT -j DSHIELD
+fi
+}
+
+dlist_spamhaus() {
+if [ ! "$DLIST_SPAMHAUS_URL_PROT" == "" ] && [ ! "$DLIST_SPAMHAUS_URL" == "" ] && [ "$DLIST_SPAMHAUS" == "1" ] && [ -f "$WGET" ]; then
+   URL_TMP="/etc/apf/.apf-$$"
+   rm -rf $URL_TMP /etc/apf/.apf-*
+   URL_FILE=`echo $DLIST_SPAMHAUS_URL | tr '/' '\n' | grep "." | tail -n 1`
+   URL_CON="$DLIST_SPAMHAUS_URL_PROT://$DLIST_SPAMHAUS_URL"
+   mkdir $URL_TMP
+   cd $URL_TMP
+   eout "{sdrop} downloading $DLIST_SPAMHAUS_URL_PROT://$DLIST_SPAMHAUS_URL"
+   $WGET -t 1 -T 4 $DLIST_SPAMHAUS_URL_PROT://$DLIST_SPAMHAUS_URL >> /dev/null 2>&1
+   if [ -f "$URL_TMP/$URL_FILE" ]; then
+        eout "{sdrop} parsing $URL_FILE into $DROP_HOSTS"
+        if [ -f "$DROP_HOSTS" ]; then
+                :> $DROP_HOSTS
+        fi
+        for str in `cat $URL_TMP/$URL_FILE | grep -v "#" | grep "/" | awk '{print$1}' | tr -d ';'`; do
+                if [ ! "$str" == "" ]; then
+                    echo "$str" >> $DROP_HOSTS
+                fi
+        done
+   else
+        eout "{sdrop} download of $DLIST_SPAMHAUS_URL_PROT://$DLIST_SPAMHAUS_URL failed"
+   fi
+   rm -rf $URL_TMP
+   cd /etc/apf
+else
+   rm -f $DROP_HOSTS
+   touch $DROP_HOSTS
+   chmod 600 $DROP_HOSTS
+fi
+}
+
+
+dlist_spamhaus_hosts() {
+if [ ! "`cat $DROP_HOSTS | grep -v "#"`" == "" ]; then
+        eout "{sdrop} loading sdrop_hosts.rules"
+        $IPT -N SDROP
+        for i in `cat $DROP_HOSTS | grep -v "#"`; do
+                if [ ! "$i" == "" ] && [ -f "$DROP_HOSTS" ]; then
+		        if [ "$LOG_DROP" == "1" ]; then
+                         $IPT -A SDROP -s $i -d 0/0 -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** SDROP ** "
+		        fi
+                        $IPT -A SDROP -s $i -d 0/0 -j $ALL_STOP
+                fi
+        done
+        $IPT -A INPUT -j SDROP
+        $IPT -A OUTPUT -j SDROP
+fi
+}
+
+dlist_ecnshame() {
+if [ ! "$DLIST_ECNSHAME_URL_PROT" == "" ] && [ ! "$DLIST_ECNSHAME_URL" == "" ] && [ "$DLIST_ECNSHAME" == "1" ] && [ -f "$WGET" ]; then
+   URL_TMP="/etc/apf/.apf-$$"
+   rm -rf $URL_TMP /etc/apf/.apf-*
+   URL_FILE=`echo $DLIST_ECNSHAME_URL | tr '/' '\n' | grep "." | tail -n 1`
+   URL_CON="$DLIST_ECNSHAME_URL_PROT://$DLIST_ECNSHAME_URL"
+   mkdir $URL_TMP
+   cd $URL_TMP
+   eout "{ecnshame} downloading $DLIST_ECNSHAME_URL_PROT://$DLIST_ECNSHAME_URL"
+   $WGET -t 1 -T 4 $DLIST_ECNSHAME_URL_PROT://$DLIST_ECNSHAME_URL >> /dev/null 2>&1
+   if [ -f "$URL_TMP/$URL_FILE" ]; then
+        eout "{ecnshame} parsing $URL_FILE into $ECNSHAME_HOSTS"
+        if [ -f "$ECNSHAME_HOSTS" ]; then
+                :> $ECNSHAME_HOSTS
+        fi
+        for str in `cat $URL_TMP/$URL_FILE`; do
+                if [ ! "$str" == "" ]; then
+                    echo "$str" >> $ECNSHAME_HOSTS
+                fi
+        done
+   else
+        eout "{ecnshame} download of $DLIST_ECNSHAME_URL_PROT://$DLIST_ECNSHAME_URL failed"
+   fi
+   rm -rf $URL_TMP
+   cd /etc/apf
+else
+   rm -f $ECNSHAME_HOSTS
+   touch $ECNSHAME_HOSTS
+   chmod 600 $ECNSHAME_HOSTS
+fi
+}
+
+dlist_ecnshame_hosts() {
+if [ ! "`cat $ECNSHAME_HOSTS | grep -v "#"`" == "" ]; then
+        eout "{ecnshame} loading ecnshame_hosts.rules"
+        for i in `cat $ECNSHAME_HOSTS | grep -v "#"`; do
+                if [ ! "$i" == "" ] && [ -f "$ECNSHAME_HOSTS" ]; then
+			$IPT -t mangle -A POSTROUTING -p tcp -d $i -j ECN --ecn-tcp-remove
+                fi
+        done
+fi
+}
+
+glob_allow_download() {
+if [ ! "$GA_URL_PROT" == "" ] && [ ! "$GA_URL" == "" ] && [ "$USE_RGT" == "1" ] && [ -f "$WGET" ]; then
+   URL_TMP="/etc/apf/.apf-$$"
+   rm -rf $URL_TMP
+   URL_FILE=`echo $GA_URL | tr '/' '\n' | grep "." | tail -n 1`
+   GA_URL_CON="$GA_URL_PROT://$GA_URL"
+   mkdir $URL_TMP
+   cd $URL_TMP
+   eout "{trust} downloading $GA_URL_PROT://$GA_URL"
+   $WGET -t 1 -T 4 $GA_URL_PROT://$GA_URL >> /dev/null 2>&1
+   if [ -f "$URL_TMP/$URL_FILE" ]; then
+        eout "{trust} parsing $URL_FILE into $GALLOW_HOSTS"
+        cat $URL_TMP/$URL_FILE > $GALLOW_HOSTS
+   else
+        eout "{trust} download of $GA_URL_PROT://$GA_URL failed"
+   fi
+   rm -rf $URL_TMP
+   cd /etc/apf
+else
+   rm -f $GALLOW_HOSTS
+   touch $GALLOW_HOSTS
+   chmod 600 $GALLOW_HOSTS
+fi
+}
+
+glob_deny_download() {
+if [ ! "$GD_URL_PROT" == "" ] && [ ! "$GD_URL" == "" ] && [ "$USE_RGT" == "1" ] && [ -f "$WGET" ]; then
+   URL_TMP="/etc/apf/.apf-$$"
+   rm -rf $URL_TMP
+   URL_FILE=`echo $GD_URL | tr '/' '\n' | grep "." | tail -n 1`
+   GD_URL_CON="$GD_URL_PROT://$GD_URL"
+   mkdir $URL_TMP
+   cd $URL_TMP
+   eout "{trust} downloading $GD_URL_PROT://$GD_URL"
+   $WGET -t 1 -T 4 $GD_URL_PROT://$GD_URL >> /dev/null 2>&1
+   if [ -f "$URL_TMP/$URL_FILE" ]; then
+        eout "{trust} parsing $URL_FILE into $GDENY_HOSTS"
+	cat $URL_TMP/$URL_FILE > $GDENY_HOSTS
+   else
+        eout "{trust} download of $GD_URL_PROT://$GD_URL failed"
+   fi
+   rm -rf $URL_TMP
+   cd /etc/apf
+else
+   rm -f $GDENY_HOSTS
+   touch $GDENY_HOSTS
+   chmod 600 $GDENY_HOSTS
+fi
+}
+
+dnet() {
+FILE="$1"
+if [ -f "$FILE" ]; then
+FNAME=`echo $FILE | tr '/' '\n' | tail -n 1`
+eout "{glob} loading $FNAME"
+ for i in `cat $FILE | grep -v "#"`; do
+  if [ ! "$i" == "" ]; then
+        $IPT -A INPUT -i $IF -s $i -j $ALL_STOP
+	$IPT -A OUTPUT -o $IF -d $i -j $ALL_STOP
+  fi
+ done
+fi
+}
+
+bandmin() {
+if [ -f "/usr/local/bandmin/bandmin" ]; then
+        /usr/local/bandmin/bandmin >> /dev/null 2>&1
+        /usr/local/bandmin/ipaddrmap >> /dev/null 2>&1
+fi
+}
+
+cdports() {
+if [ ! "$BLK_PORTS" == "" ]; then
+	eout "{glob} loading common drop ports"
+for i in `echo $BLK_PORTS | tr ',' ' '`; do
+	if [ "$(echo $i | grep "_")" == "" ]; then
+         if [ ! "$i" == "" ]; then
+		$IPT -A INPUT  -p tcp --dport $i -j $TCP_STOP
+		$IPT -A INPUT  -p udp --dport $i -j $UDP_STOP
+		$IPT -A OUTPUT  -p tcp --dport $i -j $TCP_STOP
+		$IPT -A OUTPUT  -p udp --dport $i -j $UDP_STOP
+		eout "{blk_ports} deny all to/from tcp port $i"
+                eout "{blk_ports} deny all to/from udp port $i"
+         fi
+        else
+                i=`echo $i | tr '_' ':'`
+                if [ ! "$i" == "" ]; then
+			$IPT -A INPUT  -p tcp --dport $i -j $TCP_STOP
+			$IPT -A INPUT  -p udp --dport $i -j $UDP_STOP
+			$IPT -A OUTPUT  -p tcp --dport $i -j $TCP_STOP
+			$IPT -A OUTPUT  -p udp --dport $i -j $UDP_STOP
+        	        eout "{blk_ports} deny all to/from tcp port $i"
+	                eout "{blk_ports} deny all to/from udp port $i"
+                fi
+        fi
+done
+fi
+}
+
+lgate_mac() {
+$IPT -N LMAC
+for mac in `echo $LGATE_MAC | tr ',' ' '`; do
+MAC=$mac
+if [ ! "$MAC" == "" ]; then
+  $IPT -A INPUT  -m mac ! --mac-source "$MAC" -j LMAC
+  eout "{glob} gateway ($MAC) route verification enabled"
+fi
+done
+
+if [ "$LOG_LGATE" == "1" ]; then
+ $IPT -A LMAC -m limit --limit $LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix=" ** DROP FORIGN MAC ** "
+fi
+$IPT -A LMAC  -j REJECT --reject-with icmp-net-prohibited
+}
+
+cl_cports() {
+	IG_TCP_CPORTS=""
+	IG_UDP_CPORTS=""
+	IG_ICMP_TYPES=""
+	EG_TCP_CPORTS=""
+	EG_UDP_CPORTS=""
+	EG_ICMP_TYPES=""
+	EG_TCP_UID=""
+	EG_UDP_UID=""
+}
+
+expirebans() {
+if [ -z "$SET_EXPIRE" ]; then
+	SET_EXPIRE=0
+fi
+if [ "$SET_EXPIRE" -ge "60" ]; then
+ REFRESH_TIME=$[SET_REFRESH*60]
+ if [ "$SET_EXPIRE" -lt "$REFRESH_TIME" ]; then
+	SET_EXPIRE=$REFRESH_TIME
+ fi
+ if [ -f "/etc/apf/deny_hosts.rules" ]; then
+         expire_time="$SET_EXPIRE"
+         check_time=$(date +%s)
+         for i in `cat /etc/apf/deny_hosts.rules | grep -vE "static|noexpire" | grep -iE "# added.*on.*with comment:.*" | awk '{print$3"|"$5"|"$6}'`; do
+                declare -a arr
+                arr=(`echo ${i//|/ }`)
+                ip=${arr[0]}
+                date_d=${arr[1]}
+                date_t=${arr[2]}
+                ban_time=$(date --date "$date_d $date_t" +%s)
+                time_diff=$[$check_time-$ban_time]
+                if [ "$time_diff" -ge "$expire_time" ]; then
+                        eout "{trust} removed expired ban for $ip (${time_diff}s/${expire_time}s)"
+                        /etc/apf/apf -u "$ip" >> /dev/null 2>&1
+                fi
+         done
+ fi
+fi
+}
+
+refresh() {
+	if [ "$SET_EXPIRE" -ge "60" ]; then
+		# expire deny_hosts bans
+		expirebans
+	fi
+        eout "{glob} refreshing trust system rules."
+	tmpra="/etc/apf/internals/refresh.allow.temp.$$"
+        /sbin/iptables-save | grep -E "TALLOW|TGALLOW" | grep -E '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | awk '{print$4}' | sort -n | uniq > $tmpra
+        $IPT -F REFRESH_TEMP
+        for i in `cat $tmpra | grep -v "#"`; do
+                if [ ! "$i" == "" ]; then
+                 $IPT -A REFRESH_TEMP -s $i -d 0/0 -j ACCEPT
+                 $IPT -A REFRESH_TEMP -d $i -s 0/0 -j ACCEPT
+                fi
+        done
+        tmprd="/etc/apf/internals/refresh.drop.temp.$$"
+        /sbin/iptables-save | grep -E "TDENY|TGDENY" | grep -E '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | awk '{print$4}' | sort -n | uniq > $tmprd
+        $IPT -F REFRESH_TEMP
+        for i in `cat $tmprd | grep -v "#"`; do
+                if [ ! "$i" == "" ]; then
+                 $IPT -A REFRESH_TEMP -s $i -d 0/0 -j $ALL_STOP
+                 $IPT -A REFRESH_TEMP -d $i -s 0/0 -j $ALL_STOP
+                fi
+        done
+        trim $DENY_HOSTS $SET_TRIM
+        trim $GDENY_HOSTS $SET_TRIM
+        $IPT -F TDENY
+        $IPT -F TGDENY
+        $IPT -F TALLOW
+        $IPT -F TGALLOW
+        glob_allow_download
+        glob_allow_hosts
+        allow_hosts
+        deny_hosts
+        glob_deny_download
+        glob_deny_hosts
+        $IPT -F REFRESH_TEMP
+        rm -f $tmpra $tmprd
+}
+
+cron_refresh() {
+if [ ! "$SET_REFRESH" == "0" ] && [ ! "$SET_REFRESH" == "" ]; then
+cat<<EOF > $INSTALL_PATH/internals/cron.refresh
+*/$SET_REFRESH * * * * root /etc/apf/apf --refresh >> /dev/null 2>&1 &
+EOF
+	chmod 644 $INSTALL_PATH/internals/cron.refresh
+	ln -fs $INSTALL_PATH/internals/cron.refresh /etc/cron.d/refresh.apf
+	eout "{glob} SET_REFRESH is set to $SET_REFRESH minutes"
+else
+	rm -f /etc/cron.d/refresh.apf
+	eout "{glob} SET_REFRESH is set disabled"
+
+fi
+}

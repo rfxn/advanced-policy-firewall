@@ -1,0 +1,23 @@
+#!/bin/bash
+
+if [ -d "/usr/local/dshield" ]; then
+	echo "dshield client already installed, aborting."
+	exit 1
+fi
+
+if [ -f "dshield-3.2.tar.gz" ]; then
+	tar xfz dshield-3.2.tar.gz
+	mv dshield /usr/local
+	ln -s /usr/local/dshield/dshield /usr/local/sbin
+	ln -s /usr/local/dshield/dshieldpy.conf /etc/dshieldpy.conf
+	cp cron.ds /etc/cron.daily/ds
+	chmod 755 /etc/cron.daily/ds
+fi
+
+echo "Installation completed."
+echo "Binary:  /usr/local/sbin/dshield"
+echo "Config:  /usr/local/dshield/dshieldpy.conf"
+echo "Cronjob: /etc/cron.daily/ds"
+echo ""
+echo "Warning: Running the binary from command line will send reports to dshield.org;"
+echo "repeated execution may result in your IP being banned from the service."

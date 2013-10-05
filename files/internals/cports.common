@@ -1,0 +1,193 @@
+if [ ! "$IG_TCP_CPORTS" == "" ]; then
+IG_TCP_CPORTS=`echo "$IG_TCP_CPORTS" | tr ',' ' '`
+PROTO="tcp"
+for i in `echo $IG_TCP_CPORTS`; do
+        if [ "$(echo $i | grep "_")" == "" ]; then
+         if [ ! "$i" == "" ]; then
+                $IPT -A INPUT -p $PROTO  -s 0/0 -d $VNET --dport $i -j ACCEPT
+                eout "{glob} opening inbound $PROTO port $i on $VNET"
+         fi
+        else
+                i=`echo $i | tr '_' ':'`
+                if [ ! "$i" == "" ]; then
+                        $IPT -A INPUT -p $PROTO  -s 0/0 -d $VNET --dport $i -j ACCEPT
+                        eout "{glob} opening inbound $PROTO port $i on $VNET"
+                fi
+        fi
+done
+fi
+
+if [ ! "$IG_UDP_CPORTS" == "" ]; then
+IG_UDP_CPORTS=`echo "$IG_UDP_CPORTS" | tr ',' ' '`
+PROTO="udp"
+for i in `echo $IG_UDP_CPORTS`; do
+        if [ "$(echo $i | grep "_")" == "" ]; then
+         if [ ! "$i" == "" ]; then
+                $IPT -A INPUT -p $PROTO  -s 0/0 -d $VNET --dport $i -j ACCEPT
+                eout "{glob} opening inbound $PROTO port $i on $VNET"
+         fi
+        else
+                i=`echo $i | tr '_' ':'`
+                if [ ! "$i" == "" ]; then
+                        $IPT -A INPUT -p $PROTO  -s 0/0 -d $VNET --dport $i -j ACCEPT
+                        eout "{glob} opening inbound $PROTO port $i on $VNET"
+                fi
+        fi
+done
+fi
+
+if [ "$EGF" == "1" ]; then
+if [ ! "$EG_TCP_CPORTS" == "" ]; then
+EG_TCP_CPORTS=`echo "$EG_TCP_CPORTS" | tr ',' ' '`
+PROTO="tcp"
+for i in `echo $EG_TCP_CPORTS`; do
+        if [ "$(echo $i | grep "_")" == "" ]; then
+         if [ ! "$i" == "" ]; then
+                $IPT -A OUTPUT -p $PROTO  -s $VNET --dport $i -j ACCEPT
+                eout "{glob} opening outbound $PROTO port $i on $VNET"
+         fi
+        else
+                i=`echo $i | tr '_' ':'`
+                if [ ! "$i" == "" ]; then
+                        $IPT -A OUTPUT -p $PROTO  -s $VNET --dport $i -j ACCEPT
+                        eout "{glob} opening outbound $PROTO port $i on $VNET"
+                fi
+        fi
+done
+fi
+fi
+
+if [ "$EGF" == "1" ]; then
+if [ ! "$EG_UDP_CPORTS" == "" ]; then
+EG_UDP_CPORTS=`echo "$EG_UDP_CPORTS" | tr ',' ' '`
+PROTO="udp"
+for i in `echo $EG_UDP_CPORTS`; do
+        if [ "$(echo $i | grep "_")" == "" ]; then
+         if [ ! "$i" == "" ]; then
+                $IPT -A OUTPUT -p $PROTO  -s $VNET --dport $i -j ACCEPT
+                eout "{glob} opening outbound $PROTO port $i on $VNET"
+         fi
+        else
+                i=`echo $i | tr '_' ':'`
+                if [ ! "$i" == "" ]; then
+                        $IPT -A OUTPUT -p $PROTO  -s $VNET --dport $i -j ACCEPT
+                        eout "{glob} opening outbound $PROTO port $i on $VNET"
+                fi
+        fi
+done
+fi
+fi
+
+if [ ! "$IG_ICMP_TYPES" == "" ]; then
+PROTO="icmp"
+if [ "$ICMP_LIM" == "" ]; then
+	ICMP_LIM=0
+fi
+if [ "$(echo $ICMP_LIM | tr '/' ' ' | awk '{print$1}')" -gt "0" ]; then
+	ICMP_EARGS="-m limit --limit $ICMP_LIM"
+else
+	ICMP_EARGS=""
+fi
+IG_ICMP_TYPES=`echo $IG_ICMP_TYPES | tr ',' ' '`
+	for i in `echo $IG_ICMP_TYPES`; do
+         if [ ! "$i" == "" ]; then
+                i=`echo $i | tr '[:upper:]' '[:lower:]'`
+                if [ "$i" == "all" ]; then
+                  $IPT -A INPUT -p icmp -d $VNET  -s 0/0 $ICMP_EARGS -j ACCEPT
+                  eout "{glob} opening inbound $PROTO all on $VNET"
+                else
+                  $IPT -A INPUT -p icmp --icmp-type $i -d $VNET  -s 0/0 $ICMP_EARGS -j ACCEPT
+                  eout "{glob} opening inbound $PROTO type $i on $VNET"
+                fi
+	 fi
+	done
+fi
+
+if [ "$EGF" == "1" ]; then
+if [ ! "$EG_ICMP_TYPES" == "" ]; then
+PROTO="icmp"
+if [ "$ICMP_LIM" == "" ]; then
+        ICMP_LIM=0
+fi
+if [ "$(echo $ICMP_LIM | tr '/' ' ' | awk '{print$1}')" -gt "0" ]; then
+        ICMP_EARGS="-m limit --limit $ICMP_LIM"
+else
+        ICMP_EARGS=""
+fi
+EG_ICMP_TYPES=`echo $EG_ICMP_TYPES | tr ',' ' '`
+        for i in `echo $EG_ICMP_TYPES`; do
+         if [ ! "$i" == "" ]; then
+		i=`echo $i | tr '[:upper:]' '[:lower:]'`
+		if [ "$i" == "all" ]; then
+                  $IPT -A OUTPUT -p icmp  -s $VNET -d 0/0 $ICMP_EARGS  -j ACCEPT
+                  eout "{glob} opening outbound $PROTO all on $VNET"
+		else
+                  $IPT -A OUTPUT -p icmp --icmp-type $i  -s $VNET -d 0/0 $ICMP_EARGS -j ACCEPT
+                  eout "{glob} opening outbound $PROTO type $i on $VNET"
+		fi
+         fi
+        done
+fi
+fi
+
+if [ "$EGF" == "1" ]; then
+if [ ! "$EG_TCP_UID" == "" ]; then
+EG_TCP_UID=`echo "$EG_TCP_UID" | tr ',' ' '`
+PROTO="tcp"
+for i in `echo $EG_TCP_UID`; do
+uid=`echo $i | tr ':' ' ' | awk '{print$1}'`
+port=`echo $i | tr ':' ' ' | awk '{print$2}'`
+
+        if [ "$(echo $port | grep "_")" == "" ]; then
+         if [ ! "$port" == "" ]; then
+                $IPT -A OUTPUT -p $PROTO  -s $VNET --dport $port --match owner --uid-owner $uid -j ACCEPT
+                eout "{glob} opening outbound $PROTO port $port for uid $uid from $VNET"
+         fi
+        else
+                i=`echo $port | tr '_' ':'`
+                if [ ! "$i" == "" ]; then
+                $IPT -A OUTPUT -p $PROTO  -s $VNET --dport $i --match owner --uid-owner $uid -j ACCEPT
+                eout "{glob} opening outbound $PROTO port $i for uid $uid from $VNET"
+                fi
+        fi
+done
+fi
+fi
+
+if [ "$EGF" == "1" ]; then
+if [ ! "$EG_UDP_UID" == "" ]; then
+EG_UDP_UID=`echo "$EG_UDP_UID" | tr ',' ' '`
+PROTO="udp"
+for i in `echo $EG_UDP_UID`; do
+uid=`echo $i | tr ':' ' ' | awk '{print$1}'`
+port=`echo $i | tr ':' ' ' | awk '{print$2}'`
+
+        if [ "$(echo $port | grep "_")" == "" ]; then
+         if [ ! "$port" == "" ]; then
+                $IPT -A OUTPUT -p $PROTO  -s $VNET --dport $port --match owner --uid-owner $uid -j ACCEPT
+                eout "{glob} opening outbound $PROTO port $port for uid $uid from $VNET"
+         fi
+        else
+                i=`echo $port | tr '_' ':'`
+                if [ ! "$i" == "" ]; then
+                $IPT -A OUTPUT -p $PROTO  -s $VNET --dport $i --match owner --uid-owner $uid -j ACCEPT
+                eout "{glob} opening outbound $PROTO port $i for uid $uid from $VNET"
+                fi
+        fi
+done
+fi
+fi
+
+if [ "$EGF" == "1" ]; then
+ if [ "$EG_DROP_CMD" == "1" ]; then
+		$IPT -N DEG
+	for i in `echo $EG_DROP_CMD | tr ',' ' '`; do
+		si=`echo $i | cut -c 1-6`		
+		if [ "LOG_DROP" == "1" ]; then 
+		  $IPT -A DEG -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** DEG_$si ** "
+		fi
+		$IPT -A DEG -s 0/0 -d 0/0 -m owner --cmd-owner=$i -j $ALL_STOP
+	done
+		  $IPT -A OUTPUT -j DEG
+ fi
+fi

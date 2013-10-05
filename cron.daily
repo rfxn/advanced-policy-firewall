@@ -1,0 +1,4 @@
+#!/bin/bash
+/etc/apf/apf -f >> /dev/null 2>&1
+/etc/apf/apf -s >> /dev/null 2>&1
+

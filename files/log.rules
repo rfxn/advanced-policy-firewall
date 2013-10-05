@@ -1,0 +1,12 @@
+eout "{glob} loading log.rules"
+
+if [ "$LOG_DROP" == "1" ]; then
+ if [ "$LOG_IA" == "1" ]; then
+	$IPT -N TELNET_LOG
+	$IPT -A TELNET_LOG -p tcp -s 0/0 -d 0/0 --dport 23 -m state --state NEW -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** TELNET ** "
+	$IPT -N SSH_LOG
+	$IPT -A SSH_LOG -p tcp -s 0/0 -d 0/0 --dport $HELPER_SSH_PORT -m state --state NEW -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** SSH ** "
+	$IPT -A INPUT -j TELNET_LOG
+	$IPT -A INPUT -j SSH_LOG
+ fi
+fi

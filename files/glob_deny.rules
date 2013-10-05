@@ -1,0 +1,34 @@
+##
+# glob_deny_hosts
+#
+# Trust based rule file to define addresses that are implicitly denied.
+#
+# Format of this file is line-seperated addresses, IP masking is supported.
+# Example:
+# 192.168.2.1
+# 192.168.5.0/24
+# 
+# advanced usage
+#
+# The trust rules can be made in advanced format with 4 options
+# (proto:flow:port:ip);
+# 1) protocol: [packet protocol tcp/udp]
+# 2) flow in/out: [packet direction, inbound or outbound]
+# 3) s/d=port: [packet source or destination port]
+# 4) s/d=ip(/xx) [packet source or destination address, masking supported]
+#
+# Syntax:
+# proto:flow:[s/d]=port:[s/d]=ip(/mask)
+# s - source , d - destination , flow - packet flow in/out
+#
+# Examples:
+# inbound to destination port 22 from 192.168.2.1
+# tcp:in:d=22:s=192.168.2.1
+#
+# outbound to destination port 23 to destination host 192.168.2.1
+# out:d=23:d=192.168.2.1
+#
+# inbound to destination port 3306 from 192.168.5.0/24
+# d=3306:s=192.168.5.0/24
+#
+##

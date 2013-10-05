@@ -1,0 +1,2 @@
+#!/bin/bash
+/usr/local/sbin/dshield >> /dev/null 2>&1

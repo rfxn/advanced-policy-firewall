@@ -1,0 +1,220 @@
+#!/bin/bash
+#
+# APF 9.7 [apf@r-fx.org]
+###
+# Copyright (C) 2002-2011, R-fx Networks <proj@r-fx.org>
+# Copyright (C) 2011, Ryan MacDonald <ryan@r-fx.org>
+#
+#    This program is free software; you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation; either version 2 of the License, or
+#    (at your option) any later version.
+#
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License
+#    along with this program; if not, write to the Free Software
+#    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+###
+#
+VER="9.7"
+CNF="/etc/apf/conf.apf"
+
+head() {
+echo "APF version $VER <apf@r-fx.org>"
+echo "Copyright (C) 2002-2011, R-fx Networks <proj@r-fx.org>"
+echo "Copyright (C) 2011, Ryan MacDonald <ryan@r-fx.org>"
+echo "This program may be freely redistributed under the terms of the GNU GPL"
+echo ""
+}
+
+if [ -f "$CNF" ] && [ ! "$CNF" == "" ]; then
+   source $CNF
+else
+   head
+   echo "\$CNF not found, aborting."
+   exit 1
+fi
+
+if [ ! -f $LOG_APF ]; then
+        touch $LOG_APF
+        chmod 600 $LOG_APF
+        eout "{glob} status log not found, created"
+fi
+
+start() {
+##
+# Fast Load
+##
+if [ "$SET_FASTLOAD" == "1" ]; then
+# is this our first startup?
+# if so we certainly do not want fast load
+if [ ! -f "$INSTALL_PATH/internals/.last.full" ]; then
+	SKIP_FASTLOAD_FIRSTRUN=1
+fi
+# Is our last full load more than 12h ago?
+# if so we are going to full load
+if [ -f "$INSTALL_PATH/internals/.last.full" ]; then
+ LAST_FULL=`cat $INSTALL_PATH/internals/.last.full`
+ CURRENT_LOAD=`date +"%s"`
+ LOAD_DIFF=$[CURRENT_LOAD-LAST_FULL]
+ if [ ! "$LOAD_DIFF" -lt "43200" ]; then
+	SKIP_FASTLOAD_EXPIRED=1
+ fi
+fi
+
+# has our configuration changed since full load?
+# if so full we go
+MD5_FILES="$ADR $INSTALL_PATH/*.rules $INSTALL_PATH/internals/*.networks $INSTALL_PATH/vnet/*.rules"
+if [ ! -f "$INSTALL_PATH/internals/.md5.cores" ]; then
+        SKIP_FASTLOAD_VARS=1
+	MD5_FIRSTRUN=1
+else
+        EMPTY_MD5=`cat $INSTALL_PATH/internals/.md5.cores`
+        if [ "$EMPTY_MD5" == "" ]; then
+                $MD5 $MD5_FILES > $INSTALL_PATH/internals/.md5.cores 2> /dev/null
+        fi
+	$MD5 $MD5_FILES > $INSTALL_PATH/internals/.md5.cores.new 2> /dev/null 
+        VARS_DIFF=`$DIFF $INSTALL_PATH/internals/.md5.cores.new $INSTALL_PATH/internals/.md5.cores`
+        if [ ! "$VARS_DIFF" == "" ]; then
+		$MD5 $MD5_FILES > $INSTALL_PATH/internals/.md5.cores 2> /dev/null
+                SKIP_FASTLOAD_VARS=1
+        fi
+fi
+if [ "$DEVEL_ON" == "1" ]; then
+	SKIP_FASTLOAD_VARS=1
+fi
+if [ ! -f "$INSTALL_PATH/internals/.md5.cores.new" ] && [ -f "$INSTALL_PATH/internals/.md5.cores" ]; then
+	cp $INSTALL_PATH/internals/.md5.cores $INSTALL_PATH/internals/.md5.cores.new
+fi
+
+if [ ! -f "$INSTALL_PATH/internals/.last.vars" ]; then
+	$INSTALL_PATH/apf -o > $INSTALL_PATH/internals/.last.vars
+	SKIP_FASTLOAD_VARS=1
+else
+	$INSTALL_PATH/apf -o > $INSTALL_PATH/internals/.last.vars.new
+	VARS_DIFF=`$DIFF $INSTALL_PATH/internals/.last.vars.new $INSTALL_PATH/internals/.last.vars`
+	if [ ! "$VARS_DIFF" == "" ]; then
+	        $INSTALL_PATH/apf -o > $INSTALL_PATH/internals/.last.vars
+		SKIP_FASTLOAD_VARS=1
+	fi
+fi
+
+# check uptiime is greater than 5 minutes (300s)
+ UPSEC=`cat /proc/uptime  | tr '.' ' ' | awk '{print$1}'`
+ if [ "$UPSEC" -lt "300" ]; then
+	SET_FASTLOAD_UPSEC=1
+ fi
+
+# check if we are flagged to skip fast load, otherwise off we go
+if [ "$SKIP_FASTLOAD_FIRSTRUN" == "" ] && [ "$SKIP_FASTLOAD_EXPIRED" == "" ] && [ "$SKIP_FASTLOAD_VARS" == "" ] && [ "$SET_FASTLOAD_UPSEC" == "" ]; then
+	devm
+	eout "{glob} activating firewall, fast load"
+	$IPTR $INSTALL_PATH/internals/.apf.restore
+	eout "{glob} firewall initalized"
+	if [ "$SET_VERBOSE" == "1" ] && [ "$DEVEL_ON" == "1" ]; then
+	        eout "{glob} !!DEVELOPMENT MODE ENABLED!! - firewall will flush every 5 minutes."
+	fi
+	exit 0
+ elif [ "$SKIP_FASTLOAD_FIRSTRUN" == "1" ]; then 
+	eout "{glob} first run? fast load skipped [internals/.last.full not present]"
+ elif [ "$SKIP_FASTLOAD_EXPIRED" == "1" ]; then
+	eout "{glob} fast load snapshot more than 1h old, going full load"
+ elif [ "$SKIP_FASTLOAD_VARS" == "1" ]; then
+	eout "{glob} config. or .rule file has changed since last full load, going full load"
+ elif [ "$SET_FASTLOAD_UPSEC" == "1" ]; then
+	eout "{glob} uptime less than 5 minutes, going full load"
+fi
+
+fi
+##
+# Full Load
+##
+eout "{glob} activating firewall"
+# record our last full load
+date +"%s" > $INSTALL_PATH/internals/.last.full
+if [ ! -f "$DS_HOSTS" ]; then
+	touch $DS_HOSTS
+	chmod 600 $DS_HOSTS
+fi
+if [ ! -f "$DENY_HOSTS" ]; then
+        touch $DENY_HOSTS
+        chmod 600 $DENY_HOSTS
+fi
+if [ ! -f "$ALLOW_HOSTS" ]; then
+        touch $ALLOW_HOSTS
+        chmod 600 $ALLOW_HOSTS
+fi
+# check devel mode
+devm
+# generate vnet rules
+$INSTALL_PATH/vnet/vnetgen
+# start main firewall script
+$INSTALL_PATH/firewall
+# check for/load bandmin
+LOAD=`cat /proc/loadavg | tr '.' ' ' | awk '{print$1}'`
+ if [ ! "$LOAD" -gt "10" ]; then
+	bandmin
+ fi
+eout "{glob} firewall initalized"
+if [ "$MD5_FIRSTRUN" == "1" ]; then
+        $MD5 $MD5_FILES > $INSTALL_PATH/internals/.md5.cores 2> /dev/null
+fi
+
+firewall_on=`iptables -L --numeric | grep -vE "Chain|destination"`
+if [ ! "$DEVEL_ON" == "1" ] && [ ! "$firewall_on" == "" ]; then
+	$IPTS > $INSTALL_PATH/internals/.apf.restore
+	eout "{glob} fast load snapshot saved"
+fi
+        if [ "$SET_VERBOSE" == "1" ] && [ "$DEVEL_ON" == "1" ]; then
+                eout "{glob} !!DEVELOPMENT MODE ENABLED!! - firewall will flush every 5 minutes."
+        fi
+}
+
+case "$1" in
+-s|--start)
+	start
+	;;
+-f|--flush|--stop)
+	flush
+	;;
+-l|--list)
+	list
+	;;
+-t|-st|--status)
+	status
+	;;
+
+-r|--restart)
+	$0 --flush
+	$0 --start
+	;;
+-a|--allow)
+	cli_trust_allow $2 $3 $4 $5 $6 $7 $8 $9
+	;;
+-d|--deny)
+	cli_trust_deny $2 $3 $4 $5 $6 $7 $8 $9
+	;;
+-u|--remove|--unban)
+	cli_trust_remove $2 >> /dev/null 2>&1
+	eout "{trust} removed $2 from trust system"
+	if [ ! "$SET_VERBOSE" == "1" ]; then
+	        echo "Removed $2 from trust system."
+	fi
+	;;
+-e|--refresh)
+	refresh
+	;;
+-o|--ovars)
+	head
+	ovars
+	;;
+*)
+	head
+	help
+esac
+
+exit 0

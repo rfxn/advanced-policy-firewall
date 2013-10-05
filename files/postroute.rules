@@ -1,0 +1,8 @@
+eout "{glob} loading postroute.rules"
+
+# load TOS postrouting function
+# do not remove or TOS vars will not function
+tospostroute
+
+# place your custom routing rules below
+
