@@ -7,10 +7,11 @@ if [ "$SYSCTL_CONNTRACK" == "" ]; then
 fi
 
 if [ -f "/proc/sys/net/ipv4/ip_conntrack_max" ]; then
-        echo $SYSCTL_CONNTRACK > /proc/sys/net/ipv4/ip_conntrack_max
+	echo $SYSCTL_CONNTRACK > /proc/sys/net/ipv4/ip_conntrack_max
 elif [ -f "/proc/sys/net/nf_conntrack_max" ]; then
-        echo $SYSCTL_CONNTRACK > /proc/sys/net/nf_conntrack_max
+	echo $SYSCTL_CONNTRACK > /proc/sys/net/nf_conntrack_max
 fi
+
 echo 1 > /proc/sys/net/ipv4/icmp_ignore_bogus_error_responses
 echo 1 > /proc/sys/net/ipv4/icmp_echo_ignore_broadcasts
 

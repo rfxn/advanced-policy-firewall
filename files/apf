@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# APF 9.7 [apf@r-fx.org]
+# APF 9.7-3 [apf@r-fx.org]
 ###
 # Copyright (C) 2002-2011, R-fx Networks <proj@r-fx.org>
 # Copyright (C) 2011, Ryan MacDonald <ryan@r-fx.org>
@@ -20,13 +20,13 @@
 #    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 ###
 #
-VER="9.7"
+VER="9.7-3"
 CNF="/etc/apf/conf.apf"
 
 head() {
-echo "APF version $VER <apf@r-fx.org>"
-echo "Copyright (C) 2002-2011, R-fx Networks <proj@r-fx.org>"
-echo "Copyright (C) 2011, Ryan MacDonald <ryan@r-fx.org>"
+echo "Advanced Policy Firewall (APF) v$VER <apf@rfxn.org>"
+echo "      Copyright (C) 2002-2012, R-fx Networks <proj@rfxn.org>"
+echo "      Copyright (C) 2012, Ryan MacDonald <ryan@rfxn.org>"
 echo "This program may be freely redistributed under the terms of the GNU GPL"
 echo ""
 }
@@ -148,7 +148,7 @@ if [ ! -f "$ALLOW_HOSTS" ]; then
         touch $ALLOW_HOSTS
         chmod 600 $ALLOW_HOSTS
 fi
-# check devel mode
+# check dev mode
 devm
 # generate vnet rules
 $INSTALL_PATH/vnet/vnetgen
@@ -190,6 +190,7 @@ case "$1" in
 
 -r|--restart)
 	$0 --flush
+	sleep 2
 	$0 --start
 	;;
 -a|--allow)

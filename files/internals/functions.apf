@@ -234,34 +234,34 @@ DIP=$1
         $IPT -D TGDENY -s $DIP -j $ALL_STOP
         $IPT -D TGDENY -d $DIP -j $ALL_STOP
 
-	val=`cat /etc/apf/allow_hosts.rules | grep "$DIP"`
+	val=`cat /etc/apf/allow_hosts.rules | grep -w "$DIP"`
 	if [ ! "$val" == "" ]; then
-		cat /etc/apf/allow_hosts.rules | grep -v "$DIP" > /etc/apf/allow_hosts.rules.new
+		cat /etc/apf/allow_hosts.rules | grep -vw "$DIP" > /etc/apf/allow_hosts.rules.new
 		mv /etc/apf/allow_hosts.rules.new /etc/apf/allow_hosts.rules
 	fi
-	val=`cat /etc/apf/deny_hosts.rules | grep "$DIP"`
+	val=`cat /etc/apf/deny_hosts.rules | grep -w "$DIP"`
         if [ ! "$val" == "" ]; then
-        	cat /etc/apf/deny_hosts.rules | grep -v "$DIP" > /etc/apf/deny_hosts.rules.new
+        	cat /etc/apf/deny_hosts.rules | grep -wv "$DIP" > /etc/apf/deny_hosts.rules.new
 	        mv /etc/apf/deny_hosts.rules.new /etc/apf/deny_hosts.rules
 	fi
-	val=`cat /etc/apf/glob_allow_hosts.rules | grep "$DIP"`
+	val=`cat /etc/apf/glob_allow_hosts.rules | grep -w "$DIP"`
         if [ ! "$val" == "" ]; then
-        	cat /etc/apf/glob_allow_hosts.rules | grep -v "$DIP" > /etc/apf/glob_allow_hosts.rules.new
+        	cat /etc/apf/glob_allow_hosts.rules | grep -wv "$DIP" > /etc/apf/glob_allow_hosts.rules.new
 	        mv /etc/apf/glob_allow_hosts.rules.new /etc/apf/glob_allow_hosts.rules
 	fi
-	val=`cat /etc/apf/glob_deny_hosts.rules | grep "$DIP"`
+	val=`cat /etc/apf/glob_deny_hosts.rules | grep -w "$DIP"`
         if [ ! "$val" == "" ]; then
-        	cat /etc/apf/glob_deny_hosts.rules | grep -v "$DIP" > /etc/apf/glob_deny_hosts.rules.new
+        	cat /etc/apf/glob_deny_hosts.rules | grep -wv "$DIP" > /etc/apf/glob_deny_hosts.rules.new
 	        mv /etc/apf/glob_deny_hosts.rules.new /etc/apf/glob_deny_hosts.rules
 	fi
 
-	dil=`$IPT --numeric --list INPUT --line-numbers | grep $DIP | awk '{print$1}'`
-	dol=`$IPT --numeric --list OUTPUT --line-numbers | grep $DIP | awk '{print$1}'`
+	dil=`$IPT --numeric --list INPUT --line-numbers | grep -w $DIP | awk '{print$1}'`
+	dol=`$IPT --numeric --list OUTPUT --line-numbers | grep -w $DIP | awk '{print$1}'`
 	$IPT -D INPUT $dil >> /dev/null 2>&1
 	$IPT -D OUTPUT $dol >> /dev/null 2>&1
 
-	dil=`$IPT --numeric --list TALLOW --line-numbers | grep $DIP | tac | awk '{print$1}'`
-	dol=`$IPT --numeric --list TDENY --line-numbers | grep $DIP | tac | awk '{print$1}'`
+	dil=`$IPT --numeric --list TALLOW --line-numbers | grep -w $DIP | tac | awk '{print$1}'`
+	dol=`$IPT --numeric --list TDENY --line-numbers | grep -w $DIP | tac | awk '{print$1}'`
 	for i in `echo $dil`; do
 		$IPT -D TALLOW $i >> /dev/null 2>&1
 	done
@@ -269,8 +269,8 @@ DIP=$1
 		$IPT -D TDENY $i >> /dev/null 2>&1
 	done
 
-	dil=`$IPT --numeric --list TGALLOW --line-numbers | grep $DIP | tac | awk '{print$1}'`
-	dol=`$IPT --numeric --list TGDENY --line-numbers | grep $DIP | tac | awk '{print$1}'`
+	dil=`$IPT --numeric --list TGALLOW --line-numbers | grep -w $DIP | tac | awk '{print$1}'`
+	dol=`$IPT --numeric --list TGDENY --line-numbers | grep -w $DIP | tac | awk '{print$1}'`
 	for i in `echo $dil`; do
 		$IPT -D TGALLOW $i >> /dev/null 2>&1
 	done
@@ -283,20 +283,15 @@ cli_trust_allow() {
 HOST=$1
 CMT="$2 $3 $4 $5 $6 $7 $8 $9"
 if [ ! "$HOST" == "" ]; then
-        val=`cat $DENY_HOSTS | grep -w $HOST`
-        val_rev=`cat $ALLOW_HOSTS | grep -w $HOST`
-        val_rev2=`cat $GALLOW_HOSTS | grep -w $HOST`
-        val_rev3=`cat $GDENY_HOSTS | grep -w $HOST`
-        val_rev4=`/sbin/ip addr list $IFACE_IN | grep -w inet | grep -v inet6 | tr '/' ' ' | awk '{print$2}' | grep -w $HOST`
-        if [ ! "$val" == "" ]; then
-                echo "$HOST already exists in $DENY_HOSTS"
-        elif [ ! "$val_rev" == "" ]; then
-                echo "$HOST already exists in $ALLOW_HOSTS"
-        elif [ ! "$val_rev2" == "" ]; then
-                echo "$HOST already exists in $GALLOW_HOSTS"
-        elif [ ! "$val_rev3" == "" ]; then
-                echo "$HOST already exists in $GDENY_HOSTS"
-        elif [ ! "$val_rev4" == "" ]; then
+	valtrust=`cat $DENY_HOSTS $ALLOW_HOSTS $GALLOW_HOSTS $GDENY_HOSTS | grep -w $HOST`
+	if [ "$valtrust" ]; then
+		tlist=`grep -l $HOST $DENY_HOSTS $ALLOW_HOSTS $GALLOW_HOSTS $GDENY_HOSTS | tr '\n' ' '`
+	fi
+        valip=`$ip addr list | grep inet | tr '/' ' ' | awk '{print$2}' | grep -w $HOST`
+
+	if [ "$valtrust" ]; then
+                echo "$HOST already exists in $tlist"
+	elif [ "$valip" ]; then
                 echo "$HOST is a local address and can not be added to the trust system"
         else
 	TIME=`date +"%D %H:%M:%S"`
@@ -324,20 +319,15 @@ cli_trust_deny() {
 HOST=$1
 CMT="$2 $3 $4 $5 $6 $7 $8 $9"
 if [ ! "$HOST" == "" ]; then
-        val=`cat $DENY_HOSTS | grep -w $HOST`
-        val_rev=`cat $ALLOW_HOSTS | grep -w $HOST`
-	val_rev2=`cat $GALLOW_HOSTS | grep -w $HOST`
-	val_rev3=`cat $GDENY_HOSTS | grep -w $HOST`
-        val_rev4=`/sbin/ip addr list $IFACE_IN | grep -w inet | grep -v inet6 | tr '/' ' ' | awk '{print$2}' | grep -w $HOST`
-        if [ ! "$val" == "" ]; then
-               	echo "$HOST already exists in $DENY_HOSTS"
-	elif [ ! "$val_rev" == "" ]; then
-                echo "$HOST already exists in $ALLOW_HOSTS"
-	elif [ ! "$val_rev2" == "" ]; then
-                echo "$HOST already exists in $GALLOW_HOSTS"
-        elif [ ! "$val_rev2" == "" ]; then
-                echo "$HOST already exists in $GDENY_HOSTS"
-        elif [ ! "$val_rev4" == "" ]; then
+        valtrust=`cat $DENY_HOSTS $ALLOW_HOSTS $GALLOW_HOSTS $GDENY_HOSTS | grep -w $HOST`
+	if [ "$valtrust" ]; then
+		tlist=`grep -l $HOST $DENY_HOSTS $ALLOW_HOSTS $GALLOW_HOSTS $GDENY_HOSTS | tr '\n' ' '`
+	fi
+        valip=`$ip addr list | grep inet | tr '/' ' ' | awk '{print$2}' | grep -w $HOST`
+
+        if [ "$valtrust" ]; then
+                echo "$HOST already exists in $tlist"
+        elif [ "$valip" ]; then
                 echo "$HOST is a local address and can not be added to the trust system"
         else
         TIME=`date +"%D %H:%M:%S"`
@@ -387,8 +377,8 @@ fi
 }
 
 list() {
-echo "Loading chain rules..."
-iptc=/etc/apf/.ipt.chains
+echo "Loading iptables rules..."
+iptc=/etc/apf/.iptrules.$$
 :> $iptc ; chmod 600 $iptc
 $IPT --verbose --numeric --line-numbers --list >> $iptc
 echo "Opening editor"
@@ -412,7 +402,7 @@ help() {
         echo "usage $0 [OPTION]"
         echo "-s|--start ......................... load all firewall rules"
         echo "-r|--restart ....................... stop (flush) & reload firewall rules"
-        echo "-f|--stop........................... stop (flush) all firewall rules"
+        echo "-f|--stop .......................... stop (flush) all firewall rules"
         echo "-l|--list .......................... list all firewall rules"
         echo "-t|--status ........................ output firewall status log"
 	echo "-e|--refresh ....................... refresh & resolve dns names in trust rules"
@@ -425,7 +415,7 @@ help() {
 	echo "-o|--ovars ......................... output all configuration options"
 }
 
-tospreroute() {
+tosroute() {
 # Type of Service (TOS) parameters
 # 0: Normal-Service
 # 2: Minimize-Cost
@@ -433,109 +423,57 @@ tospreroute() {
 # 8: Maximum Throughput - Minimum Delay
 # 16: No Delay - Moderate Throughput - High Reliability
 #
+TYPE="$1"
+
+if [ -z "$TYPE" ]; then
+	break
+fi
 
 if [ ! "$TOS_0" == "" ]; then
         for i in `echo $TOS_0 | tr ',' ' '`; do
                 i=`echo $i | tr '_' ':'`
-                $IPT -t mangle  -A PREROUTING -p tcp --sport $i -j TOS --set-tos 0
-                $IPT -t mangle  -A PREROUTING -p udp --sport $i -j TOS --set-tos 0
+                $IPT -t mangle -A $TYPE -p tcp --dport $i -j TOS --set-tos 0
+                $IPT -t mangle -A $TYPE -p udp --dport $i -j TOS --set-tos 0
         done
 fi
 
 if [ ! "$TOS_2" == "" ]; then
         for i in `echo $TOS_2 | tr ',' ' '`; do
                 i=`echo $i | tr '_' ':'`
-                $IPT -t mangle  -A PREROUTING -p tcp --sport $i -j TOS --set-tos 2
-                $IPT -t mangle  -A PREROUTING -p udp --sport $i -j TOS --set-tos 2
+                $IPT -t mangle -A $TYPE -p tcp --dport $i -j TOS --set-tos 2
+                $IPT -t mangle -A $TYPE -p udp --dport $i -j TOS --set-tos 2
         done
 fi
 
 if [ ! "$TOS_4" == "" ]; then
         for i in `echo $TOS_4 | tr ',' ' '`; do
                 i=`echo $i | tr '_' ':'`
-                $IPT -t mangle  -A PREROUTING -p tcp --sport $i -j TOS --set-tos 4
-                $IPT -t mangle  -A PREROUTING -p udp --sport $i -j TOS --set-tos 4
+                $IPT -t mangle -A $TYPE -p tcp --dport $i -j TOS --set-tos 4
+                $IPT -t mangle -A $TYPE -p udp --dport $i -j TOS --set-tos 4
         done
 fi
 
 if [ ! "$TOS_8" == "" ]; then
         for i in `echo $TOS_8 | tr ',' ' '`; do
                 i=`echo $i | tr '_' ':'`
-                $IPT -t mangle  -A PREROUTING -p tcp --sport $i -j TOS --set-tos 8
-                $IPT -t mangle  -A PREROUTING -p udp --sport $i -j TOS --set-tos 8
+                $IPT -t mangle -A $TYPE -p tcp --dport $i -j TOS --set-tos 8
+                $IPT -t mangle -A $TYPE -p udp --dport $i -j TOS --set-tos 8
         done
 fi
 
 if [ ! "$TOS_16" == "" ]; then
         for i in `echo $TOS_16 | tr ',' ' '`; do
                 i=`echo $i | tr '_' ':'`
-                $IPT -t mangle  -A PREROUTING -p tcp --sport $i -j TOS --set-tos 16
-                $IPT -t mangle  -A PREROUTING -p udp --sport $i -j TOS --set-tos 16
+                $IPT -t mangle -A $TYPE -p tcp --dport $i -j TOS --set-tos 16
+                $IPT -t mangle -A $TYPE -p udp --dport $i -j TOS --set-tos 16
         done
 fi
 
 if [ ! "$TOS_DEF_RANGE" == "" ]; then
         for i in `echo $TOS_DEF_RANGE | tr ',' ' '`; do
                 i=`echo $i | tr '_' ':'`
-                $IPT -t mangle  -A PREROUTING -p tcp --sport $i -j TOS --set-tos $TOS_DEF
-                $IPT -t mangle  -A PREROUTING -p udp --sport $i -j TOS --set-tos $TOS_DEF
-        done
-fi
-}
-
-tospostroute() {
-# Type of Service (TOS) parameters
-# 0: Normal-Service
-# 2: Minimize-Cost
-# 4: Minimize Delay - Maximize Reliability
-# 8: Maximum Throughput - Minimum Delay
-# 16: No Delay - Moderate Throughput - High Reliability
-#
-if [ ! "$TOS_0" == "" ]; then
-        for i in `echo $TOS_0 | tr ',' ' '`; do
-                i=`echo $i | tr '_' ':'`
-                $IPT -t mangle -A POSTROUTING -p tcp --dport $i -j TOS --set-tos 0
-                $IPT -t mangle -A POSTROUTING -p udp --dport $i -j TOS --set-tos 0
-        done
-fi
-
-if [ ! "$TOS_2" == "" ]; then
-        for i in `echo $TOS_2 | tr ',' ' '`; do
-                i=`echo $i | tr '_' ':'`
-                $IPT -t mangle -A POSTROUTING -p tcp --dport $i -j TOS --set-tos 2
-                $IPT -t mangle -A POSTROUTING -p udp --dport $i -j TOS --set-tos 2
-        done
-fi
-
-if [ ! "$TOS_4" == "" ]; then
-        for i in `echo $TOS_4 | tr ',' ' '`; do
-                i=`echo $i | tr '_' ':'`
-                $IPT -t mangle -A POSTROUTING -p tcp --dport $i -j TOS --set-tos 4
-                $IPT -t mangle -A POSTROUTING -p udp --dport $i -j TOS --set-tos 4
-        done
-fi
-
-if [ ! "$TOS_8" == "" ]; then
-        for i in `echo $TOS_8 | tr ',' ' '`; do
-                i=`echo $i | tr '_' ':'`
-                $IPT -t mangle -A POSTROUTING -p tcp --dport $i -j TOS --set-tos 8
-                $IPT -t mangle -A POSTROUTING -p udp --dport $i -j TOS --set-tos 8
-        done
-fi
-
-if [ ! "$TOS_16" == "" ]; then
-        for i in `echo $TOS_16 | tr ',' ' '`; do
-                i=`echo $i | tr '_' ':'`
-                $IPT -t mangle -A POSTROUTING -p tcp --dport $i -j TOS --set-tos 16
-                $IPT -t mangle -A POSTROUTING -p udp --dport $i -j TOS --set-tos 16
-        done
-fi
-
-if [ ! "$TOS_DEF_RANGE" == "" ]; then
-        for i in `echo $TOS_DEF_RANGE | tr ',' ' '`; do
-                i=`echo $i | tr '_' ':'`
-                $IPT -t mangle -A POSTROUTING -p tcp --dport $i -j TOS --set-tos $TOS_DEF
-                $IPT -t mangle -A POSTROUTING -p udp --dport $i -j TOS --set-tos $TOS_DEF
+                $IPT -t mangle -A $TYPE -p tcp --dport $i -j TOS --set-tos $TOS_DEF
+                $IPT -t mangle -A $TYPE -p udp --dport $i -j TOS --set-tos $TOS_DEF
         done
 fi
 }
@@ -687,7 +625,6 @@ if [ ! "`cat $ALLOW_HOSTS | grep -v "#"`" == "" ]; then
                                 IPFLOW="d"
                         fi
                         PIP=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$6}'`
-
 
                         if [ ! "$PTYPE" == "" ] && [ ! "$NFLOW" == "" ] && [ ! "$IPFLOW" == "" ] && [ ! "$PIP" == "" ] && [ ! "$IPFLOW" == "" ] && [ ! "$PPORT" == "" ]; then
                          if [ "$IPFLOW" == "s" ] && [ "$NFLOW" == "INPUT" ] && [ "$(/sbin/ip addr list $IFACE_IN | grep -w inet | grep -v inet6 | tr '/' ' ' | awk '{print$2}' | grep -w $PIP)" ]; then
@@ -1437,8 +1374,8 @@ FNAME=`echo $FILE | tr '/' '\n' | tail -n 1`
 eout "{glob} loading $FNAME"
  for i in `cat $FILE | grep -v "#"`; do
   if [ ! "$i" == "" ]; then
-        $IPT -A INPUT -i $IF -s $i -j $ALL_STOP
-	$IPT -A OUTPUT -o $IF -d $i -j $ALL_STOP
+        $IPT -A INPUT -s $i -j $ALL_STOP
+	$IPT -A OUTPUT -d $i -j $ALL_STOP
   fi
  done
 fi
@@ -1508,17 +1445,17 @@ cl_cports() {
 
 expirebans() {
 if [ -z "$SET_EXPIRE" ]; then
-	SET_EXPIRE=0
+        SET_EXPIRE=0
 fi
 if [ "$SET_EXPIRE" -ge "60" ]; then
  REFRESH_TIME=$[SET_REFRESH*60]
  if [ "$SET_EXPIRE" -lt "$REFRESH_TIME" ]; then
-	SET_EXPIRE=$REFRESH_TIME
+        SET_EXPIRE=$REFRESH_TIME
  fi
  if [ -f "/etc/apf/deny_hosts.rules" ]; then
          expire_time="$SET_EXPIRE"
          check_time=$(date +%s)
-         for i in `cat /etc/apf/deny_hosts.rules | grep -vE "static|noexpire" | grep -iE "# added.*on.*with comment:.*" | awk '{print$3"|"$5"|"$6}'`; do
+         for i in `cat /etc/apf/deny_hosts.rules | grep -iE "# added.*on.*with comment:.*" | awk '{print$3"|"$5"|"$6}'`; do
                 declare -a arr
                 arr=(`echo ${i//|/ }`)
                 ip=${arr[0]}
@@ -1536,10 +1473,10 @@ fi
 }
 
 refresh() {
-	if [ "$SET_EXPIRE" -ge "60" ]; then
-		# expire deny_hosts bans
-		expirebans
-	fi
+        if [ "$SET_EXPIRE" -ge "60" ]; then
+                # expire deny_hosts bans
+                expirebans
+        fi
         eout "{glob} refreshing trust system rules."
 	tmpra="/etc/apf/internals/refresh.allow.temp.$$"
         /sbin/iptables-save | grep -E "TALLOW|TGALLOW" | grep -E '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | awk '{print$4}' | sort -n | uniq > $tmpra

@@ -1,9 +1,31 @@
 - 9.7
-(rev:2)
+(rev:3)
 [Change] dshield, spamhaus and projecthoneypot drop lists now only filter traffic sourced
          from addresses in the respective lists to reduce rule counts instead of to/from
          (src & dst)
 [New] added SET_EXPIRE configuration option for controlling deny_hosts ban expiration time
+[Change] internalize a list of local ip addresses and ignore generic to/from allow trust rules
+         on said local ip list to prevent firewall loopholes due to misconfiguration
+[Change] modified tospre/post route function into consolidated tosroute function
+[Change] modified preroute/postroute.rules files to remove callouts to tos functions which
+         are now called prior to the pre/post route file inclusions
+[Change] modified cli allow/deny trust functions for improved sanity checks through consolidated
+         validation callouts
+[Change] preroute rules now load before implicit trust on loopback interface traffic so rules can be
+         applied against loopback traffic if so desired
+[Fix] SYSCTL_CONNTRACK better handles varied kernel and iptables versions to apply value on correct sysctl
+      hook file; nf_conntrack_max or ip_conntrack_max
+[Fix] trust rules refresh cronjob modified to remove MAILTO & SHELL variables which were causing crond
+      'bad minute' errors on some systems
+[Fix] reordered chain flushes on refresh() to avoid any possible packet loss or loss of connectivity
+      from hosts in the allow tables
+[Change] consolidated TMP_DROP and TMP_ALLOW chains into REFRESH_TEMP
+[Fix] restarts in some situations can cause 'iptables: Resource temporarily unavailable' errors, added 2sec
+      sleep delay on restarts between flush() and start() to prevent resource errors
+[Fix] block rules for BLK_PRVNET and BLK_RESNET were being added with no interface modifier and as such had
+      the potential to block traffic over private and loopback interfaces when it was otherwise not intended
+
+(rev:2)
 [Fix] xt/ipt_recent module path changed under RHEL/CentOS 6
 [Fix] kernel version tests for 2.4/2.6 kernel modules failed under kernel 3.x
 [Change] RAB should default to a minimal level of sensitivity; lowered RAB_PSCAN_LEVEL to 1

@@ -80,6 +80,10 @@ fi
 eout "{glob} determined (IFACE_IN) $IFACE_IN has address $NET"
 eout "{glob} determined (IFACE_OUT) $IFACE_OUT has address $NET"
 
+# Load our PREROUTE rules
+tosroute PREROUTING
+. $PRERT
+
 # Allow all traffic on the loopback interface
 $IPT -A INPUT -i lo -s 0/0 -d 0/0 -j ACCEPT
 $IPT -A OUTPUT -o lo -s 0/0 -d 0/0 -j ACCEPT
@@ -110,9 +114,6 @@ $IPT -A PROHIBIT -j REJECT --reject-with icmp-host-prohibited
 # Fix MTU/MSS Problems
 $IPT -A OUTPUT -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu
 
-# Load our PREROUTE rules
-. $PRERT
-
 # Block common nonroutable IP networks
 if [ "$BLK_MCATNET" = "1" ]; then
 	dnet $MCATNET
@@ -137,10 +138,10 @@ $IPT -A INPUT -j REFRESH_TEMP
 $IPT -A OUTPUT -j REFRESH_TEMP
 $IPT -A INPUT -j TALLOW
 $IPT -A OUTPUT -j TALLOW
-$IPT -A INPUT -j TDENY
-$IPT -A OUTPUT -j TDENY
 $IPT -A INPUT -j TGALLOW
 $IPT -A OUTPUT -j TGALLOW
+$IPT -A INPUT -j TDENY
+$IPT -A OUTPUT -j TDENY
 $IPT -A INPUT -j TGDENY
 $IPT -A OUTPUT -j TGDENY
 
@@ -298,6 +299,7 @@ if [ "$SYSCTL_ECN" == "1" ]; then
 fi
 
 # Load our POSTROUTE rules
+tosroute POSTROUTING
 . $POSTRT
 
 # Default Output Policies
