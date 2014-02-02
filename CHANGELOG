@@ -1,4 +1,7 @@
 - 9.7
+[TODO] dynamically set pscan trigger level based on security level
+[TODO] what happened to the RAB_PSCAN code? is it missing or is github desktop just crap and I cant find it; check and fix if needed
+
 (rev:3)
 [Change] dshield, spamhaus and projecthoneypot drop lists now only filter traffic sourced
          from addresses in the respective lists to reduce rule counts instead of to/from
