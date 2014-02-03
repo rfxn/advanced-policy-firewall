@@ -1,35 +1,34 @@
 ##
 # deny_hosts
 #
-# Trust based rule file to define addresses that are denied traffic through the firewall.
+# Trust based rule file to define addresses that are implicitly denied.
 #
-# Format of this file is line-seperated FQDN/CIDR addresses.
-# Examples:
+# Format of this file is line-seperated addresses, IP masking is supported.
+# Example:
 # 192.168.2.1
 # 192.168.5.0/24
-# domain.com
-#
-# The trust system supports an advanced rule syntax to allow for more specific
-# trust rules to be created based on protocol, flow, port and address.
-#
-# The advanced syntax format is as follows:
-# protocol	flow	port	address
-# tcp|udp|any	in|out  1-65535 FQDN/CIDR address
 # 
-# Protocol:	ip protocl tcp, udp or any
-# Flow: 	traffic flow representing inbound (in) or outbound (out) communication
-# Port:		network port (1-65535) that the communication will take place on
-# Address:	network address that communication will take place to/from
+# advanced usage
+#
+# The trust rules can be made in advanced format with 4 options
+# (proto:flow:port:ip);
+# 1) protocol: [packet protocol tcp/udp]
+# 2) flow in/out: [packet direction, inbound or outbound]
+# 3) s/d=port: [packet source or destination port]
+# 4) s/d=ip(/xx) [packet source or destination address, masking supported]
+#
+# Syntax:
+# proto:flow:[s/d]=port:[s/d]=ip(/mask)
+# s - source , d - destination , flow - packet flow in/out
 #
 # Examples:
 # inbound to destination port 22 from 192.168.2.1
-# tcp in 22 192.168.2.1
+# tcp:in:d=22:s=192.168.2.1
 #
 # outbound to destination port 23 to destination host 192.168.2.1
-# tcp out 23 192.168.2.1
+# out:d=23:d=192.168.2.1
 #
 # inbound to destination port 3306 from 192.168.5.0/24
-# tcp in 3306 192.168.5.0/24
-##
+# d=3306:s=192.168.5.0/24
 #
-# protocol      flow    port    address
+##

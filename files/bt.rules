@@ -2,8 +2,8 @@ eout "{glob} loading bt.rules"
 
 # Load our Deny Hosts rules
 glob_deny_download
-glob_deny_hosts
-deny_hosts
+glob_deny_hosts $GDENY_HOSTS TGDENY
+deny_hosts $ALLOW_HOSTS TDENY
 
 # Load our projecthoneypot drop list
 dlist_php

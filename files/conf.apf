@@ -22,11 +22,10 @@ DEVEL_MODE="1"
 # The installation path of APF; this can be changed but it is not recommended.
 INSTALL_PATH="/etc/apf"
 
-# Untrusted Network interface(s); all traffic on defined interface will be
+# Untrusted Network interface; all traffic on defined interface will be
 # subject to all firewall rules. This should be your internet exposed
-# interfaces. Only one interface is accepted for each value.
-IFACE_IN="eth0" 
-IFACE_OUT="eth0"
+# interface.
+IFACE_UNTRUSTED="eth0"
 
 # Trusted Network interface(s); all traffic on defined interface(s) will by-pass
 # ALL firewall rules, format is white space or comma separated list.
@@ -79,17 +78,13 @@ SET_REFRESH="10"
 # This is the total amount of rules allowed inside of the deny trust system.
 # When this limit is reached, the deny rule files will begin to purge older
 # entries to maintain the set limit. [value is max lines, 0 for unlimited]
-SET_TRIM="150"
+SET_TRIM="200"
 
 # Verifies that the IFACE_* and IFACE_TRUSTED interfaces are actually routed
 # to something. If configured interfaces are found with no routes setup then
 # APF will exit with an error to prevent further issues (such as being locked 
 # out of the system).
 VF_ROUTE="1"
-
-# Verifies that crond is running when DEVEL_MODE=1; if not then APF will not
-# try to load as if lock-up occurs no cron service to flush firewall.
-VF_CROND="1"
 
 # Verifies that all inbound traffic is sourced from a defined local gateway MAC
 # address. All other traffic that does not match this MAC address will be
@@ -435,7 +430,7 @@ EG_DROP_CMD="eggdrop psybnc bitchx BitchX init udp.pl"
 # from the PHP IP Data at:  http://www.projecthoneypot.org/list_of_ips.php
 DLIST_PHP="0"
 
-DLIST_PHP_URL="rfxn.com/downloads/php_list"          
+DLIST_PHP_URL="cdn.rfxn.com/downloads/php_list"          
 DLIST_PHP_URL_PROT="http"                            
 
 # The Spamhaus Don't Route Or Peer List (DROP) is an advisory "drop all 
@@ -464,7 +459,7 @@ DLIST_DSHIELD_URL_PROT="http"
 # BLK_RESNET is set to enabled.
 DLIST_RESERVED="1"
 
-DLIST_RESERVED_URL="rfxn.com/downloads/reserved.networks"
+DLIST_RESERVED_URL="cdn.rfxn.com/downloads/reserved.networks"
 DLIST_RESERVED_URL_PROT="http"			    
 
 # ECN is an extension which helps reduce congestion. Unfortunately some
@@ -476,7 +471,7 @@ DLIST_RESERVED_URL_PROT="http"
 # otherwise it stays disabled.
 DLIST_ECNSHAME="0"
 
-DLIST_ECNSHAME_URL="rfxn.com/downloads/ecnshame.lst" 
+DLIST_ECNSHAME_URL="cdn.rfxn.com/downloads/ecnshame.lst" 
 DLIST_ECNSHAME_URL_PROT="http"               
 
 ##

@@ -73,12 +73,13 @@ if [ "$DLIST_PHP" == "1" ] || [ "$DLIST_SPAMHAUS" == "1" ] || [ "$DLIST_DSHIELD"
 	fi
 fi
 
+/sbin/ip addr list $IFACE_UNTRUSTED | grep -w inet | grep -v inet6 | tr '/' ' ' | awk '{print$2}' > /etc/apf/internals/.localaddrs
+
 if [ "$RAB" == "0" ]; then
 	RAB_LOG_HIT=0
 fi
 
-eout "{glob} determined (IFACE_IN) $IFACE_IN has address $NET"
-eout "{glob} determined (IFACE_OUT) $IFACE_OUT has address $NET"
+eout "{glob} determined (IFACE_UNTRUSTED) $IFACE_UNTRUSTED has address $NET"
 
 # Load our PREROUTE rules
 tosroute PREROUTING
@@ -153,8 +154,8 @@ cron_refresh
 
 # Load our Allow Hosts rules
 glob_allow_download
-glob_allow_hosts
-allow_hosts
+glob_allow_hosts $GALLOW_HOSTS TGALLOW
+allow_hosts $ALLOW_HOSTS TALLOW
 
 # RAB default drop for events
 check_rab

@@ -63,7 +63,7 @@ fi
 
 if [ "$SET_ADDIFACE" == "1" ]; then
  ## associate a vnet rule for ip's on additional interfaces other than the main
- for anet in `ifconfig | grep Link | grep -vwE "inet|inet6|lo|$IFACE_IN|$IFACE_OUT" | awk '{print$1}'`; do
+ for anet in `ifconfig | grep Link | grep -vwE "inet|inet6|lo|$IFACE_UNTRUSTED|$IFACE_UNTRUSTED" | awk '{print$1}'`; do
   if [ -f "$ip" ]; then
   valtif=`echo $TIF | grep $anet`
    if [ "$valtif" == "" ]; then

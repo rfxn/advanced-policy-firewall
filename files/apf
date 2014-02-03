@@ -194,10 +194,10 @@ case "$1" in
 	$0 --start
 	;;
 -a|--allow)
-	cli_trust_allow $2 $3 $4 $5 $6 $7 $8 $9
+	cli_trust "TALLOW" "ALLOW" "$ALLOW_HOSTS" "$2" "$3"
 	;;
 -d|--deny)
-	cli_trust_deny $2 $3 $4 $5 $6 $7 $8 $9
+	cli_trust "TDENY" "DENY" "$DENY_HOSTS" "$2" "$3"
 	;;
 -u|--remove|--unban)
 	cli_trust_remove $2 >> /dev/null 2>&1

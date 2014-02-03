@@ -321,13 +321,10 @@ Description: As it implies, this is the installation path for APF and unless
 you have become a brave surgeon it is unlikely you will ever need to reconfigure
 this option - on we go.
 
-Option: IFACE_IN & IFACE_OUT
-Description: These variables instruct the firewall as to what interfaces you
-use for main network communication, such as to the Internet. In most cases these
-variables are configured to the same values such as eth0 or ppp0. In a more
-technical capacity these variables control what the firewall considers as the
-untrusted network interfaces, those which are far beyond the reasonable realm
-of control of an administrator.
+Option: IFACE_UNTRUSTED
+Description: This variable controls the interface that firewall rules are applied
+against. This interface is commonly the Internet facing interface or any interface
+that faces the main network of untrusted communication (WAN).
 
 Option: IFACE_TRUSTED
 Description: It is common that you may want to set a specific interface as
@@ -461,12 +458,6 @@ Description: This option will make sure that the IP addressess associated to
 the IFACE_* variables do actually have route entries. If a route entry can not
 be found then APF will not load as it is likely a configuration error has been
 made with possible results being a locked-up server.
-
-Option: VF_CROND
-Description: This option will make sure that the cron service is running when
-the DEVEL_MODE option is enabled. If the cron service is not found to be running
-then APF will not load as if there is a configuration error it is likely that
-the server will lock-up.
 
 Option: VF_LGATE
 Description: This option will make sure that all traffic coming into this host

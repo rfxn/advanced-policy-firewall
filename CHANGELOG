@@ -2,6 +2,15 @@
 [TODO] dynamically set pscan trigger level based on security level
 
 (rev:3)
+[Change] replace IFACE_IN/OUT variables with IFACE_UNTRUSTED variable in conf.apf
+[Change] removed defunct crondcheck() function
+[Change] modified devel mode function to use cron.d file instead of directly editing /etc/crontab
+[Change] removed glob_allow and glob_deny functions, modified allow|deny_hosts functions to support generic usage across any trust based rule files
+[Change] modified ml() and modinit() functions to remove unnecessary checks and simplify usage
+[Change] modified cli_trust_remove to remove unnecessary checks and improve accuracy in removing addresses from the running firewall set
+[Change] consolidated cli_trust_add|deny into single cli_trust() function; reduce unnecessary checks and redundant scripting
+[Change] modified rfxn.com URI references in conf.apf to cdn.rfxn.com
+[Change] improved sysctl.conf TCP defaults to reduce TW socket states
 [Change] dshield, spamhaus and projecthoneypot drop lists now only filter traffic sourced
          from addresses in the respective lists to reduce rule counts instead of to/from
          (src & dst)

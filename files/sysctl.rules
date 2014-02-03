@@ -26,12 +26,12 @@ echo 1 > /proc/sys/net/ipv4/icmp_echo_ignore_broadcasts
 
 if [ "$SYSCTL_LOGMARTIANS" == "1" ]; then
 	eout "{glob} setting sysctl_logmartians enabled"
-	echo 1 > /proc/sys/net/ipv4/conf/$IFACE_IN/log_martians
-	echo 1 > /proc/sys/net/ipv4/conf/$IFACE_OUT/log_martians
+	echo 1 > /proc/sys/net/ipv4/conf/$IFACE_UNTRUSTED/log_martians
+	echo 1 > /proc/sys/net/ipv4/conf/$IFACE_UNTRUSTED/log_martians
 else
         eout "{glob} setting sysctl_logmartians disabled"
-        echo 0 > /proc/sys/net/ipv4/conf/$IFACE_IN/log_martians
-        echo 0 > /proc/sys/net/ipv4/conf/$IFACE_OUT/log_martians
+        echo 0 > /proc/sys/net/ipv4/conf/$IFACE_UNTRUSTED/log_martians
+        echo 0 > /proc/sys/net/ipv4/conf/$IFACE_UNTRUSTED/log_martians
 fi
 
 if [ "$SYSCTL_ECN" == "1" ]; then
@@ -68,8 +68,8 @@ if [ "$SYSCTL_TCP" == "1" ]; then
 	echo 1 > /proc/sys/net/ipv4/tcp_sack
         echo 1 > /proc/sys/net/ipv4/tcp_dsack
 	echo 1 > /proc/sys/net/ipv4/tcp_fack
-	echo 1200 > /proc/sys/net/ipv4/tcp_keepalive_time
-	echo 20 > /proc/sys/net/ipv4/tcp_fin_timeout
+	echo 1800 > /proc/sys/net/ipv4/tcp_keepalive_time
+	echo 30 > /proc/sys/net/ipv4/tcp_fin_timeout
 	echo 3 > /proc/sys/net/ipv4/tcp_retries1
 fi
 
@@ -84,18 +84,18 @@ fi
 # Routing Parameters
 if [ "$SYSCTL_ROUTE" == "1" ]; then
 	eout "{glob} setting sysctl_routing enabled"
-	echo 1 > /proc/sys/net/ipv4/conf/$IFACE_IN/rp_filter
-	echo 1 > /proc/sys/net/ipv4/conf/$IFACE_OUT/rp_filter
-	echo 0 > /proc/sys/net/ipv4/conf/$IFACE_IN/accept_source_route
-	echo 0 > /proc/sys/net/ipv4/conf/$IFACE_OUT/accept_source_route
+	echo 1 > /proc/sys/net/ipv4/conf/$IFACE_UNTRUSTED/rp_filter
+	echo 1 > /proc/sys/net/ipv4/conf/$IFACE_UNTRUSTED/rp_filter
+	echo 0 > /proc/sys/net/ipv4/conf/$IFACE_UNTRUSTED/accept_source_route
+	echo 0 > /proc/sys/net/ipv4/conf/$IFACE_UNTRUSTED/accept_source_route
 	echo 0 > /proc/sys/net/ipv4/conf/all/bootp_relay
 	echo 0 > /proc/sys/net/ipv4/ip_forward
 	echo 0 > /proc/sys/net/ipv4/secure_redirects
 	echo 0 > /proc/sys/net/ipv4/send_redirects
 	echo 0 > /proc/sys/net/ipv4/proxy_arp
 else
-        echo 0 > /proc/sys/net/ipv4/conf/$IFACE_IN/rp_filter
-        echo 0 > /proc/sys/net/ipv4/conf/$IFACE_OUT/rp_filter
+        echo 0 > /proc/sys/net/ipv4/conf/$IFACE_UNTRUSTED/rp_filter
+        echo 0 > /proc/sys/net/ipv4/conf/$IFACE_UNTRUSTED/rp_filter
         echo 1 > /proc/sys/net/ipv4/conf/all/bootp_relay
         echo 1 > /proc/sys/net/ipv4/ip_forward
 fi
