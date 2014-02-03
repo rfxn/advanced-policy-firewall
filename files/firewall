@@ -154,7 +154,7 @@ cron_refresh
 
 # Load our Allow Hosts rules
 glob_allow_download
-glob_allow_hosts $GALLOW_HOSTS TGALLOW
+allow_hosts $GALLOW_HOSTS TGALLOW
 allow_hosts $ALLOW_HOSTS TALLOW
 
 # RAB default drop for events
