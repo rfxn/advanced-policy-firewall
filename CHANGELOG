@@ -1,6 +1,5 @@
 - 9.7
 [TODO] dynamically set pscan trigger level based on security level
-[TODO] what happened to the RAB_PSCAN code? is it missing or is github desktop just crap and I cant find it; check and fix if needed
 
 (rev:3)
 [Change] dshield, spamhaus and projecthoneypot drop lists now only filter traffic sourced
@@ -27,6 +26,8 @@
       sleep delay on restarts between flush() and start() to prevent resource errors
 [Fix] block rules for BLK_PRVNET and BLK_RESNET were being added with no interface modifier and as such had
       the potential to block traffic over private and loopback interfaces when it was otherwise not intended
+[Fix] in some situations, RABPSCAN would not enable due to kernel module extension variable not being scoped
+      properly and the check_rab function returning that the kernel did not support ipt/xt_recent.
 
 (rev:2)
 [Fix] xt/ipt_recent module path changed under RHEL/CentOS 6

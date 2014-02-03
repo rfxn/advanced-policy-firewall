@@ -105,56 +105,58 @@ if [ ! "$IPC_VAL" == "" ]; then
 fi
 
 if [ ! "$SET_MONOKERN" == "1" ]; then
-# Loading Kernel Modules
-ml ip_tables 1
-ml iptable_filter
-ml iptable_mangle
-ml ip_conntrack
-ml ip_conntrack_irc
-ml ip_conntrack_ftp
-ml ipt_state
-ml ipt_multiport
-ml ipt_limit
-ml ipt_recent
-ml ipt_LOG
-ml ipt_REJECT
-ml ipt_ecn
-ml ipt_length
-ml ipt_mac
-ml ipt_multiport
-ml ipt_owner
-ml ipt_state
-ml ipt_ttl
-ml ipt_TOS
-ml ipt_TCPMSS
-ml ipt_ULOG
-ml xt_conntrack
-ml xt_conntrack_irc
-ml xt_conntrack_ftp
-ml xt_state
-ml xt_multiport
-ml xt_limit
-ml xt_recent
-ml xt_LOG
-ml xt_REJECT
-ml xt_ecn
-ml xt_length
-ml xt_mac
-ml xt_multiport
-ml xt_owner
-ml xt_state
-ml xt_ttl
-ml xt_TOS
-ml xt_TCPMSS
-ml xt_ULOG
-ml nf_conntrack
-ml nf_conntrack_irc
-ml nf_conntrack_ftp
+        # Loading Kernel Modules
+        ml ip_tables 1
+        ml iptable_filter
+        ml iptable_mangle
+        ml ip_conntrack
+        ml ip_conntrack_irc
+        ml ip_conntrack_ftp
+        ml ipt_state
+        ml ipt_multiport
+        ml ipt_limit
+        ml ipt_recent
+        ml ipt_LOG
+        ml ipt_REJECT
+        ml ipt_ecn
+        ml ipt_length
+        ml ipt_mac
+        ml ipt_multiport
+        ml ipt_owner
+        ml ipt_state
+        ml ipt_ttl
+        ml ipt_TOS
+        ml ipt_TCPMSS
+        ml ipt_ULOG
+        ml xt_conntrack
+        ml xt_conntrack_irc
+        ml xt_conntrack_ftp
+        ml xt_state
+        ml xt_multiport
+        ml xt_limit
+        ml xt_recent
+        ml xt_LOG
+        ml xt_REJECT
+        ml xt_ecn
+        ml xt_length
+        ml xt_mac
+        ml xt_multiport
+        ml xt_owner
+        ml xt_state
+        ml xt_ttl
+        ml xt_TOS
+        ml xt_TCPMSS
+        ml xt_ULOG
+        ml nf_conntrack
+        ml nf_conntrack_irc
+        ml nf_conntrack_ftp
 fi
 }
 
 check_rab() {
-if [ ! -f "/lib/modules/$(uname -r)/kernel/net/ipv4/netfilter/ipt_recent.$MEXT" ] && [ ! -f "/lib/modules/$(uname -r)/kernel/net/ipv4/netfilter/xt_recent.$MEXT" ]&& [ ! -f "/lib/modules/$(uname -r)/kernel/net/netfilter/xt_recent.$MEXT" ]; then
+ml xt_recent
+ml ipt_recent
+if [ ! -f "/lib/modules/$(uname -r)/kernel/net/ipv4/netfilter/ipt_recent.$MEXT" ] && [ ! -f "/lib/modules/$(uname -r)/kernel/net/ipv4/netfilter/xt_recent.$MEXT" ] && [ ! -f "/lib/modules/$(uname -r)/kernel/net/netfilter/xt_recent.$MEXT" ]; then
  if [ "$RAB" == "1" ]; then
 	RAB="0"
 	eout "{rab} force set RAB disabled, kernel module xt/ipt_recent not found."
