@@ -86,7 +86,7 @@ modinit() {
 check_rab() {
  ml xt_recent
  ml ipt_recent
- if [ ! -f "/lib/modules/$(uname -r)/kernel/net/ipv4/netfilter/ipt_recent.$MEXT" ] && [ ! -f "/lib/modules/$(uname -r)/kernel/net/ipv4/netfilter/xt_recent.$MEXT" ] && [ ! -f "/lib/modules/$(uname -r)/kernel/net/netfilter/xt_recent.$MEXT" ] && [ "$RAB" == 1" ]; then
+ if [ ! -f "/lib/modules/$(uname -r)/kernel/net/ipv4/netfilter/ipt_recent.$MEXT" ] && [ ! -f "/lib/modules/$(uname -r)/kernel/net/ipv4/netfilter/xt_recent.$MEXT" ] && [ ! -f "/lib/modules/$(uname -r)/kernel/net/netfilter/xt_recent.$MEXT" ] && [ "$RAB" == "1" ]; then
 	RAB="0"
 	eout "{rab} force set RAB disabled, kernel module xt/ipt_recent not found."
  fi
