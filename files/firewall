@@ -75,7 +75,7 @@ tosroute PREROUTING
 # Allow all traffic on the loopback interface
 $IPT -A INPUT -i lo -s 0/0 -d 0/0 -j ACCEPT
 $IPT -A OUTPUT -o lo -s 0/0 -d 0/0 -j ACCEPT
-if [ "$USE_IPV6" == "1" ] then
+if [ "$USE_IPV6" == "1" ]; then
 	$IP6T -A INPUT -i lo -s 0/0 -d 0/0 -j ACCEPT
 	$IP6T -A OUTPUT -o lo -s 0/0 -d 0/0 -j ACCEPT
 fi
@@ -83,16 +83,16 @@ fi
 
 # Allow all traffic on trusted interfaces
 if [ ! "$IFACE_TRUSTED" == "" ]; then
-for i in `echo $IFACE_TRUSTED | tr ',' ' '`; do
-VAL_IF=`/sbin/ip addr list | grep -w $i`
-if [ "$VAL_IF" == "" ]; then
+ for i in `echo $IFACE_TRUSTED | tr ',' ' '`; do
+ VAL_IF=`/sbin/ip addr list | grep -w $i`
+ if [ "$VAL_IF" == "" ]; then
         eout "{glob} unable to verify status of interface $i; assuming untrusted"
-else
+ else
         eout "{glob} allow all to/from trusted interface $i"
         $IPT -A INPUT -i $i -s 0/0 -d 0/0 -j ACCEPT
         $IPT -A OUTPUT -o $i -s 0/0 -d 0/0 -j ACCEPT
-fi
-done
+ fi
+ done
 fi
 
 # Create TCP RESET & UDP PROHIBIT chains
