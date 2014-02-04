@@ -19,7 +19,6 @@ install() {
         chmod 750 $INSTALL_PATH/firewall
         chmod 750 $INSTALL_PATH/vnet/vnetgen
 	chmod 750 $INSTALL_PATH/extras/get_ports
-	chmod 750 $INSTALL_PATH/extras/dshield/install
 	chmod 750 $INSTALL_PATH
 	cp -pf .ca.def importconf $INSTALL_PATH/extras/
 	mkdir $INSTALL_PATH/doc
