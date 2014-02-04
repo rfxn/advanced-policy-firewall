@@ -26,7 +26,7 @@ INSTALL_PATH="$INSTALL_PATH"
 # Untrusted Network interface; all traffic on defined interface will be
 # subject to all firewall rules. This should be your internet exposed
 # interface.
-IFACE_UNTRUSTED="$IFACE_IN"
+IFACE_UNTRUSTED="$IFACE_UNTRUSTED"
 
 # Trusted Network interface(s); all traffic on defined interface(s) will by-pass
 # ALL firewall rules, format is white space or comma separated list.

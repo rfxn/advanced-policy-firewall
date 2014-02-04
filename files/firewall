@@ -170,7 +170,7 @@ if [ "$RAB" == "1" ]; then
  else
 	RAB_TRIP_FLAGS="--update"
  fi
- 
+
  if [ "$LOG_DROP" == "1" ] || [ "$RAB_LOG_TRIP" == "1" ]; then
 	$IPT -A INPUT -p all -m recent --rcheck --hitcount $RAB_HITCOUNT --seconds $RAB_TIMER -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** RABTRIP ** "
  fi
@@ -191,6 +191,12 @@ if [ "$RAB" == "1" ]; then
   esac
   eout "{rab} RAB_PSCAN monitored ports $RAB_PSCAN_PORTS"
   $IPT -N RABPSCAN
+  LDNS=`cat /etc/resolv.conf  | grep -v "#" | grep -w nameserver | awk '{print$2}' | grep -v 127.0.0.1`
+  if [ "$LDNS" ]; then
+	for i in `echo $LDNS`; do
+		$IPT -I RABPSCAN -s $i -j RETURN
+	done
+  fi
   for i in `echo $RAB_PSCAN_PORTS | tr ',' ' '`; do
    if [ "$LOG_DROP" == "1" ] || [ "$RAB_LOG_HIT" == "1" ]; then
 	   $IPT -A RABPSCAN -p tcp --dport $i -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** RABHIT ** "

@@ -1,6 +1,4 @@
 - 9.7
-[TODO] dynamically set pscan trigger level based on security level
-
 (rev:3)
 [Change] replace IFACE_IN/OUT variables with IFACE_UNTRUSTED variable in conf.apf
 [Change] removed defunct crondcheck() function
@@ -24,13 +22,14 @@
          validation callouts
 [Change] preroute rules now load before implicit trust on loopback interface traffic so rules can be
          applied against loopback traffic if so desired
-[Fix] SYSCTL_CONNTRACK better handles varied kernel and iptables versions to apply value on correct sysctl
-      hook file; nf_conntrack_max or ip_conntrack_max
+[Change] consolidated TMP_DROP and TMP_ALLOW chains into REFRESH_TEMP
 [Fix] trust rules refresh cronjob modified to remove MAILTO & SHELL variables which were causing crond
       'bad minute' errors on some systems
 [Fix] reordered chain flushes on refresh() to avoid any possible packet loss or loss of connectivity
       from hosts in the allow tables
-[Change] consolidated TMP_DROP and TMP_ALLOW chains into REFRESH_TEMP
+[Fix] SYSCTL_CONNTRACK better handles varied kernel and iptables versions to apply value on correct sysctl
+      hook file; nf_conntrack_max or ip_conntrack_max
+[Fix] set local DNS servers as configured in resolv.conf to bypass RABPSCAN to prevent potential Denial of Service from forged packets
 [Fix] restarts in some situations can cause 'iptables: Resource temporarily unavailable' errors, added 2sec
       sleep delay on restarts between flush() and start() to prevent resource errors
 [Fix] block rules for BLK_PRVNET and BLK_RESNET were being added with no interface modifier and as such had
