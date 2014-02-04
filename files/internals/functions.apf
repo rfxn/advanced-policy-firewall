@@ -1,24 +1,11 @@
 #!/bin/bash
 #
-# APF 9.7 [apf@r-fx.org]
-###
-# Copyright (C) 2002-2011, R-fx Networks <proj@r-fx.org>
-# Copyright (C) 2011, Ryan MacDonald <ryan@r-fx.org>
-#
-#    This program is free software; you can redistribute it and/or modify
-#    it under the terms of the GNU General Public License as published by
-#    the Free Software Foundation; either version 2 of the License, or
-#    (at your option) any later version.
-#
-#    This program is distributed in the hope that it will be useful,
-#    but WITHOUT ANY WARRANTY; without even the implied warranty of
-#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#    GNU General Public License for more details.
-#
-#    You should have received a copy of the GNU General Public License
-#    along with this program; if not, write to the Free Software
-#    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-###
+##
+# Advanced Policy Firewall (APF) v1.7.5
+#             (C) 2002-2014, R-fx Networks <proj@rfxn.com>
+#             (C) 2014, Ryan MacDonald <ryan@rfxn.com>
+# This program may be freely redistributed under the terms of the GNU GPL v2
+##
 #
 
 eout() {
@@ -1086,12 +1073,12 @@ refresh() {
         $IPT -F TGDENY
         $IPT -F TALLOW
         $IPT -F TGALLOW
-        glob_allow_download
-        glob_allow_hosts
-        allow_hosts
-        deny_hosts
-        glob_deny_download
-        glob_deny_hosts
+	glob_allow_download
+	allow_hosts $GALLOW_HOSTS TGALLOW
+	allow_hosts $ALLOW_HOSTS TALLOW
+	glob_deny_download
+	deny_hosts $GDENY_HOSTS TGDENY
+	deny_hosts $ALLOW_HOSTS TDENY
         $IPT -F REFRESH_TEMP
         rm -f $tmpra $tmprd
 }

@@ -1,15 +1,14 @@
 #!/bin/bash
 #
-# APF 9.7 [apf@r-fx.org]
-# Copyright (C) 2002-2011, R-fx Networks <proj@r-fx.org>
-# Copyright (C) 2011, Ryan MacDonald <ryan@r-fx.org>
-# This program may be freely redistributed under the terms of the GNU GPL
-#
+##
+# Advanced Policy Firewall (APF) v1.7.5
+#             (C) 2002-2014, R-fx Networks <proj@rfxn.com>
+#             (C) 2014, Ryan MacDonald <ryan@rfxn.com>
+# This program may be freely redistributed under the terms of the GNU GPL v2
+##
 # NOTE: This file should be edited with word/line wrapping off,
-#       if your using pico/nano please start it with the -w switch
-#       (e.g: pico -w filename)
-# NOTE: All options in this file are integer values unless otherwise
-#       indicated. This means value of 0 = disabled and 1 = enabled.
+#       if your using pico/nano please start use the -w switch
+#       (e.g: nano -w filename)
 
 ##
 # [Main]

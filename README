@@ -1,7 +1,6 @@
-[disclaimer: work in progress still]
-APF (Advanced Policy Firewall) - 9.7 [apf@r-fx.org]
- Copyright (C) 2002-2011, R-fx Networks <proj@r-fx.org>
- Copyright (C) 2011, Ryan MacDonald <ryan@r-fx.org>
+Advanced Policy Firewall (APF) v1.7.5
+    (C) 2002-2014, R-fx Networks <proj@rfxn.com>
+    (C) 2014, Ryan MacDonald <ryan@rfxn.com>
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
