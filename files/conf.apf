@@ -30,6 +30,13 @@ IFACE_UNTRUSTED="eth0"
 # ALL firewall rules, format is white space or comma separated list.
 IFACE_TRUSTED=""
 
+# This option enables IPv6 support for APF and loads all appropriate IPv6 kernel
+# modules. This feature depends on IPv6 support being enabled in your networking
+# configuration and that the modules are explicitly available. Please ensure that
+# you do not have IPv6 disabled via modprobe.conf/.d or in sysconfig files.
+# Note: The VNET (virtual network) feature does not currently support IPv6.
+USE_IPV6="0"
+
 # This option will allow for all status events to be displayed in real time on
 # the console as you use the firewall. Typically, APF used to operate silent
 # with all logging piped to $LOG_APF. The use of this option will not disable
@@ -45,20 +52,20 @@ SET_VERBOSE="1"
 #       b) if snapshot age exceeds 12 hours, the snapshot is expired
 #       c) if conf or a .rule has changed since last load, snapshot is expired
 #       d) if it is your first run of APF since install, snapshot is generated
-#       - an expired snapshot means APF will do a full start rule-by-rule 
+#       - an expired snapshot means APF will do a full start rule-by-rule
 SET_FASTLOAD="0"
 
 # Virtual Network Sub-System (VNET) creates independent policy rule set for
-# each IP on a system to /etc/apf/vnet/IP.rules. These rule files can be 
-# configured with conf.apf variables for unique but convenient firewall 
+# each IP on a system to /etc/apf/vnet/IP.rules. These rule files can be
+# configured with conf.apf variables for unique but convenient firewall
 # policies or custom iptables entries for even greater flexibility.
 SET_VNET="0"
 
-# This feature firewalls any additional interfaces on the server as untrusted 
+# This feature firewalls any additional interfaces on the server as untrusted
 # through the VNET sub-system. Excluded are interfaces that have already been
-# defined by IFACE_* variables. This feature is ideal for systems running 
-# private interfaces where not all hosts on the private network are trusted or 
-# are otherwise exposed to "open" networks through this private interface 
+# defined by IFACE_* variables. This feature is ideal for systems running
+# private interfaces where not all hosts on the private network are trusted or
+# are otherwise exposed to "open" networks through this private interface
 # (i.e: the Internet, network accessible storage LAN, corporate WAN, etc..)
 SET_ADDIFACE="0"
 

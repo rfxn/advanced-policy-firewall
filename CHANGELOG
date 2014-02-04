@@ -1,12 +1,17 @@
 - 1.7.5 | Feb 4th 2014:
+[New] added USE_IPV6 option to conf.apf for enabling/disabling IPv6 support/rule creation
+[New] added SET_EXPIRE configuration option for controlling deny_hosts ban expiration time
+[New] use of keywords 'static' or 'noexpire' in ban comments (e.g: apf -d IP "noexpire http flood") will cause
+      an address to never expire from the deny_hosts till removed with 'apf -u HOST/IP' or manually deleted
+      from file
 [New] Versioning scheme changed as follows:
       - MAJOR#.MINOR#.REVISION#
       - [0.]9.7-3 becomes 1.7.3
       - 1.7.3 Mar 11th 2013 contained many backported items from dev tree that became 1.7.4; merged trees into 1.7.5
       - New versioning scheme will become consistent across all rfxn.com projects
-      - Pending release of APF2 (2.0.0) will provide robust IPv6 support
       - The old versioning scheme had no real value and had become a never
         ending release tree
+[Change] replaced usage of ifconfig with ip command for determining interface addresses, preserved ifconfig support for older <=EL4 systems
 [Change] removed extras dshield package which was rarely utilized, users can of course still manually download it from dshield.org
 [Change] updates --refresh|-e to utilize new consolidated allow/deny functions and improve performance of refresh (reload) operations
 [Change] modified CHANGELOG versioning history to contain release dates back to initial Mar 2003 release
@@ -23,7 +28,6 @@
 [Change] dshield, spamhaus and projecthoneypot drop lists now only filter traffic sourced
          from addresses in the respective lists to reduce rule counts instead of to/from
          (src & dst)
-[New] added SET_EXPIRE configuration option for controlling deny_hosts ban expiration time
 [Change] internalize a list of local ip addresses and ignore generic to/from allow trust rules
          on said local ip list to prevent firewall loopholes due to misconfiguration
 [Change] modified tospre/post route function into consolidated tosroute function

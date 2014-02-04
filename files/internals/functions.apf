@@ -1078,7 +1078,7 @@ refresh() {
 	allow_hosts $ALLOW_HOSTS TALLOW
 	glob_deny_download
 	deny_hosts $GDENY_HOSTS TGDENY
-	deny_hosts $ALLOW_HOSTS TDENY
+	deny_hosts $DENY_HOSTS TDENY
         $IPT -F REFRESH_TEMP
         rm -f $tmpra $tmprd
 }
