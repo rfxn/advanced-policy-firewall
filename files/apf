@@ -179,7 +179,6 @@ case "$1" in
 	;;
 
 -r|--restart)
-	get_state
 	$0 --flush
 	sleep 2
 	$0 --start
