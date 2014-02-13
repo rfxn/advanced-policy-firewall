@@ -105,6 +105,7 @@ if [ "$SKIP_FASTLOAD_FIRSTRUN" == "" ] && [ "$SKIP_FASTLOAD_EXPIRED" == "" ] && 
 	if [ "$SET_VERBOSE" == "1" ] && [ "$DEVEL_ON" == "1" ]; then
 	        eout "{glob} !!DEVELOPMENT MODE ENABLED!! - firewall will flush every 5 minutes."
 	fi
+        rm -f $LOCK_FILE
 	exit 0
  elif [ "$SKIP_FASTLOAD_FIRSTRUN" == "1" ]; then 
 	eout "{glob} first run? fast load skipped [internals/.last.full not present]"
@@ -208,5 +209,5 @@ case "$1" in
 	head
 	help
 esac
-
+rm -f $LOCK_FILE
 exit 0
