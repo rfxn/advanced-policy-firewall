@@ -46,6 +46,7 @@ ml() {
                 echo "Unable to load iptables module ($1), aborting."
         fi
         eout "{glob} unable to load iptables module ($1), aborting."
+        rm -f $LOCK_FILE
         exit 1
  fi
  if [ -f "/lib/modules/$(uname -r)/kernel/net/ipv4/netfilter/$1.$MEXT" ] || [ -f "/lib/modules/$(uname -r)/kernel/net/netfilter/$1.$MEXT" ]; then
@@ -339,6 +340,7 @@ chain="$2"
 if [ -z "$file" ] || [ -z "$chain" ]; then
         eout "could not process allow_hosts $file $chain, fatal error, aborting!"
         /etc/init.d/apf stop
+        rm -f $LOCK_FILE
         exit 1
 fi
 
@@ -507,6 +509,7 @@ chain=$2
 if [ -z "$file" ] || [ -z "$chain" ]; then
 	eout "could not process deny_hosts $file $chain, fatal error, aborting!"
 	/etc/init.d/apf stop
+        rm -f $LOCK_FILE
 	exit 1
 fi
 
