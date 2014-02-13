@@ -672,16 +672,15 @@ if [ -f "$WGET" ] && [ -f "$RESNET" ]; then
    URL_TMP="/etc/apf/.apf-$$"
    rm -rf $URL_TMP
    URL_FILE=`echo $DLIST_RESERVED_URL | tr '/' '\n' | grep "." | tail -n 1`
-   RD_CON="$DLIST_RESERVED_URL_PROT://$DLIST_RESERVED_URL"
    mkdir $URL_TMP
    cd $URL_TMP
-   eout "{resnet} downloading $DLIST_RESERVED_URL_PROT://$DLIST_RESERVED_URL"
-   $WGET -t 1 -T 4 $DLIST_RESERVED_URL_PROT://$DLIST_RESERVED_URL >> /dev/null 2>&1
+   eout "{resnet} downloading $DLIST_RESERVED_URL"
+   $WGET -t 1 -T 4 $DLIST_RESERVED_URL >> /dev/null 2>&1
    if [ -f "$URL_TMP/$URL_FILE" ]; then
         eout "{resnet} parsing $URL_FILE into $RESNET"
         cat $URL_TMP/$URL_FILE > $RESNET
    else
-        eout "{resnet} download of $DLIST_RESERVED_URL_PROT://$DLIST_RESERVED_URL failed"
+        eout "{resnet} download of $DLIST_RESERVED_URL failed"
 	 if [ -f "$RESNET" ]; then
 	     cp $RESNET.bk $RESNET
    	     chmod 600 $RESNET $RESNET.bk
@@ -698,15 +697,14 @@ fi
 }
 
 dlist_php() {
-if [ ! "$DLIST_PHP_URL_PROT" == "" ] && [ ! "$DLIST_PHP_URL" == "" ] && [ "$DLIST_PHP" == "1" ] && [ -f "$WGET" ]; then
+if [ ! "$DLIST_PHP_URL" == "" ] && [ "$DLIST_PHP" == "1" ] && [ -f "$WGET" ]; then
    URL_TMP="/etc/apf/.apf-$$"
    rm -rf $URL_TMP /etc/apf/.apf-*
    URL_FILE=`echo $DLIST_PHP_URL | tr '/' '\n' | grep "." | tail -n 1`
-   URL_CON="$DLIST_PHP_URL_PROT://$DLIST_PHP_URL"
    mkdir $URL_TMP
    cd $URL_TMP
-   eout "{php} downloading $DLIST_PHP_URL_PROT://$DLIST_PHP_URL"
-   $WGET -t 1 -T 4 $DLIST_PHP_URL_PROT://$DLIST_PHP_URL >> /dev/null 2>&1
+   eout "{php} downloading $DLIST_PHP_URL"
+   $WGET -t 1 -T 4 $DLIST_PHP_URL >> /dev/null 2>&1
    if [ -f "$URL_TMP/$URL_FILE" ]; then
         eout "{php} parsing $URL_FILE into $PHP_HOSTS"
         if [ -f "$PHP_HOSTS" ]; then
@@ -718,7 +716,7 @@ if [ ! "$DLIST_PHP_URL_PROT" == "" ] && [ ! "$DLIST_PHP_URL" == "" ] && [ "$DLIS
                 fi
         done
    else
-        eout "{php} download of $DLIST_PHP_URL_PROT://$DLIST_PHP_URL failed"
+        eout "{php} download of $DLIST_PHP_URL failed"
    fi
    rm -rf $URL_TMP
    cd /etc/apf
@@ -747,15 +745,14 @@ fi
 }
 
 dlist_dshield() {
-if [ ! "$DLIST_DSHIELD_URL_PROT" == "" ] && [ ! "$DLIST_DSHIELD_URL" == "" ] && [ "$DLIST_DSHIELD" == "1" ] && [ -f "$WGET" ]; then
+if [ ! "$DLIST_DSHIELD_URL" == "" ] && [ "$DLIST_DSHIELD" == "1" ] && [ -f "$WGET" ]; then
    URL_TMP="/etc/apf/.apf-$$"
    rm -rf $URL_TMP /etc/apf/.apf-*
    URL_FILE=`echo $DLIST_DSHIELD_URL | tr '/' '\n' | grep "." | tail -n 1`
-   URL_CON="$DLIST_DSHIELD_URL_PROT://$DLIST_DSHIELD_URL"
    mkdir $URL_TMP
    cd $URL_TMP
-   eout "{dshield} downloading $DLIST_DSHIELD_URL_PROT://$DLIST_DSHIELD_URL"
-   $WGET -t 1 -T 4 $DLIST_DSHIELD_URL_PROT://$DLIST_DSHIELD_URL >> /dev/null 2>&1
+   eout "{dshield} downloading $DLIST_DSHIELD_URL"
+   $WGET -t 1 -T 4 $DLIST_DSHIELD_URL >> /dev/null 2>&1
    if [ -f "$URL_TMP/$URL_FILE" ]; then
         eout "{dshield} parsing $URL_FILE into $DS_HOSTS"
         if [ -f "$DS_HOSTS" ]; then
@@ -767,7 +764,7 @@ if [ ! "$DLIST_DSHIELD_URL_PROT" == "" ] && [ ! "$DLIST_DSHIELD_URL" == "" ] && 
                 fi
         done
    else
-        eout "{dshield} download of $DLIST_DSHIELD_URL_PROT://$DLIST_DSHIELD_URL failed"
+        eout "{dshield} download of $DLIST_DSHIELD_URL failed"
    fi
    rm -rf $URL_TMP
    cd /etc/apf
@@ -796,15 +793,14 @@ fi
 }
 
 dlist_spamhaus() {
-if [ ! "$DLIST_SPAMHAUS_URL_PROT" == "" ] && [ ! "$DLIST_SPAMHAUS_URL" == "" ] && [ "$DLIST_SPAMHAUS" == "1" ] && [ -f "$WGET" ]; then
+if [ ! "$DLIST_SPAMHAUS_URL" == "" ] && [ "$DLIST_SPAMHAUS" == "1" ] && [ -f "$WGET" ]; then
    URL_TMP="/etc/apf/.apf-$$"
    rm -rf $URL_TMP /etc/apf/.apf-*
    URL_FILE=`echo $DLIST_SPAMHAUS_URL | tr '/' '\n' | grep "." | tail -n 1`
-   URL_CON="$DLIST_SPAMHAUS_URL_PROT://$DLIST_SPAMHAUS_URL"
    mkdir $URL_TMP
    cd $URL_TMP
-   eout "{sdrop} downloading $DLIST_SPAMHAUS_URL_PROT://$DLIST_SPAMHAUS_URL"
-   $WGET -t 1 -T 4 $DLIST_SPAMHAUS_URL_PROT://$DLIST_SPAMHAUS_URL >> /dev/null 2>&1
+   eout "{sdrop} downloading $DLIST_SPAMHAUS_URL"
+   $WGET -t 1 -T 4 $DLIST_SPAMHAUS_URL >> /dev/null 2>&1
    if [ -f "$URL_TMP/$URL_FILE" ]; then
         eout "{sdrop} parsing $URL_FILE into $DROP_HOSTS"
         if [ -f "$DROP_HOSTS" ]; then
@@ -816,7 +812,7 @@ if [ ! "$DLIST_SPAMHAUS_URL_PROT" == "" ] && [ ! "$DLIST_SPAMHAUS_URL" == "" ] &
                 fi
         done
    else
-        eout "{sdrop} download of $DLIST_SPAMHAUS_URL_PROT://$DLIST_SPAMHAUS_URL failed"
+        eout "{sdrop} download of $DLIST_SPAMHAUS_URL failed"
    fi
    rm -rf $URL_TMP
    cd /etc/apf
@@ -846,15 +842,14 @@ fi
 }
 
 dlist_ecnshame() {
-if [ ! "$DLIST_ECNSHAME_URL_PROT" == "" ] && [ ! "$DLIST_ECNSHAME_URL" == "" ] && [ "$DLIST_ECNSHAME" == "1" ] && [ -f "$WGET" ]; then
+if [ ! "$DLIST_ECNSHAME_URL" == "" ] && [ "$DLIST_ECNSHAME" == "1" ] && [ -f "$WGET" ]; then
    URL_TMP="/etc/apf/.apf-$$"
    rm -rf $URL_TMP /etc/apf/.apf-*
    URL_FILE=`echo $DLIST_ECNSHAME_URL | tr '/' '\n' | grep "." | tail -n 1`
-   URL_CON="$DLIST_ECNSHAME_URL_PROT://$DLIST_ECNSHAME_URL"
    mkdir $URL_TMP
    cd $URL_TMP
-   eout "{ecnshame} downloading $DLIST_ECNSHAME_URL_PROT://$DLIST_ECNSHAME_URL"
-   $WGET -t 1 -T 4 $DLIST_ECNSHAME_URL_PROT://$DLIST_ECNSHAME_URL >> /dev/null 2>&1
+   eout "{ecnshame} downloading $DLIST_ECNSHAME_URL"
+   $WGET -t 1 -T 4 $DLIST_ECNSHAME_URL >> /dev/null 2>&1
    if [ -f "$URL_TMP/$URL_FILE" ]; then
         eout "{ecnshame} parsing $URL_FILE into $ECNSHAME_HOSTS"
         if [ -f "$ECNSHAME_HOSTS" ]; then
@@ -866,7 +861,7 @@ if [ ! "$DLIST_ECNSHAME_URL_PROT" == "" ] && [ ! "$DLIST_ECNSHAME_URL" == "" ] &
                 fi
         done
    else
-        eout "{ecnshame} download of $DLIST_ECNSHAME_URL_PROT://$DLIST_ECNSHAME_URL failed"
+        eout "{ecnshame} download of $DLIST_ECNSHAME_URL failed"
    fi
    rm -rf $URL_TMP
    cd /etc/apf
@@ -889,20 +884,19 @@ fi
 }
 
 glob_allow_download() {
-if [ ! "$GA_URL_PROT" == "" ] && [ ! "$GA_URL" == "" ] && [ "$USE_RGT" == "1" ] && [ -f "$WGET" ]; then
+if [ ! "$GA_URL" == "" ] && [ "$USE_RGT" == "1" ] && [ -f "$WGET" ]; then
    URL_TMP="/etc/apf/.apf-$$"
    rm -rf $URL_TMP
    URL_FILE=`echo $GA_URL | tr '/' '\n' | grep "." | tail -n 1`
-   GA_URL_CON="$GA_URL_PROT://$GA_URL"
    mkdir $URL_TMP
    cd $URL_TMP
-   eout "{trust} downloading $GA_URL_PROT://$GA_URL"
-   $WGET -t 1 -T 4 $GA_URL_PROT://$GA_URL >> /dev/null 2>&1
+   eout "{trust} downloading $GA_URL"
+   $WGET -t 1 -T 4 $GA_URL >> /dev/null 2>&1
    if [ -f "$URL_TMP/$URL_FILE" ]; then
         eout "{trust} parsing $URL_FILE into $GALLOW_HOSTS"
         cat $URL_TMP/$URL_FILE > $GALLOW_HOSTS
    else
-        eout "{trust} download of $GA_URL_PROT://$GA_URL failed"
+        eout "{trust} download of $GA_URL failed"
    fi
    rm -rf $URL_TMP
    cd /etc/apf
@@ -914,20 +908,19 @@ fi
 }
 
 glob_deny_download() {
-if [ ! "$GD_URL_PROT" == "" ] && [ ! "$GD_URL" == "" ] && [ "$USE_RGT" == "1" ] && [ -f "$WGET" ]; then
+if [ ! "$GD_URL" == "" ] && [ "$USE_RGT" == "1" ] && [ -f "$WGET" ]; then
    URL_TMP="/etc/apf/.apf-$$"
    rm -rf $URL_TMP
    URL_FILE=`echo $GD_URL | tr '/' '\n' | grep "." | tail -n 1`
-   GD_URL_CON="$GD_URL_PROT://$GD_URL"
    mkdir $URL_TMP
    cd $URL_TMP
-   eout "{trust} downloading $GD_URL_PROT://$GD_URL"
-   $WGET -t 1 -T 4 $GD_URL_PROT://$GD_URL >> /dev/null 2>&1
+   eout "{trust} downloading $GD_URL"
+   $WGET -t 1 -T 4 $GD_URL >> /dev/null 2>&1
    if [ -f "$URL_TMP/$URL_FILE" ]; then
         eout "{trust} parsing $URL_FILE into $GDENY_HOSTS"
 	cat $URL_TMP/$URL_FILE > $GDENY_HOSTS
    else
-        eout "{trust} download of $GD_URL_PROT://$GD_URL failed"
+        eout "{trust} download of $GD_URL failed"
    fi
    rm -rf $URL_TMP
    cd /etc/apf

@@ -436,27 +436,21 @@ EG_DROP_CMD="$EG_DROP_CMD"
 # This aggregate list combines Harvesters, Spammers and SMTP Dictionary attacks
 # from the PHP IP Data at:  http://www.projecthoneypot.org/list_of_ips.php
 DLIST_PHP="$DLIST_PHP"
-
-DLIST_PHP_URL="rfxn.com/downloads/php_list"
-DLIST_PHP_URL_PROT="http"
+DLIST_PHP_URL="http://rfxn.com/downloads/php_list"
 
 # The Spamhaus Don't Route Or Peer List (DROP) is an advisory "drop all
 # traffic" list, consisting of stolen 'zombie' netblocks and netblocks
 # controlled entirely by professional spammers. For more information please
 # see http://www.spamhaus.org/drop/.
 DLIST_SPAMHAUS="$DLIST_SPAMHAUS"
-
-DLIST_SPAMHAUS_URL="www.spamhaus.org/drop/drop.lasso"
-DLIST_SPAMHAUS_URL_PROT="http"
+DLIST_SPAMHAUS_URL="http://www.spamhaus.org/drop/drop.lasso"
 
 # DShield collects data about malicious activity from across the Internet.
 # This data is cataloged, summarized and can be used to discover trends in
 # activity, confirm widespread attacks, or assist in preparing better firewall
 # rules. This is a list of top networks that have exhibited suspicious activity.
 DLIST_DSHIELD="$DLIST_DSHIELD"
-
-DLIST_DSHIELD_URL="feeds.dshield.org/top10-2.txt"
-DLIST_DSHIELD_URL_PROT="http"
+DLIST_DSHIELD_URL="http://feeds.dshield.org/top10-2.txt"
 
 # The reserved networks list is addresses which ARIN has marked as reserved
 # for future assignement and have no business as valid traffic on the internet.
@@ -465,9 +459,7 @@ DLIST_DSHIELD_URL_PROT="http"
 # on the internet from getting blocked; this option is only important when
 # BLK_RESNET is set to enabled.
 DLIST_RESERVED="1"
-
-DLIST_RESERVED_URL="rfxn.com/downloads/reserved.networks"
-DLIST_RESERVED_URL_PROT="http"
+DLIST_RESERVED_URL="http://rfxn.com/downloads/reserved.networks"
 
 # ECN is an extension which helps reduce congestion. Unfortunately some
 # clueless software/hardware vendors have setup their sites or implemented
@@ -477,9 +469,7 @@ DLIST_RESERVED_URL_PROT="http"
 # is accepted as intended. This option is dependent on setting SYSCTL_ECN="1"
 # otherwise it stays disabled.
 DLIST_ECNSHAME="$DLIST_ECNSHAME"
-
-DLIST_ECNSHAME_URL="rfxn.com/downloads/ecnshame.lst"
-DLIST_ECNSHAME_URL_PROT="http"
+DLIST_ECNSHAME_URL="http://rfxn.com/downloads/ecnshame.lst"
 
 ##
 # Global Trust
@@ -491,11 +481,8 @@ DLIST_ECNSHAME_URL_PROT="http"
 # leaving USE_RGT=0, ideal for a host serving the files.
 USE_RGT="$USE_RGT"
 
-GA_URL="$GA_URL"       # glob_allow.rules url (no *://)
-GA_URL_PROT="http" 			     # protocol for use with wget
-
-GD_URL="$GD_URL"        # glob_deny.rules url (no *://)
-GD_URL_PROT="http"			     # protocol for use with wget
+GA_URL="$GA_URL"
+GD_URL="$GD_URL"
 
 ##
 # [Logging and control settings]

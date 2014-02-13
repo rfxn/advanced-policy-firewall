@@ -11,11 +11,11 @@ VER="1.7.5"
 CNF="/etc/apf/conf.apf"
 
 head() {
-echo "Advanced Policy Firewall (APF) v$VER <apf@rfxn.org>"
-echo "      Copyright (C) 2002-2014, R-fx Networks <proj@rfxn.org>"
-echo "      Copyright (C) 2014, Ryan MacDonald <ryan@rfxn.org>"
-echo "This program may be freely redistributed under the terms of the GNU GPL"
-echo ""
+	echo "Advanced Policy Firewall (APF) v$VER <apf@rfxn.org>"
+	echo "      Copyright (C) 2002-2014, R-fx Networks <proj@rfxn.org>"
+	echo "      Copyright (C) 2014, Ryan MacDonald <ryan@rfxn.org>"
+	echo "This program may be freely redistributed under the terms of the GNU GPL"
+	echo ""
 }
 
 if [ -f "$CNF" ] && [ ! "$CNF" == "" ]; then
@@ -90,7 +90,7 @@ else
 	fi
 fi
 
-# check uptiime is greater than 5 minutes (300s)
+# check uptime is greater than 5 minutes (300s)
  UPSEC=`cat /proc/uptime  | tr '.' ' ' | awk '{print$1}'`
  if [ "$UPSEC" -lt "300" ]; then
 	SET_FASTLOAD_UPSEC=1
@@ -163,9 +163,11 @@ fi
 
 case "$1" in
 -s|--start)
+	get_state
 	start
 	;;
 -f|--flush|--stop)
+	get_state
 	flush
 	;;
 -l|--list)
@@ -176,6 +178,7 @@ case "$1" in
 	;;
 
 -r|--restart)
+	get_state
 	$0 --flush
 	sleep 2
 	$0 --start
@@ -194,6 +197,7 @@ case "$1" in
 	fi
 	;;
 -e|--refresh)
+	get_state
 	refresh
 	;;
 -o|--ovars)
