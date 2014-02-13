@@ -80,18 +80,18 @@ check_rab() {
 }
 
 get_state() {
- if [ -f "$LOCK" ]; then
-        OVAL=`cat $LOCK`
+ if [ -f "$LOCK_FILE" ]; then
+        OVAL=`cat $LOCK_FILE`
         DIFF=$[UTIME-OVAL]
         if [ "$DIFF" -gt "$LOCK_TIMEOUT" ]; then
-                echo "$UTIME" > $LOCK
+                echo "$UTIME" > $LOCK_FILE
                 eout "{glob} cleared stale lock file file."
         else
-                eout "{glob} locked subsystem, already running ? ($LOCK is $DIFF seconds old), aborting."
+                eout "{glob} locked subsystem, already running ? ($LOCK_FILE is $DIFF seconds old), aborting."
                 exit 1
         fi
  else
-        echo "$UTIME" > $LOCK
+        echo "$UTIME" > $LOCK_FILE
  fi
 }
 
