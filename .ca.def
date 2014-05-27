@@ -69,6 +69,12 @@ SET_ADDIFACE="$SET_ADDIFACE"
 # scale APF to unique situations.
 SET_MONOKERN="$SET_MONOKERN"
 
+# The expiry interval, in seconds, that bans will be expired out of the trust
+# system. This only applies to local bans from deny_hosts.rules and not global
+# import rules. The value must not be less than equiv. seconds of SET_REFRESH.
+# [value in seconds, 0 to disable, recommended 600]
+SET_EXPIRE="$SET_EXPIRE"
+
 # This controls how often, if at all, we want the trust system to refresh rules.
 # The firewall will flush & reload all static rules, redownload global rules and
 # re-resolve any dns names in the rules. This is ideal when using dynamic dns
