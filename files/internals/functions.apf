@@ -1022,7 +1022,7 @@ if [ "$SET_EXPIRE" -ge "60" ]; then
  if [ -f "/etc/apf/deny_hosts.rules" ]; then
          expire_time="$SET_EXPIRE"
          check_time=$(date +%s)
-         for i in `cat /etc/apf/deny_hosts.rules | grep -iE "# added.*on.*with comment:.*" | awk '{print$3"|"$5"|"$6}'`; do
+         for i in `cat /etc/apf/deny_hosts.rules | grep -vE "static|noexpire" | grep -iE "# added.*on.*with comment:.*" | awk '{print$3"|"$5"|"$6}'`; do
                 declare -a arr
                 arr=(`echo ${i//|/ }`)
                 ip=${arr[0]}
