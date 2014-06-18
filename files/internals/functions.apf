@@ -388,7 +388,8 @@ if [ ! "`cat $file | grep -v "#"`" == "" ]; then
 
                         if [ ! "$IPFLOW" == "" ] && [ ! "$PIP" == "" ] && [ ! "$IPFLOW" == "" ] && [ ! "$PPORT" == "" ]; then
                                 eout "{trust} allow $PIP $PFLOW_T port $PPORT"
-                                $IPT -A $chain -p tcp -$IPFLOW $PIP --$PFLOW $PPORT -j ACCEPT
+                                $IPT -A $chain -p tcp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j ACCEPT
+                                $IPT -A $chain -p udp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j ACCEPT
                         fi
                 fi
         done
@@ -437,7 +438,8 @@ if [ ! "`cat $file | grep -v "#"`" == "" ]; then
                                 eout "{trust} ignored local ip allow rule '$NFLOW_T $PIP $PFLOW_T port $PPORT'"
                          else
                                 eout "{trust} allow $NFLOW_T $PIP $PFLOW_T port $PPORT"
-                                $IPT -A $chain -p tcp -$IPFLOW $PIP --$PFLOW $PPORT -j ACCEPT
+                                $IPT -A $chain -p tcp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j ACCEPT
+                                $IPT -A $chain -p udp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j ACCEPT
                          fi
                         fi
                 fi
@@ -493,8 +495,13 @@ if [ ! "`cat $file | grep -v "#"`" == "" ]; then
                          elif [ "$IPFLOW" == "d" ] && [ "$NFLOW" == "OUTPUT" ] && [ "$(cat /etc/apf/internals/.localaddrs | grep -w $PIP)" ]; then
                                 eout "{trust} ignored local ip allow rule '$NFLOW_T $PIP $PFLOW_T port $PPORT'"
                          else
-                                eout "{trust} allow $NFLOW_T $PTYPE $PIP $PFLOW_T port $PPORT"
-                                $IPT -A $chain -p $PTYPE -$IPFLOW $PIP --$PFLOW $PPORT -j ACCEPT
+                                if [ "$PTYPE" == "tcp" ]; then
+	                                eout "{trust} allow $NFLOW_T $PTYPE $PIP $PFLOW_T port $PPORT"
+	                                $IPT -A $chain -p $PTYPE -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j ACCEPT
+                                elif [ "$PTYPE" == "udp" ]; then
+                                        eout "{trust} allow $NFLOW_T $PTYPE $PIP $PFLOW_T port $PPORT"
+		                        $IPT -A $chain -p $PTYPE -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j ACCEPT
+                                fi
                          fi
                         fi
                 fi
@@ -557,8 +564,8 @@ if [ ! "`cat $file | grep -v "#"`" == "" ]; then
 
                         if [ ! "$IPFLOW" == "" ] && [ ! "$PIP" == "" ] && [ ! "$IPFLOW" == "" ] && [ ! "$PPORT" == "" ]; then
                                 eout "{trust} deny $PIP $PFLOW_T port $PPORT"
-                                $IPT -A $chain -p tcp -$IPFLOW $PIP --$PFLOW $PPORT -j $TCP_STOP
-				$IPT -A $chain -p udp -$IPFLOW $PIP --$PFLOW $PPORT -j $UDP_STOP
+                                $IPT -A $chain -p tcp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j $TCP_STOP
+				$IPT -A $chain -p udp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j $UDP_STOP
                         fi
                 fi
         done
@@ -602,8 +609,8 @@ if [ ! "`cat $file | grep -v "#"`" == "" ]; then
 
                         if [ ! "$NFLOW" == "" ] && [ ! "$IPFLOW" == "" ] && [ ! "$PIP" == "" ] && [ ! "$IPFLOW" == "" ] && [ ! "$PPORT" == "" ]; then
                                 eout "{trust} deny ($NFLOW_T) $PIP $PFLOW_T port $PPORT"
-                                $IPT -A $chain -p tcp -$IPFLOW $PIP --$PFLOW $PPORT -j $TCP_STOP
-				$IPT -A $chain -p udp -$IPFLOW $PIP --$PFLOW $PPORT -j $UDP_STOP
+                                $IPT -A $chain -p tcp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j $TCP_STOP
+				$IPT -A $chain -p udp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j $UDP_STOP
                         fi
                 fi
         done
@@ -653,11 +660,12 @@ if [ ! "`cat $file | grep -v "#"`" == "" ]; then
                         PIP=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$6}'`
 
                         if [ ! "$PTYPE" == "" ] && [ ! "$NFLOW" == "" ] && [ ! "$IPFLOW" == "" ] && [ ! "$PIP" == "" ] && [ ! "$IPFLOW" == "" ] && [ ! "$PPORT" == "" ]; then
-                                eout "{trust} deny $NFLOW_T $PTYPE $PIP $PFLOW_T port $PPORT"
 				if [ "$PTYPE" == "tcp" ]; then
-                                $IPT -A $chain -p $PTYPE -$IPFLOW $PIP --$PFLOW $PPORT -j $TCP_STOP
+        	                        eout "{trust} deny $NFLOW_T $PTYPE $PIP $PFLOW_T port $PPORT"
+	                                $IPT -A $chain -p $PTYPE -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j $TCP_STOP
 				elif [ "$PTYPE" == "udp" ]; then
-				$IPT -A $chain -p $PTYPE -$IPFLOW $PIP --$PFLOW $PPORT -j $UDP_STOP
+	                                eout "{trust} deny $NFLOW_T $PTYPE $PIP $PFLOW_T port $PPORT"
+					$IPT -A $chain -p $PTYPE -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j $UDP_STOP
 				fi
                         fi
                 fi

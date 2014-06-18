@@ -12,6 +12,7 @@
       - The old versioning scheme had no real value and had become a never
         ending release tree
 [New] added locking support to prevent multiple start,stop,restart,refresh operations from running on top of each other
+[New] added mutliport support to trust syntax
 [Change] replaced usage of ifconfig with ip command for determining interface addresses, preserved ifconfig support for older <=EL4 systems
 [Change] removed extras dshield package which was rarely utilized, users can of course still manually download it from dshield.org
 [Change] updates --refresh|-e to utilize new consolidated allow/deny functions and improve performance of refresh (reload) operations
@@ -41,6 +42,7 @@
 [Change] consolidated TMP_DROP and TMP_ALLOW chains into REFRESH_TEMP
 [Change] updated copyright dates in all output and file headers
 [Change] removed use of *_URL_PROT variables, URL's should now be fully qualified URI's (e.g: http://domain.com/path/file)
+[Fix] allow rules in the format advanced trust syntax, when otherwise not defining a protocol, were only applying to TCP traffic
 [Fix] trust rules refresh cronjob modified to remove MAILTO & SHELL variables which were causing crond
       'bad minute' errors on some systems
 [Fix] reordered chain flushes on refresh() to avoid any possible packet loss or loss of connectivity
