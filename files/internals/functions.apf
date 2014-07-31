@@ -1072,7 +1072,7 @@ refresh() {
 	 if [ -f "/etc/apf/internals/.trusts.md5" ]; then
 		last_trusts_md5=`cat /etc/apf/internals/.trusts.md5`
 		if [ "$trusts_md5" == "$last_trusts_md5" ]; then
-		        eout "{glob} "trust rules unchanged since last refresh, doing nothing."
+		        eout "{glob} trust rules unchanged since last refresh, doing nothing."
 	                echo "$trusts_md5" > /etc/apf/internals/.trusts.md5
 		        rm -f $LOCK_FILE
 			exit 1
