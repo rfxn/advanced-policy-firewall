@@ -31,6 +31,13 @@ IFACE_UNTRUSTED="$IFACE_UNTRUSTED"
 # ALL firewall rules, format is white space or comma separated list.
 IFACE_TRUSTED="$IFACE_TRUSTED"
 
+# This option enables IPv6 support for APF and loads all appropriate IPv6 kernel
+# modules. This feature depends on IPv6 support being enabled in your networking
+# configuration and that the modules are explicitly available. Please ensure that
+# you do not have IPv6 disabled via modprobe.conf/.d or in sysconfig files.
+# Note: The VNET (virtual network) feature does not currently support IPv6.
+USE_IPV6="$USE_IPV6"
+
 # This option will allow for all status events to be displayed in real time on
 # the console as you use the firewall. Typically, APF used to operate silent
 # with all logging piped to \$LOG_APF. The use of this option will not disable
@@ -80,6 +87,13 @@ SET_EXPIRE="$SET_EXPIRE"
 # re-resolve any dns names in the rules. This is ideal when using dynamic dns
 # names or downloadable global trust rules. [value in minutes, 0 to disable]
 SET_REFRESH="$SET_REFRESH"
+
+# The refreshing of large allow/deny trust files can be resource intensive, this
+# feature checks for changes to trust files between refreshes and only performs
+# a refresh if contents have changed. If you are using dynamic DNS names in trust
+# rules, which require regular DNS refreshes, you should keep this disabled.
+# [value in minutes, 0 to disable]
+SET_REFRESH_MD5="$SET_REFRESH_MD5"
 
 # This is the total amount of rules allowed inside of the deny trust system.
 # When this limit is reached, the deny rule files will begin to purge older

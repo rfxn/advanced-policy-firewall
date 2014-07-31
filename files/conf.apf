@@ -84,8 +84,16 @@ SET_EXPIRE="0"
 # This controls how often, if at all, we want the trust system to refresh rules.
 # The firewall will flush & reload all static rules, redownload global rules and
 # re-resolve any dns names in the rules. This is ideal when using dynamic dns
-# names or downloadable global trust rules. [value in minutes, 0 to disable]
+# names or downloadable global trust rules.
+# [value in minutes, 0 to disable]
 SET_REFRESH="10"
+
+# The refreshing of large allow/deny trust files can be resource intensive, this
+# feature checks for changes to trust files between refreshes and only performs
+# a refresh if contents have changed. If you are using dynamic DNS names in trust
+# rules, which require regular DNS refreshes, you should keep this disabled.
+# [value in minutes, 0 to disable]
+SET_REFRESH_MD5="0"
 
 # This is the total amount of rules allowed inside of the deny trust system.
 # When this limit is reached, the deny rule files will begin to purge older
@@ -94,13 +102,13 @@ SET_TRIM="200"
 
 # Verifies that the IFACE_* and IFACE_TRUSTED interfaces are actually routed
 # to something. If configured interfaces are found with no routes setup then
-# APF will exit with an error to prevent further issues (such as being locked 
+# APF will exit with an error to prevent further issues (such as being locked
 # out of the system).
 VF_ROUTE="1"
 
 # Verifies that all inbound traffic is sourced from a defined local gateway MAC
 # address. All other traffic that does not match this MAC address will be
-# rejected as untrusted traffic. It is quite easy to forge a MAC address and as 
+# rejected as untrusted traffic. It is quite easy to forge a MAC address and as
 # such this feature executes NO default accept policy. Leave this option empty
 # to disable or enter a 48-bit MAC address to enable.
 VF_LGATE=""

@@ -1,6 +1,7 @@
 - 1.7.5 | Feb 4th 2014:
-[New] added USE_IPV6 option to conf.apf for enabling/disabling IPv6 support/rule creation
+[New] added USE_IPV6 configuration option for enabling/disabling IPv6 support/rule creation
 [New] added SET_EXPIRE configuration option for controlling deny_hosts ban expiration time
+[New] added SET_REFRESH_MD5 configuration option which controls validation checks on trust rules and skips refresh if no changes
 [New] use of keywords 'static' or 'noexpire' in ban comments (e.g: apf -d IP "noexpire http flood") will cause
       an address to never expire from the deny_hosts till removed with 'apf -u HOST/IP' or manually deleted
       from file

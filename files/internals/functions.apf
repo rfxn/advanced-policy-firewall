@@ -1025,7 +1025,7 @@ fi
 if [ "$SET_EXPIRE" -ge "60" ]; then
  REFRESH_TIME=$[SET_REFRESH*60]
  if [ "$SET_EXPIRE" -lt "$REFRESH_TIME" ]; then
-        SET_EXPIRE=$REFRESH_TIME
+        SET_EXPIRE="$REFRESH_TIME"
  fi
  if [ -f "/etc/apf/deny_hosts.rules" ]; then
          expire_time="$SET_EXPIRE"
@@ -1050,12 +1050,43 @@ fi
 }
 
 refresh() {
+	apf_loaded=`$IPT --list --numeric | grep PROHIBIT`
+	if [ -z "$apf_loaded" ]; then
+	        eout "{glob} apf does not appear to have rules loaded, doing nothing."
+	        rm -f $LOCK_FILE
+		exit 1
+	fi
+
+        eout "{glob} refreshing trust system rules"
+	tmpra="/etc/apf/internals/refresh.allow.temp.$$"
+
         if [ "$SET_EXPIRE" -ge "60" ]; then
                 # expire deny_hosts bans
                 expirebans
         fi
-        eout "{glob} refreshing trust system rules."
-	tmpra="/etc/apf/internals/refresh.allow.temp.$$"
+
+	if [ "$SET_REFRESH_MD5" == "1" ]; then
+ 	 glob_allow_download
+	 glob_deny_download
+	 trusts_md5=`$MD5 $DENY_HOSTS $GDENY_HOSTS $ALLOW_HOSTS $GALLOW_HOSTS | md5sum | awk '{print$1}'`
+	 if [ -f "/etc/apf/internals/.trusts.md5" ]; then
+		last_trusts_md5=`cat /etc/apf/internals/.trusts.md5`
+		if [ "$trusts_md5" == "$last_trusts_md5" ]; then
+		        eout "{glob} "trust rules unchanged since last refresh, doing nothing."
+	                echo "$trusts_md5" > /etc/apf/internals/.trusts.md5
+		        rm -f $LOCK_FILE
+			exit 1
+		else
+	                echo "$trusts_md5" > /etc/apf/internals/.trusts.md5
+		fi
+	 else
+		echo "$trusts_md5" > /etc/apf/internals/.trusts.md5
+	 fi
+	else
+		glob_allow_download
+		glob_deny_download
+	fi
+
         /sbin/iptables-save | grep -E "TALLOW|TGALLOW" | grep -E '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | awk '{print$4}' | sort -n | uniq > $tmpra
         $IPT -F REFRESH_TEMP
         for i in `cat $tmpra | grep -v "#"`; do
@@ -1079,10 +1110,8 @@ refresh() {
         $IPT -F TGDENY
         $IPT -F TALLOW
         $IPT -F TGALLOW
-	glob_allow_download
 	allow_hosts $GALLOW_HOSTS TGALLOW
 	allow_hosts $ALLOW_HOSTS TALLOW
-	glob_deny_download
 	deny_hosts $GDENY_HOSTS TGDENY
 	deny_hosts $DENY_HOSTS TDENY
         $IPT -F REFRESH_TEMP
