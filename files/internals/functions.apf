@@ -1040,6 +1040,8 @@ if [ "$SET_EXPIRE" -ge "60" ]; then
                 time_diff=$[$check_time-$ban_time]
                 if [ "$time_diff" -ge "$expire_time" ]; then
                         eout "{trust} removed expired ban for $ip (${time_diff}s/${expire_time}s)"
+                        sdel=`echo $ip | sed 's%/%\\\/%'`
+                        sed -i "/$sdel/d" /etc/apf/deny_hosts.rules
                         /etc/apf/apf -u "$ip" >> /dev/null 2>&1
                 fi
          done
