@@ -163,6 +163,7 @@ fi
 
 if [ "$SET_REFRESH_MD5" == "1" ] && [ "$MD5" ]; then
 	$MD5 $DENY_HOSTS $GDENY_HOSTS $ALLOW_HOSTS $GALLOW_HOSTS | $MD5 | awk '{print$1}' > /etc/apf/internals/.trusts.md5
+fi
 }
 
 case "$1" in
