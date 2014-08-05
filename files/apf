@@ -157,9 +157,12 @@ if [ ! "$DEVEL_ON" == "1" ] && [ ! "$firewall_on" == "" ]; then
 	$IPTS > $INSTALL_PATH/internals/.apf.restore
 	eout "{glob} fast load snapshot saved"
 fi
-        if [ "$SET_VERBOSE" == "1" ] && [ "$DEVEL_ON" == "1" ]; then
-                eout "{glob} !!DEVELOPMENT MODE ENABLED!! - firewall will flush every 5 minutes."
-        fi
+if [ "$SET_VERBOSE" == "1" ] && [ "$DEVEL_ON" == "1" ]; then
+	eout "{glob} !!DEVELOPMENT MODE ENABLED!! - firewall will flush every 5 minutes."
+fi
+
+if [ "$SET_REFRESH_MD5" == "1" ] && [ "$MD5" ]; then
+	$MD5 $DENY_HOSTS $GDENY_HOSTS $ALLOW_HOSTS $GALLOW_HOSTS | $MD5 | awk '{print$1}' > /etc/apf/internals/.trusts.md5
 }
 
 case "$1" in
