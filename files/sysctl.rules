@@ -62,7 +62,7 @@ fi
 if [ "$SYSCTL_TCP" == "1" ]; then
 	eout "{glob} setting sysctl_tcp enabled"
 	echo 0 > /proc/sys/net/ipv4.tcp_tw_recycle
-	echo 1 > /proc/sys/net/ipv4.tcp_tw_reuse
+	echo 1 > /proc/sys/net/ipv4/tcp_tw_reuse
 	echo 1 > /proc/sys/net/ipv4/tcp_window_scaling
 	echo 0 > /proc/sys/net/ipv4/tcp_timestamps
 	echo 1 > /proc/sys/net/ipv4/tcp_sack
