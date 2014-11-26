@@ -7,12 +7,13 @@
 # This program may be freely redistributed under the terms of the GNU GPL v2
 ##
 #
-INSTALL_PATH="/etc/apf"
-BINPATH="/usr/local/sbin/apf"
-COMPAT_BINPATH="/usr/local/sbin/fwmgr"
+INSTALL_PATH=${INSTALL_PATH:-"/etc/apf"}
+BINPATH=${BINPATH:-"/usr/local/sbin/apf"}
+COMPAT_BINPATH=${COMPAT_BINPATH:-"/usr/local/sbin/fwmgr"}
 
 install() {
         mkdir $INSTALL_PATH
+        find ./files -type f -exec sed -i s:/etc/apf:$INSTALL_PATH:g {} \;
         cp -fR files/* $INSTALL_PATH
         chmod -R 640 $INSTALL_PATH/*
         chmod 750 $INSTALL_PATH/apf
@@ -26,7 +27,7 @@ install() {
         ln -fs $INSTALL_PATH/apf $BINPATH
         ln -fs $INSTALL_PATH/apf $COMPAT_BINPATH
 	rm -f /etc/cron.d/fwdev
-	rm -f /etc/apf/cron.fwdev
+	rm -f $INSTALL_PATH/cron.fwdev
         if [ -f "/etc/cron.hourly/fw" ]; then
 		rm -f /etc/cron.hourly/fw
         fi
@@ -49,7 +50,7 @@ install() {
 		if [ -f "/etc/rc.local" ]; then
 			val=`grep -i apf /etc/rc.local`
 			if [ "$val" == "" ]; then
-				echo "/etc/apf/apf -s >> /dev/null 2>&1" >> /etc/rc.local
+				echo "$INSTALL_PATH/apf -s >> /dev/null 2>&1" >> /etc/rc.local
 			fi
 		fi
         fi
@@ -63,10 +64,10 @@ install() {
 	/sbin/chkconfig --add apf
 	/sbin/chkconfig --level 345 apf on
 	fi
-	/etc/apf/vnet/vnetgen
-	if [ -f "/usr/bin/dialog" ] && [ -d "/etc/apf/extras/apf-m" ]; then
+	$INSTALL_PATH/vnet/vnetgen
+	if [ -f "/usr/bin/dialog" ] && [ -d "$INSTALL_PATH/extras/apf-m" ]; then
 		last=`pwd`
-		cd /etc/apf/extras/apf-m/
+		cd $INSTALL_PATH/extras/apf-m/
 		sh install -i
 		cd $last
 	fi
@@ -77,8 +78,8 @@ VER=`cat files/VERSION | grep version | awk '{print$2}'`
 if [ -d "$INSTALL_PATH" ]; then
 	DVAL=`date +"%d%m%Y-%s"`
 	cp -R $INSTALL_PATH $INSTALL_PATH.bk$DVAL
-	rm -f /etc/apf.bk.last
-	ln -fs $INSTALL_PATH.bk$DVAL /etc/apf.bk.last 
+	rm -f $INSTALL_PATH.bk.last
+	ln -fs $INSTALL_PATH.bk$DVAL $INSTALL_PATH/.bk.last 
 	rm -rf $INSTALL_PATH
 	echo -n "Installing APF $VER: "
 	install
@@ -96,9 +97,9 @@ echo "  Config path:          $INSTALL_PATH/conf.apf"
 echo "  Executable path:      $BINPATH"
 echo ""
 echo "Other Details:"
-if [ -d "/etc/apf.bk.last" ]; then
+if [ -d "$INSTALL_PATH.bk.last" ]; then
 	./importconf
-	echo "  Note: Please review /etc/apf/conf.apf for consistency, install default backed up to /etc/apf/conf.apf.orig"
+	echo "  Note: Please review $INSTALL_PATH/conf.apf for consistency, install default backed up to $INSTALL_PATH/conf.apf.orig"
 else
 . $INSTALL_PATH/extras/get_ports
 	echo "  Note: These ports are not auto-configured; they are simply presented for information purposes. You must manually configure all port options."
