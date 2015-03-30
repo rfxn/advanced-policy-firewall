@@ -40,7 +40,7 @@ if [ ! "$IF" == "" ]; then
 	fi
  done
 fi
-if [ ! "$IFACE_TRUSTED" == "" ]; then
+if [ ! "$IF" == "" ] && [ "$VF_ROUTE" == "1" ]; then
  for i in `echo $IFACE_TRUSTED`; do
   VAL_IFACE_TRUSTED=`/sbin/route -n | grep -w $i`
         if [ "$VAL_IFACE_TRUSTED" == "" ]; then
