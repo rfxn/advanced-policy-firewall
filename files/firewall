@@ -28,7 +28,7 @@ modinit
 # Delete user made chains. Flush and zero the chains.
 flush 1
 
-if [ ! "$IF" == "" ]; then
+if [ ! "$IF" == "" ] && [ "$VF_ROUTE" == "1" ]; then
  for i in `echo $IF`; do
   VAL_IF=`/sbin/route -n | grep -w $i`
 	if [ "$VAL_IF" == "" ]; then
@@ -40,7 +40,7 @@ if [ ! "$IF" == "" ]; then
 	fi
  done
 fi
-if [ ! "$IF" == "" ] && [ "$VF_ROUTE" == "1" ]; then
+if [ ! "$IFACE_TRUSTED" == "" ] && [ "$VF_ROUTE" == "1" ]; then
  for i in `echo $IFACE_TRUSTED`; do
   VAL_IFACE_TRUSTED=`/sbin/route -n | grep -w $i`
         if [ "$VAL_IFACE_TRUSTED" == "" ]; then
