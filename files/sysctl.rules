@@ -2,8 +2,8 @@ eout "{glob} loading sysctl.rules"
 
 # START SYSCTL config
 
-if [ "$SYSCTL_CONNTRACK" == "" ]; then
-	SYSCTL_CONNTRACK = 65536
+if [ "$SYSCTL_CONNTRACK" == "" ] || [ -z "$SYSCTL_CONNTRACK" ]; then
+	SYSCTL_CONNTRACK=65536
 fi
 
 if [ -f "/proc/sys/net/ipv4/ip_conntrack_max" ]; then
