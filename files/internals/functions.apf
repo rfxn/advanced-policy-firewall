@@ -686,7 +686,7 @@ if [ -f "$WGET" ] && [ -f "$RESNET" ]; then
    mkdir $URL_TMP
    cd $URL_TMP
    eout "{resnet} downloading $DLIST_RESERVED_URL"
-   $WGET -t 1 -T 4 $DLIST_RESERVED_URL >> /dev/null 2>&1
+   $WGET -4 -t 1 -T 4 $DLIST_RESERVED_URL >> /dev/null 2>&1
    if [ -f "$URL_TMP/$URL_FILE" ]; then
         eout "{resnet} parsing $URL_FILE into $RESNET"
         cat $URL_TMP/$URL_FILE > $RESNET
@@ -715,7 +715,7 @@ if [ ! "$DLIST_PHP_URL" == "" ] && [ "$DLIST_PHP" == "1" ] && [ -f "$WGET" ]; th
    mkdir $URL_TMP
    cd $URL_TMP
    eout "{php} downloading $DLIST_PHP_URL"
-   $WGET -t 1 -T 4 $DLIST_PHP_URL >> /dev/null 2>&1
+   $WGET -4 -t 1 -T 4 $DLIST_PHP_URL >> /dev/null 2>&1
    if [ -f "$URL_TMP/$URL_FILE" ]; then
         eout "{php} parsing $URL_FILE into $PHP_HOSTS"
         if [ -f "$PHP_HOSTS" ]; then
@@ -763,7 +763,7 @@ if [ ! "$DLIST_DSHIELD_URL" == "" ] && [ "$DLIST_DSHIELD" == "1" ] && [ -f "$WGE
    mkdir $URL_TMP
    cd $URL_TMP
    eout "{dshield} downloading $DLIST_DSHIELD_URL"
-   $WGET -t 1 -T 4 $DLIST_DSHIELD_URL >> /dev/null 2>&1
+   $WGET -4 -t 1 -T 4 $DLIST_DSHIELD_URL >> /dev/null 2>&1
    if [ -f "$URL_TMP/$URL_FILE" ]; then
         eout "{dshield} parsing $URL_FILE into $DS_HOSTS"
         if [ -f "$DS_HOSTS" ]; then
@@ -811,7 +811,7 @@ if [ ! "$DLIST_SPAMHAUS_URL" == "" ] && [ "$DLIST_SPAMHAUS" == "1" ] && [ -f "$W
    mkdir $URL_TMP
    cd $URL_TMP
    eout "{sdrop} downloading $DLIST_SPAMHAUS_URL"
-   $WGET -t 1 -T 4 $DLIST_SPAMHAUS_URL >> /dev/null 2>&1
+   $WGET -4 -t 1 -T 4 $DLIST_SPAMHAUS_URL >> /dev/null 2>&1
    if [ -f "$URL_TMP/$URL_FILE" ]; then
         eout "{sdrop} parsing $URL_FILE into $DROP_HOSTS"
         if [ -f "$DROP_HOSTS" ]; then
@@ -860,7 +860,7 @@ if [ ! "$DLIST_ECNSHAME_URL" == "" ] && [ "$DLIST_ECNSHAME" == "1" ] && [ -f "$W
    mkdir $URL_TMP
    cd $URL_TMP
    eout "{ecnshame} downloading $DLIST_ECNSHAME_URL"
-   $WGET -t 1 -T 4 $DLIST_ECNSHAME_URL >> /dev/null 2>&1
+   $WGET -4 -t 1 -T 4 $DLIST_ECNSHAME_URL >> /dev/null 2>&1
    if [ -f "$URL_TMP/$URL_FILE" ]; then
         eout "{ecnshame} parsing $URL_FILE into $ECNSHAME_HOSTS"
         if [ -f "$ECNSHAME_HOSTS" ]; then
@@ -902,7 +902,7 @@ if [ ! "$GA_URL" == "" ] && [ "$USE_RGT" == "1" ] && [ -f "$WGET" ]; then
    mkdir $URL_TMP
    cd $URL_TMP
    eout "{trust} downloading $GA_URL"
-   $WGET -t 1 -T 4 $GA_URL >> /dev/null 2>&1
+   $WGET -4 -t 1 -T 4 $GA_URL >> /dev/null 2>&1
    if [ -f "$URL_TMP/$URL_FILE" ]; then
         eout "{trust} parsing $URL_FILE into $GALLOW_HOSTS"
         cat $URL_TMP/$URL_FILE > $GALLOW_HOSTS
@@ -926,7 +926,7 @@ if [ ! "$GD_URL" == "" ] && [ "$USE_RGT" == "1" ] && [ -f "$WGET" ]; then
    mkdir $URL_TMP
    cd $URL_TMP
    eout "{trust} downloading $GD_URL"
-   $WGET -t 1 -T 4 $GD_URL >> /dev/null 2>&1
+   $WGET -4 -t 1 -T 4 $GD_URL >> /dev/null 2>&1
    if [ -f "$URL_TMP/$URL_FILE" ]; then
         eout "{trust} parsing $URL_FILE into $GDENY_HOSTS"
 	cat $URL_TMP/$URL_FILE > $GDENY_HOSTS
