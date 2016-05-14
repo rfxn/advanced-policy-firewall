@@ -98,7 +98,7 @@ SET_REFRESH_MD5="$SET_REFRESH_MD5"
 # This is the total amount of rules allowed inside of the deny trust system.
 # When this limit is reached, the deny rule files will begin to purge older
 # entries to maintain the set limit. [value is max lines, 0 for unlimited]
-SET_TRIM="200"
+SET_TRIM="250"
 
 # Verifies that the IFACE_* and IFACE_TRUSTED interfaces are actually routed
 # to something. If configured interfaces are found with no routes setup then

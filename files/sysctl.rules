@@ -3,7 +3,7 @@ eout "{glob} loading sysctl.rules"
 # START SYSCTL config
 
 if [ "$SYSCTL_CONNTRACK" == "" ]; then
-	SYSCTL_CONNTRACK = 65536
+	SYSCTL_CONNTRACK=131072
 fi
 
 if [ -f "/proc/sys/net/ipv4/ip_conntrack_max" ]; then
@@ -61,7 +61,7 @@ fi
 # TCP Parameters
 if [ "$SYSCTL_TCP" == "1" ]; then
 	eout "{glob} setting sysctl_tcp enabled"
-	echo 0 > /proc/sys/net/ipv4.tcp_tw_recycle
+	echo 0 > /proc/sys/net/ipv4/tcp_tw_recycle
 	echo 1 > /proc/sys/net/ipv4/tcp_tw_reuse
 	echo 1 > /proc/sys/net/ipv4/tcp_window_scaling
 	echo 0 > /proc/sys/net/ipv4/tcp_timestamps
@@ -90,6 +90,8 @@ if [ "$SYSCTL_ROUTE" == "1" ]; then
 	echo 0 > /proc/sys/net/ipv4/conf/$IFACE_UNTRUSTED/accept_source_route
 	echo 0 > /proc/sys/net/ipv4/conf/all/bootp_relay
 	echo 0 > /proc/sys/net/ipv4/ip_forward
+	echo 0 > /proc/sys/net/ipv4/conf/all/forwarding
+	echo 0 > /proc/sys/net/ipv4/conf/all/accept_redirects
 	echo 0 > /proc/sys/net/ipv4/secure_redirects
 	echo 0 > /proc/sys/net/ipv4/send_redirects
 	echo 0 > /proc/sys/net/ipv4/proxy_arp
@@ -98,6 +100,8 @@ else
         echo 0 > /proc/sys/net/ipv4/conf/$IFACE_UNTRUSTED/rp_filter
         echo 1 > /proc/sys/net/ipv4/conf/all/bootp_relay
         echo 1 > /proc/sys/net/ipv4/ip_forward
+	echo 1 > /proc/sys/net/ipv4/conf/all/forwarding
+
 fi
 
 echo 1 > /proc/sys/net/ipv4/route/flush

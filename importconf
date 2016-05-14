@@ -14,8 +14,15 @@ DOUT=".conf.apf"
 if [ -d "/etc/apf.bk.last" ]; then
 # get all the vars from current release
 . /etc/apf/conf.apf
+NEW_SYSCTL_CONNTRACK="$SYSCTL_CONNTRACK"
 # replace with any vars old release had
 . /etc/apf.bk.last/conf.apf
+# make sure conntrack is set and is not lower than package default
+if [ -z "$SYSCTL_CONNTRACK" ] || [ -z "$NEW_SYSCTL_CONNTRACK" ]; then
+	SYSCTL_CONNTRACK="131072"
+elif [ "$NEW_SYSCTL_CONNTRACK" -lt "$SYSCTL_CONNTRACK" ]; then
+	SYSCTL_CONNTRACK="131072"
+fi
 # generate new conf
 . $DEF
 

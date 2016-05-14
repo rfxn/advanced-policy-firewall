@@ -98,7 +98,7 @@ SET_REFRESH_MD5="0"
 # This is the total amount of rules allowed inside of the deny trust system.
 # When this limit is reached, the deny rule files will begin to purge older
 # entries to maintain the set limit. [value is max lines, 0 for unlimited]
-SET_TRIM="200"
+SET_TRIM="250"
 
 # Verifies that the IFACE_* and IFACE_TRUSTED interfaces are actually routed
 # to something. If configured interfaces are found with no routes setup then
@@ -297,10 +297,15 @@ BLK_IDENT="0"
 
 # This is the maximum number of "sessions" (connection tracking entries) that
 # can be handled simultaneously by the firewall in kernel memory. Increasing
-# this value too high will simply waste memory - setting it too low may result
-# in some or all connections being refused, in particular during denial of
-# service attacks.
-SYSCTL_CONNTRACK="65536"
+# this value too high will simply waste memory and add latency but setting it
+# too low may result in some or all connections being refused, in particular
+# during denial of service attacks.
+SYSCTL_CONNTRACK="131072"
+
+SYSCTL_CONNTRACK_ADAPTIVE="0"
+SYSCTL_CONNTRACK_INCREMENT="65536"
+SYSCTL_CONNTRACK_HIGH="1048576"
+SYSCTL_CONNTRACK_BUCKETS="16384"
 
 # These are system control (sysctl) option changes to disable TCP features
 # that can be abused in addition to tweaking other TCP features for increased
