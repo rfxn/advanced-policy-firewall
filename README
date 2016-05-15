@@ -220,6 +220,9 @@ install.sh script that will perform all the tasks of installing APF for you.
 
 Begin Install:
 # sh install.sh
+or
+# INSTALL_PATH=/etc/yourpath sh install.sh
+
 
 If one so desires they may customize the setup of APF by editing the variables
 inside the install.sh script followed by also editing the path variables in

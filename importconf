@@ -2,36 +2,29 @@
 #
 ##
 # Advanced Policy Firewall (APF) v1.7.5
-#             (C) 2002-2014, R-fx Networks <proj@rfxn.com>
-#             (C) 2014, Ryan MacDonald <ryan@rfxn.com>
+#             (C) 2002-2016, R-fx Networks <proj@rfxn.com>
+#             (C) 2016, Ryan MacDonald <ryan@rfxn.com>
 # This program may be freely redistributed under the terms of the GNU GPL v2
 ##
 #
-INSTALL_PATH="/etc/apf"
-DEF=".ca.def"
-DOUT=".conf.apf"
+INSTALL_PATH=${INSTALL_PATH:-"/etc/apf"}
+DEF=${DEF:-".ca.def"}
+DOUT=${DOUT:-".conf.apf"}
 
-if [ -d "/etc/apf.bk.last" ]; then
+if [ -d "$INSTALL_PATH.bk.last" ]; then
 # get all the vars from current release
-. /etc/apf/conf.apf
-NEW_SYSCTL_CONNTRACK="$SYSCTL_CONNTRACK"
+. $INSTALL_PATH/conf.apf
 # replace with any vars old release had
-. /etc/apf.bk.last/conf.apf
-# make sure conntrack is set and is not lower than package default
-if [ -z "$SYSCTL_CONNTRACK" ] || [ -z "$NEW_SYSCTL_CONNTRACK" ]; then
-	SYSCTL_CONNTRACK="131072"
-elif [ "$NEW_SYSCTL_CONNTRACK" -lt "$SYSCTL_CONNTRACK" ]; then
-	SYSCTL_CONNTRACK="131072"
-fi
+. $INSTALL_PATH.bk.last/conf.apf
 # generate new conf
 . $DEF
 
 cp -f $INSTALL_PATH/conf.apf $INSTALL_PATH/conf.apf.orig
 cp -f $DOUT $INSTALL_PATH/conf.apf
-cp -f /etc/apf.bk.last/*_hosts.rules /etc/apf/
-cp -f /etc/apf.bk.last/vnet/*.rules /etc/apf/vnet/
+cp -f $INSTALL_PATH.bk.last/*_hosts.rules /etc/apf/
+cp -f $INSTALL_PATH.bk.last/vnet/*.rules /etc/apf/vnet/
 
-OV=`cat /etc/apf.bk.last/VERSION | awk '{print$2}'`
-NV=`cat /etc/apf/VERSION | awk '{print$2}'`
+OV=`cat $INSTALL_PATH.bk.last/VERSION | awk '{print$2}'`
+NV=`cat $INSTALL_PATH/VERSION | awk '{print$2}'`
         echo "  Imported options from $OV to $NV."
 fi
