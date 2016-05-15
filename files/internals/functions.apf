@@ -168,7 +168,7 @@ cli_trust() {
  HOST="$4"
  CMT="$5"
  if [ ! "$HOST" == "" ]; then
-        valtrust=`cat $DENY_HOSTS $ALLOW_HOSTS $GALLOW_HOSTS $GDENY_HOSTS | grep -w $HOST`
+        valtrust=`cat $DENY_HOSTS $ALLOW_HOSTS $GALLOW_HOSTS $GDENY_HOSTS | grep -F -w $HOST`
 	if [ "$valtrust" ]; then
 		tlist=`grep -l $HOST $DENY_HOSTS $ALLOW_HOSTS $GALLOW_HOSTS $GDENY_HOSTS | tr '\n' ' '`
 	fi
