@@ -72,7 +72,7 @@ if [ -d "$INSTALL_PATH" ]; then
 	DVAL=`date +"%d%m%Y-%s"`
 	cp -R $INSTALL_PATH $INSTALL_PATH.bk$DVAL
 	rm -f $INSTALL_PATH.bk.last
-	ln -fs $INSTALL_PATH.bk$DVAL $INSTALL_PATH/.bk.last 
+	ln -fs $INSTALL_PATH.bk$DVAL ${INSTALL_PATH}.bk.last
 	rm -rf $INSTALL_PATH
 	echo -n "Installing APF $VER: "
 	install
