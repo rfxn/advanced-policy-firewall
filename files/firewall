@@ -41,7 +41,7 @@ if [ ! "$IF" == "" ] && [ "$VF_ROUTE" == "1" ]; then
  done
 fi
 if [ ! "$IFACE_TRUSTED" == "" ] && [ "$VF_ROUTE" == "1" ]; then
- for i in `echo $IFACE_TRUSTED`; do
+ for i in `echo $IFACE_TRUSTED | tr ',' ' '`; do
   VAL_IFACE_TRUSTED=`/sbin/route -n | grep -w $i`
         if [ "$VAL_IFACE_TRUSTED" == "" ]; then
                 eout "{glob} could not verify that interface $IFACE_TRUSTED is routed to a network, aborting."
