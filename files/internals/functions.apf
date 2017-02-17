@@ -46,7 +46,7 @@ ml() {
                 echo "Unable to load iptables module ($1), aborting."
         fi
         eout "{glob} unable to load iptables module ($1), aborting."
-        rm -f $LOCK_FILE
+        mutex_unlock
         exit 1
  fi
  if [ -f "/lib/modules/$(uname -r)/kernel/net/ipv4/netfilter/$1.$MEXT" ] || [ -f "/lib/modules/$(uname -r)/kernel/net/netfilter/$1.$MEXT" ]; then
@@ -80,7 +80,7 @@ check_rab() {
  fi
 }
 
-get_state() {
+mutex_lock() {
  if [ -f "$LOCK_FILE" ]; then
         OVAL=`cat $LOCK_FILE`
         DIFF=$[UTIME-OVAL]
@@ -94,6 +94,14 @@ get_state() {
  else
         echo "$UTIME" > $LOCK_FILE
  fi
+ APF_MUTEX_LOCKED="1"
+}
+
+mutex_unlock() {
+  if [ "$APF_MUTEX_LOCKED" == "1" ]; then
+    rm -f $LOCK_FILE
+    APF_MUTEX_LOCKED="0"
+  fi
 }
 
 trim() {
@@ -340,7 +348,7 @@ chain="$2"
 if [ -z "$file" ] || [ -z "$chain" ]; then
         eout "could not process allow_hosts $file $chain, fatal error, aborting!"
         /etc/init.d/apf stop
-        rm -f $LOCK_FILE
+        mutex_unlock
         exit 1
 fi
 
@@ -516,7 +524,7 @@ chain=$2
 if [ -z "$file" ] || [ -z "$chain" ]; then
 	eout "could not process deny_hosts $file $chain, fatal error, aborting!"
 	/etc/init.d/apf stop
-        rm -f $LOCK_FILE
+        mutex_unlock
 	exit 1
 fi
 
@@ -1053,7 +1061,7 @@ refresh() {
 	apf_loaded=`$IPT --list --numeric | grep PROHIBIT`
 	if [ -z "$apf_loaded" ]; then
 	        eout "{glob} apf does not appear to have rules loaded, doing nothing."
-	        rm -f $LOCK_FILE
+	        mutex_unlock
 		exit 1
 	fi
 
@@ -1074,7 +1082,7 @@ refresh() {
 		if [ "$trusts_md5" == "$last_trusts_md5" ]; then
 		        eout "{glob} trust rules unchanged since last refresh, doing nothing."
 	                echo "$trusts_md5" > /etc/apf/internals/.trusts.md5
-		        rm -f $LOCK_FILE
+		        mutex_unlock
 			exit 1
 		else
 	                echo "$trusts_md5" > /etc/apf/internals/.trusts.md5
