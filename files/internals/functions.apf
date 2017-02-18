@@ -81,20 +81,36 @@ check_rab() {
 }
 
 mutex_lock() {
- if [ -f "$LOCK_FILE" ]; then
-        OVAL=`cat $LOCK_FILE`
-        DIFF=$[UTIME-OVAL]
-        if [ "$DIFF" -gt "$LOCK_TIMEOUT" ]; then
-                echo "$UTIME" > $LOCK_FILE
-                eout "{glob} cleared stale lock file file."
-        else
-                eout "{glob} locked subsystem, already running ? ($LOCK_FILE is $DIFF seconds old), aborting."
-                exit 1
-        fi
- else
-        echo "$UTIME" > $LOCK_FILE
- fi
- APF_MUTEX_LOCKED="1"
+  if [ "$APF_MUTEX_LOCKED" == "1" ]; then
+    return
+  fi
+  STARTTIME=`date +"%s"`
+
+  while [ -f "$LOCK_FILE" ]; do
+    read LOCKPID LOCKTIME <<<$(cat $LOCK_FILE)
+    PIDNAME=`ps -p $LOCKPID -o comm=`
+    if [ ! "$PIDNAME" == "apf" ]; then
+      eout "{glob} pid in lock file is not apf, clearing lock."
+      break
+    fi
+    LOCKDIFF=$[`date +"%s"`-LOCKTIME]
+    LOCALDIFF=$[`date +"%s"`-STARTTIME]
+    if [ "$LOCKDIFF" -gt "$LOCK_TIMEOUT" ]; then
+      eout "{glob} stale lock file found, clearing lock."
+      break
+    elif [ "$LOCALDIFF" -gt "$ENTER_LOCK_TIMEOUT" ]; then
+      eout "{glob} timed out while attempting to gain lock."
+      exit 1
+    else
+      eout "{glob} locked subsystem, already running? $LOCK_FILE is $LOCKDIFF seconds old, waiting..."
+      sleep 5
+    fi
+  done
+
+  touch $LOCK_FILE
+  chmod 600 $LOCK_FILE
+  echo "$$ $UTIME" > $LOCK_FILE
+  APF_MUTEX_LOCKED="1"
 }
 
 mutex_unlock() {
