@@ -46,7 +46,7 @@ ml() {
                 echo "Unable to load iptables module ($1), aborting."
         fi
         eout "{glob} unable to load iptables module ($1), aborting."
-        rm -f $LOCK_FILE
+        mutex_unlock
         exit 1
  fi
  if [ -f "/lib/modules/$(uname -r)/kernel/net/ipv4/netfilter/$1.$MEXT" ] || [ -f "/lib/modules/$(uname -r)/kernel/net/netfilter/$1.$MEXT" ]; then
@@ -80,20 +80,44 @@ check_rab() {
  fi
 }
 
-get_state() {
- if [ -f "$LOCK_FILE" ]; then
-        OVAL=`cat $LOCK_FILE`
-        DIFF=$[UTIME-OVAL]
-        if [ "$DIFF" -gt "$LOCK_TIMEOUT" ]; then
-                echo "$UTIME" > $LOCK_FILE
-                eout "{glob} cleared stale lock file file."
-        else
-                eout "{glob} locked subsystem, already running ? ($LOCK_FILE is $DIFF seconds old), aborting."
-                exit 1
-        fi
- else
-        echo "$UTIME" > $LOCK_FILE
- fi
+mutex_lock() {
+  if [ "$APF_MUTEX_LOCKED" == "1" ]; then
+    return
+  fi
+  STARTTIME=`date +"%s"`
+
+  while [ -f "$LOCK_FILE" ]; do
+    read LOCKPID LOCKTIME <<<$(cat $LOCK_FILE)
+    PIDNAME=`ps -p $LOCKPID -o comm=`
+    if [ ! "$PIDNAME" == "apf" ]; then
+      eout "{glob} pid in lock file is not apf, clearing lock."
+      break
+    fi
+    LOCKDIFF=$[`date +"%s"`-LOCKTIME]
+    LOCALDIFF=$[`date +"%s"`-STARTTIME]
+    if [ "$LOCKDIFF" -gt "$LOCK_TIMEOUT" ]; then
+      eout "{glob} stale lock file found, clearing lock."
+      break
+    elif [ "$LOCALDIFF" -gt "$ENTER_LOCK_TIMEOUT" ]; then
+      eout "{glob} timed out while attempting to gain lock."
+      exit 1
+    else
+      eout "{glob} locked subsystem, already running? $LOCK_FILE is $LOCKDIFF seconds old, waiting..."
+      sleep 5
+    fi
+  done
+
+  touch $LOCK_FILE
+  chmod 600 $LOCK_FILE
+  echo "$$ $UTIME" > $LOCK_FILE
+  APF_MUTEX_LOCKED="1"
+}
+
+mutex_unlock() {
+  if [ "$APF_MUTEX_LOCKED" == "1" ]; then
+    rm -f $LOCK_FILE
+    APF_MUTEX_LOCKED="0"
+  fi
 }
 
 trim() {
@@ -340,7 +364,7 @@ chain="$2"
 if [ -z "$file" ] || [ -z "$chain" ]; then
         eout "could not process allow_hosts $file $chain, fatal error, aborting!"
         /etc/init.d/apf stop
-        rm -f $LOCK_FILE
+        mutex_unlock
         exit 1
 fi
 
@@ -516,7 +540,7 @@ chain=$2
 if [ -z "$file" ] || [ -z "$chain" ]; then
 	eout "could not process deny_hosts $file $chain, fatal error, aborting!"
 	/etc/init.d/apf stop
-        rm -f $LOCK_FILE
+        mutex_unlock
 	exit 1
 fi
 
@@ -1053,7 +1077,7 @@ refresh() {
 	apf_loaded=`$IPT --list --numeric | grep PROHIBIT`
 	if [ -z "$apf_loaded" ]; then
 	        eout "{glob} apf does not appear to have rules loaded, doing nothing."
-	        rm -f $LOCK_FILE
+	        mutex_unlock
 		exit 1
 	fi
 
@@ -1074,7 +1098,7 @@ refresh() {
 		if [ "$trusts_md5" == "$last_trusts_md5" ]; then
 		        eout "{glob} trust rules unchanged since last refresh, doing nothing."
 	                echo "$trusts_md5" > /etc/apf/internals/.trusts.md5
-		        rm -f $LOCK_FILE
+		        mutex_unlock
 			exit 1
 		else
 	                echo "$trusts_md5" > /etc/apf/internals/.trusts.md5
