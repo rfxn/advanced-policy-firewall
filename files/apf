@@ -105,7 +105,7 @@ if [ "$SKIP_FASTLOAD_FIRSTRUN" == "" ] && [ "$SKIP_FASTLOAD_EXPIRED" == "" ] && 
 	if [ "$SET_VERBOSE" == "1" ] && [ "$DEVEL_ON" == "1" ]; then
 	        eout "{glob} !!DEVELOPMENT MODE ENABLED!! - firewall will flush every 5 minutes."
 	fi
-        mutex_unlock
+	mutex_unlock
 	exit 0
  elif [ "$SKIP_FASTLOAD_FIRSTRUN" == "1" ]; then 
 	eout "{glob} first run? fast load skipped [internals/.last.full not present]"
@@ -168,11 +168,11 @@ fi
 
 case "$1" in
 -s|--start)
-  mutex_lock
+	mutex_lock
 	start
 	;;
 -f|--flush|--stop)
-  mutex_lock
+	mutex_lock
 	flush
 	;;
 -l|--list)
@@ -201,7 +201,7 @@ case "$1" in
 	fi
 	;;
 -e|--refresh)
-  mutex_lock
+	mutex_lock
 	refresh
 	;;
 -o|--ovars)
