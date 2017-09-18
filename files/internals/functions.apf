@@ -41,7 +41,7 @@ ml() {
         MEXT="ko"
  fi
 
- if [ "$FATAL" == "1" ] && [ ! -f "/lib/modules/$(uname -r)/kernel/net/ipv4/netfilter/$1.$MEXT" ]; then
+ if [ "$FATAL" == "1" ] && [ ! -f "/lib/modules/$(uname -r)/kernel/net/ipv4/netfilter/$1.$MEXT" ] && [ ! -f "/lib/modules/$(uname -r)/kernel/net/ipv4/netfilter/$1.${MEXT}.xz" ]; then
         if [ ! "$SET_VERBOSE" == "1" ]; then
                 echo "Unable to load iptables module ($1), aborting."
         fi
@@ -74,7 +74,7 @@ modinit() {
 check_rab() {
  ml xt_recent
  ml ipt_recent
- if [ ! -f "/lib/modules/$(uname -r)/kernel/net/ipv4/netfilter/ipt_recent.$MEXT" ] && [ ! -f "/lib/modules/$(uname -r)/kernel/net/ipv4/netfilter/xt_recent.$MEXT" ] && [ ! -f "/lib/modules/$(uname -r)/kernel/net/netfilter/xt_recent.$MEXT" ] && [ "$RAB" == "1" ]; then
+ if [ ! -f "/lib/modules/$(uname -r)/kernel/net/ipv4/netfilter/ipt_recent.$MEXT" ] && [ ! -f "/lib/modules/$(uname -r)/kernel/net/ipv4/netfilter/ipt_recent.${MEXT}.xz" ] && [ ! -f "/lib/modules/$(uname -r)/kernel/net/ipv4/netfilter/xt_recent.$MEXT" ] && [ ! -f "/lib/modules/$(uname -r)/kernel/net/netfilter/xt_recent.$MEXT" ] && [ ! -f "/lib/modules/$(uname -r)/kernel/net/netfilter/xt_recent.${MEXT}.xz" ] && [ "$RAB" == "1" ]; then
 	RAB="0"
 	eout "{rab} force set RAB disabled, kernel module xt/ipt_recent not found."
  fi
