@@ -7,7 +7,7 @@
 # This program may be freely redistributed under the terms of the GNU GPL v2
 ##
 #
-VER="1.7.5"
+VER="1.7.5-2"
 CNF="/etc/apf/conf.apf"
 
 head() {
