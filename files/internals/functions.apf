@@ -49,7 +49,7 @@ ml() {
         mutex_unlock
         exit 1
  fi
- if [ -f "/lib/modules/$(uname -r)/kernel/net/ipv4/netfilter/$1.$MEXT" ] || [ -f "/lib/modules/$(uname -r)/kernel/net/netfilter/$1.$MEXT" ]; then
+ if [ -f "/lib/modules/$(uname -r)/kernel/net/ipv4/netfilter/$1.$MEXT" ] || [ -f "/lib/modules/$(uname -r)/kernel/net/netfilter/$1.$MEXT" ] || [ -f "/lib/modules/$(uname -r)/kernel/net/ipv4/netfilter/$1.${MEXT}.xz" ] || [ -f "/lib/modules/$(uname -r)/kernel/net/netfilter/$1.${MEXT}.xz" ]; then
         $MPB $1 >> /dev/null 2>&1 &
  fi
 }
