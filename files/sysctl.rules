@@ -20,7 +20,7 @@ elif [ -f "/proc/sys/net/ipv4/netfilter/ip_conntrack_tcp_timeout_established" ];
 	echo 90 > /proc/sys/net/ipv4/netfilter/ip_conntrack_tcp_timeout_time_wait
 fi
 
-echo '24576 65534' > /proc/sys/net/ipv4/ip_local_port_range
+echo '24577 65534' > /proc/sys/net/ipv4/ip_local_port_range
 echo 1 > /proc/sys/net/ipv4/icmp_ignore_bogus_error_responses
 echo 1 > /proc/sys/net/ipv4/icmp_echo_ignore_broadcasts
 

@@ -1,3 +1,19 @@
+- 1.7.5-2 | Sep 18 2017:
+[Fix] ipt/xt_recent detection for RAB w/ compressed kernel modules
+[Fix] el7.4 for some reason does not set CONFIG_MODULE_COMPRESSED_XZ=y in config-$(uname -r); addressed with more trivial check
+[Fix] rewrite mutex_lock to behave more like an actual mutex, with timeout on both entering the lock and clearing old lock files.
+      This helps resolve race conditions and works to fix #16
+[Fix] typo in sysctl.conf for setting tcp_tw_reuse=1
+[Change] SET_REFRESH_MD5 hashing now performed on start calls instead of only on '-e|--refresh'
+[Change] if setting VF_ROUTE to disabled there should be no check whether interfaces are actually routed to something
+[Fix] wget fails when ipv6 is disabled on host
+[Fix] IP addresses interpreted as regex
+[Change] support for custom INSTALL_PATH during installation
+[Change] increased default conntrack limit from 65k to 128k
+[Change] increased default rule trim count from 200 to 250
+[Change] added configuration options for adaptive conntrack tuning during
+         start/restart/reload operations
+
 - 1.7.5 | Feb 4th 2014:
 [New] added USE_IPV6 configuration option for enabling/disabling IPv6 support/rule creation
 [New] added SET_EXPIRE configuration option for controlling deny_hosts ban expiration time

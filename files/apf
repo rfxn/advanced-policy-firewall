@@ -7,7 +7,7 @@
 # This program may be freely redistributed under the terms of the GNU GPL v2
 ##
 #
-VER="1.7.5"
+VER="1.7.5-2"
 CNF="/etc/apf/conf.apf"
 
 head() {
@@ -105,7 +105,7 @@ if [ "$SKIP_FASTLOAD_FIRSTRUN" == "" ] && [ "$SKIP_FASTLOAD_EXPIRED" == "" ] && 
 	if [ "$SET_VERBOSE" == "1" ] && [ "$DEVEL_ON" == "1" ]; then
 	        eout "{glob} !!DEVELOPMENT MODE ENABLED!! - firewall will flush every 5 minutes."
 	fi
-        rm -f $LOCK_FILE
+	mutex_unlock
 	exit 0
  elif [ "$SKIP_FASTLOAD_FIRSTRUN" == "1" ]; then 
 	eout "{glob} first run? fast load skipped [internals/.last.full not present]"
@@ -168,11 +168,11 @@ fi
 
 case "$1" in
 -s|--start)
-	get_state
+	mutex_lock
 	start
 	;;
 -f|--flush|--stop)
-	get_state
+	mutex_lock
 	flush
 	;;
 -l|--list)
@@ -201,7 +201,7 @@ case "$1" in
 	fi
 	;;
 -e|--refresh)
-	get_state
+	mutex_lock
 	refresh
 	;;
 -o|--ovars)
@@ -212,5 +212,5 @@ case "$1" in
 	head
 	help
 esac
-rm -f $LOCK_FILE
+mutex_unlock
 exit 0
