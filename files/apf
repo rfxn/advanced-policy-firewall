@@ -101,7 +101,7 @@ if [ "$SKIP_FASTLOAD_FIRSTRUN" == "" ] && [ "$SKIP_FASTLOAD_EXPIRED" == "" ] && 
 	devm
 	eout "{glob} activating firewall, fast load"
 	$IPTR $INSTALL_PATH/internals/.apf.restore
-	eout "{glob} firewall initalized"
+	eout "{glob} firewall initialized"
 	if [ "$SET_VERBOSE" == "1" ] && [ "$DEVEL_ON" == "1" ]; then
 	        eout "{glob} !!DEVELOPMENT MODE ENABLED!! - firewall will flush every 5 minutes."
 	fi
@@ -147,7 +147,7 @@ LOAD=`cat /proc/loadavg | tr '.' ' ' | awk '{print$1}'`
  if [ ! "$LOAD" -gt "10" ]; then
 	bandmin
  fi
-eout "{glob} firewall initalized"
+eout "{glob} firewall initialized"
 if [ "$MD5_FIRSTRUN" == "1" ]; then
         $MD5 $MD5_FILES > $INSTALL_PATH/internals/.md5.cores 2> /dev/null
 fi
