@@ -242,6 +242,15 @@ $IPT -P INPUT ACCEPT
 $IPT -P OUTPUT ACCEPT
 $IPT -P FORWARD ACCEPT
 
+if [ "$USE_IPV6" == "1" ]; then
+	chains6=`cat /proc/net/ip6_tables_names 2>/dev/null`
+	for i in $chains6; do $IP6T -t $i -F; done
+	for i in $chains6; do $IP6T -t $i -X; done
+	$IP6T -P INPUT ACCEPT
+	$IP6T -P OUTPUT ACCEPT
+	$IP6T -P FORWARD ACCEPT
+fi
+
 if [ -f "/proc/net/ipt_recent/DEFAULT" ]; then
 	eout "{glob} flushing xt/ipt_recent bans"
 	echo clear > /proc/net/ipt_recent/DEFAULT
