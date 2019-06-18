@@ -145,7 +145,7 @@ a point form summary of most APF features for reference and review:
 Still on the feature todo list is:
 - full support for NAT/MASQ including port forwarding
 - cluster oriented round-robin packet or port forwarding
-- in-line firewall reactive address blocking of connction floods
+- in-line firewall reactive address blocking of connection floods
 - and much more...
 
 1.1) Introduction: Supported Systems & Requirements
@@ -251,7 +251,7 @@ and configure it to load on boot. If you are setting up APF in a more
 custom situation then you may follow the below instructions.
 
 There is really 3 modes of operation for having APF firewall our system
-and each has no real benifit except tailoring itself to your needs.
+and each has no real benefit except tailoring itself to your needs.
 
 The first is to setup APF in the init system with chkconfig (done by
 default during install), as detailed below:
@@ -267,7 +267,7 @@ sh -c "/etc/apf/apf -s" &
 It is NOT recommended that you use both of these startup methods together,
 for most systems the init script via chkconfig should be fine.
 
-The third and final approuch is to simply run APF in an on-demand fashion. That
+The third and final approach is to simply run APF in an on-demand fashion. That
 is, enable it with the 'apf -s' command when desired and disable it with the
 'apf -f' when desired.
 
@@ -314,7 +314,7 @@ Option: DEVEL_MODE
 Description: This tells APF to run in a development mode which in short means
 that the firewall will shut itself off every 5 minutes from a cronjob. When
 you install any version of APF, upgrade or new install, this feature is by 
-default enabled to make sure the user does not lock themself out of the 
+default enabled to make sure the user does not lock themselves out of the
 system with configuration errors. Once you are satisfied that you have the
 firewall configured and operating as intended then you must disable it.
 
@@ -333,7 +333,7 @@ Description: It is common that you may want to set a specific interface as
 trusted to be excluded from the firewall, these may be administrative private
 links, virtualized VPN interfaces or a local area network that is contains
 trusted resources. This feature is similar to what some term as demilitarized
-zone or DMZ for short, any interfaces set in this option will be excempt from 
+zone or DMZ for short, any interfaces set in this option will be exempt from
 all firewall rules with an implicit trust rule set early in the firewall load.
 
 Option: SET_VERBOSE
@@ -456,7 +456,7 @@ setup and APF is unable to find certain iptables modules but you know for a
 fact they are there, then enable this option.
 
 Option: VF_ROUTE
-Description: This option will make sure that the IP addressess associated to
+Description: This option will make sure that the IP addresses associated to
 the IFACE_* variables do actually have route entries. If a route entry can not
 be found then APF will not load as it is likely a configuration error has been
 made with possible results being a locked-up server.
@@ -479,10 +479,10 @@ temporarily banned for the duration of RAB_TIMER value in seconds.
 
 Option: RAB_PSCAN_LEVEL
 Description: This enables RAB for port scan violations, which is when an
-address attempts to connect to a port that has been classifed as malicious. 
+address attempts to connect to a port that has been classified as malicious.
 These types of are those which are not commonly used in today's Internet but are
 the subject of scrutiny by attackers, such as ports 1,7,9,11. The values for
-this option are broken into 4 intergers and they are 0 for disabled, 1 for
+this option are broken into 4 integers and they are 0 for disabled, 1 for
 low security, 2 for medium security and 3 for high security.
 
 Option: RAB_HITCOUNT
@@ -497,7 +497,7 @@ option has a max accepted value of 43200 seconds or 12 hours.
 
 Option: RAB_TRIP
 Description: This allows RAB to 'trip' the block timer back to 0 seconds if an
-address attempts ANY subsiquent communication while still on the inital block
+address attempts ANY subsequent communication while still on the initial block
 period. This option really is one of the more exciting features of the RAB
 system as it can cut off an attack at the legs before it ever mounts into
 something tangible against the system.
@@ -510,10 +510,10 @@ against this host. The use of LOG_DROP variable set to 1 will override this to
 force logging. 
 
 Option: RAB_LOG_TRIP
-Description: This controls if the firewall should log all subsiquent traffic
+Description: This controls if the firewall should log all subsequent traffic
 from an address that is already blocked for a violation hit, this can generate
 allot of logs. However, the use of this option despite the depth of log data it
-may generate could provide valuble information as to the intents of an attacker.
+may generate could provide valuable information as to the intents of an attacker.
 The use of LOG_DROP variable set to 1 will override this to force logging.
 
 Option: TCP_STOP, UDP_STOP, ALL_STOP
@@ -523,7 +523,7 @@ review these options below in short and provide the pro/con's of their uses.
 
  - The default is DROP which tells the firewall silently discard packets
    and not reply to them at all, which some consider to be "stealth" firewall
-   behavoir. The direct benifit is that it saves system resources, especially 
+   behavior. The direct benefit is that it saves system resources, especially
    during a DoS attack in not having to reply to every discarded packet. However
    the problem is experienced attackers know the way TCP/IP works and it is such
    that when you try to connect to a service that is unavailable, your server or
@@ -535,7 +535,7 @@ review these options below in short and provide the pro/con's of their uses.
  - Then we have RESET which allows the firewall to reply to discarded packets
    in such a way that it trys to make the remote host "reset/terminate" the
    connection attempts to you. This option is more in-line with TCP/IP 
-   standards however in most situations will provide no real benifits or
+   standards however in most situations will provide no real benefits or
    drawbacks. In some really isolated situations you may find that using RESET
    during DoS attacks will help terminate connections more promptly but in
    general this does not serve to counter the system resources expended to 
@@ -543,7 +543,7 @@ review these options below in short and provide the pro/con's of their uses.
 
  - Then we have the REJECT value which is a more common alternative to DROP as
    it allows the firewall to reply to packets with an error message. This
-   acomplishes the goal of filtering a packet while at the same time not
+   accomplishes the goal of filtering a packet while at the same time not
    allowing the remote host to know that we are running a firewall, they just
    think the port/service is closed/unavailable.
 
@@ -583,7 +583,7 @@ very good rule of thumb with TOS configuration is to look at the name of the TOS
 value and apply some good judgement to how that name applies to certain service
 based traffic on your network. For example the TOS value Minimize-Cost designed
 to minimize data transmission generally not be a good setting to improve the 
-responce time or throughput of HTTP connections. A more fitting setting for
+response time or throughput of HTTP connections. A more fitting setting for
 this would be "Maximum Throughput - Minimum Delay", as set to default for HTTP.
 The default TOS settings are designed to improve throughput and reliability for
 FTP,HTTP,SMTP,POP3 and IMAP, please review conf.apf under the TOS_ settings for
@@ -593,7 +593,7 @@ Following the TOS settings we find the traceroute settings TCR_ which tell the
 firewall if and how we should handle traceroute traffic. This is by default
 enabled in APF, mostly cause of popular demand but really there is no reason
 to have it enabled or disabled other than personal preference. The TCR_PASS
-option tells the firwall if we want to accept traceroutes and on the TCR_PORTS
+option tells the firewall if we want to accept traceroutes and on the TCR_PORTS
 
 
 3.3) Configuration: Reactive Address Blocking
@@ -677,7 +677,7 @@ then determine the network operators assigned address space and ban the network
 with bit masking.
 
 There are two methods for adding entries to the trust files and they are first
-and formost by using an editor or interface of some type to edit the two files
+and foremost by using an editor or interface of some type to edit the two files
 manually, such as nano (pico clone) or vi (old school editor). 
 
 The second is by using the 'apf' command with the options --allow (-a for 
@@ -745,7 +745,7 @@ If you require any assistance with APF you may refer to the R-fx Networks
 community forums located at http://forums.rfxnetworks.com. You may also send
 an e-mail to support@r-fx.org.
 
-The offical home page for APF is located at:
+The official home page for APF is located at:
 http://www.rfxnetworks.com/apf.php
 
 All bugs or feature requests should be sent to apf@r-fx.org and please be sure
