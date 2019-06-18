@@ -1,19 +1,19 @@
 #!/bin/bash
 #
 ##
-# Advanced Policy Firewall (APF) v1.7.5
-#             (C) 2002-2014, R-fx Networks <proj@rfxn.com>
-#             (C) 2014, Ryan MacDonald <ryan@rfxn.com>
+# Advanced Policy Firewall (APF) v1.7.6
+#             (C) 2002-2019, R-fx Networks <proj@rfxn.com>
+#             (C) 2019, Ryan MacDonald <ryan@rfxn.com>
 # This program may be freely redistributed under the terms of the GNU GPL v2
 ##
 #
-VER="1.7.5-2"
+VER="1.7.6-1"
 CNF="/etc/apf/conf.apf"
 
 head() {
 	echo "Advanced Policy Firewall (APF) v$VER <apf@rfxn.org>"
-	echo "      Copyright (C) 2002-2014, R-fx Networks <proj@rfxn.org>"
-	echo "      Copyright (C) 2014, Ryan MacDonald <ryan@rfxn.org>"
+	echo "      Copyright (C) 2002-2019, R-fx Networks <proj@rfxn.org>"
+	echo "      Copyright (C) 2019, Ryan MacDonald <ryan@rfxn.org>"
 	echo "This program may be freely redistributed under the terms of the GNU GPL"
 	echo ""
 }

@@ -1,15 +1,15 @@
-- 1.7.5-2 | Sep 18 2017:
-[Fix] ipt/xt_recent detection for RAB w/ compressed kernel modules
-[Fix] el7.4 for some reason does not set CONFIG_MODULE_COMPRESSED_XZ=y in config-$(uname -r); addressed with more trivial check
-[Fix] rewrite mutex_lock to behave more like an actual mutex, with timeout on both entering the lock and clearing old lock files.
-      This helps resolve race conditions and works to fix #16
-[Fix] typo in sysctl.conf for setting tcp_tw_reuse=1
-[Change] SET_REFRESH_MD5 hashing now performed on start calls instead of only on '-e|--refresh'
-[Change] if setting VF_ROUTE to disabled there should be no check whether interfaces are actually routed to something
-[Fix] wget fails when ipv6 is disabled on host
-[Fix] IP addresses interpreted as regex
-[Change] support for custom INSTALL_PATH during installation
-[Change] increased default conntrack limit from 65k to 128k
-[Change] increased default rule trim count from 200 to 250
-[Change] added configuration options for adaptive conntrack tuning during
-         start/restart/reload operations
+- 1.7.6-1 | Jun 18 2019:
+[New] add mitigation options for TCP SACK Panic vulnerability
+      SYSCTL_TCP_NOSACK and BLK_TCP_SACK_PANIC added to conf.apf
+      https://access.redhat.com/security/vulnerabilities/tcpsack
+[Change] updated autoconf template
+[Change] ignore value of BLK_TCP_SACK_PANIC when SYSCTL_TCP_NOSACK is set
+[Change] make init script LSB compliant for use with systemd; pr #26
+[Fix] README typos; pr #28
+[Fix] flush ip6tables rules on stop/flush if USE_IPV6 enabled; pr #28
+[Fix] only the first nameserver in resolv.conf would be whitelisted when
+      RESV_DNS_DROP is set enabled; issue #25
+[Fix] change ipv4.ip_local_port_range to not emmit errors ref:
+      Marco Padovan <evcz at evcz.tk>
+      https://access.redhat.com/solutions/2887631
+      https://www.spinics.net/lists/netdev/msg330895.html
