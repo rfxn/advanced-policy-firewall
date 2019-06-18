@@ -92,7 +92,7 @@ SET_REFRESH="10"
 # feature checks for changes to trust files between refreshes and only performs
 # a refresh if contents have changed. If you are using dynamic DNS names in trust
 # rules, which require regular DNS refreshes, you should keep this disabled.
-# [value in minutes, 0 to disable]
+# [value 1 to enable, 0 to disable]
 SET_REFRESH_MD5="0"
 
 # This is the total amount of rules allowed inside of the deny trust system.
@@ -289,6 +289,21 @@ BLK_PRVNET="0"
 # to the 'internals/reserved.networks' file for listing of address space.
 BLK_RESNET="1"
 
+# Three related flaws were found in the Linux kernel’s handling of TCP Selective
+# Acknowledgement (SACK) packets handling with low MSS size. The extent of impact
+# is understood to be limited to denial of service at this time. 
+#
+# ref: https://access.redhat.com/security/vulnerabilities/tcpsack
+#      CVE-2019-11477, CVE-2019-11478, CVE-2019-11479
+#
+# This may affect traffic from legitimate sources that require the lower MSS values
+# to transmit correctly.
+#
+# The recommended safe path is to disable TCP SACK with SYSCTL_TCP_NOSACK=1
+# This can be safely ignored if you are running on a modern patched kernel newer
+# than June 16th 2109.
+BLK_TCP_SACK_PANIC="0"
+
 # Block all ident (tcp 113) requests in and out of the server IF the port is
 # not already opened in *_TCP_CPORTS. This uses a REJECT target to make sure
 # the ident requests terminate quickly. You can see an increase in irc and 
@@ -311,6 +326,17 @@ SYSCTL_CONNTRACK_BUCKETS="16384"
 # that can be abused in addition to tweaking other TCP features for increased
 # performance and reliability.
 SYSCTL_TCP="1"
+
+# Three related flaws were found in the Linux kernel’s handling of TCP Selective
+# Acknowledgement (SACK) packets handling with low MSS size. The extent of impact
+# is understood to be limited to denial of service at this time.
+#
+# ref: https://access.redhat.com/security/vulnerabilities/tcpsack
+#      CVE-2019-11477, CVE-2019-11478, CVE-2019-11479
+#
+# This can be safely ignored if you are running on a modern patched kernel newer
+# than June 16th 2109.
+SYSCTL_TCP_NOSACK="0"
 
 # These are system control (sysctl) option changes intended to help mitigate
 # syn-flood attacks by lowering syn retry, syn backlog & syn time-out values.

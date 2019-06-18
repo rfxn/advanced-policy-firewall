@@ -302,6 +302,21 @@ BLK_RESNET="$BLK_RESNET"
 # other connection performance with this feature.
 BLK_IDENT="$BLK_IDENT"
 
+# Three related flaws were found in the Linux kernel’s handling of TCP Selective
+# Acknowledgement (SACK) packets handling with low MSS size. The extent of impact
+# is understood to be limited to denial of service at this time.
+#
+# ref: https://access.redhat.com/security/vulnerabilities/tcpsack
+#      CVE-2019-11477, CVE-2019-11478, CVE-2019-11479
+#
+# This may affect traffic from legitimate sources that require the lower MSS values
+# to transmit correctly.
+#
+# The recommended safe path is to disable TCP SACK with SYSCTL_TCP_NOSACK=1
+# This can be safely ignored if you are running on a modern patched kernel newer
+# than June 16th 2109.
+BLK_TCP_SACK_PANIC="$BLK_TCP_SACK_PANIC"
+
 # This is the maximum number of "sessions" (connection tracking entries) that
 # can be handled simultaneously by the firewall in kernel memory. Increasing
 # this value too high will simply waste memory - setting it too low may result
@@ -313,6 +328,17 @@ SYSCTL_CONNTRACK="$SYSCTL_CONNTRACK"
 # that can be abused in addition to tweaking other TCP features for increased
 # performance and reliability.
 SYSCTL_TCP="$SYSCTL_TCP"
+
+# Three related flaws were found in the Linux kernel’s handling of TCP Selective
+# Acknowledgement (SACK) packets handling with low MSS size. The extent of impact
+# is understood to be limited to denial of service at this time.
+#
+# ref: https://access.redhat.com/security/vulnerabilities/tcpsack
+#      CVE-2019-11477, CVE-2019-11478, CVE-2019-11479
+#
+# This can be safely ignored if you are running on a modern patched kernel newer
+# than June 16th 2109.
+SYSCTL_TCP_NOSACK="$SYSCTL_TCP_NOSACK"
 
 # These are system control (sysctl) option changes intended to help mitigate
 # syn-flood attacks by lowering syn retry, syn backlog & syn time-out values.
