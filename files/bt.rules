@@ -328,3 +328,11 @@ if [ ! "$BLK_P2P_PORTS" == "" ]; then
         $IPT -A OUTPUT -j P2P
 fi
 
+if [ "$BLK_TCP_SACK_PANIC" ]; then
+	eout "{blk_tcp_sack_panic} applying mitigation for TCP SACK Panic CVE-2019-11477, CVE-2019-11478, CVE-2019-11479 https://access.redhat.com/security/vulnerabilities/tcpsack"
+	eout "{blk_tcp_sack_panic} deny inbound tcp-flags SYN with MSS size 1 to 500 bytes "
+	$IPT -I INPUT -p tcp --tcp-flags SYN SYN -m tcpmss --mss 1:500 -j $TCP_STOP
+	if [ "$USE_IPV6" == "1" ]; then
+		$IP6T -I INPUT -p tcp --tcp-flags SYN SYN -m tcpmss --mss 1:500 -j $TCP_STOP
+	fi
+fi
