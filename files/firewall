@@ -240,12 +240,14 @@ LDNS=`cat /etc/resolv.conf  | grep -v "#" | grep -w nameserver | awk '{print$2}'
         $IPT -A OUTPUT -p udp -d $i --dport 53 --sport 1023:65535 -j ACCEPT
         $IPT -A OUTPUT -p tcp -d $i --dport 53 --sport 1023:65535 -j ACCEPT
         if [ "$RESV_DNS_DROP" == "1" ]; then
-                $IPT -A INPUT  -p tcp -s 0/0 --sport 53 --dport 1023:65535 -j $ALL_STOP
-                $IPT -A INPUT  -p udp -s 0/0 --sport 53 --dport 1023:65535 -j $ALL_STOP
                 $IPT -A OUTPUT -p udp -d $i --dport 53 --sport 1023:65535 -j ACCEPT
                 $IPT -A OUTPUT -p tcp -d $i --dport 53 --sport 1023:65535 -j ACCEPT
         fi
         done
+        if [ "$RESV_DNS_DROP" == "1" ]; then
+                $IPT -A INPUT  -p tcp -s 0/0 --sport 53 --dport 1023:65535 -j $ALL_STOP
+                $IPT -A INPUT  -p udp -s 0/0 --sport 53 --dport 1023:65535 -j $ALL_STOP
+        fi
   fi
 else
         $IPT -A INPUT  -p udp --sport 53 --dport 1023:65535 -j ACCEPT
