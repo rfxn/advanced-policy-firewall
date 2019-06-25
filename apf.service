@@ -1,0 +1,12 @@
+[Unit]
+Description=apf firewall with iptables
+After=syslog.target network.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=true
+ExecStart=/usr/local/sbin/apf-start.sh
+ExecStop=/usr/local/sbin/apf --stop
+
+[Install]
+WantedBy=basic.target
