@@ -247,14 +247,14 @@ copied to /etc/apf/docs and /etc/apf/extras respective.
 
 2.1) Installation: Boot Loading
 On installation APF will install an init script to /etc/init.d/apf
-and configure it to load on boot. If you are setting up APF in a more
+or systemd unit file depending on what your distro supports, both are configured to load on boot. If you are setting up APF in a more
 custom situation then you may follow the below instructions.
 
-There is really 3 modes of operation for having APF firewall our system
+There is really 4 modes of operation for having APF firewall our system
 and each has no real benefit except tailoring itself to your needs.
 
 The first is to setup APF in the init system with chkconfig (done by
-default during install), as detailed below:
+default during install, if your disto supports SystemV init); as detailed below:
 
 chkconfig --add apf
 chkconfig --level 345 apf on
@@ -267,9 +267,11 @@ sh -c "/etc/apf/apf -s" &
 It is NOT recommended that you use both of these startup methods together,
 for most systems the init script via chkconfig should be fine.
 
-The third and final approach is to simply run APF in an on-demand fashion. That
+The third is to simply run APF in an on-demand fashion. That
 is, enable it with the 'apf -s' command when desired and disable it with the
 'apf -f' when desired.
+
+This version now includes a systemd startup unit file and apf  will be automatically configured if your distrobution supports. 
 
 3) Configuration:
 On your first installation of APF it will come pretty bare in the way of 
