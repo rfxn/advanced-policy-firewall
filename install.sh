@@ -9,6 +9,7 @@
 #
 INSTALL_PATH=${INSTALL_PATH:-"/etc/apf"}
 BINPATH=${BINPATH:-"/usr/local/sbin/apf"}
+WRAPPERPATH=${WRAPPERPATH:-"/usr/local/sbin/apf-start.sh"}
 COMPAT_BINPATH=${COMPAT_BINPATH:-"/usr/local/sbin/fwmgr"}
 
 install() {
@@ -17,6 +18,7 @@ install() {
         cp -fR files/* $INSTALL_PATH
         chmod -R 640 $INSTALL_PATH/*
         chmod 750 $INSTALL_PATH/apf
+	chmod 750 $INSTALL_PATH/apf-start.sh
         chmod 750 $INSTALL_PATH/firewall
         chmod 750 $INSTALL_PATH/vnet/vnetgen
 	chmod 750 $INSTALL_PATH/extras/get_ports
@@ -25,6 +27,7 @@ install() {
 	mkdir $INSTALL_PATH/doc
 	cp README CHANGELOG COPYING.GPL $INSTALL_PATH/doc
         ln -fs $INSTALL_PATH/apf $BINPATH
+	ln -fs $INSTALL_PATH/apf-start.sh $WRAPPERPATH
         ln -fs $INSTALL_PATH/apf $COMPAT_BINPATH
 	rm -f /etc/cron.hourly/fw /etc/cron.daily/fw /etc/cron.d/fwdev $INSTALL_PATH/cron.fwdev
         if [ -f "/etc/cron.daily/apf" ]; then
@@ -35,7 +38,9 @@ install() {
                 cp cron.daily /etc/cron.daily/apf
                 chmod 755 /etc/cron.daily/apf
         fi
-	if [ -d "/etc/rc.d/init.d" ]; then
+	if [ -d "/lib/systemd/system" ]; then
+		cp -f apf.service /lib/systemd/system/
+	elif [ -d "/etc/rc.d/init.d" ]; then
                 cp -f apf.init /etc/rc.d/init.d/apf
 	elif [ -d "/etc/init.d" ]; then
 		cp -f apf.init /etc/init.d/apf
@@ -53,9 +58,13 @@ install() {
 	if [ -d "/etc/logrotate.d" ] && [ -f "logrotate.d.apf" ]; then
 		cp logrotate.d.apf /etc/logrotate.d/apf
 	fi
-	if [ -f "/sbin/chkconfig" ]; then
-	/sbin/chkconfig --add apf
-	/sbin/chkconfig --level 345 apf on
+	if [ -d "/lib/systemd/system" ]; then
+		/usr/bin/systemctl enable apf.service
+	else
+		if [ -f "/sbin/chkconfig" ]; then
+			/sbin/chkconfig --add apf
+			/sbin/chkconfig --level 345 apf on
+		fi
 	fi
 	$INSTALL_PATH/vnet/vnetgen
 	if [ -f "/usr/bin/dialog" ] && [ -d "$INSTALL_PATH/extras/apf-m" ]; then
