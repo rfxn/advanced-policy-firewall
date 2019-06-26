@@ -1,4 +1,4 @@
-/var/log/apfados_log /var/log/apf_log {
+/var/log/apfados_log /var/log/apf_log /tmp/check-apf {
     missingok
     postrotate
     endscript
