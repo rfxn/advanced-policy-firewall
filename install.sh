@@ -32,12 +32,18 @@ install() {
 	rm -f /etc/cron.hourly/fw /etc/cron.daily/fw /etc/cron.d/fwdev $INSTALL_PATH/cron.fwdev
         if [ -f "/etc/cron.daily/apf" ]; then
                 rm -f /etc/cron.daily/apf
-                cp cron.daily /etc/cron.daily/apf
+        fi 
+	if [ -d "/etc/rc.d/init.d" ]; then       
+		cp cron.daily /etc/cron.daily/apf
                 chmod 755 /etc/cron.daily/apf
-        else
+        elif [ -d "/etc/init.d" ]; then
                 cp cron.daily /etc/cron.daily/apf
                 chmod 755 /etc/cron.daily/apf
         fi
+	if [ -d "/lib/systemd/system" ]; then
+		cp cron-systemd.daily /etc/cron.daily/apf
+                chmod 755 /etc/cron.daily/apf
+	fi
 	if [ -d "/lib/systemd/system" ]; then
 		cp -f apf.service /lib/systemd/system/
 	elif [ -d "/etc/rc.d/init.d" ]; then
