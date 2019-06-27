@@ -65,7 +65,7 @@ install() {
 		cp logrotate.d.apf /etc/logrotate.d/apf
 	fi
 	if [ -d "/lib/systemd/system" ]; then
-		/usr/bin/systemctl enable apf.service
+		/bin/systemctl enable apf.service
 	else
 		if [ -f "/sbin/chkconfig" ]; then
 			/sbin/chkconfig --add apf
