@@ -1,2 +1,2 @@
 #!/bin/bash
-/usr/bin/systemctl restart apf.service >> /dev/null 2>&1
+/bin/systemctl restart apf.service >> /dev/null 2>&1
