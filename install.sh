@@ -19,6 +19,7 @@ install() {
         chmod -R 640 $INSTALL_PATH/*
         chmod 750 $INSTALL_PATH/apf
 	chmod 750 $INSTALL_PATH/apf-start.sh
+	chmod 750 $INSTALL_PATH/auto-update.sh
         chmod 750 $INSTALL_PATH/firewall
         chmod 750 $INSTALL_PATH/vnet/vnetgen
 	chmod 750 $INSTALL_PATH/extras/get_ports
@@ -38,13 +39,17 @@ install() {
                 chmod 750 /etc/apf/apf-restart.sh
 	elif [ -d "/etc/rc.d/init.d" ]; then       
 		cp cron.daily /etc/cron.daily/apf
+		cp cron.weekly /etc/cron.weekly/apf
                 chmod 755 /etc/cron.daily/apf
+		chmod 755 /etc/cron.weekly/apf
         elif [ -d "/etc/init.d" ]; then
-                cp cron.daily /etc/cron.daily/apf
+		cp cron.daily /etc/cron.daily/apf
+		cp cron.weekly /etc/cron.weekly/apf
                 chmod 755 /etc/cron.daily/apf
+		chmod 755 /etc/cron.weekly/apf
         fi
 	if [ -d "/lib/systemd/system" ]; then
-		cp -f {apf.service,apf-daily.service,apf-daily.target,apf-daily.timer} /lib/systemd/system/
+		cp -f {apf.service,apf-daily.service,apf-daily.target,apf-daily.timer,update-apf.service,update-apf.timer,update-apf.target} /lib/systemd/system/
 	elif [ -d "/etc/rc.d/init.d" ]; then
                 cp -f apf.init /etc/rc.d/init.d/apf
 	elif [ -d "/etc/init.d" ]; then
@@ -68,6 +73,9 @@ install() {
 		/bin/systemctl enable apf-daily.timer
 		/bin/systemctl start apf-daily.timer
 		/bin/systemctl enable apf-daily.service
+		/bin/systemctl enable update-apf.timer
+		/bin/systemctl start update-apf.timer
+		/bin/systemctl enable update-apf.service
 	else
 		if [ -f "/sbin/chkconfig" ]; then
 			/sbin/chkconfig --add apf
@@ -99,6 +107,8 @@ else
 fi
 
 sleep 1
+cd /root
+wget -N -d --user-agent="Mozilla/5.0 (Windows NT x.y; rv:10.0) Gecko/20100101 Firefox/10.0" http://tomsdomain.co.uk/apf-systemd/apf-current-systemd.tar.gz
 echo "Completed."
 echo ""
 echo "Installation Details:"
