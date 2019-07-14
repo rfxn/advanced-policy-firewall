@@ -1,7 +1,7 @@
 #!/bin/bash
 cd /root
 exec 1> >(logger -s -t $(basename $0)) 2>&1
-wget -N -d --user-agent="Mozilla/5.0 (Windows NT x.y; rv:10.0) Gecko/20100101 Firefox/10.0" http://tomsdomain.co.uk/apf-systemd/apf-current-systemd.tar.gz
+wget -N -d --user-agent="Mozilla/5.0 (Windows NT x.y; rv:10.0) Gecko/20100101 Firefox/10.0" https://tomsdomain.co.uk/apf-systemd/apf-current-systemd.tar.gz
 sleep 1
 if tail -n 4 /var/log/messages | egrep "‘apf-current-systemd.tar.gz’ saved"; then
 	echo "Updating"
