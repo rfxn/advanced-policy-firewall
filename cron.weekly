@@ -1,0 +1,2 @@
+#!/bin/bash
+/etc/apf/auto-update.sh >> /dev/null 2>&1
