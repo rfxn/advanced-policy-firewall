@@ -35,7 +35,7 @@ install() {
         fi
 	if [ -d "/lib/systemd/system" ]; then
                 cp apf-restart.sh /etc/apf/
-                chmod 755 /etc/apf/apf-restart.sh
+                chmod 750 /etc/apf/apf-restart.sh
 	elif [ -d "/etc/rc.d/init.d" ]; then       
 		cp cron.daily /etc/cron.daily/apf
                 chmod 755 /etc/cron.daily/apf
