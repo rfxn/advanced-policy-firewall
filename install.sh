@@ -32,18 +32,17 @@ install() {
 	rm -f /etc/cron.hourly/fw /etc/cron.daily/fw /etc/cron.d/fwdev $INSTALL_PATH/cron.fwdev
         if [ -f "/etc/cron.daily/apf" ]; then
                 rm -f /etc/cron.daily/apf
-        fi 
-	if [ -d "/etc/rc.d/init.d" ]; then       
+        fi
+	if [ -d "/lib/systemd/system" ]; then
+                cp apf-restart.sh /etc/apf/
+                chmod 755 /etc/apf/apf-restart.sh
+	elif [ -d "/etc/rc.d/init.d" ]; then       
 		cp cron.daily /etc/cron.daily/apf
                 chmod 755 /etc/cron.daily/apf
         elif [ -d "/etc/init.d" ]; then
                 cp cron.daily /etc/cron.daily/apf
                 chmod 755 /etc/cron.daily/apf
         fi
-	if [ -d "/lib/systemd/system" ]; then
-                cp apf-restart.sh /etc/apf/
-                chmod 755 /etc/apf/apf-restart.sh
-	fi
 	if [ -d "/lib/systemd/system" ]; then
 		cp -f {apf.service,apf-daily.service,apf-daily.target,apf-daily.timer} /lib/systemd/system/
 	elif [ -d "/etc/rc.d/init.d" ]; then
