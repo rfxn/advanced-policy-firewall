@@ -1,0 +1,9 @@
+[Unit]
+Description=Apf Daily timer
+
+[Timer]
+OnCalendar=Daily
+Unit=apf-daily.target
+
+[Install]
+WantedBy=basic.target
