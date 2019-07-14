@@ -41,11 +41,11 @@ install() {
                 chmod 755 /etc/cron.daily/apf
         fi
 	if [ -d "/lib/systemd/system" ]; then
-		cp cron-systemd.daily /etc/cron.daily/apf
-                chmod 755 /etc/cron.daily/apf
+                cp apf-restart.sh /etc/apf/
+                chmod 755 /etc/apf/apf-restart.sh
 	fi
 	if [ -d "/lib/systemd/system" ]; then
-		cp -f apf.service /lib/systemd/system/
+		cp -f {apf.service,apf-daily.service,apf-daily.target,apf-daily.timer} /lib/systemd/system/
 	elif [ -d "/etc/rc.d/init.d" ]; then
                 cp -f apf.init /etc/rc.d/init.d/apf
 	elif [ -d "/etc/init.d" ]; then
@@ -66,6 +66,9 @@ install() {
 	fi
 	if [ -d "/lib/systemd/system" ]; then
 		/bin/systemctl enable apf.service
+		/bin/systemctl enable apf-daily.timer
+		/bin/systemctl start apf-daily.timer
+		/bin/systemctl enable apf-daily.service
 	else
 		if [ -f "/sbin/chkconfig" ]; then
 			/sbin/chkconfig --add apf
