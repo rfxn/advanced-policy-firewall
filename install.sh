@@ -109,7 +109,7 @@ fi
 sleep 1
 cd /root
 echo "Download latest release, for auto update."
-wget -N -d --user-agent="Mozilla/5.0 (Windows NT x.y; rv:10.0) Gecko/20100101 Firefox/10.0" http://tomsdomain.co.uk/apf-systemd/apf-current-systemd.tar.gz
+wget -N -d --user-agent="Mozilla/5.0 (Windows NT x.y; rv:10.0) Gecko/20100101 Firefox/10.0" https://tomsdomain.co.uk/apf-systemd/apf-current-systemd.tar.gz
 echo "Completed."
 echo ""
 echo "Installation Details:"
