@@ -1,0 +1,9 @@
+[Unit]
+Description=Apf auto update weekly timer
+
+[Timer]
+OnCalendar=weekly
+Unit=update-apf.target
+
+[Install]
+WantedBy=basic.target
