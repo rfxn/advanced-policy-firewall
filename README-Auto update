@@ -1,0 +1,4 @@
+The install script downloads the current version of apf-systemd (works on none systemd distributions) to /root/apf-current-systemd.tar.gz 
+(unless already downloaded to this location.) This file needs to remain in place for auto updates to work. 
+
+Checks for updates are sceduled for once a week and apf-systed is updated if an update is avaiable. 
