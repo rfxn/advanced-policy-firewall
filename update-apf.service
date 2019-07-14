@@ -1,0 +1,9 @@
+[Unit]
+Description=Auto Update APF
+
+[Service]
+Type=simple
+ExecStart=/etc/apf/auto-update.sh
+
+[Install]
+WantedBy=update-apf.target
