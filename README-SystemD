@@ -1,1 +1,3 @@
 Fork of rfxn/advanced-policy-firewall to support systemd.
+
+Also comes with an uninstall script: /usr/local/sbin/apf-uninstall.sh
