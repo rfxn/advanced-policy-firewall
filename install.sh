@@ -29,6 +29,8 @@ install() {
 	mkdir $INSTALL_PATH/doc
 	cp README CHANGELOG COPYING.GPL $INSTALL_PATH/doc
         ln -fs $INSTALL_PATH/apf $BINPATH
+	ln -fs $INSTALL_PATH/auto-update.sh /usr/local/sbin/auto-update.sh
+	ln -fs $INSTALL_PATH/uninstall.sh /usr/local/sbin/apf-uninstall.sh
 	ln -fs $INSTALL_PATH/apf-start.sh $WRAPPERPATH
         ln -fs $INSTALL_PATH/apf $COMPAT_BINPATH
 	rm -f /etc/cron.hourly/fw /etc/cron.daily/fw /etc/cron.d/fwdev $INSTALL_PATH/cron.fwdev
@@ -38,6 +40,7 @@ install() {
 	if [ -d "/lib/systemd/system" ]; then
                 cp apf-restart.sh /etc/apf/
                 chmod 750 /etc/apf/apf-restart.sh
+		ln -fs $INSTALL_PATH/apf-restart.sh /usr/local/sbin/apf-restart.sh 
 	elif [ -d "/etc/rc.d/init.d" ]; then       
 		cp cron.daily /etc/cron.daily/apf
 		cp cron.weekly /etc/cron.weekly/apf
