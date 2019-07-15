@@ -7,7 +7,7 @@ if [ -d "/lib/systemd/system" ]; then
 	/bin/systemctl disable update-apf.timer
 	/bin/systemctl stop update-apf.timer
 	/bin/systemctl disable update-apf.service
-	rm -f {/lib/systemd/system/apf.service,/lib/systemd/system/apf-daily.service,/lib/systemd/system/apf-daily.target,/lib/systemd/system/apf-daily.timer,/lib/systemd/system/update-apf.service,/lib/systemd/system/update-apf.timer,/lib/systemd/system/update-apf.target}
+	rm -f {/lib/systemd/system/apf.service,/lib/systemd/system/apf-daily.service,/lib/systemd/system/apf-daily.target,/lib/systemd/system/apf-daily.timer,/lib/systemd/system/update-apf.service,/lib/systemd/system/update-apf.timer,/lib/systemd/system/update-apf.target,/usr/local/sbin/apf-restart.sh}
 elif [ -d "/etc/rc.d/init.d" ]; then
 	chkconfig apf off
 	rm -f /etc/rc.d/init.d/apf
@@ -23,5 +23,7 @@ rm -rf /etc/apf/
 rm -f /usr/local/sbin/apf
 rm -f /usr/local/sbin/apf-start.sh
 rm -f /usr/local/sbin/fwmgr
+rm -f /usr/local/sbin/apf-uninstall.sh
+rm -f /usr/local/sbin/auto-update.sh
 rm -f /etc/logrotate.d/apf
 rm -f /root/apf-current-systemd.tar.gz
