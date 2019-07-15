@@ -20,10 +20,11 @@ install() {
         chmod 750 $INSTALL_PATH/apf
 	chmod 750 $INSTALL_PATH/apf-start.sh
 	chmod 750 $INSTALL_PATH/auto-update.sh
+	chmod 750 $INSTALL_PATH/
         chmod 750 $INSTALL_PATH/firewall
         chmod 750 $INSTALL_PATH/vnet/vnetgen
 	chmod 750 $INSTALL_PATH/extras/get_ports
-	chmod 750 $INSTALL_PATH
+	chmod 750 $INSTALL_PATH/uninstall.sh
 	cp -pf .ca.def importconf $INSTALL_PATH/extras/
 	mkdir $INSTALL_PATH/doc
 	cp README CHANGELOG COPYING.GPL $INSTALL_PATH/doc
