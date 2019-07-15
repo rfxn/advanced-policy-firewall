@@ -3,7 +3,7 @@ Description=SystemD Timer replacement for Cron.daily
 
 [Service]
 Type=simple
-ExecStart=/etc/apf/apf-restart.sh
+ExecStart=/usr/local/sbin/apf-restart.sh
 
 [Install]
 WantedBy=apf-daily.target
