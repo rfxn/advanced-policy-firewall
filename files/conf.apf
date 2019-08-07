@@ -301,7 +301,7 @@ BLK_RESNET="1"
 #
 # The recommended safe path is to disable TCP SACK with SYSCTL_TCP_NOSACK=1
 # This can be safely ignored if you are running on a modern patched kernel newer
-# than June 16th 2109.
+# than June 16th 2019.
 BLK_TCP_SACK_PANIC="0"
 
 # Block all ident (tcp 113) requests in and out of the server IF the port is
