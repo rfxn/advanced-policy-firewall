@@ -314,7 +314,7 @@ BLK_IDENT="$BLK_IDENT"
 #
 # The recommended safe path is to disable TCP SACK with SYSCTL_TCP_NOSACK=1
 # This can be safely ignored if you are running on a modern patched kernel newer
-# than June 16th 2109.
+# than June 16th 2019.
 BLK_TCP_SACK_PANIC="$BLK_TCP_SACK_PANIC"
 
 # This is the maximum number of "sessions" (connection tracking entries) that
