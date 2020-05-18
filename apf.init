@@ -46,10 +46,10 @@ restart)
         $0 start
         ;;
 condrestart)
-	if $ipt -n -L TALLOW > /dev/null 2>&1 && \
-	    $ipt -n -L TDENY > /dev/null 2>&1 && \
-	    $ipt -n -L TGALLOW > /dev/null 2>&1 && \
-	    $ipt -n -L TGDENY > /dev/null 2>&1; then
+	if $ipt $IPT_FLAGS -n -L TALLOW > /dev/null 2>&1 && \
+	    $ipt $IPT_FLAGS -n -L TDENY > /dev/null 2>&1 && \
+	    $ipt $IPT_FLAGS -n -L TGALLOW > /dev/null 2>&1 && \
+	    $ipt $IPT_FLAGS -n -L TGDENY > /dev/null 2>&1; then
 	    $0 stop
 	    $0 start
 	else

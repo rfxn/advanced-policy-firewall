@@ -145,43 +145,43 @@ trim() {
 
 cli_trust_remove() {
 	DIP="$1"
-	$IPT -D INPUT -s $DIP -j ACCEPT
-	$IPT -D OUTPUT -d $DIP -j ACCEPT
-        $IPT -D INPUT -s $DIP -j $ALL_STOP
-        $IPT -D OUTPUT -d $DIP -j $ALL_STOP
+	$IPT $IPT_FLAGS -D INPUT -s $DIP -j ACCEPT
+	$IPT $IPT_FLAGS -D OUTPUT -d $DIP -j ACCEPT
+        $IPT $IPT_FLAGS -D INPUT -s $DIP -j $ALL_STOP
+        $IPT $IPT_FLAGS -D OUTPUT -d $DIP -j $ALL_STOP
 
-	$IPT -D TALLOW -s $DIP -j ACCEPT
-	$IPT -D TALLOW -d $DIP -j ACCEPT
-        $IPT -D TDENY -s $DIP -j $ALL_STOP
-        $IPT -D TDENY -d $DIP -j $ALL_STOP
+	$IPT $IPT_FLAGS -D TALLOW -s $DIP -j ACCEPT
+	$IPT $IPT_FLAGS -D TALLOW -d $DIP -j ACCEPT
+        $IPT $IPT_FLAGS -D TDENY -s $DIP -j $ALL_STOP
+        $IPT $IPT_FLAGS -D TDENY -d $DIP -j $ALL_STOP
 
-	$IPT -D TGALLOW -s $DIP -j ACCEPT
-	$IPT -D TGALLOW -d $DIP -j ACCEPT
-        $IPT -D TGDENY -s $DIP -j $ALL_STOP
-        $IPT -D TGDENY -d $DIP -j $ALL_STOP
+	$IPT $IPT_FLAGS -D TGALLOW -s $DIP -j ACCEPT
+	$IPT $IPT_FLAGS -D TGALLOW -d $DIP -j ACCEPT
+        $IPT $IPT_FLAGS -D TGDENY -s $DIP -j $ALL_STOP
+        $IPT $IPT_FLAGS -D TGDENY -d $DIP -j $ALL_STOP
 
 	sed -i "/$DIP/d" $ALLOW_HOSTS $DENY_HOSTS $GALLOW_HOSTS $GDENY_HOSTS
-	dil=`$IPT --numeric --list INPUT --line-numbers | grep -w $DIP | awk '{print$1}'`
-	dol=`$IPT --numeric --list OUTPUT --line-numbers | grep -w $DIP | awk '{print$1}'`
-	$IPT -D INPUT $dil >> /dev/null 2>&1
-	$IPT -D OUTPUT $dol >> /dev/null 2>&1
+	dil=`$IPT $IPT_FLAGS --numeric --list INPUT --line-numbers | grep -w $DIP | awk '{print$1}'`
+	dol=`$IPT $IPT_FLAGS --numeric --list OUTPUT --line-numbers | grep -w $DIP | awk '{print$1}'`
+	$IPT $IPT_FLAGS -D INPUT $dil >> /dev/null 2>&1
+	$IPT $IPT_FLAGS -D OUTPUT $dol >> /dev/null 2>&1
 
-	dil=`$IPT --numeric --list TALLOW --line-numbers | grep -w $DIP | tac | awk '{print$1}'`
-	dol=`$IPT --numeric --list TDENY --line-numbers | grep -w $DIP | tac | awk '{print$1}'`
+	dil=`$IPT $IPT_FLAGS --numeric --list TALLOW --line-numbers | grep -w $DIP | tac | awk '{print$1}'`
+	dol=`$IPT $IPT_FLAGS --numeric --list TDENY --line-numbers | grep -w $DIP | tac | awk '{print$1}'`
 	for i in `echo $dil`; do
-		$IPT -D TALLOW $i >> /dev/null 2>&1
+		$IPT $IPT_FLAGS -D TALLOW $i >> /dev/null 2>&1
 	done
 	for i in `echo $dol`; do
-		$IPT -D TDENY $i >> /dev/null 2>&1
+		$IPT $IPT_FLAGS -D TDENY $i >> /dev/null 2>&1
 	done
 
-	dil=`$IPT --numeric --list TGALLOW --line-numbers | grep -w $DIP | tac | awk '{print$1}'`
-	dol=`$IPT --numeric --list TGDENY --line-numbers | grep -w $DIP | tac | awk '{print$1}'`
+	dil=`$IPT $IPT_FLAGS --numeric --list TGALLOW --line-numbers | grep -w $DIP | tac | awk '{print$1}'`
+	dol=`$IPT $IPT_FLAGS --numeric --list TGDENY --line-numbers | grep -w $DIP | tac | awk '{print$1}'`
 	for i in `echo $dil`; do
-		$IPT -D TGALLOW $i >> /dev/null 2>&1
+		$IPT $IPT_FLAGS -D TGALLOW $i >> /dev/null 2>&1
 	done
 	for i in `echo $dol`; do
-		$IPT -D TGDENY $i >> /dev/null 2>&1
+		$IPT $IPT_FLAGS -D TGDENY $i >> /dev/null 2>&1
 	done
 }
 
@@ -214,8 +214,8 @@ cli_trust() {
 		elif [ "$ACTION" == "ALLOW" ]; then
 			JACTION="ACCEPT"
 		fi
-	        $IPT -I $CHAIN -s $HOST -j $JACTION
-	       	$IPT -I $CHAIN -d $HOST -j $JACTION
+	        $IPT $IPT_FLAGS -I $CHAIN -s $HOST -j $JACTION
+	       	$IPT $IPT_FLAGS -I $CHAIN -d $HOST -j $JACTION
 	        eout "(trust) added $ACTION all to/from $HOST"
 	        if [ ! "$SET_VERBOSE" == "1" ]; then
 		        echo "Inserted into firewall: $ACTION all to/from $HOST"
@@ -227,7 +227,7 @@ cli_trust() {
 }
 
 flush() {
-firewall_on=`iptables -L --numeric | grep -vE "Chain|destination"`
+firewall_on=`$IPT $IPT_FLAGS -L --numeric | grep -vE "Chain|destination"`
 if [ "$SET_FASTLOAD" == "1" ] && [ ! "$1" == "1" ] && [ ! "$DEVEL_ON" == "1" ] && [ ! "$firewall_on" == "" ]; then
 	$IPTS > $INSTALL_PATH/internals/.apf.restore
 	eout "{glob} fast load snapshot saved"
@@ -236,11 +236,11 @@ if [ ! "$1" = "1" ]; then
 	eout "{glob} flushing & zeroing chain policies"
 fi
 chains=`cat /proc/net/ip_tables_names 2>/dev/null`
-for i in $chains; do $IPT -t $i -F; done
-for i in $chains; do $IPT -t $i -X; done
-$IPT -P INPUT ACCEPT
-$IPT -P OUTPUT ACCEPT
-$IPT -P FORWARD ACCEPT
+for i in $chains; do $IPT $IPT_FLAGS -t $i -F; done
+for i in $chains; do $IPT $IPT_FLAGS -t $i -X; done
+$IPT $IPT_FLAGS -P INPUT ACCEPT
+$IPT $IPT_FLAGS -P OUTPUT ACCEPT
+$IPT $IPT_FLAGS -P FORWARD ACCEPT
 
 if [ "$USE_IPV6" == "1" ]; then
 	chains6=`cat /proc/net/ip6_tables_names 2>/dev/null`
@@ -265,7 +265,7 @@ list() {
 echo "Loading iptables rules..."
 iptc=/etc/apf/.iptrules.$$
 :> $iptc ; chmod 600 $iptc
-$IPT --verbose --numeric --line-numbers --list >> $iptc
+$IPT $IPT_FLAGS --verbose --numeric --line-numbers --list >> $iptc
 echo "Opening editor"
 if [ -f "/usr/bin/pico" ]; then
 	/usr/bin/pico -w $iptc
@@ -317,48 +317,48 @@ fi
 if [ ! "$TOS_0" == "" ]; then
         for i in `echo $TOS_0 | tr ',' ' '`; do
                 i=`echo $i | tr '_' ':'`
-                $IPT -t mangle -A $TYPE -p tcp --dport $i -j TOS --set-tos 0
-                $IPT -t mangle -A $TYPE -p udp --dport $i -j TOS --set-tos 0
+                $IPT $IPT_FLAGS -t mangle -A $TYPE -p tcp --dport $i -j TOS --set-tos 0
+                $IPT $IPT_FLAGS -t mangle -A $TYPE -p udp --dport $i -j TOS --set-tos 0
         done
 fi
 
 if [ ! "$TOS_2" == "" ]; then
         for i in `echo $TOS_2 | tr ',' ' '`; do
                 i=`echo $i | tr '_' ':'`
-                $IPT -t mangle -A $TYPE -p tcp --dport $i -j TOS --set-tos 2
-                $IPT -t mangle -A $TYPE -p udp --dport $i -j TOS --set-tos 2
+                $IPT $IPT_FLAGS -t mangle -A $TYPE -p tcp --dport $i -j TOS --set-tos 2
+                $IPT $IPT_FLAGS -t mangle -A $TYPE -p udp --dport $i -j TOS --set-tos 2
         done
 fi
 
 if [ ! "$TOS_4" == "" ]; then
         for i in `echo $TOS_4 | tr ',' ' '`; do
                 i=`echo $i | tr '_' ':'`
-                $IPT -t mangle -A $TYPE -p tcp --dport $i -j TOS --set-tos 4
-                $IPT -t mangle -A $TYPE -p udp --dport $i -j TOS --set-tos 4
+                $IPT $IPT_FLAGS -t mangle -A $TYPE -p tcp --dport $i -j TOS --set-tos 4
+                $IPT $IPT_FLAGS -t mangle -A $TYPE -p udp --dport $i -j TOS --set-tos 4
         done
 fi
 
 if [ ! "$TOS_8" == "" ]; then
         for i in `echo $TOS_8 | tr ',' ' '`; do
                 i=`echo $i | tr '_' ':'`
-                $IPT -t mangle -A $TYPE -p tcp --dport $i -j TOS --set-tos 8
-                $IPT -t mangle -A $TYPE -p udp --dport $i -j TOS --set-tos 8
+                $IPT $IPT_FLAGS -t mangle -A $TYPE -p tcp --dport $i -j TOS --set-tos 8
+                $IPT $IPT_FLAGS -t mangle -A $TYPE -p udp --dport $i -j TOS --set-tos 8
         done
 fi
 
 if [ ! "$TOS_16" == "" ]; then
         for i in `echo $TOS_16 | tr ',' ' '`; do
                 i=`echo $i | tr '_' ':'`
-                $IPT -t mangle -A $TYPE -p tcp --dport $i -j TOS --set-tos 16
-                $IPT -t mangle -A $TYPE -p udp --dport $i -j TOS --set-tos 16
+                $IPT $IPT_FLAGS -t mangle -A $TYPE -p tcp --dport $i -j TOS --set-tos 16
+                $IPT $IPT_FLAGS -t mangle -A $TYPE -p udp --dport $i -j TOS --set-tos 16
         done
 fi
 
 if [ ! "$TOS_DEF_RANGE" == "" ]; then
         for i in `echo $TOS_DEF_RANGE | tr ',' ' '`; do
                 i=`echo $i | tr '_' ':'`
-                $IPT -t mangle -A $TYPE -p tcp --dport $i -j TOS --set-tos $TOS_DEF
-                $IPT -t mangle -A $TYPE -p udp --dport $i -j TOS --set-tos $TOS_DEF
+                $IPT $IPT_FLAGS -t mangle -A $TYPE -p tcp --dport $i -j TOS --set-tos $TOS_DEF
+                $IPT $IPT_FLAGS -t mangle -A $TYPE -p udp --dport $i -j TOS --set-tos $TOS_DEF
         done
 fi
 }
@@ -386,8 +386,8 @@ if [ ! "`cat $file | grep -v "#"`" == "" ]; then
                 if [ ! "$val" ]; then
                  if [ ! "$i" == "" ] && [ -f "$file" ]; then
                         eout "{trust} allow all to/from $i"
-                        $IPT -A $chain -s $i -d 0/0 -j ACCEPT
-                        $IPT -A $chain -d $i -s 0/0 -j ACCEPT
+                        $IPT $IPT_FLAGS -A $chain -s $i -d 0/0 -j ACCEPT
+                        $IPT $IPT_FLAGS -A $chain -d $i -s 0/0 -j ACCEPT
                  fi
 		fi
         done
@@ -421,8 +421,8 @@ if [ ! "`cat $file | grep -v "#"`" == "" ]; then
 
                         if [ ! "$IPFLOW" == "" ] && [ ! "$PIP" == "" ] && [ ! "$IPFLOW" == "" ] && [ ! "$PPORT" == "" ]; then
                                 eout "{trust} allow $PIP $PFLOW_T port $PPORT"
-                                $IPT -A $chain -p tcp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j ACCEPT
-                                $IPT -A $chain -p udp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j ACCEPT
+                                $IPT $IPT_FLAGS -A $chain -p tcp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j ACCEPT
+                                $IPT $IPT_FLAGS -A $chain -p udp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j ACCEPT
                         fi
                 fi
         done
@@ -471,8 +471,8 @@ if [ ! "`cat $file | grep -v "#"`" == "" ]; then
                                 eout "{trust} ignored local ip allow rule '$NFLOW_T $PIP $PFLOW_T port $PPORT'"
                          else
                                 eout "{trust} allow $NFLOW_T $PIP $PFLOW_T port $PPORT"
-                                $IPT -A $chain -p tcp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j ACCEPT
-                                $IPT -A $chain -p udp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j ACCEPT
+                                $IPT $IPT_FLAGS -A $chain -p tcp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j ACCEPT
+                                $IPT $IPT_FLAGS -A $chain -p udp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j ACCEPT
                          fi
                         fi
                 fi
@@ -530,10 +530,10 @@ if [ ! "`cat $file | grep -v "#"`" == "" ]; then
                          else
                                 if [ "$PTYPE" == "tcp" ]; then
 	                                eout "{trust} allow $NFLOW_T $PTYPE $PIP $PFLOW_T port $PPORT"
-	                                $IPT -A $chain -p $PTYPE -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j ACCEPT
+	                                $IPT $IPT_FLAGS -A $chain -p $PTYPE -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j ACCEPT
                                 elif [ "$PTYPE" == "udp" ]; then
                                         eout "{trust} allow $NFLOW_T $PTYPE $PIP $PFLOW_T port $PPORT"
-		                        $IPT -A $chain -p $PTYPE -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j ACCEPT
+		                        $IPT $IPT_FLAGS -A $chain -p $PTYPE -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j ACCEPT
                                 fi
                          fi
                         fi
@@ -562,8 +562,8 @@ if [ ! "`cat $file | grep -v "#"`" == "" ]; then
                 if [ ! "$val" ]; then
                  if [ ! "$i" == "" ] && [ -f "$file" ]; then
                         eout "{trust} deny all to/from $i"
-                        $IPT -A $chain -s $i -d 0/0 -j $ALL_STOP
-                        $IPT -A $chain -d $i -s 0/0 -j $ALL_STOP
+                        $IPT $IPT_FLAGS -A $chain -s $i -d 0/0 -j $ALL_STOP
+                        $IPT $IPT_FLAGS -A $chain -d $i -s 0/0 -j $ALL_STOP
                  fi
 		fi
         done
@@ -597,8 +597,8 @@ if [ ! "`cat $file | grep -v "#"`" == "" ]; then
 
                         if [ ! "$IPFLOW" == "" ] && [ ! "$PIP" == "" ] && [ ! "$IPFLOW" == "" ] && [ ! "$PPORT" == "" ]; then
                                 eout "{trust} deny $PIP $PFLOW_T port $PPORT"
-                                $IPT -A $chain -p tcp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j $TCP_STOP
-				$IPT -A $chain -p udp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j $UDP_STOP
+                                $IPT $IPT_FLAGS -A $chain -p tcp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j $TCP_STOP
+				$IPT $IPT_FLAGS -A $chain -p udp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j $UDP_STOP
                         fi
                 fi
         done
@@ -642,8 +642,8 @@ if [ ! "`cat $file | grep -v "#"`" == "" ]; then
 
                         if [ ! "$NFLOW" == "" ] && [ ! "$IPFLOW" == "" ] && [ ! "$PIP" == "" ] && [ ! "$IPFLOW" == "" ] && [ ! "$PPORT" == "" ]; then
                                 eout "{trust} deny ($NFLOW_T) $PIP $PFLOW_T port $PPORT"
-                                $IPT -A $chain -p tcp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j $TCP_STOP
-				$IPT -A $chain -p udp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j $UDP_STOP
+                                $IPT $IPT_FLAGS -A $chain -p tcp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j $TCP_STOP
+				$IPT $IPT_FLAGS -A $chain -p udp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j $UDP_STOP
                         fi
                 fi
         done
@@ -695,10 +695,10 @@ if [ ! "`cat $file | grep -v "#"`" == "" ]; then
                         if [ ! "$PTYPE" == "" ] && [ ! "$NFLOW" == "" ] && [ ! "$IPFLOW" == "" ] && [ ! "$PIP" == "" ] && [ ! "$IPFLOW" == "" ] && [ ! "$PPORT" == "" ]; then
 				if [ "$PTYPE" == "tcp" ]; then
         	                        eout "{trust} deny $NFLOW_T $PTYPE $PIP $PFLOW_T port $PPORT"
-	                                $IPT -A $chain -p $PTYPE -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j $TCP_STOP
+	                                $IPT $IPT_FLAGS -A $chain -p $PTYPE -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j $TCP_STOP
 				elif [ "$PTYPE" == "udp" ]; then
 	                                eout "{trust} deny $NFLOW_T $PTYPE $PIP $PFLOW_T port $PPORT"
-					$IPT -A $chain -p $PTYPE -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j $UDP_STOP
+					$IPT $IPT_FLAGS -A $chain -p $PTYPE -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j $UDP_STOP
 				fi
                         fi
                 fi
@@ -774,17 +774,17 @@ fi
 dlist_php_hosts() {
 if [ ! "`cat $PHP_HOSTS | grep -v "#"`" == "" ]; then
         eout "{php} loading php_hosts.rules"
-        $IPT -N PHP
+        $IPT $IPT_FLAGS -N PHP
         for i in `cat $PHP_HOSTS | grep -v "#"`; do
                 if [ ! "$i" == "" ] && [ -f "$PHP_HOSTS" ]; then
 		        if [ "$LOG_DROP" == "1" ]; then
-                         $IPT -A PHP -s $i -d 0/0 -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** PHP ** "
+                         $IPT $IPT_FLAGS -A PHP -s $i -d 0/0 -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** PHP ** "
 			fi
-                        $IPT -A PHP -s $i -d 0/0 -j $ALL_STOP
+                        $IPT $IPT_FLAGS -A PHP -s $i -d 0/0 -j $ALL_STOP
                 fi
         done
-        $IPT -A INPUT -j PHP
-        $IPT -A OUTPUT -j PHP
+        $IPT $IPT_FLAGS -A INPUT -j PHP
+        $IPT $IPT_FLAGS -A OUTPUT -j PHP
 fi
 }
 
@@ -822,17 +822,17 @@ fi
 dlist_dshield_hosts() {
 if [ ! "`cat $DS_HOSTS | grep -v "#"`" == "" ]; then
         eout "{dshield} loading ds_hosts.rules"
-        $IPT -N DSHIELD
+        $IPT $IPT_FLAGS -N DSHIELD
         for i in `cat $DS_HOSTS | grep -v "#"`; do
                 if [ ! "$i" == "" ] && [ -f "$DS_HOSTS" ]; then
 		        if [ "$LOG_DROP" == "1" ]; then
-                         $IPT -A DSHIELD -s $i -d 0/0 -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** DSHIELD ** "
+                         $IPT $IPT_FLAGS -A DSHIELD -s $i -d 0/0 -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** DSHIELD ** "
 			fi
-                        $IPT -A DSHIELD -s $i -d 0/0 -j $ALL_STOP
+                        $IPT $IPT_FLAGS -A DSHIELD -s $i -d 0/0 -j $ALL_STOP
                 fi
         done
-        $IPT -A INPUT -j DSHIELD
-        $IPT -A OUTPUT -j DSHIELD
+        $IPT $IPT_FLAGS -A INPUT -j DSHIELD
+        $IPT $IPT_FLAGS -A OUTPUT -j DSHIELD
 fi
 }
 
@@ -871,17 +871,17 @@ fi
 dlist_spamhaus_hosts() {
 if [ ! "`cat $DROP_HOSTS | grep -v "#"`" == "" ]; then
         eout "{sdrop} loading sdrop_hosts.rules"
-        $IPT -N SDROP
+        $IPT $IPT_FLAGS -N SDROP
         for i in `cat $DROP_HOSTS | grep -v "#"`; do
                 if [ ! "$i" == "" ] && [ -f "$DROP_HOSTS" ]; then
 		        if [ "$LOG_DROP" == "1" ]; then
-                         $IPT -A SDROP -s $i -d 0/0 -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** SDROP ** "
+                         $IPT $IPT_FLAGS -A SDROP -s $i -d 0/0 -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** SDROP ** "
 		        fi
-                        $IPT -A SDROP -s $i -d 0/0 -j $ALL_STOP
+                        $IPT $IPT_FLAGS -A SDROP -s $i -d 0/0 -j $ALL_STOP
                 fi
         done
-        $IPT -A INPUT -j SDROP
-        $IPT -A OUTPUT -j SDROP
+        $IPT $IPT_FLAGS -A INPUT -j SDROP
+        $IPT $IPT_FLAGS -A OUTPUT -j SDROP
 fi
 }
 
@@ -921,7 +921,7 @@ if [ ! "`cat $ECNSHAME_HOSTS | grep -v "#"`" == "" ]; then
         eout "{ecnshame} loading ecnshame_hosts.rules"
         for i in `cat $ECNSHAME_HOSTS | grep -v "#"`; do
                 if [ ! "$i" == "" ] && [ -f "$ECNSHAME_HOSTS" ]; then
-			$IPT -t mangle -A POSTROUTING -p tcp -d $i -j ECN --ecn-tcp-remove
+			$IPT $IPT_FLAGS -t mangle -A POSTROUTING -p tcp -d $i -j ECN --ecn-tcp-remove
                 fi
         done
 fi
@@ -982,8 +982,8 @@ FNAME=`echo $FILE | tr '/' '\n' | tail -n 1`
 eout "{glob} loading $FNAME"
  for i in `cat $FILE | grep -v "#"`; do
   if [ ! "$i" == "" ]; then
-        $IPT -A INPUT -s $i -j $ALL_STOP
-	$IPT -A OUTPUT -d $i -j $ALL_STOP
+        $IPT $IPT_FLAGS -A INPUT -s $i -j $ALL_STOP
+	$IPT $IPT_FLAGS -A OUTPUT -d $i -j $ALL_STOP
   fi
  done
 fi
@@ -1002,20 +1002,20 @@ if [ ! "$BLK_PORTS" == "" ]; then
 for i in `echo $BLK_PORTS | tr ',' ' '`; do
 	if [ "$(echo $i | grep "_")" == "" ]; then
          if [ ! "$i" == "" ]; then
-		$IPT -A INPUT  -p tcp --dport $i -j $TCP_STOP
-		$IPT -A INPUT  -p udp --dport $i -j $UDP_STOP
-		$IPT -A OUTPUT  -p tcp --dport $i -j $TCP_STOP
-		$IPT -A OUTPUT  -p udp --dport $i -j $UDP_STOP
+		$IPT $IPT_FLAGS -A INPUT  -p tcp --dport $i -j $TCP_STOP
+		$IPT $IPT_FLAGS -A INPUT  -p udp --dport $i -j $UDP_STOP
+		$IPT $IPT_FLAGS -A OUTPUT  -p tcp --dport $i -j $TCP_STOP
+		$IPT $IPT_FLAGS -A OUTPUT  -p udp --dport $i -j $UDP_STOP
 		eout "{blk_ports} deny all to/from tcp port $i"
                 eout "{blk_ports} deny all to/from udp port $i"
          fi
         else
                 i=`echo $i | tr '_' ':'`
                 if [ ! "$i" == "" ]; then
-			$IPT -A INPUT  -p tcp --dport $i -j $TCP_STOP
-			$IPT -A INPUT  -p udp --dport $i -j $UDP_STOP
-			$IPT -A OUTPUT  -p tcp --dport $i -j $TCP_STOP
-			$IPT -A OUTPUT  -p udp --dport $i -j $UDP_STOP
+			$IPT $IPT_FLAGS -A INPUT  -p tcp --dport $i -j $TCP_STOP
+			$IPT $IPT_FLAGS -A INPUT  -p udp --dport $i -j $UDP_STOP
+			$IPT $IPT_FLAGS -A OUTPUT  -p tcp --dport $i -j $TCP_STOP
+			$IPT $IPT_FLAGS -A OUTPUT  -p udp --dport $i -j $UDP_STOP
         	        eout "{blk_ports} deny all to/from tcp port $i"
 	                eout "{blk_ports} deny all to/from udp port $i"
                 fi
@@ -1025,19 +1025,19 @@ fi
 }
 
 lgate_mac() {
-$IPT -N LMAC
+$IPT $IPT_FLAGS -N LMAC
 for mac in `echo $LGATE_MAC | tr ',' ' '`; do
 MAC=$mac
 if [ ! "$MAC" == "" ]; then
-  $IPT -A INPUT  -m mac ! --mac-source "$MAC" -j LMAC
+  $IPT $IPT_FLAGS -A INPUT  -m mac ! --mac-source "$MAC" -j LMAC
   eout "{glob} gateway ($MAC) route verification enabled"
 fi
 done
 
 if [ "$LOG_LGATE" == "1" ]; then
- $IPT -A LMAC -m limit --limit $LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix=" ** DROP FORIGN MAC ** "
+ $IPT $IPT_FLAGS -A LMAC -m limit --limit $LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix=" ** DROP FORIGN MAC ** "
 fi
-$IPT -A LMAC  -j REJECT --reject-with icmp-net-prohibited
+$IPT $IPT_FLAGS -A LMAC  -j REJECT --reject-with icmp-net-prohibited
 }
 
 cl_cports() {
@@ -1083,7 +1083,7 @@ fi
 }
 
 refresh() {
-	apf_loaded=`$IPT --list --numeric | grep PROHIBIT`
+	apf_loaded=`$IPT $IPT_FLAGS --list --numeric | grep PROHIBIT`
 	if [ -z "$apf_loaded" ]; then
 	        eout "{glob} apf does not appear to have rules loaded, doing nothing."
 	        mutex_unlock
@@ -1121,33 +1121,33 @@ refresh() {
 	fi
 
         /sbin/iptables-save | grep -E "TALLOW|TGALLOW" | grep -E '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | awk '{print$4}' | sort -n | uniq > $tmpra
-        $IPT -F REFRESH_TEMP
+        $IPT $IPT_FLAGS -F REFRESH_TEMP
         for i in `cat $tmpra | grep -v "#"`; do
                 if [ ! "$i" == "" ]; then
-                 $IPT -A REFRESH_TEMP -s $i -d 0/0 -j ACCEPT
-                 $IPT -A REFRESH_TEMP -d $i -s 0/0 -j ACCEPT
+                 $IPT $IPT_FLAGS -A REFRESH_TEMP -s $i -d 0/0 -j ACCEPT
+                 $IPT $IPT_FLAGS -A REFRESH_TEMP -d $i -s 0/0 -j ACCEPT
                 fi
         done
         tmprd="/etc/apf/internals/refresh.drop.temp.$$"
         /sbin/iptables-save | grep -E "TDENY|TGDENY" | grep -E '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | awk '{print$4}' | sort -n | uniq > $tmprd
-        $IPT -F REFRESH_TEMP
+        $IPT $IPT_FLAGS -F REFRESH_TEMP
         for i in `cat $tmprd | grep -v "#"`; do
                 if [ ! "$i" == "" ]; then
-                 $IPT -A REFRESH_TEMP -s $i -d 0/0 -j $ALL_STOP
-                 $IPT -A REFRESH_TEMP -d $i -s 0/0 -j $ALL_STOP
+                 $IPT $IPT_FLAGS -A REFRESH_TEMP -s $i -d 0/0 -j $ALL_STOP
+                 $IPT $IPT_FLAGS -A REFRESH_TEMP -d $i -s 0/0 -j $ALL_STOP
                 fi
         done
         trim $DENY_HOSTS $SET_TRIM
         trim $GDENY_HOSTS $SET_TRIM
-        $IPT -F TDENY
-        $IPT -F TGDENY
-        $IPT -F TALLOW
-        $IPT -F TGALLOW
+        $IPT $IPT_FLAGS -F TDENY
+        $IPT $IPT_FLAGS -F TGDENY
+        $IPT $IPT_FLAGS -F TALLOW
+        $IPT $IPT_FLAGS -F TGALLOW
 	allow_hosts $GALLOW_HOSTS TGALLOW
 	allow_hosts $ALLOW_HOSTS TALLOW
 	deny_hosts $GDENY_HOSTS TGDENY
 	deny_hosts $DENY_HOSTS TDENY
-        $IPT -F REFRESH_TEMP
+        $IPT $IPT_FLAGS -F REFRESH_TEMP
         rm -f $tmpra $tmprd
 }
 
