@@ -561,6 +561,11 @@ LOG_RATE="30"
 # sends outputs to this file
 LOG_APF="/var/log/apf_log"
 
+# Adds -w flag to iptables to enable locking support. This is only available
+# on iptables >= 1.4.20, but if supported you probably want this.
+IPT_LOCK_SUPPORT="0"
+IPT_LOCK_TIMEOUT="3"
+
 ##
 # [Import misc. conf]
 ##
