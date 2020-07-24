@@ -12,19 +12,19 @@ DEF=${DEF:-".ca.def"}
 DOUT=${DOUT:-".conf.apf"}
 
 if [ -d "$INSTALL_PATH.bk.last" ]; then
-# get all the vars from current release
-. $INSTALL_PATH/conf.apf
-# replace with any vars old release had
-. $INSTALL_PATH.bk.last/conf.apf
-# generate new conf
-. $DEF
+        # get all the vars from current release
+        . $INSTALL_PATH/conf.apf
+        # replace with any vars old release had
+        . $INSTALL_PATH.bk.last/conf.apf
+        # generate new conf
+        . $DEF
 
-cp -f $INSTALL_PATH/conf.apf $INSTALL_PATH/conf.apf.orig
-cp -f $DOUT $INSTALL_PATH/conf.apf
-cp -f $INSTALL_PATH.bk.last/*_hosts.rules /etc/apf/
-cp -f $INSTALL_PATH.bk.last/vnet/*.rules /etc/apf/vnet/
+        cp -f $INSTALL_PATH/conf.apf $INSTALL_PATH/conf.apf.orig
+        cp -f $DOUT $INSTALL_PATH/conf.apf
+        cp -f $INSTALL_PATH.bk.last/*_hosts.rules /etc/apf/
+        cp -f $INSTALL_PATH.bk.last/vnet/*.rules /etc/apf/vnet/
 
-OV=`cat $INSTALL_PATH.bk.last/VERSION | awk '{print$2}'`
-NV=`cat $INSTALL_PATH/VERSION | awk '{print$2}'`
+        OV=`cat $INSTALL_PATH.bk.last/VERSION | awk '{print$2}'`
+        NV=`cat $INSTALL_PATH/VERSION | awk '{print$2}'`
         echo "  Imported options from $OV to $NV."
 fi
