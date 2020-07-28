@@ -6,12 +6,18 @@ for i in `echo $IG_TCP_CPORTS`; do
          if [ ! "$i" == "" ]; then
                 $IPT -A INPUT -p $PROTO  -s 0/0 -d $VNET --dport $i -j ACCEPT
                 eout "{glob} opening inbound $PROTO port $i on $VNET"
+                if [ "$USE_IPV6" == "1" ]; then
+                        $IP6T -A INPUT -m state --state NEW -m tcp -p $PROTO --dport $i -d $VNET -j ACCEPT
+                fi
          fi
         else
                 i=`echo $i | tr '_' ':'`
                 if [ ! "$i" == "" ]; then
                         $IPT -A INPUT -p $PROTO  -s 0/0 -d $VNET --dport $i -j ACCEPT
                         eout "{glob} opening inbound $PROTO port $i on $VNET"
+                        if [ "$USE_IPV6" == "1" ]; then
+                                $IP6T -A INPUT -m state --state NEW -m tcp -p $PROTO --dport $i -d $VNET -j ACCEPT
+                        fi
                 fi
         fi
 done
@@ -101,6 +107,9 @@ IG_ICMP_TYPES=`echo $IG_ICMP_TYPES | tr ',' ' '`
                 fi
 	 fi
 	done
+	if [ "$USE_IPV6" == "1" ]; then
+	        $IP6T -A INPUT -p ipv6-icmp -j ACCEPT
+	fi
 fi
 
 if [ "$EGF" == "1" ]; then

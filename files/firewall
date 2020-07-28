@@ -228,6 +228,10 @@ $IPT -A INPUT  -p tcp -m state --state ESTABLISHED,RELATED -j ACCEPT
 $IPT -A INPUT  -p udp -m state --state ESTABLISHED,RELATED -j ACCEPT
 $IPT -A OUTPUT  -p tcp --dport 1024:65535 -m state --state ESTABLISHED,RELATED -j ACCEPT
 $IPT -A OUTPUT  -p udp --dport 1024:65535 -m state --state ESTABLISHED,RELATED -j ACCEPT
+if [ "$USE_IPV6" == "1" ]; then
+	$IP6T -A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+fi
+
 
 # DNS
 if [ -f "/etc/resolv.conf" ] && [ "$RESV_DNS" == "1" ]; then
@@ -271,6 +275,10 @@ if [ "$HELPER_SSH" == "1" ]; then
 	$IPT -A INPUT  -p tcp --sport $HELPER_SSH_PORT --dport 513:65535 -m state --state ESTABLISHED,RELATED -j ACCEPT
 	$IPT -A INPUT  -p tcp --sport 1024:65535 --dport $HELPER_SSH_PORT --syn -m state --state ESTABLISHED,RELATED -j ACCEPT
 	$IPT -A INPUT  -p udp --dport $HELPER_SSH_PORT -m state --state ESTABLISHED -j ACCEPT
+
+	if [ "$USE_IPV6" == "1" ]; then
+                $IP6T -A INPUT -m state --state NEW -m tcp -p tcp --dport $HELPER_SSH_PORT -j ACCEPT
+        fi
 fi
 
 # Traceroute
@@ -319,3 +327,8 @@ eout "{glob} default (ingress) input drop"
 $IPT -A INPUT -p tcp -j $TCP_STOP
 $IPT -A INPUT -p udp -j $UDP_STOP
 $IPT -A INPUT -p all -j $ALL_STOP
+if [ "$USE_IPV6" == "1" ]; then
+        $IP6T -A INPUT -p tcp -j $TCP_STOP
+        $IP6T -A INPUT -p udp -j $UDP_STOP
+        $IP6T -A INPUT -p all -j $ALL_STOP
+fi
