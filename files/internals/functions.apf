@@ -368,14 +368,8 @@ ovars() {
 }
 
 allow_hosts() {
-file="$1"
-chain="$2"
-if [ -z "$file" ] || [ -z "$chain" ]; then
-        eout "could not process allow_hosts $file $chain, fatal error, aborting!"
-        /etc/init.d/apf stop
-        mutex_unlock
-        exit 1
-fi
+   file="$1"
+   chain="$2"
 
 if [ ! "`cat $file | grep -v "#"`" == "" ]; then
         eout "{glob} loading $file"
@@ -544,14 +538,14 @@ fi
 
 
 deny_hosts() {
-file=$1
-chain=$2
-if [ -z "$file" ] || [ -z "$chain" ]; then
-	eout "could not process deny_hosts $file $chain, fatal error, aborting!"
-	/etc/init.d/apf stop
-        mutex_unlock
-	exit 1
-fi
+   file=$1
+   chain=$2
+   if [ -z "$file" ] || [ -z "$chain" ]; then
+      eout "could not process deny_hosts $file $chain, fatal error, aborting!"
+      /etc/init.d/apf stop
+      mutex_unlock
+      exit 1
+   fi
 
 if [ ! "`cat $file | grep -v "#"`" == "" ]; then
         eout "{glob} loading $file"
