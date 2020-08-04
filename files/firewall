@@ -138,6 +138,22 @@ $IPT -A OUTPUT -j TDENY
 $IPT -A INPUT -j TGDENY
 $IPT -A OUTPUT -j TGDENY
 
+if [ "$USE_IPV6" = "1" ]; then
+  $IP6T -N TALLOW
+  $IP6T -N TDENY
+  $IP6T -N TGALLOW
+  $IP6T -N TGDENY
+
+  $IPT -A INPUT -j TALLOW
+  $IPT -A OUTPUT -j TALLOW
+  $IP6T -A INPUT -j TGALLOW
+  $IP6T -A OUTPUT -j TGALLOW
+  $IP6T -A INPUT -j TDENY
+  $IP6T -A OUTPUT -j TDENY
+  $IP6T -A INPUT -j TGDENY
+  $IP6T -A OUTPUT -j TGDENY
+fi
+
 # Load our Blocked Traffic rules
 . $INSTALL_PATH/bt.rules
 
