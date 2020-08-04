@@ -430,6 +430,10 @@ allow_hosts() {
                $IPT -A $chain -p tcp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j ACCEPT
                $IPT -A $chain -p udp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j ACCEPT
                if [ "$USE_IPV6" == "1" ]; then
+                  if [[ $PIP =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+                     eout "ignoring ipv4 address $PIP"
+                     continue
+                  fi
 ￼                 $IP6T -A $chain -m state --state NEW -m tcp -p tcp -$IPFLOW $PIP --$PFLOW $PPORT -j ACCEPT
 ￼                 $IP6T -A $chain -m state --state NEW -m udp -p udp -$IPFLOW $PIP --$PFLOW $PPORT -j ACCEPT
                fi
@@ -585,6 +589,10 @@ deny_hosts() {
                $IPT -A $chain -s $i -d 0/0 -j $ALL_STOP
                $IPT -A $chain -d $i -s 0/0 -j $ALL_STOP
                if [ "$USE_IPV6" == "1" ]; then
+                  if [[ $i =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+                     eout "ignoring ipv4 address $i"
+                     continue
+                  fi
                   $IP6T -A $chain -m state --state NEW -s $i -d 0/0 -j $ALL_STOP
                   $IP6T -A $chain -m state --state NEW -d $i -s 0/0 -j $ALL_STOP
                fi
@@ -1182,6 +1190,12 @@ refresh() {
         $IPT -F TGDENY
         $IPT -F TALLOW
         $IPT -F TGALLOW
+        if [ $USE_IPV6 == "1" ]; then
+           $IP6T -F TDENY
+           $IP6T -F TGDENY
+           $IP6T -F TALLOW
+           $IP6T -F TGALLOW
+        fi
 	allow_hosts $GALLOW_HOSTS TGALLOW
 	allow_hosts $ALLOW_HOSTS TALLOW
 	deny_hosts $GDENY_HOSTS TGDENY
