@@ -534,6 +534,7 @@ if [ ! "`cat $file | grep -v "#"`" == "" ]; then
                 fi
         done
 fi
+
 }
 
 
@@ -698,6 +699,7 @@ if [ ! "`cat $file | grep -v "#"`" == "" ]; then
                 fi
         done
 fi
+
 
 }
 
@@ -1138,6 +1140,12 @@ refresh() {
         $IPT $IPT_FLAGS -F TGDENY
         $IPT $IPT_FLAGS -F TALLOW
         $IPT $IPT_FLAGS -F TGALLOW
+        if [ $USE_IPV6 == "1" ]; then
+           $IP6T -F TDENY
+           $IP6T -F TGDENY
+           $IP6T -F TALLOW
+           $IP6T -F TGALLOW
+        fi
 	allow_hosts $GALLOW_HOSTS TGALLOW
 	allow_hosts $ALLOW_HOSTS TALLOW
 	deny_hosts $GDENY_HOSTS TGDENY
