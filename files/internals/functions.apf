@@ -390,6 +390,11 @@ allow_hosts() {
                $IPT -A $chain -s $i -d 0/0 -j ACCEPT
                $IPT -A $chain -d $i -s 0/0 -j ACCEPT
                if [ "$USE_IPV6" == "1" ]; then
+                  subnet=`echo $i | awk -F'/' '{print $1}'`
+                  if [[ $subnet =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+                     eout "ignoring ipv4 address $i"
+                     continue
+                  fi
                   $IP6T -A $chain -m state --state NEW -s $i -d 0/0 -j ACCEPT
                   $IP6T -A $chain -m state --state NEW -d $i -s 0/0 -j ACCEPT
                fi
@@ -589,7 +594,8 @@ deny_hosts() {
                $IPT -A $chain -s $i -d 0/0 -j $ALL_STOP
                $IPT -A $chain -d $i -s 0/0 -j $ALL_STOP
                if [ "$USE_IPV6" == "1" ]; then
-                  if [[ $i =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+                  subnet=`echo $i | awk -F'/' '{print $1}'`
+                  if [[ $subnet =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
                      eout "ignoring ipv4 address $i"
                      continue
                   fi
