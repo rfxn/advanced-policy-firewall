@@ -488,8 +488,8 @@ allow_hosts() {
                   $IPT -A $chain -p tcp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j ACCEPT
                   $IPT -A $chain -p udp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j ACCEPT
                   if [ "$USE_IPV6" == "1" ]; then
-   ￼                 $IP6T -A $chain -m state --state NEW -p tcp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j ACCEPT
-   ￼                 $IP6T -A $chain -m state --state NEW -p udp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j ACCEPT
+                     $IP6T -A $chain -m state --state NEW -p tcp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j ACCEPT
+                     $IP6T -A $chain -m state --state NEW -p udp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j ACCEPT
                   fi
                fi
             fi
@@ -682,8 +682,8 @@ deny_hosts() {
                $IPT -A $chain -p tcp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j $TCP_STOP
                $IPT -A $chain -p udp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j $UDP_STOP
                if [ "$USE_IPV6" == "1" ]; then
-   ￼              $IP6T -A $chain -m state --state NEW -p tcp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j $TCP_STOP
-   ￼              $IP6T -A $chain -m state --state NEW -p udp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j $UDP_STOP
+                  $IP6T -A $chain -m state --state NEW -p tcp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j $TCP_STOP
+                  $IP6T -A $chain -m state --state NEW -p udp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j $UDP_STOP
                fi
             fi
          fi
