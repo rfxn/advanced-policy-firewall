@@ -434,8 +434,8 @@ allow_hosts() {
                      eout "ignoring ipv4 address $PIP"
                      continue
                   fi
-￼                 $IP6T -A $chain -m state --state NEW -m tcp -p tcp -$IPFLOW $PIP --$PFLOW $PPORT -j ACCEPT
-￼                 $IP6T -A $chain -m state --state NEW -m udp -p udp -$IPFLOW $PIP --$PFLOW $PPORT -j ACCEPT
+                  $IP6T -A $chain -m state --state NEW -m tcp -p tcp -$IPFLOW $PIP --$PFLOW $PPORT -j ACCEPT
+                  $IP6T -A $chain -m state --state NEW -m udp -p udp -$IPFLOW $PIP --$PFLOW $PPORT -j ACCEPT
                fi
             fi
          fi
