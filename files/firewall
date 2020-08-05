@@ -233,6 +233,9 @@ cl_cports
 # Load our main TCP/UDP rules
 if [ "$SET_VNET" == "1" ]; then
 	VNET="$NET"
+	if [ "$USE_IPV6" == "1" ]; then
+	  VNET="$IP6_NET"
+	fi
 else
 	VNET="0/0"
 fi
