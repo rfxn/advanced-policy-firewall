@@ -32,4 +32,5 @@
 # inbound to destination port 3306 from 192.168.5.0/24
 # d=3306:s=192.168.5.0/24
 #
+# TODO does not support IPv6 address, but hostname IPv6 ok
 ##

@@ -367,343 +367,398 @@ ovars() {
 	nice -n 16 cat /etc/apf/conf.apf /etc/apf/internals/internals.conf | grep -v "#" | grep "=" | tr '=' ' ' | awk '{print""$"$1"}'
 }
 
+# TODO does not support ipv6 address, but hostname ipv6 ok
 allow_hosts() {
-file="$1"
-chain="$2"
-if [ -z "$file" ] || [ -z "$chain" ]; then
-        eout "could not process allow_hosts $file $chain, fatal error, aborting!"
-        /etc/init.d/apf stop
-        mutex_unlock
-        exit 1
-fi
+   file="$1"
+   chain="$2"
 
-if [ ! "`cat $file | grep -v "#"`" == "" ]; then
-        eout "{glob} loading $file"
-        #
-        #
-        for i in `cat $file | grep -v "#" | grep -v ":" | grep -v "="`; do
-                val=`cat /etc/apf/internals/.localaddrs | grep -w $i`
-                if [ ! "$val" ]; then
-                 if [ ! "$i" == "" ] && [ -f "$file" ]; then
-                        eout "{trust} allow all to/from $i"
-                        $IPT -A $chain -s $i -d 0/0 -j ACCEPT
-                        $IPT -A $chain -d $i -s 0/0 -j ACCEPT
-                 fi
-		fi
-        done
-        #
-        #
-        for i in `cat $file | grep -v "#" | grep ":" | grep "=" | grep -vw in | grep -vw out | grep -v tcp | grep -v udp`; do
-                if [ ! "$i" == "" ] && [ -f "$file" ]; then
+   if [ -z "$file" ] || [ -z "$chain" ]; then
+      eout "could not process allow_hosts $file $chain, fatal error, aborting!"
+      /etc/init.d/apf stop
+      mutex_unlock
+      exit 1
+   fi
 
-                        PFLOW=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$1}'`
-                if [ "$PFLOW" == "s" ]; then
-                                PFLOW="sport"
-                                PFLOW_T="from"
-                        elif [ "$PFLOW" == "d" ]; then
-                                PFLOW="dport"
-                                PFLOW_T="to"
-                        fi
-                        PPORT=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$2}'`
-                        if [ ! "$(echo $PPORT | grep _)" == "" ]; then
-                                PPORT_BEG=`echo $PPORT | tr '_' ' ' | awk '{print$1}'`
-                                PPORT_END=`echo $PPORT | tr '_' ' ' | awk '{print$2}'`
-                                PPORT="$PPORT_BEG:$PPORT_END"
-                        fi
+   if [ ! "`cat $file | grep -v "#"`" == "" ]; then
+      eout "{glob} loading $file"
+      #
+      #
+      for i in `cat $file | grep -v "#" | grep -v ":" | grep -v "="`; do
+         val=`cat /etc/apf/internals/.localaddrs | grep -w $i`
+         if [ ! "$val" ]; then
+            if [ ! "$i" == "" ] && [ -f "$file" ]; then
+               eout "{trust} allow all to/from $i"
+               $IPT -A $chain -s $i -d 0/0 -j ACCEPT
+               $IPT -A $chain -d $i -s 0/0 -j ACCEPT
+               if [ "$USE_IPV6" == "1" ]; then
+                  subnet=`echo $i | awk -F'/' '{print $1}'`
+                  if [[ $subnet =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+                     eout "ignoring ipv4 address $i"
+                     continue
+                  fi
+                  $IP6T -A $chain -m state --state NEW -s $i -d 0/0 -j ACCEPT
+                  $IP6T -A $chain -m state --state NEW -d $i -s 0/0 -j ACCEPT
+               fi
+            fi
+         fi
+      done
+      #
+      #
+      for i in `cat $file | grep -v "#" | grep ":" | grep "=" | grep -vw in | grep -vw out | grep -v tcp | grep -v udp`; do
+         if [ ! "$i" == "" ] && [ -f "$file" ]; then
 
-                        IPFLOW=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$3}'`
-                        if [ "$IPFLOW" == "s" ]; then
-                                IPFLOW="s"
-                        elif [ "$IPFLOW" == "d" ]; then
-                                IPFLOW="d"
-                        fi
-                        PIP=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$4}'`
+            PFLOW=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$1}'`
+            if [ "$PFLOW" == "s" ]; then
+               PFLOW="sport"
+               PFLOW_T="from"
+            elif [ "$PFLOW" == "d" ]; then
+               PFLOW="dport"
+               PFLOW_T="to"
+            fi
 
-                        if [ ! "$IPFLOW" == "" ] && [ ! "$PIP" == "" ] && [ ! "$IPFLOW" == "" ] && [ ! "$PPORT" == "" ]; then
-                                eout "{trust} allow $PIP $PFLOW_T port $PPORT"
-                                $IPT -A $chain -p tcp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j ACCEPT
-                                $IPT -A $chain -p udp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j ACCEPT
-                        fi
-                fi
-        done
-        #
-        #
-        for i in `cat $file | grep -v "#" | grep ":" | grep "=" | grep -v "tcp" | grep -v "udp"`; do
-                if [ ! "$i" == "" ] && [ -f "$file" ]; then
+            PPORT=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$2}'`
+            if [ ! "$(echo $PPORT | grep _)" == "" ]; then
+               PPORT_BEG=`echo $PPORT | tr '_' ' ' | awk '{print$1}'`
+               PPORT_END=`echo $PPORT | tr '_' ' ' | awk '{print$2}'`
+               PPORT="$PPORT_BEG:$PPORT_END"
+            fi
 
-                        NFLOW=`echo $i | tr ':' ' ' | tr '=' ' '| awk '{print$1}'`
-                        if [ "$NFLOW" == "in" ]; then
-                                NFLOW="INPUT"
-                                NFLOW_T="inbound"
-                        elif [ "$NFLOW" == "out" ]; then
-                                NFLOW="OUTPUT"
-                                NFLOW_T="outbound"
-                        fi
+            IPFLOW=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$3}'`
+            if [ "$IPFLOW" == "s" ]; then
+               IPFLOW="s"
+            elif [ "$IPFLOW" == "d" ]; then
+               IPFLOW="d"
+            fi
 
-                        PFLOW=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$2}'`
-                        if [ "$PFLOW" == "s" ]; then
-                                PFLOW="sport"
-                                PFLOW_T="from"
-                        elif [ "$PFLOW" == "d" ]; then
-                                PFLOW="dport"
-                                PFLOW_T="to"
-                        fi
+            PIP=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$4}'`
+            if [ ! "$IPFLOW" == "" ] && [ ! "$PIP" == "" ] && [ ! "$IPFLOW" == "" ] && [ ! "$PPORT" == "" ]; then
+               eout "{trust} allow $PIP $PFLOW_T port $PPORT"
+               $IPT -A $chain -p tcp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j ACCEPT
+               $IPT -A $chain -p udp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j ACCEPT
+               if [ "$USE_IPV6" == "1" ]; then
+                  if [[ $PIP =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+                     eout "ignoring ipv4 address $PIP"
+                     continue
+                  fi
+                  $IP6T -A $chain -m state --state NEW -m tcp -p tcp -$IPFLOW $PIP --$PFLOW $PPORT -j ACCEPT
+                  $IP6T -A $chain -m state --state NEW -m udp -p udp -$IPFLOW $PIP --$PFLOW $PPORT -j ACCEPT
+               fi
+            fi
+         fi
+      done
+      #
+      #
+      for i in `cat $file | grep -v "#" | grep ":" | grep "=" | grep -v "tcp" | grep -v "udp"`; do
+         if [ ! "$i" == "" ] && [ -f "$file" ]; then
 
-                        PPORT=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$3}'`
-                        if [ ! "$(echo $PPORT | grep _)" == "" ]; then
-                                PPORT_BEG=`echo $PPORT | tr '_' ' ' | awk '{print$1}'`
-                                PPORT_END=`echo $PPORT | tr '_' ' ' | awk '{print$2}'`
-                                PPORT="$PPORT_BEG:$PPORT_END"
-                        fi
+            NFLOW=`echo $i | tr ':' ' ' | tr '=' ' '| awk '{print$1}'`
+            if [ "$NFLOW" == "in" ]; then
+               NFLOW="INPUT"
+               NFLOW_T="inbound"
+            elif [ "$NFLOW" == "out" ]; then
+               NFLOW="OUTPUT"
+               NFLOW_T="outbound"
+            fi
 
-                        IPFLOW=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$4}'`
-                        if [ "$IPFLOW" == "s" ]; then
-                                IPFLOW="s"
-                        elif [ "$IPFLOW" == "d" ]; then
-                                IPFLOW="d"
-                        fi
-                        PIP=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$5}'`
+            PFLOW=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$2}'`
+            if [ "$PFLOW" == "s" ]; then
+               PFLOW="sport"
+               PFLOW_T="from"
+            elif [ "$PFLOW" == "d" ]; then
+               PFLOW="dport"
+               PFLOW_T="to"
+            fi
 
-                        if [ ! "$NFLOW" == "" ] && [ ! "$IPFLOW" == "" ] && [ ! "$PIP" == "" ] && [ ! "$IPFLOW" == "" ] && [ ! "$PPORT" == "" ]; then
-                         if [ "$IPFLOW" == "s" ] && [ "$NFLOW" == "INPUT" ] && [ "$(cat /etc/apf/internals/.localaddrs | grep -w $PIP)" ]; then
-                                eout "{trust} ignored local ip allow rule '$NFLOW_T $PIP $PFLOW_T port $PPORT'"
-                         elif [ "$IPFLOW" == "d" ] && [ "$NFLOW" == "OUTPUT" ] && [ "$(cat /etc/apf/internals/.localaddrs | grep -w $PIP)" ]; then
-                                eout "{trust} ignored local ip allow rule '$NFLOW_T $PIP $PFLOW_T port $PPORT'"
-                         else
-                                eout "{trust} allow $NFLOW_T $PIP $PFLOW_T port $PPORT"
-                                $IPT -A $chain -p tcp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j ACCEPT
-                                $IPT -A $chain -p udp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j ACCEPT
-                         fi
-                        fi
-                fi
-        done
-        #
-        #
-        for i in `cat $file | grep -v "#" | grep ":" | grep "="`; do
-                if [ ! "$i" == "" ] && [ -f "$file" ]; then
+            PPORT=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$3}'`
+            if [ ! "$(echo $PPORT | grep _)" == "" ]; then
+               PPORT_BEG=`echo $PPORT | tr '_' ' ' | awk '{print$1}'`
+               PPORT_END=`echo $PPORT | tr '_' ' ' | awk '{print$2}'`
+               PPORT="$PPORT_BEG:$PPORT_END"
+            fi
 
-                        PTYPE=`echo $i | tr ':' ' ' | tr '=' ' '| awk '{print$1}'`
-                        if [ "$PTYPE" == "tcp" ]; then
-                                PTYPE="tcp"
-                        elif [ "$PTYPE" == "udp" ]; then
-                                PTYPE="udp"
-                        fi
+            IPFLOW=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$4}'`
+            if [ "$IPFLOW" == "s" ]; then
+               IPFLOW="s"
+            elif [ "$IPFLOW" == "d" ]; then
+               IPFLOW="d"
+            fi
 
-                        NFLOW=`echo $i | tr ':' ' ' | tr '=' ' '| awk '{print$2}'`
-                        if [ "$NFLOW" == "in" ]; then
-                                NFLOW="INPUT"
-                                NFLOW_T="inbound"
-                        elif [ "$NFLOW" == "out" ]; then
-                                NFLOW="OUTPUT"
-                                NFLOW_T="outbound"
-                        fi
+            PIP=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$5}'`
+            if [ ! "$NFLOW" == "" ] && [ ! "$IPFLOW" == "" ] && [ ! "$PIP" == "" ] && [ ! "$IPFLOW" == "" ] && [ ! "$PPORT" == "" ]; then
+               if [ "$IPFLOW" == "s" ] && [ "$NFLOW" == "INPUT" ] && [ "$(cat /etc/apf/internals/.localaddrs | grep -w $PIP)" ]; then
+                  eout "{trust} ignored local ip allow rule '$NFLOW_T $PIP $PFLOW_T port $PPORT'"
+               elif [ "$IPFLOW" == "d" ] && [ "$NFLOW" == "OUTPUT" ] && [ "$(cat /etc/apf/internals/.localaddrs | grep -w $PIP)" ]; then
+                  eout "{trust} ignored local ip allow rule '$NFLOW_T $PIP $PFLOW_T port $PPORT'"
+               else
+                  eout "{trust} allow $NFLOW_T $PIP $PFLOW_T port $PPORT"
+                  $IPT -A $chain -p tcp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j ACCEPT
+                  $IPT -A $chain -p udp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j ACCEPT
+                  if [ "$USE_IPV6" == "1" ]; then
+                     $IP6T -A $chain -m state --state NEW -p tcp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j ACCEPT
+                     $IP6T -A $chain -m state --state NEW -p udp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j ACCEPT
+                  fi
+               fi
+            fi
+         fi
+      done
+      #
+      #
+      for i in `cat $file | grep -v "#" | grep ":" | grep "="`; do
+         if [ ! "$i" == "" ] && [ -f "$file" ]; then
 
-                        PFLOW=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$3}'`
-                        if [ "$PFLOW" == "s" ]; then
-                                PFLOW="sport"
-                                PFLOW_T="from"
-                        elif [ "$PFLOW" == "d" ]; then
-                                PFLOW="dport"
-                                PFLOW_T="to"
-                        fi
+            PTYPE=`echo $i | tr ':' ' ' | tr '=' ' '| awk '{print$1}'`
+            if [ "$PTYPE" == "tcp" ]; then
+               PTYPE="tcp"
+            elif [ "$PTYPE" == "udp" ]; then
+               PTYPE="udp"
+            fi
 
-                        PPORT=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$4}'`
-                        if [ ! "$(echo $PPORT | grep _)" == "" ]; then
-                                PPORT_BEG=`echo $PPORT | tr '_' ' ' | awk '{print$1}'`
-                                PPORT_END=`echo $PPORT | tr '_' ' ' | awk '{print$2}'`
-                                PPORT="$PPORT_BEG:$PPORT_END"
-                        fi
+            NFLOW=`echo $i | tr ':' ' ' | tr '=' ' '| awk '{print$2}'`
+            if [ "$NFLOW" == "in" ]; then
+               NFLOW="INPUT"
+               NFLOW_T="inbound"
+            elif [ "$NFLOW" == "out" ]; then
+               NFLOW="OUTPUT"
+               NFLOW_T="outbound"
+            fi
 
-                        IPFLOW=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$5}'`
-                        if [ "$IPFLOW" == "s" ]; then
-                                IPFLOW="s"
-                        elif [ "$IPFLOW" == "d" ]; then
-                                IPFLOW="d"
-                        fi
-                        PIP=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$6}'`
+            PFLOW=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$3}'`
+            if [ "$PFLOW" == "s" ]; then
+               PFLOW="sport"
+               PFLOW_T="from"
+            elif [ "$PFLOW" == "d" ]; then
+               PFLOW="dport"
+               PFLOW_T="to"
+            fi
 
-                        if [ ! "$PTYPE" == "" ] && [ ! "$NFLOW" == "" ] && [ ! "$IPFLOW" == "" ] && [ ! "$PIP" == "" ] && [ ! "$IPFLOW" == "" ] && [ ! "$PPORT" == "" ]; then
-                         if [ "$IPFLOW" == "s" ] && [ "$NFLOW" == "INPUT" ] && [ "$(cat /etc/apf/internals/.localaddrs | grep -w $PIP)" ]; then
-                                eout "{trust} ignored local ip allow rule '$NFLOW_T $PIP $PFLOW_T port $PPORT'"
-                         elif [ "$IPFLOW" == "d" ] && [ "$NFLOW" == "OUTPUT" ] && [ "$(cat /etc/apf/internals/.localaddrs | grep -w $PIP)" ]; then
-                                eout "{trust} ignored local ip allow rule '$NFLOW_T $PIP $PFLOW_T port $PPORT'"
-                         else
-                                if [ "$PTYPE" == "tcp" ]; then
-	                                eout "{trust} allow $NFLOW_T $PTYPE $PIP $PFLOW_T port $PPORT"
-	                                $IPT -A $chain -p $PTYPE -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j ACCEPT
-                                elif [ "$PTYPE" == "udp" ]; then
-                                        eout "{trust} allow $NFLOW_T $PTYPE $PIP $PFLOW_T port $PPORT"
-		                        $IPT -A $chain -p $PTYPE -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j ACCEPT
-                                fi
-                         fi
-                        fi
-                fi
-        done
-fi
+            PPORT=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$4}'`
+            if [ ! "$(echo $PPORT | grep _)" == "" ]; then
+               PPORT_BEG=`echo $PPORT | tr '_' ' ' | awk '{print$1}'`
+               PPORT_END=`echo $PPORT | tr '_' ' ' | awk '{print$2}'`
+               PPORT="$PPORT_BEG:$PPORT_END"
+            fi
+
+            IPFLOW=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$5}'`
+            if [ "$IPFLOW" == "s" ]; then
+               IPFLOW="s"
+            elif [ "$IPFLOW" == "d" ]; then
+               IPFLOW="d"
+            fi
+
+            PIP=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$6}'`
+            if [ ! "$PTYPE" == "" ] && [ ! "$NFLOW" == "" ] && [ ! "$IPFLOW" == "" ] && [ ! "$PIP" == "" ] && [ ! "$IPFLOW" == "" ] && [ ! "$PPORT" == "" ]; then
+               if [ "$IPFLOW" == "s" ] && [ "$NFLOW" == "INPUT" ] && [ "$(cat /etc/apf/internals/.localaddrs | grep -w $PIP)" ]; then
+                  eout "{trust} ignored local ip allow rule '$NFLOW_T $PIP $PFLOW_T port $PPORT'"
+               elif [ "$IPFLOW" == "d" ] && [ "$NFLOW" == "OUTPUT" ] && [ "$(cat /etc/apf/internals/.localaddrs | grep -w $PIP)" ]; then
+                  eout "{trust} ignored local ip allow rule '$NFLOW_T $PIP $PFLOW_T port $PPORT'"
+               else
+                  if [ "$PTYPE" == "tcp" ]; then
+                     eout "{trust} allow $NFLOW_T $PTYPE $PIP $PFLOW_T port $PPORT"
+                     $IPT -A $chain -p $PTYPE -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j ACCEPT
+                     if [ "$USE_IPV6" == "1" ]; then
+                        $IP6T -A $chain -m state --state NEW -p $PTYPE -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j ACCEPT
+                     fi
+                  elif [ "$PTYPE" == "udp" ]; then
+                     eout "{trust} allow $NFLOW_T $PTYPE $PIP $PFLOW_T port $PPORT"
+                     $IPT -A $chain -p $PTYPE -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j ACCEPT
+                     if [ "$USE_IPV6" == "1" ]; then
+                        $IP6T -A $chain -m state --state NEW -p $PTYPE -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j ACCEPT
+                     fi
+                  fi
+               fi
+            fi
+         fi
+      done
+   fi
 }
 
 
+# TODO does not support ipv6 address, but hostname ipv6 ok
 deny_hosts() {
-file=$1
-chain=$2
-if [ -z "$file" ] || [ -z "$chain" ]; then
-	eout "could not process deny_hosts $file $chain, fatal error, aborting!"
-	/etc/init.d/apf stop
-        mutex_unlock
-	exit 1
-fi
+   file=$1
+   chain=$2
+   if [ -z "$file" ] || [ -z "$chain" ]; then
+      eout "could not process deny_hosts $file $chain, fatal error, aborting!"
+      /etc/init.d/apf stop
+      mutex_unlock
+      exit 1
+   fi
 
-if [ ! "`cat $file | grep -v "#"`" == "" ]; then
-        eout "{glob} loading $file"
-        #
-        #
-        for i in `cat $file | grep -v "#" | grep -v ":" | grep -v "="`; do
-                val="$(cat /etc/apf/internals/.localaddrs | grep -w $i)"
-                if [ ! "$val" ]; then
-                 if [ ! "$i" == "" ] && [ -f "$file" ]; then
-                        eout "{trust} deny all to/from $i"
-                        $IPT -A $chain -s $i -d 0/0 -j $ALL_STOP
-                        $IPT -A $chain -d $i -s 0/0 -j $ALL_STOP
-                 fi
-		fi
-        done
-        #
-        #
-	for i in `cat $file | grep -v "#" | grep ":" | grep "=" | grep -vw in | grep -vw out | grep -v tcp | grep -v udp`; do
-                if [ ! "$i" == "" ] && [ -f "$file" ]; then
+   if [ ! "`cat $file | grep -v "#"`" == "" ]; then
+      eout "{glob} loading $file"
+      #
+      #
+      for i in `cat $file | grep -v "#" | grep -v ":" | grep -v "="`; do
+         val="$(cat /etc/apf/internals/.localaddrs | grep -w $i)"
+         if [ ! "$val" ]; then
+            if [ ! "$i" == "" ] && [ -f "$file" ]; then
+               eout "{trust} deny all to/from $i"
+               $IPT -A $chain -s $i -d 0/0 -j $ALL_STOP
+               $IPT -A $chain -d $i -s 0/0 -j $ALL_STOP
+               if [ "$USE_IPV6" == "1" ]; then
+                  subnet=`echo $i | awk -F'/' '{print $1}'`
+                  if [[ $subnet =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+                     eout "ignoring ipv4 address $i"
+                     continue
+                  fi
+                  $IP6T -A $chain -m state --state NEW -s $i -d 0/0 -j $ALL_STOP
+                  $IP6T -A $chain -m state --state NEW -d $i -s 0/0 -j $ALL_STOP
+               fi
+            fi
+         fi
+      done
+      #
+      #
+      for i in `cat $file | grep -v "#" | grep ":" | grep "=" | grep -vw in | grep -vw out | grep -v tcp | grep -v udp`; do
+         if [ ! "$i" == "" ] && [ -f "$file" ]; then
 
-                        PFLOW=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$1}'`
-                        if [ "$PFLOW" == "s" ]; then
-                                PFLOW="sport"
-                                PFLOW_T="from"
-                        elif [ "$PFLOW" == "d" ]; then
-                                PFLOW="dport"
-                                PFLOW_T="to"
-                        fi
-                        PPORT=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$2}'`
-                        if [ ! "$(echo $PPORT | grep _)" == "" ]; then
-                                PPORT_BEG=`echo $PPORT | tr '_' ' ' | awk '{print$1}'`
-                                PPORT_END=`echo $PPORT | tr '_' ' ' | awk '{print$2}'`
-                                PPORT="$PPORT_BEG:$PPORT_END"
-                        fi
+            PFLOW=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$1}'`
+            if [ "$PFLOW" == "s" ]; then
+               PFLOW="sport"
+               PFLOW_T="from"
+            elif [ "$PFLOW" == "d" ]; then
+               PFLOW="dport"
+               PFLOW_T="to"
+            fi
 
-                        IPFLOW=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$3}'`
-                        if [ "$IPFLOW" == "s" ]; then
-                                IPFLOW="s"
-                        elif [ "$IPFLOW" == "d" ]; then
-                                IPFLOW="d"
-                        fi
-                        PIP=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$4}'`
+            PPORT=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$2}'`
+            if [ ! "$(echo $PPORT | grep _)" == "" ]; then
+               PPORT_BEG=`echo $PPORT | tr '_' ' ' | awk '{print$1}'`
+               PPORT_END=`echo $PPORT | tr '_' ' ' | awk '{print$2}'`
+               PPORT="$PPORT_BEG:$PPORT_END"
+            fi
 
-                        if [ ! "$IPFLOW" == "" ] && [ ! "$PIP" == "" ] && [ ! "$IPFLOW" == "" ] && [ ! "$PPORT" == "" ]; then
-                                eout "{trust} deny $PIP $PFLOW_T port $PPORT"
-                                $IPT -A $chain -p tcp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j $TCP_STOP
-				$IPT -A $chain -p udp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j $UDP_STOP
-                        fi
-                fi
-        done
-        #
-        #
-        for i in `cat $file | grep -v "#" | grep ":" | grep "=" | grep -v "tcp" | grep -v "udp"`; do
-                if [ ! "$i" == "" ] && [ -f "$file" ]; then
+            IPFLOW=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$3}'`
+            if [ "$IPFLOW" == "s" ]; then
+               IPFLOW="s"
+            elif [ "$IPFLOW" == "d" ]; then
+               IPFLOW="d"
+            fi
 
-                        NFLOW=`echo $i | tr ':' ' ' | tr '=' ' '| awk '{print$1}'`
-                        if [ "$NFLOW" == "in" ]; then
-                                NFLOW="INPUT"
-                                NFLOW_T="inbound"
-                        elif [ "$NFLOW" == "out" ]; then
-                                NFLOW="OUTPUT"
-                                NFLOW_T="outbound"
-                        fi
+            PIP=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$4}'`
+            if [ ! "$IPFLOW" == "" ] && [ ! "$PIP" == "" ] && [ ! "$IPFLOW" == "" ] && [ ! "$PPORT" == "" ]; then
+               eout "{trust} deny $PIP $PFLOW_T port $PPORT"
+               $IPT -A $chain -p tcp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j $TCP_STOP
+               $IPT -A $chain -p udp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j $UDP_STOP
+               if [ "$USE_IPV6" == "1" ]; then
+                  $IP6T -A $chain -m state --state NEW -m tcp -p tcp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j ACCEPT
+                  $IP6T -A $chain -m state --state NEW -m udp -p udp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j ACCEPT
+               fi
+            fi
+         fi
+      done
+      #
+      #
+      for i in `cat $file | grep -v "#" | grep ":" | grep "=" | grep -v "tcp" | grep -v "udp"`; do
+         if [ ! "$i" == "" ] && [ -f "$file" ]; then
 
-                        PFLOW=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$2}'`
-                        if [ "$PFLOW" == "s" ]; then
-                                PFLOW="sport"
-                                PFLOW_T="from"
-                        elif [ "$PFLOW" == "d" ]; then
-                                PFLOW="dport"
-                                PFLOW_T="to"
-                        fi
+            NFLOW=`echo $i | tr ':' ' ' | tr '=' ' '| awk '{print$1}'`
+            if [ "$NFLOW" == "in" ]; then
+               NFLOW="INPUT"
+               NFLOW_T="inbound"
+            elif [ "$NFLOW" == "out" ]; then
+               NFLOW="OUTPUT"
+               NFLOW_T="outbound"
+            fi
 
-                        PPORT=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$3}'`
-                        if [ ! "$(echo $PPORT | grep _)" == "" ]; then
-                                PPORT_BEG=`echo $PPORT | tr '_' ' ' | awk '{print$1}'`
-                                PPORT_END=`echo $PPORT | tr '_' ' ' | awk '{print$2}'`
-                                PPORT="$PPORT_BEG:$PPORT_END"
-                        fi
+            PFLOW=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$2}'`
+            if [ "$PFLOW" == "s" ]; then
+               PFLOW="sport"
+               PFLOW_T="from"
+            elif [ "$PFLOW" == "d" ]; then
+               PFLOW="dport"
+               PFLOW_T="to"
+            fi
 
-                        IPFLOW=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$4}'`
-                        if [ "$IPFLOW" == "s" ]; then
-                                IPFLOW="s"
-                        elif [ "$IPFLOW" == "d" ]; then
-                                IPFLOW="d"
-                        fi
-                        PIP=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$5}'`
+            PPORT=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$3}'`
+            if [ ! "$(echo $PPORT | grep _)" == "" ]; then
+               PPORT_BEG=`echo $PPORT | tr '_' ' ' | awk '{print$1}'`
+               PPORT_END=`echo $PPORT | tr '_' ' ' | awk '{print$2}'`
+               PPORT="$PPORT_BEG:$PPORT_END"
+            fi
 
-                        if [ ! "$NFLOW" == "" ] && [ ! "$IPFLOW" == "" ] && [ ! "$PIP" == "" ] && [ ! "$IPFLOW" == "" ] && [ ! "$PPORT" == "" ]; then
-                                eout "{trust} deny ($NFLOW_T) $PIP $PFLOW_T port $PPORT"
-                                $IPT -A $chain -p tcp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j $TCP_STOP
-				$IPT -A $chain -p udp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j $UDP_STOP
-                        fi
-                fi
-        done
-        #
-        #
-        for i in `cat $file | grep -v "#" | grep ":" | grep "="`; do
-                if [ ! "$i" == "" ] && [ -f "$file" ]; then
+            IPFLOW=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$4}'`
+            if [ "$IPFLOW" == "s" ]; then
+               IPFLOW="s"
+            elif [ "$IPFLOW" == "d" ]; then
+               IPFLOW="d"
+            fi
 
-                        PTYPE=`echo $i | tr ':' ' ' | tr '=' ' '| awk '{print$1}'`
-                        if [ "$PTYPE" == "tcp" ]; then
-                                PTYPE="tcp"
-                        elif [ "$PTYPE" == "udp" ]; then
-                                PTYPE="udp"
-                        fi
+            PIP=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$5}'`
+            if [ ! "$NFLOW" == "" ] && [ ! "$IPFLOW" == "" ] && [ ! "$PIP" == "" ] && [ ! "$IPFLOW" == "" ] && [ ! "$PPORT" == "" ]; then
+               eout "{trust} deny ($NFLOW_T) $PIP $PFLOW_T port $PPORT"
+               $IPT -A $chain -p tcp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j $TCP_STOP
+               $IPT -A $chain -p udp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j $UDP_STOP
+               if [ "$USE_IPV6" == "1" ]; then
+                  $IP6T -A $chain -m state --state NEW -p tcp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j $TCP_STOP
+                  $IP6T -A $chain -m state --state NEW -p udp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j $UDP_STOP
+               fi
+            fi
+         fi
+      done
+      #
+      #
+      for i in `cat $file | grep -v "#" | grep ":" | grep "="`; do
+         if [ ! "$i" == "" ] && [ -f "$file" ]; then
 
-                        NFLOW=`echo $i | tr ':' ' ' | tr '=' ' '| awk '{print$2}'`
-                        if [ "$NFLOW" == "in" ]; then
-                                NFLOW="INPUT"
-                                NFLOW_T="inbound"
-                        elif [ "$NFLOW" == "out" ]; then
-                                NFLOW="OUTPUT"
-                                NFLOW_T="outbound"
-                        fi
+            PTYPE=`echo $i | tr ':' ' ' | tr '=' ' '| awk '{print$1}'`
+            if [ "$PTYPE" == "tcp" ]; then
+               PTYPE="tcp"
+            elif [ "$PTYPE" == "udp" ]; then
+               PTYPE="udp"
+            fi
 
-                        PFLOW=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$3}'`
-                        if [ "$PFLOW" == "s" ]; then
-                                PFLOW="sport"
-                                PFLOW_T="from"
-                        elif [ "$PFLOW" == "d" ]; then
-                                PFLOW="dport"
-                                PFLOW_T="to"
-                        fi
+            NFLOW=`echo $i | tr ':' ' ' | tr '=' ' '| awk '{print$2}'`
+            if [ "$NFLOW" == "in" ]; then
+               NFLOW="INPUT"
+               NFLOW_T="inbound"
+            elif [ "$NFLOW" == "out" ]; then
+               NFLOW="OUTPUT"
+               NFLOW_T="outbound"
+            fi
 
-                        PPORT=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$4}'`
-                        if [ ! "$(echo $PPORT | grep _)" == "" ]; then
-                                PPORT_BEG=`echo $PPORT | tr '_' ' ' | awk '{print$1}'`
-                                PPORT_END=`echo $PPORT | tr '_' ' ' | awk '{print$2}'`
-                                PPORT="$PPORT_BEG:$PPORT_END"
-                        fi
+            PFLOW=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$3}'`
+            if [ "$PFLOW" == "s" ]; then
+               PFLOW="sport"
+               PFLOW_T="from"
+            elif [ "$PFLOW" == "d" ]; then
+               PFLOW="dport"
+               PFLOW_T="to"
+            fi
 
-                        IPFLOW=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$5}'`
-                        if [ "$IPFLOW" == "s" ]; then
-                                IPFLOW="s"
-                        elif [ "$IPFLOW" == "d" ]; then
-                                IPFLOW="d"
-                        fi
-                        PIP=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$6}'`
+            PPORT=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$4}'`
+            if [ ! "$(echo $PPORT | grep _)" == "" ]; then
+               PPORT_BEG=`echo $PPORT | tr '_' ' ' | awk '{print$1}'`
+               PPORT_END=`echo $PPORT | tr '_' ' ' | awk '{print$2}'`
+               PPORT="$PPORT_BEG:$PPORT_END"
+            fi
 
-                        if [ ! "$PTYPE" == "" ] && [ ! "$NFLOW" == "" ] && [ ! "$IPFLOW" == "" ] && [ ! "$PIP" == "" ] && [ ! "$IPFLOW" == "" ] && [ ! "$PPORT" == "" ]; then
-				if [ "$PTYPE" == "tcp" ]; then
-        	                        eout "{trust} deny $NFLOW_T $PTYPE $PIP $PFLOW_T port $PPORT"
-	                                $IPT -A $chain -p $PTYPE -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j $TCP_STOP
-				elif [ "$PTYPE" == "udp" ]; then
-	                                eout "{trust} deny $NFLOW_T $PTYPE $PIP $PFLOW_T port $PPORT"
-					$IPT -A $chain -p $PTYPE -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j $UDP_STOP
-				fi
-                        fi
-                fi
-        done
-fi
+            IPFLOW=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$5}'`
+            if [ "$IPFLOW" == "s" ]; then
+               IPFLOW="s"
+            elif [ "$IPFLOW" == "d" ]; then
+               IPFLOW="d"
+            fi
+
+            PIP=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$6}'`
+            if [ ! "$PTYPE" == "" ] && [ ! "$NFLOW" == "" ] && [ ! "$IPFLOW" == "" ] && [ ! "$PIP" == "" ] && [ ! "$IPFLOW" == "" ] && [ ! "$PPORT" == "" ]; then
+               if [ "$PTYPE" == "tcp" ]; then
+                  eout "{trust} deny $NFLOW_T $PTYPE $PIP $PFLOW_T port $PPORT"
+                  $IPT -A $chain -p $PTYPE -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j $TCP_STOP
+                  if [ "$USE_IPV6" == "1" ]; then
+                     $IP6T -A $chain -m state --state NEW -p $PTYPE -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j $TCP_STOP
+                  fi
+               elif [ "$PTYPE" == "udp" ]; then
+                  eout "{trust} deny $NFLOW_T $PTYPE $PIP $PFLOW_T port $PPORT"
+                  $IPT -A $chain -p $PTYPE -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j $UDP_STOP
+                  if [ "$USE_IPV6" == "1" ]; then
+                     $IP6T -A $chain -m state --state NEW -p $PTYPE -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j $UDP_STOP
+                  fi
+               fi
+            fi
+         fi
+      done
+   fi
 }
 
 
@@ -1143,6 +1198,12 @@ refresh() {
         $IPT -F TGDENY
         $IPT -F TALLOW
         $IPT -F TGALLOW
+        if [ $USE_IPV6 == "1" ]; then
+           $IP6T -F TDENY
+           $IP6T -F TGDENY
+           $IP6T -F TALLOW
+           $IP6T -F TGALLOW
+        fi
 	allow_hosts $GALLOW_HOSTS TGALLOW
 	allow_hosts $ALLOW_HOSTS TALLOW
 	deny_hosts $GDENY_HOSTS TGDENY

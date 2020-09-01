@@ -36,6 +36,15 @@ elif [ -f "$ip" ]; then
         . $INSTALL_PATH/vnet/vnetgen.def
   fi
  done
+ if [ "$USE_IPV6" == "1" ]; then
+    for addr in `$ip addr list $IFACE_UNTRUSTED | tr '/' ' ' | grep -w inet6 | grep global | grep -vw $IP6_NET | awk '{print$2}'`; do
+      if [ ! -f "$INSTALL_PATH/vnet/$addr.rules" ]; then
+        touch $INSTALL_PATH/vnet/$addr.rules
+        chmod 600 $INSTALL_PATH/vnet/$addr.rules
+        . $INSTALL_PATH/vnet/vnetgen.def
+      fi
+    done
+ fi
 elif [ -f "$ifconfig" ]; then
 for iface in `ifconfig | grep -w $IF | awk '{print$1}'`; do
   for addr in `ifconfig $iface | grep -w inet | tr ':' ' ' | grep -vw $NET | awk '{print$3}'`; do
