@@ -367,6 +367,7 @@ ovars() {
 	nice -n 16 cat /etc/apf/conf.apf /etc/apf/internals/internals.conf | grep -v "#" | grep "=" | tr '=' ' ' | awk '{print""$"$1"}'
 }
 
+# TODO does not support ipv6 address, but hostname ipv6 ok
 allow_hosts() {
    file="$1"
    chain="$2"
@@ -572,6 +573,7 @@ allow_hosts() {
 }
 
 
+# TODO does not support ipv6 address, but hostname ipv6 ok
 deny_hosts() {
    file=$1
    chain=$2
