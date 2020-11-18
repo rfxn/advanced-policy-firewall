@@ -1,3 +1,9 @@
+- 1.7.6-2 | Nov 18 2020:
+[New] add iptables locking support with iptables >= 1.4.20; pr #36
+      IPT_LOCK_SUPPORT
+      IPT_LOCK_TIMEOUT
+[Fix] typos
+
 - 1.7.6-1 | Jun 18 2019:
 [New] add mitigation options for TCP SACK Panic vulnerability
       SYSCTL_TCP_NOSACK and BLK_TCP_SACK_PANIC added to conf.apf
