@@ -564,6 +564,11 @@ LOG_RATE="$LOG_RATE"
 # sends outputs to this file
 LOG_APF="$LOG_APF"
 
+# Adds -w flag to iptables to enable locking support. This is only available
+# on iptables >= 1.4.20, but if supported you probably want this.
+IPT_LOCK_SUPPORT="$IPT_LOCK_SUPPORT"
+IPT_LOCK_TIMEOUT="$IPT_LOCK_TIMEOUT"
+
 ##
 # [Import misc. conf]
 ##
