@@ -65,7 +65,7 @@ if [ "$SYSCTL_TCP" == "1" ]; then
 	echo 1 > /proc/sys/net/ipv4/tcp_tw_reuse
 	echo 1 > /proc/sys/net/ipv4/tcp_window_scaling
 	echo 0 > /proc/sys/net/ipv4/tcp_timestamps
-	if [ "$SYSCTL_TCP_NOSACK" ]; then
+	if [ "$SYSCTL_TCP_NOSACK" == "1" ]; then
 		echo 0 > /proc/sys/net/ipv4/tcp_sack
 	else
 		echo 1 > /proc/sys/net/ipv4/tcp_sack
