@@ -58,33 +58,41 @@ done
 fi
 
 
-if [ "$SET_ADDIFACE" == "1" ]; then
- ## associate a vnet rule for ip's on additional interfaces other than the main
- for anet in `ifconfig | grep Link | grep -vwE "inet|inet6|lo|$IFACE_UNTRUSTED|$IFACE_UNTRUSTED" | awk '{print$1}'`; do
-  if [ -f "$ip" ]; then
-  valtif=`echo $TIF | grep $anet`
-   if [ "$valtif" == "" ]; then
-    for addr in `/sbin/ip addr list | tr '/' ' ' | grep -w inet | grep -w $anet | grep -v 127.0.0.1 | grep -vw $NET | awk '{print$2}'`; do
-     if [ ! -f "$INSTALL_PATH/vnet/$addr.rules" ]; then
-        touch $INSTALL_PATH/vnet/$addr.rules
-        chmod 600 $INSTALL_PATH/vnet/$addr.rules
-        . $INSTALL_PATH/vnet/vnetgen.def
-     fi
-    done
-   fi
-  elif [ -f "$ifconfig" ]; then
-   for iface in `ifconfig | grep -w $anet | awk '{print$1}'`; do
-    valtif=`echo $TIF | grep $anet`
-    if [ "$valtif" == "" ]; then 
-     for addr in `ifconfig $iface | grep -w inet | tr ':' ' ' | grep -vw $NET | awk '{print$3}'`; do
-      if [ ! -f "$INSTALL_PATH/vnet/$addr.rules" ]; then
-        touch $INSTALL_PATH/vnet/$addr.rules
-        chmod 600 $INSTALL_PATH/vnet/$addr.rules
-        . $INSTALL_PATH/vnet/vnetgen.def
-      fi
-     done
-    fi
-   done
+# use ip as default as newer linux tend to not use ifconfig anymore
+if [ -f "$ip" ]; then
+  SEARCH_IFACES=$(ip link | grep -w mtu | tr ": " " " | awk '{print $2}' | grep -vwE "lo|$IFACE_UNTRUSTED")
+elif [ -f "$ifconfig" ]; then
+  # ifconfig changed from old versions (Ubuntu 12 maybe 14), which contains "Link" on interface lines.
+  # On newer ifconfig (Ubuntu 16+) ifconfig line contains "mtu" on interface lines
+  ifconfig | grep -q Link
+  if [[ $? -eq 0 ]]; then
+      SEARCH_IFACES=$(ifconfig | grep Link | grep -vwE "inet|inet6|lo|$IFACE_UNTRUSTED" | awk '{print$1}')
+  else
+      SEARCH_IFACES=$(ifconfig | grep mtu | grep -vwE "inet|inet6|lo|$IFACE_UNTRUSTED" | tr ":" " " | awk '{print$1}')
   fi
- done
+fi
+
+if [ "$SET_ADDIFACE" == "1" ]; then
+  ## associate a vnet rule for ip's on additional interfaces other than the main
+  for anet in $SEARCH_IFACES; do
+    if [ -f "$ip" ]; then
+      for addr in `/sbin/ip addr list | tr '/' ' ' | grep -w inet | grep -w $anet | grep -v 127.0.0.1 | grep -vw $NET | awk '{print$2}'`; do
+        if [ ! -f "$INSTALL_PATH/vnet/$addr.rules" ]; then
+          touch $INSTALL_PATH/vnet/$addr.rules
+          chmod 600 $INSTALL_PATH/vnet/$addr.rules
+          . $INSTALL_PATH/vnet/vnetgen.def
+        fi
+      done
+    elif [ -f "$ifconfig" ]; then
+      for iface in `ifconfig | grep -w $anet | awk '{print$1}'`; do
+        for addr in `ifconfig $iface | grep -w inet | tr ':' ' ' | grep -vw $NET | awk '{print$3}'`; do
+          if [ ! -f "$INSTALL_PATH/vnet/$addr.rules" ]; then
+            touch $INSTALL_PATH/vnet/$addr.rules
+            chmod 600 $INSTALL_PATH/vnet/$addr.rules
+            . $INSTALL_PATH/vnet/vnetgen.def
+          fi
+        done
+      done
+    fi
+  done
 fi
