@@ -156,8 +156,8 @@ RAB_TRIP="1"
 # The use of LOG_DROP variable set to 1 will override this to force logging.
 RAB_LOG_HIT="1"
 
-# This controls if the firewall should log all subsiqent traffic from an address
-# that is already blocked for a violation hit, this can generate allot of logs.
+# This controls if the firewall should log all subsequent traffic from an address
+# that is already blocked for a violation hit, this can generate a lot of logs.
 # The use of LOG_DROP variable set to 1 will override this to force logging.
 RAB_LOG_TRIP="0"
 

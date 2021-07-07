@@ -138,6 +138,22 @@ $IPT $IPT_FLAGS -A OUTPUT -j TDENY
 $IPT $IPT_FLAGS -A INPUT -j TGDENY
 $IPT $IPT_FLAGS -A OUTPUT -j TGDENY
 
+if [ "$USE_IPV6" = "1" ]; then
+  $IP6T -N TALLOW
+  $IP6T -N TDENY
+  $IP6T -N TGALLOW
+  $IP6T -N TGDENY
+
+  $IP6T -A INPUT -j TALLOW
+  $IP6T -A OUTPUT -j TALLOW
+  $IP6T -A INPUT -j TGALLOW
+  $IP6T -A OUTPUT -j TGALLOW
+  $IP6T -A INPUT -j TDENY
+  $IP6T -A OUTPUT -j TDENY
+  $IP6T -A INPUT -j TGDENY
+  $IP6T -A OUTPUT -j TGDENY
+fi
+
 # Load our Blocked Traffic rules
 . $INSTALL_PATH/bt.rules
 
@@ -217,6 +233,9 @@ cl_cports
 # Load our main TCP/UDP rules
 if [ "$SET_VNET" == "1" ]; then
 	VNET="$NET"
+	if [ "$USE_IPV6" == "1" ]; then
+	  VNET="$IP6_NET"
+	fi
 else
 	VNET="0/0"
 fi
@@ -228,6 +247,9 @@ $IPT $IPT_FLAGS -A INPUT  -p tcp -m state --state ESTABLISHED,RELATED -j ACCEPT
 $IPT $IPT_FLAGS -A INPUT  -p udp -m state --state ESTABLISHED,RELATED -j ACCEPT
 $IPT $IPT_FLAGS -A OUTPUT  -p tcp --dport 1024:65535 -m state --state ESTABLISHED,RELATED -j ACCEPT
 $IPT $IPT_FLAGS -A OUTPUT  -p udp --dport 1024:65535 -m state --state ESTABLISHED,RELATED -j ACCEPT
+if [ "$USE_IPV6" == "1" ]; then
+	$IP6T -A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+fi
 
 # DNS
 if [ -f "/etc/resolv.conf" ] && [ "$RESV_DNS" == "1" ]; then
@@ -271,6 +293,10 @@ if [ "$HELPER_SSH" == "1" ]; then
 	$IPT $IPT_FLAGS -A INPUT  -p tcp --sport $HELPER_SSH_PORT --dport 513:65535 -m state --state ESTABLISHED,RELATED -j ACCEPT
 	$IPT $IPT_FLAGS -A INPUT  -p tcp --sport 1024:65535 --dport $HELPER_SSH_PORT --syn -m state --state ESTABLISHED,RELATED -j ACCEPT
 	$IPT $IPT_FLAGS -A INPUT  -p udp --dport $HELPER_SSH_PORT -m state --state ESTABLISHED -j ACCEPT
+
+	if [ "$USE_IPV6" == "1" ]; then
+                $IP6T -A INPUT -m state --state NEW -m tcp -p tcp --dport $HELPER_SSH_PORT -j ACCEPT
+        fi
 fi
 
 # Traceroute
@@ -319,3 +345,8 @@ eout "{glob} default (ingress) input drop"
 $IPT $IPT_FLAGS -A INPUT -p tcp -j $TCP_STOP
 $IPT $IPT_FLAGS -A INPUT -p udp -j $UDP_STOP
 $IPT $IPT_FLAGS -A INPUT -p all -j $ALL_STOP
+if [ "$USE_IPV6" == "1" ]; then
+        $IP6T -A INPUT -p tcp -j $TCP_STOP
+        $IP6T -A INPUT -p udp -j $UDP_STOP
+        $IP6T -A INPUT -p all -j $ALL_STOP
+fi
