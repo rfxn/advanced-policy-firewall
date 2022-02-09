@@ -232,18 +232,6 @@ if [ "$SET_FASTLOAD" == "1" ] && [ ! "$1" == "1" ] && [ ! "$DEVEL_ON" == "1" ] &
 	$IPTS > $INSTALL_PATH/internals/.apf.restore
 	eout "{glob} fast load snapshot saved"
 fi
-# saving existing docker rules if exists
-if [ "$SET_DOCKER" == "1" ]; then
-	eout "{glob} saving docker rules if exists"
-	$IPTS -t filter | egrep "filter|FORWARD|DOCKER|docker|COMMIT" > "$INSTALL_PATH/internals/.docker.filter"
-	if [ -s "$INSTALL_PATH/internals/.docker.filter" ]; then
-	    eout "{docker} saved docker table filter"
-	fi
-	$IPTS -t nat | egrep "\*nat|DOCKER|docker|COMMIT" > "$INSTALL_PATH/internals/.docker.nat"
-	if [ -s "$INSTALL_PATH/internals/.docker.nat" ]; then
-	    eout "{docker} saved docker table nat"
-	fi
-fi
 if [ ! "$1" = "1" ]; then
 	eout "{glob} flushing & zeroing chain policies"
 fi
