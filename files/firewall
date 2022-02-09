@@ -350,3 +350,9 @@ if [ "$USE_IPV6" == "1" ]; then
         $IP6T -A INPUT -p udp -j $UDP_STOP
         $IP6T -A INPUT -p all -j $ALL_STOP
 fi
+
+# Restarting Docker
+if [ "$SET_DOCKER" == "1" ]; then
+        eout "{glob} restarting docker"
+	service docker restart
+fi
