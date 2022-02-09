@@ -566,6 +566,10 @@ LOG_APF="/var/log/apf_log"
 IPT_LOCK_SUPPORT="0"
 IPT_LOCK_TIMEOUT="3"
 
+# support for docker. when apf start, docker will be restart. Because docker 
+# rules are adhoc and change as container start/stop.
+SET_DOCKER="0"
+
 ##
 # [Import misc. conf]
 ##
