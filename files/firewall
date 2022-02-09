@@ -351,15 +351,8 @@ if [ "$USE_IPV6" == "1" ]; then
         $IP6T -A INPUT -p all -j $ALL_STOP
 fi
 
-# Restoring Docker rules if exists
+# Restarting Docker
 if [ "$SET_DOCKER" == "1" ]; then
-        eout "{glob} restoring docker rules if exists"
-        if [ -f "$INSTALL_PATH/internals/.docker.filter" ]; then
-            eout "{docker} restoring docker table filter"
-            $IPTR -c -n < "$INSTALL_PATH/internals/.docker.filter"
-        fi
-        if [ -f "$INSTALL_PATH/internals/.docker.nat" ]; then
-            eout "{docker} restoring docker table nat"
-            $IPTR -c -n < "$INSTALL_PATH/internals/.docker.nat"
-        fi
+        eout "{glob} restarting docker"
+	service docker restart
 fi
