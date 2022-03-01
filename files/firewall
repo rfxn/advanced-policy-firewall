@@ -355,4 +355,5 @@ fi
 if [ "$SET_DOCKER" == "1" ]; then
         eout "{glob} restarting docker"
 	service docker restart
+	. $DOCKERR
 fi
