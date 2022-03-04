@@ -1,3 +1,14 @@
+Differences with upstream rfxn
+- support ipv6
+- support docker
+
+Disclamimer: While I'm not expert in this field, but these support
+             implementations allow me to administer current operating
+             system more effectively. If you use my fork and found
+             bug, please contact me for more information
+             at <jason@weetech.ch>
+
+
 Advanced Policy Firewall (APF) v1.7.6
     (C) 2002-2019, R-fx Networks <proj@rfxn.com>
     (C) 2019, Ryan MacDonald <ryan@rfxn.com>
