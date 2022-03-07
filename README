@@ -1,6 +1,7 @@
 Differences with upstream rfxn
 - support ipv6
 - support docker
+- support netfilter
 
 Disclamimer: While I'm not expert in this field, but these support
              implementations allow me to administer current operating
