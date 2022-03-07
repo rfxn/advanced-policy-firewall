@@ -37,6 +37,10 @@ IFACE_TRUSTED=""
 # Note: The VNET (virtual network) feature does not currently support IPv6.
 USE_IPV6="0"
 
+# If nft is detected, apf will automatically to use that. If this is set to 1
+# fallback to the old iptables to set the rulesets.
+USE_IPTABLES="0"
+
 # This option will allow for all status events to be displayed in real time on
 # the console as you use the firewall. Typically, APF used to operate silent
 # with all logging piped to $LOG_APF. The use of this option will not disable
