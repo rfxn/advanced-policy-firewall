@@ -73,11 +73,15 @@ tosroute PREROUTING
 . $PRERT
 
 # Allow all traffic on the loopback interface
-$IPT $IPT_FLAGS -A INPUT -i lo -s 0/0 -d 0/0 -j ACCEPT
-$IPT $IPT_FLAGS -A OUTPUT -o lo -s 0/0 -d 0/0 -j ACCEPT
-if [ "$USE_IPV6" == "1" ]; then
+if [ $EXECUTOR == "nft" ]; then
+   # TODO nft
+else
+   $IPT $IPT_FLAGS -A INPUT -i lo -s 0/0 -d 0/0 -j ACCEPT
+   $IPT $IPT_FLAGS -A OUTPUT -o lo -s 0/0 -d 0/0 -j ACCEPT
+   if [ "$USE_IPV6" == "1" ]; then
 	$IP6T -A INPUT -i lo -s 0/0 -d 0/0 -j ACCEPT
 	$IP6T -A OUTPUT -o lo -s 0/0 -d 0/0 -j ACCEPT
+   fi
 fi
 
 
@@ -89,23 +93,35 @@ if [ ! "$IFACE_TRUSTED" == "" ]; then
         eout "{glob} unable to verify status of interface $i; assuming untrusted"
  else
         eout "{glob} allow all to/from trusted interface $i"
-        $IPT $IPT_FLAGS -A INPUT -i $i -s 0/0 -d 0/0 -j ACCEPT
-        $IPT $IPT_FLAGS -A OUTPUT -o $i -s 0/0 -d 0/0 -j ACCEPT
+	if [ $EXECUTOR == "nft" ]; then
+           # TODO nft
+        else
+          $IPT $IPT_FLAGS -A INPUT -i $i -s 0/0 -d 0/0 -j ACCEPT
+          $IPT $IPT_FLAGS -A OUTPUT -o $i -s 0/0 -d 0/0 -j ACCEPT
+	fi
  fi
  done
 fi
 
 # Create TCP RESET & UDP PROHIBIT chains
-$IPT $IPT_FLAGS -N RESET
-$IPT $IPT_FLAGS -A RESET -p tcp -j REJECT --reject-with tcp-reset
-$IPT $IPT_FLAGS -N PROHIBIT
-$IPT $IPT_FLAGS -A PROHIBIT -j REJECT --reject-with icmp-host-prohibited
+if [ $EXECUTOR == "nft" ]; then
+   # TODO nft
+else
+   $IPT $IPT_FLAGS -N RESET
+   $IPT $IPT_FLAGS -A RESET -p tcp -j REJECT --reject-with tcp-reset
+   $IPT $IPT_FLAGS -N PROHIBIT
+   $IPT $IPT_FLAGS -A PROHIBIT -j REJECT --reject-with icmp-host-prohibited
+fi
 
 # Load our SYSCTL rules
 . $INSTALL_PATH/sysctl.rules >> /dev/null 2>&1
 
 # Fix MTU/MSS Problems
-$IPT $IPT_FLAGS -A OUTPUT -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu
+if [ $EXECUTOR == "nft" ]; then
+   # TODO nft
+else
+   $IPT $IPT_FLAGS -A OUTPUT -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu
+fi
 
 # Block common nonroutable IP networks
 if [ "$BLK_MCATNET" = "1" ]; then
@@ -122,36 +138,40 @@ if [ "$BLK_RESNET" = "1" ]; then
 fi
 
 # Create (glob)trust system chains
-$IPT $IPT_FLAGS -N TALLOW
-$IPT $IPT_FLAGS -N TDENY
-$IPT $IPT_FLAGS -N TGALLOW
-$IPT $IPT_FLAGS -N TGDENY
-$IPT $IPT_FLAGS -N REFRESH_TEMP
-$IPT $IPT_FLAGS -A INPUT -j REFRESH_TEMP
-$IPT $IPT_FLAGS -A OUTPUT -j REFRESH_TEMP
-$IPT $IPT_FLAGS -A INPUT -j TALLOW
-$IPT $IPT_FLAGS -A OUTPUT -j TALLOW
-$IPT $IPT_FLAGS -A INPUT -j TGALLOW
-$IPT $IPT_FLAGS -A OUTPUT -j TGALLOW
-$IPT $IPT_FLAGS -A INPUT -j TDENY
-$IPT $IPT_FLAGS -A OUTPUT -j TDENY
-$IPT $IPT_FLAGS -A INPUT -j TGDENY
-$IPT $IPT_FLAGS -A OUTPUT -j TGDENY
+if [ $EXECUTOR == "nft" ]; then
+  # TODO nft
+else
+  $IPT $IPT_FLAGS -N TALLOW
+  $IPT $IPT_FLAGS -N TDENY
+  $IPT $IPT_FLAGS -N TGALLOW
+  $IPT $IPT_FLAGS -N TGDENY
+  $IPT $IPT_FLAGS -N REFRESH_TEMP
+  $IPT $IPT_FLAGS -A INPUT -j REFRESH_TEMP
+  $IPT $IPT_FLAGS -A OUTPUT -j REFRESH_TEMP
+  $IPT $IPT_FLAGS -A INPUT -j TALLOW
+  $IPT $IPT_FLAGS -A OUTPUT -j TALLOW
+  $IPT $IPT_FLAGS -A INPUT -j TGALLOW
+  $IPT $IPT_FLAGS -A OUTPUT -j TGALLOW
+  $IPT $IPT_FLAGS -A INPUT -j TDENY
+  $IPT $IPT_FLAGS -A OUTPUT -j TDENY
+  $IPT $IPT_FLAGS -A INPUT -j TGDENY
+  $IPT $IPT_FLAGS -A OUTPUT -j TGDENY
 
-if [ "$USE_IPV6" = "1" ]; then
-  $IP6T -N TALLOW
-  $IP6T -N TDENY
-  $IP6T -N TGALLOW
-  $IP6T -N TGDENY
+  if [ "$USE_IPV6" = "1" ]; then
+    $IP6T -N TALLOW
+    $IP6T -N TDENY
+    $IP6T -N TGALLOW
+    $IP6T -N TGDENY
 
-  $IP6T -A INPUT -j TALLOW
-  $IP6T -A OUTPUT -j TALLOW
-  $IP6T -A INPUT -j TGALLOW
-  $IP6T -A OUTPUT -j TGALLOW
-  $IP6T -A INPUT -j TDENY
-  $IP6T -A OUTPUT -j TDENY
-  $IP6T -A INPUT -j TGDENY
-  $IP6T -A OUTPUT -j TGDENY
+    $IP6T -A INPUT -j TALLOW
+    $IP6T -A OUTPUT -j TALLOW
+    $IP6T -A INPUT -j TGALLOW
+    $IP6T -A OUTPUT -j TGALLOW
+    $IP6T -A INPUT -j TDENY
+    $IP6T -A OUTPUT -j TDENY
+    $IP6T -A INPUT -j TGDENY
+    $IP6T -A OUTPUT -j TGDENY
+  fi
 fi
 
 # Load our Blocked Traffic rules
@@ -180,9 +200,17 @@ if [ "$RAB" == "1" ]; then
  fi
 
  if [ "$LOG_DROP" == "1" ] || [ "$RAB_LOG_TRIP" == "1" ]; then
-	$IPT $IPT_FLAGS -A INPUT -p all -m recent --rcheck --hitcount $RAB_HITCOUNT --seconds $RAB_TIMER -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** RABTRIP ** "
+	if [ $EXECUTOR == "nft" ]; then
+           # TODO nft
+        else
+	   $IPT $IPT_FLAGS -A INPUT -p all -m recent --rcheck --hitcount $RAB_HITCOUNT --seconds $RAB_TIMER -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** RABTRIP ** "
+        fi
  fi
- $IPT $IPT_FLAGS -A INPUT -p all -m recent $RAB_TRIP_FLAGS --hitcount $RAB_HITCOUNT --seconds $RAB_TIMER -j $ALL_STOP
+ if [ $EXECUTOR == "nft" ]; then
+    # TODO nft
+ else
+    $IPT $IPT_FLAGS -A INPUT -p all -m recent $RAB_TRIP_FLAGS --hitcount $RAB_HITCOUNT --seconds $RAB_TIMER -j $ALL_STOP
+ fi
 
  # RAB portscan rules
  if [ ! "$RAB_PSCAN_LEVEL" == "0" ] || [ ! "$RAB_PSCAN_LEVEL" == "" ]; then
@@ -198,22 +226,42 @@ if [ "$RAB" == "1" ]; then
   RAB_PSCAN_PORTS="$RAB_PSCAN_LEVEL_3"
   esac
   eout "{rab} RAB_PSCAN monitored ports $RAB_PSCAN_PORTS"
-  $IPT $IPT_FLAGS -N RABPSCAN
+  if [ $EXECUTOR == "nft" ]; then
+     # TODO nft
+  else
+     $IPT $IPT_FLAGS -N RABPSCAN
+  fi
   LDNS=`cat /etc/resolv.conf  | grep -v "#" | grep -w nameserver | awk '{print$2}' | grep -v 127.0.0.1`
   if [ "$LDNS" ]; then
 	for i in `echo $LDNS`; do
-		$IPT $IPT_FLAGS -I RABPSCAN -s $i -j RETURN
+	        if [ $EXECUTOR == "nft" ]; then
+                   # TODO nft
+                else
+		   $IPT $IPT_FLAGS -I RABPSCAN -s $i -j RETURN
+		fi
 	done
   fi
   for i in `echo $RAB_PSCAN_PORTS | tr ',' ' '`; do
    if [ "$LOG_DROP" == "1" ] || [ "$RAB_LOG_HIT" == "1" ]; then
-	   $IPT $IPT_FLAGS -A RABPSCAN -p tcp --dport $i -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** RABHIT ** "
-	   $IPT $IPT_FLAGS -A RABPSCAN -p udp --dport $i -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** RABHIT ** "
+	   if [ $EXECUTOR == "nft" ]; then
+              # TODO nft
+           else
+	      $IPT $IPT_FLAGS -A RABPSCAN -p tcp --dport $i -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** RABHIT ** "
+	      $IPT $IPT_FLAGS -A RABPSCAN -p udp --dport $i -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** RABHIT ** "
+	   fi
    fi
-   $IPT $IPT_FLAGS -A RABPSCAN -p tcp --dport $i -m recent --set -j $TCP_STOP
-   $IPT $IPT_FLAGS -A RABPSCAN -p udp --dport $i -m recent --set -j $UDP_STOP
+   if [ $EXECUTOR == "nft" ]; then
+      # TODO nft
+   else
+      $IPT $IPT_FLAGS -A RABPSCAN -p tcp --dport $i -m recent --set -j $TCP_STOP
+      $IPT $IPT_FLAGS -A RABPSCAN -p udp --dport $i -m recent --set -j $UDP_STOP
+   fi
   done
-  $IPT $IPT_FLAGS -A INPUT -j RABPSCAN
+  if [ $EXECUTOR == "nft" ]; then
+     # TODO nft
+  else
+     $IPT $IPT_FLAGS -A INPUT -j RABPSCAN
+  fi
  fi
 fi
 
@@ -242,13 +290,17 @@ fi
 . $INSTALL_PATH/main.rules
 
 # Drop NEW tcp connections after this point
-$IPT $IPT_FLAGS -A INPUT  -p tcp ! --syn -m state --state NEW -j $ALL_STOP
-$IPT $IPT_FLAGS -A INPUT  -p tcp -m state --state ESTABLISHED,RELATED -j ACCEPT
-$IPT $IPT_FLAGS -A INPUT  -p udp -m state --state ESTABLISHED,RELATED -j ACCEPT
-$IPT $IPT_FLAGS -A OUTPUT  -p tcp --dport 1024:65535 -m state --state ESTABLISHED,RELATED -j ACCEPT
-$IPT $IPT_FLAGS -A OUTPUT  -p udp --dport 1024:65535 -m state --state ESTABLISHED,RELATED -j ACCEPT
-if [ "$USE_IPV6" == "1" ]; then
+if [ $EXECUTOR == "nft" ]; then
+   # TODO nft
+else
+   $IPT $IPT_FLAGS -A INPUT  -p tcp ! --syn -m state --state NEW -j $ALL_STOP
+   $IPT $IPT_FLAGS -A INPUT  -p tcp -m state --state ESTABLISHED,RELATED -j ACCEPT
+   $IPT $IPT_FLAGS -A INPUT  -p udp -m state --state ESTABLISHED,RELATED -j ACCEPT
+   $IPT $IPT_FLAGS -A OUTPUT  -p tcp --dport 1024:65535 -m state --state ESTABLISHED,RELATED -j ACCEPT
+   $IPT $IPT_FLAGS -A OUTPUT  -p udp --dport 1024:65535 -m state --state ESTABLISHED,RELATED -j ACCEPT
+   if [ "$USE_IPV6" == "1" ]; then
 	$IP6T -A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+   fi
 fi
 
 # DNS
@@ -257,65 +309,97 @@ LDNS=`cat /etc/resolv.conf  | grep -v "#" | grep -w nameserver | awk '{print$2}'
   if [ ! "$LDNS" == "" ]; then
         for i in `echo $LDNS`; do
         eout "{glob} resolv dns discovery for $i"
-        $IPT $IPT_FLAGS -A INPUT -p udp -s $i --sport 53 --dport 1023:65535 -j ACCEPT
-        $IPT $IPT_FLAGS -A INPUT -p tcp -s $i --sport 53 --dport 1023:65535 -j ACCEPT
-        $IPT $IPT_FLAGS -A OUTPUT -p udp -d $i --dport 53 --sport 1023:65535 -j ACCEPT
-        $IPT $IPT_FLAGS -A OUTPUT -p tcp -d $i --dport 53 --sport 1023:65535 -j ACCEPT
-        if [ "$RESV_DNS_DROP" == "1" ]; then
+	if [ $EXECUTOR == "nft" ]; then
+           # TODO nft
+        else
+           $IPT $IPT_FLAGS -A INPUT -p udp -s $i --sport 53 --dport 1023:65535 -j ACCEPT
+           $IPT $IPT_FLAGS -A INPUT -p tcp -s $i --sport 53 --dport 1023:65535 -j ACCEPT
+           $IPT $IPT_FLAGS -A OUTPUT -p udp -d $i --dport 53 --sport 1023:65535 -j ACCEPT
+           $IPT $IPT_FLAGS -A OUTPUT -p tcp -d $i --dport 53 --sport 1023:65535 -j ACCEPT
+           if [ "$RESV_DNS_DROP" == "1" ]; then
                 $IPT $IPT_FLAGS -A OUTPUT -p udp -d $i --dport 53 --sport 1023:65535 -j ACCEPT
                 $IPT $IPT_FLAGS -A OUTPUT -p tcp -d $i --dport 53 --sport 1023:65535 -j ACCEPT
-        fi
+           fi
+	fi
         done
-        if [ "$RESV_DNS_DROP" == "1" ]; then
-                $IPT $IPT_FLAGS -A INPUT  -p tcp -s 0/0 --sport 53 --dport 1023:65535 -j $ALL_STOP
-                $IPT $IPT_FLAGS -A INPUT  -p udp -s 0/0 --sport 53 --dport 1023:65535 -j $ALL_STOP
-        fi
+	if [ $EXECUTOR == "nft" ]; then
+           # TODO nft
+        else
+           if [ "$RESV_DNS_DROP" == "1" ]; then
+                   $IPT $IPT_FLAGS -A INPUT  -p tcp -s 0/0 --sport 53 --dport 1023:65535 -j $ALL_STOP
+                   $IPT $IPT_FLAGS -A INPUT  -p udp -s 0/0 --sport 53 --dport 1023:65535 -j $ALL_STOP
+           fi
+	fi
   fi
 else
-        $IPT $IPT_FLAGS -A INPUT  -p udp --sport 53 --dport 1023:65535 -j ACCEPT
-        $IPT $IPT_FLAGS -A INPUT  -p tcp --sport 53 --dport 1023:65535 -j ACCEPT
-        $IPT $IPT_FLAGS -A OUTPUT -p udp --dport 53 --sport 1023:65535 -j ACCEPT
-        $IPT $IPT_FLAGS -A OUTPUT -p tcp --dport 53 --sport 1023:65535 -j ACCEPT
+	if [ $EXECUTOR == "nft" ]; then
+           # TODO nft
+        else
+           $IPT $IPT_FLAGS -A INPUT  -p udp --sport 53 --dport 1023:65535 -j ACCEPT
+           $IPT $IPT_FLAGS -A INPUT  -p tcp --sport 53 --dport 1023:65535 -j ACCEPT
+           $IPT $IPT_FLAGS -A OUTPUT -p udp --dport 53 --sport 1023:65535 -j ACCEPT
+           $IPT $IPT_FLAGS -A OUTPUT -p tcp --dport 53 --sport 1023:65535 -j ACCEPT
+	fi
 fi
 
 # FTP
 if [ "$HELPER_FTP" == "1" ]; then
-$IPT $IPT_FLAGS -A INPUT  -p tcp --sport 1023:65535 --dport $HELPER_FTP_PORT -m state --state RELATED,ESTABLISHED -j ACCEPT
-$IPT $IPT_FLAGS -A INPUT  -p tcp -m multiport --dport $HELPER_FTP_PORT,$HELPER_FTP_DATA -m state --state ESTABLISHED,RELATED -j ACCEPT
-$IPT $IPT_FLAGS -A INPUT  -p udp -m multiport --dport $HELPER_FTP_PORT,$HELPER_FTP_DATA -m state --state ESTABLISHED,RELATED -j ACCEPT
-$IPT $IPT_FLAGS -A OUTPUT  -p tcp --dport 1023:65535 --sport $HELPER_FTP_PORT -m state --state RELATED,ESTABLISHED -j ACCEPT
-$IPT $IPT_FLAGS -A OUTPUT  -p tcp -m multiport --dport $HELPER_FTP_PORT,$HELPER_FTP_DATA -m state --state ESTABLISHED,RELATED -j ACCEPT
-$IPT $IPT_FLAGS -A OUTPUT  -p udp -m multiport --dport $HELPER_FTP_PORT,$HELPER_FTP_DATA -m state --state ESTABLISHED,RELATED -j ACCEPT
+	if [ $EXECUTOR == "nft" ]; then
+           # TODO nft
+        else
+	   $IPT $IPT_FLAGS -A INPUT  -p tcp --sport 1023:65535 --dport $HELPER_FTP_PORT -m state --state RELATED,ESTABLISHED -j ACCEPT
+	   $IPT $IPT_FLAGS -A INPUT  -p tcp -m multiport --dport $HELPER_FTP_PORT,$HELPER_FTP_DATA -m state --state ESTABLISHED,RELATED -j ACCEPT
+	   $IPT $IPT_FLAGS -A INPUT  -p udp -m multiport --dport $HELPER_FTP_PORT,$HELPER_FTP_DATA -m state --state ESTABLISHED,RELATED -j ACCEPT
+	   $IPT $IPT_FLAGS -A OUTPUT  -p tcp --dport 1023:65535 --sport $HELPER_FTP_PORT -m state --state RELATED,ESTABLISHED -j ACCEPT
+	   $IPT $IPT_FLAGS -A OUTPUT  -p tcp -m multiport --dport $HELPER_FTP_PORT,$HELPER_FTP_DATA -m state --state ESTABLISHED,RELATED -j ACCEPT
+	   $IPT $IPT_FLAGS -A OUTPUT  -p udp -m multiport --dport $HELPER_FTP_PORT,$HELPER_FTP_DATA -m state --state ESTABLISHED,RELATED -j ACCEPT
+	fi
 fi
 
 # SSH
 if [ "$HELPER_SSH" == "1" ]; then
-	$IPT $IPT_FLAGS -A INPUT  -p tcp --sport $HELPER_SSH_PORT --dport 513:65535 -m state --state ESTABLISHED,RELATED -j ACCEPT
-	$IPT $IPT_FLAGS -A INPUT  -p tcp --sport 1024:65535 --dport $HELPER_SSH_PORT --syn -m state --state ESTABLISHED,RELATED -j ACCEPT
-	$IPT $IPT_FLAGS -A INPUT  -p udp --dport $HELPER_SSH_PORT -m state --state ESTABLISHED -j ACCEPT
+	if [ $EXECUTOR == "nft" ]; then
+           # TODO nft
+        else
+	   $IPT $IPT_FLAGS -A INPUT  -p tcp --sport $HELPER_SSH_PORT --dport 513:65535 -m state --state ESTABLISHED,RELATED -j ACCEPT
+	   $IPT $IPT_FLAGS -A INPUT  -p tcp --sport 1024:65535 --dport $HELPER_SSH_PORT --syn -m state --state ESTABLISHED,RELATED -j ACCEPT
+	   $IPT $IPT_FLAGS -A INPUT  -p udp --dport $HELPER_SSH_PORT -m state --state ESTABLISHED -j ACCEPT
 
-	if [ "$USE_IPV6" == "1" ]; then
+	   if [ "$USE_IPV6" == "1" ]; then
                 $IP6T -A INPUT -m state --state NEW -m tcp -p tcp --dport $HELPER_SSH_PORT -j ACCEPT
-        fi
+           fi
+	fi
 fi
 
 # Traceroute
 if [ "$TCR_PASS" == "1" ]; then
-	$IPT $IPT_FLAGS -A INPUT  -p udp -m state --state NEW --dport $TCR_PORTS -j ACCEPT
-        $IPT $IPT_FLAGS -A OUTPUT  -p udp -m state --state NEW --dport $TCR_PORTS -j ACCEPT
+	if [ $EXECUTOR == "nft" ]; then
+           # TODO nft
+        else
+           $IPT $IPT_FLAGS -A INPUT  -p udp -m state --state NEW --dport $TCR_PORTS -j ACCEPT
+           $IPT $IPT_FLAGS -A OUTPUT  -p udp -m state --state NEW --dport $TCR_PORTS -j ACCEPT
+	fi
 fi
 
 
 if [ "$LOG_DROP" == "1" ]; then
 # Default TCP/UDP INPUT log chain
-         $IPT $IPT_FLAGS -A INPUT -p tcp -m limit --limit $LOG_RATE/minute  -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** IN_TCP DROP ** "
-         $IPT $IPT_FLAGS -A INPUT -p udp -m limit --limit $LOG_RATE/minute  -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** IN_UDP DROP ** "
+         if [ $EXECUTOR == "nft" ]; then
+            # TODO nft
+         else
+            $IPT $IPT_FLAGS -A INPUT -p tcp -m limit --limit $LOG_RATE/minute  -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** IN_TCP DROP ** "
+            $IPT $IPT_FLAGS -A INPUT -p udp -m limit --limit $LOG_RATE/minute  -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** IN_UDP DROP ** "
+	 fi
 fi
 
 if [ "$LOG_DROP" == "1" ] && [ "$EGF" == "1" ]; then
 # Default TCP/UDP OUTPUT log chain
-         $IPT $IPT_FLAGS -A OUTPUT -p tcp -m limit --limit $LOG_RATE/minute  -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** OUT_TCP DROP ** "
-         $IPT $IPT_FLAGS -A OUTPUT -p udp -m limit --limit $LOG_RATE/minute  -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** OUT_UDP DROP ** "
+         if [ $EXECUTOR == "nft" ]; then
+            # TODO nft
+         else
+            $IPT $IPT_FLAGS -A OUTPUT -p tcp -m limit --limit $LOG_RATE/minute  -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** OUT_TCP DROP ** "
+            $IPT $IPT_FLAGS -A OUTPUT -p udp -m limit --limit $LOG_RATE/minute  -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** OUT_UDP DROP ** "
+	 fi
 fi
 
 
@@ -331,24 +415,36 @@ tosroute POSTROUTING
 
 # Default Output Policies
 if [ ! "$EGF" == "1" ] || [ "$EGF" == "" ]; then
-        $IPT $IPT_FLAGS -A OUTPUT -j ACCEPT
+	if [ $EXECUTOR == "nft" ]; then
+           # TODO nft
+        else
+           $IPT $IPT_FLAGS -A OUTPUT -j ACCEPT
+	fi
         eout "{glob} default (egress) output accept"
 elif [ "$EGF" == "1" ]; then
-	$IPT $IPT_FLAGS -A OUTPUT -p tcp -j $TCP_STOP
-	$IPT $IPT_FLAGS -A OUTPUT -p udp -j $UDP_STOP
-        $IPT $IPT_FLAGS -A OUTPUT -p all -j $ALL_STOP
+	if [ $EXECUTOR == "nft" ]; then
+           # TODO nft
+        else
+	   $IPT $IPT_FLAGS -A OUTPUT -p tcp -j $TCP_STOP
+	   $IPT $IPT_FLAGS -A OUTPUT -p udp -j $UDP_STOP
+           $IPT $IPT_FLAGS -A OUTPUT -p all -j $ALL_STOP
+	fi
         eout "{glob} default (egress) output drop"
 fi
 
 # Default Input Policies
 eout "{glob} default (ingress) input drop"
-$IPT $IPT_FLAGS -A INPUT -p tcp -j $TCP_STOP
-$IPT $IPT_FLAGS -A INPUT -p udp -j $UDP_STOP
-$IPT $IPT_FLAGS -A INPUT -p all -j $ALL_STOP
-if [ "$USE_IPV6" == "1" ]; then
+if [ $EXECUTOR == "nft" ]; then
+   # TODO nft
+else
+   $IPT $IPT_FLAGS -A INPUT -p tcp -j $TCP_STOP
+   $IPT $IPT_FLAGS -A INPUT -p udp -j $UDP_STOP
+   $IPT $IPT_FLAGS -A INPUT -p all -j $ALL_STOP
+   if [ "$USE_IPV6" == "1" ]; then
         $IP6T -A INPUT -p tcp -j $TCP_STOP
         $IP6T -A INPUT -p udp -j $UDP_STOP
         $IP6T -A INPUT -p all -j $ALL_STOP
+   fi
 fi
 
 # Restarting Docker

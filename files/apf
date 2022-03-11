@@ -100,7 +100,11 @@ fi
 if [ "$SKIP_FASTLOAD_FIRSTRUN" == "" ] && [ "$SKIP_FASTLOAD_EXPIRED" == "" ] && [ "$SKIP_FASTLOAD_VARS" == "" ] && [ "$SET_FASTLOAD_UPSEC" == "" ]; then
 	devm
 	eout "{glob} activating firewall, fast load"
-	$IPTR $IPT_FLAGS $INSTALL_PATH/internals/.apf.restore
+	if [ $EXECUTOR == "nft" ]; then
+	   $NFT -f $INSTALL_PATH/internals/.apf.restore
+	else
+	   $IPTR $IPT_FLAGS $INSTALL_PATH/internals/.apf.restore
+	fi
 	eout "{glob} firewall initialized"
 	if [ "$SET_VERBOSE" == "1" ] && [ "$DEVEL_ON" == "1" ]; then
 	        eout "{glob} !!DEVELOPMENT MODE ENABLED!! - firewall will flush every 5 minutes."
@@ -152,9 +156,17 @@ if [ "$MD5_FIRSTRUN" == "1" ]; then
         $MD5 $MD5_FILES > $INSTALL_PATH/internals/.md5.cores 2> /dev/null
 fi
 
-firewall_on=`$IPT $IPT_FLAGS -L --numeric | grep -vE "Chain|destination"`
+if [ $EXECUTOR == "nft" ]; then
+	firewall_on=`$NFT -n list ruleset | grep -vE "chain|table"`
+else
+	firewall_on=`$IPT $IPT_FLAGS -L --numeric | grep -vE "Chain|destination"`
+fi
 if [ ! "$DEVEL_ON" == "1" ] && [ ! "$firewall_on" == "" ]; then
-	$IPTS > $INSTALL_PATH/internals/.apf.restore
+	if [ $EXECUTOR == "nft" ]; then
+	   $NFT list ruleset > $INSTALL_PATH/internals/.apf.restore
+	else
+	   $IPTS > $INSTALL_PATH/internals/.apf.restore
+	fi
 	eout "{glob} fast load snapshot saved"
 fi
 if [ "$SET_VERBOSE" == "1" ] && [ "$DEVEL_ON" == "1" ]; then

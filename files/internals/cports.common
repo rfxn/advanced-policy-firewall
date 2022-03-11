@@ -4,20 +4,28 @@ PROTO="tcp"
 for i in `echo $IG_TCP_CPORTS`; do
         if [ "$(echo $i | grep "_")" == "" ]; then
          if [ ! "$i" == "" ]; then
-                $IPT $IPT_FLAGS -A INPUT -p $PROTO  -s 0/0 -d $VNET --dport $i -j ACCEPT
+		if [ $EXECUTOR == "nft" ]; then
+                   #TODO nft
+		else
+                   $IPT $IPT_FLAGS -A INPUT -p $PROTO  -s 0/0 -d $VNET --dport $i -j ACCEPT
+                   if [ "$USE_IPV6" == "1" ]; then
+                      $IP6T -A INPUT -m state --state NEW -m tcp -p $PROTO --dport $i -d $VNET -j ACCEPT
+                   fi
+		fi
                 eout "{glob} opening inbound $PROTO port $i on $VNET"
-                if [ "$USE_IPV6" == "1" ]; then
-                        $IP6T -A INPUT -m state --state NEW -m tcp -p $PROTO --dport $i -d $VNET -j ACCEPT
-                fi
          fi
         else
                 i=`echo $i | tr '_' ':'`
                 if [ ! "$i" == "" ]; then
-                        $IPT $IPT_FLAGS -A INPUT -p $PROTO  -s 0/0 -d $VNET --dport $i -j ACCEPT
-                        eout "{glob} opening inbound $PROTO port $i on $VNET"
-                        if [ "$USE_IPV6" == "1" ]; then
-                                $IP6T -A INPUT -m state --state NEW -m tcp -p $PROTO --dport $i -d $VNET -j ACCEPT
-                        fi
+		   if [ $EXECUTOR == "nft" ]; then
+                      # TODO nft
+		   else
+                      $IPT $IPT_FLAGS -A INPUT -p $PROTO  -s 0/0 -d $VNET --dport $i -j ACCEPT
+                      if [ "$USE_IPV6" == "1" ]; then
+                         $IP6T -A INPUT -m state --state NEW -m tcp -p $PROTO --dport $i -d $VNET -j ACCEPT
+                      fi
+	           fi
+                   eout "{glob} opening inbound $PROTO port $i on $VNET"
                 fi
         fi
 done
@@ -29,14 +37,24 @@ PROTO="udp"
 for i in `echo $IG_UDP_CPORTS`; do
         if [ "$(echo $i | grep "_")" == "" ]; then
          if [ ! "$i" == "" ]; then
-                $IPT $IPT_FLAGS -A INPUT -p $PROTO  -s 0/0 -d $VNET --dport $i -j ACCEPT
+		if [ $EXECUTOR == "nft" ]; then
+                   # TODO nft
+		else
+                   $IPT $IPT_FLAGS -A INPUT -p $PROTO  -s 0/0 -d $VNET --dport $i -j ACCEPT
+		   # TODO ipv6?
+		fi
                 eout "{glob} opening inbound $PROTO port $i on $VNET"
          fi
         else
                 i=`echo $i | tr '_' ':'`
                 if [ ! "$i" == "" ]; then
-                        $IPT $IPT_FLAGS -A INPUT -p $PROTO  -s 0/0 -d $VNET --dport $i -j ACCEPT
-                        eout "{glob} opening inbound $PROTO port $i on $VNET"
+		   if [ $EXECUTOR == "nft" ]; then
+                      # TODO nft
+		   else
+                      $IPT $IPT_FLAGS -A INPUT -p $PROTO  -s 0/0 -d $VNET --dport $i -j ACCEPT
+		      # TODO ipv6?
+		   fi
+                   eout "{glob} opening inbound $PROTO port $i on $VNET"
                 fi
         fi
 done
@@ -49,14 +67,24 @@ PROTO="tcp"
 for i in `echo $EG_TCP_CPORTS`; do
         if [ "$(echo $i | grep "_")" == "" ]; then
          if [ ! "$i" == "" ]; then
-                $IPT $IPT_FLAGS -A OUTPUT -p $PROTO  -s $VNET --dport $i -j ACCEPT
+		if [ $EXECUTOR == "nft" ]; then
+                   # TODO nft
+		else
+                   $IPT $IPT_FLAGS -A OUTPUT -p $PROTO  -s $VNET --dport $i -j ACCEPT
+		   # TODO ipv6?
+		fi
                 eout "{glob} opening outbound $PROTO port $i on $VNET"
          fi
         else
                 i=`echo $i | tr '_' ':'`
                 if [ ! "$i" == "" ]; then
+		   if [ $EXECUTOR == "nft" ]; then
+                        # TODO nft
+		   else
                         $IPT $IPT_FLAGS -A OUTPUT -p $PROTO  -s $VNET --dport $i -j ACCEPT
-                        eout "{glob} opening outbound $PROTO port $i on $VNET"
+		        # TODO ipv6?
+		   fi
+                   eout "{glob} opening outbound $PROTO port $i on $VNET"
                 fi
         fi
 done
@@ -70,14 +98,24 @@ PROTO="udp"
 for i in `echo $EG_UDP_CPORTS`; do
         if [ "$(echo $i | grep "_")" == "" ]; then
          if [ ! "$i" == "" ]; then
-                $IPT $IPT_FLAGS -A OUTPUT -p $PROTO  -s $VNET --dport $i -j ACCEPT
+		if [ $EXECUTOR == "nft" ]; then
+                   # TODO nft
+                else
+                   $IPT $IPT_FLAGS -A OUTPUT -p $PROTO  -s $VNET --dport $i -j ACCEPT
+		   # TODO ipv6?
+		fi
                 eout "{glob} opening outbound $PROTO port $i on $VNET"
          fi
         else
                 i=`echo $i | tr '_' ':'`
                 if [ ! "$i" == "" ]; then
-                        $IPT $IPT_FLAGS -A OUTPUT -p $PROTO  -s $VNET --dport $i -j ACCEPT
-                        eout "{glob} opening outbound $PROTO port $i on $VNET"
+	           if [ $EXECUTOR == "nft" ]; then
+                      # TODO nft
+                   else
+                      $IPT $IPT_FLAGS -A OUTPUT -p $PROTO  -s $VNET --dport $i -j ACCEPT
+		      # TODO ipv6?
+		   fi
+                   eout "{glob} opening outbound $PROTO port $i on $VNET"
                 fi
         fi
 done
@@ -99,16 +137,28 @@ IG_ICMP_TYPES=`echo $IG_ICMP_TYPES | tr ',' ' '`
          if [ ! "$i" == "" ]; then
                 i=`echo $i | tr '[:upper:]' '[:lower:]'`
                 if [ "$i" == "all" ]; then
-                  $IPT $IPT_FLAGS -A INPUT -p icmp -d $VNET  -s 0/0 $ICMP_EARGS -j ACCEPT
+	          if [ $EXECUTOR == "nft" ]; then
+                     # TODO nft
+		  else
+                     $IPT $IPT_FLAGS -A INPUT -p icmp -d $VNET  -s 0/0 $ICMP_EARGS -j ACCEPT
+		  fi
                   eout "{glob} opening inbound $PROTO all on $VNET"
                 else
-                  $IPT $IPT_FLAGS -A INPUT -p icmp --icmp-type $i -d $VNET  -s 0/0 $ICMP_EARGS -j ACCEPT
+	          if [ $EXECUTOR == "nft" ]; then
+                     # TODO nft
+	          else
+                     $IPT $IPT_FLAGS -A INPUT -p icmp --icmp-type $i -d $VNET  -s 0/0 $ICMP_EARGS -j ACCEPT
+		  fi
                   eout "{glob} opening inbound $PROTO type $i on $VNET"
                 fi
 	 fi
 	done
 	if [ "$USE_IPV6" == "1" ]; then
-	        $IP6T -A INPUT -p ipv6-icmp -j ACCEPT
+           if [ $EXECUTOR == "nft" ]; then
+              # TODO nft
+	   else
+	      $IP6T -A INPUT -p ipv6-icmp -j ACCEPT
+	   fi
 	fi
 fi
 
@@ -128,10 +178,20 @@ EG_ICMP_TYPES=`echo $EG_ICMP_TYPES | tr ',' ' '`
          if [ ! "$i" == "" ]; then
 		i=`echo $i | tr '[:upper:]' '[:lower:]'`
 		if [ "$i" == "all" ]; then
-                  $IPT $IPT_FLAGS -A OUTPUT -p icmp  -s $VNET -d 0/0 $ICMP_EARGS  -j ACCEPT
+	          if [ $EXECUTOR == "nft" ]; then
+                     # TODO nft
+                  else
+                     $IPT $IPT_FLAGS -A OUTPUT -p icmp  -s $VNET -d 0/0 $ICMP_EARGS  -j ACCEPT
+		     # TODO ipv6?
+		  fi
                   eout "{glob} opening outbound $PROTO all on $VNET"
 		else
-                  $IPT $IPT_FLAGS -A OUTPUT -p icmp --icmp-type $i  -s $VNET -d 0/0 $ICMP_EARGS -j ACCEPT
+                  if [ $EXECUTOR == "nft" ]; then
+                     # TODO nft
+                  else
+                     $IPT $IPT_FLAGS -A OUTPUT -p icmp --icmp-type $i  -s $VNET -d 0/0 $ICMP_EARGS -j ACCEPT
+		     # TODO ipv6?
+		  fi
                   eout "{glob} opening outbound $PROTO type $i on $VNET"
 		fi
          fi
@@ -149,14 +209,24 @@ port=`echo $i | tr ':' ' ' | awk '{print$2}'`
 
         if [ "$(echo $port | grep "_")" == "" ]; then
          if [ ! "$port" == "" ]; then
-                $IPT $IPT_FLAGS -A OUTPUT -p $PROTO  -s $VNET --dport $port --match owner --uid-owner $uid -j ACCEPT
+                if [ $EXECUTOR == "nft" ]; then
+                   # TODO nft
+                else
+                   $IPT $IPT_FLAGS -A OUTPUT -p $PROTO  -s $VNET --dport $port --match owner --uid-owner $uid -j ACCEPT
+		   # TODO ipv6?
+		fi
                 eout "{glob} opening outbound $PROTO port $port for uid $uid from $VNET"
          fi
         else
                 i=`echo $port | tr '_' ':'`
                 if [ ! "$i" == "" ]; then
-                $IPT $IPT_FLAGS -A OUTPUT -p $PROTO  -s $VNET --dport $i --match owner --uid-owner $uid -j ACCEPT
-                eout "{glob} opening outbound $PROTO port $i for uid $uid from $VNET"
+	           if [ $EXECUTOR == "nft" ]; then
+                      # TODO nft
+                   else
+                      $IPT $IPT_FLAGS -A OUTPUT -p $PROTO  -s $VNET --dport $i --match owner --uid-owner $uid -j ACCEPT
+		      # TODO ipv6?
+		   fi
+                   eout "{glob} opening outbound $PROTO port $i for uid $uid from $VNET"
                 fi
         fi
 done
@@ -173,14 +243,24 @@ port=`echo $i | tr ':' ' ' | awk '{print$2}'`
 
         if [ "$(echo $port | grep "_")" == "" ]; then
          if [ ! "$port" == "" ]; then
-                $IPT $IPT_FLAGS -A OUTPUT -p $PROTO  -s $VNET --dport $port --match owner --uid-owner $uid -j ACCEPT
+                if [ $EXECUTOR == "nft" ]; then
+                   # TODO nft
+                else
+                   $IPT $IPT_FLAGS -A OUTPUT -p $PROTO  -s $VNET --dport $port --match owner --uid-owner $uid -j ACCEPT
+		   # TODO ipv6?
+		fi
                 eout "{glob} opening outbound $PROTO port $port for uid $uid from $VNET"
          fi
         else
                 i=`echo $port | tr '_' ':'`
                 if [ ! "$i" == "" ]; then
-                $IPT $IPT_FLAGS -A OUTPUT -p $PROTO  -s $VNET --dport $i --match owner --uid-owner $uid -j ACCEPT
-                eout "{glob} opening outbound $PROTO port $i for uid $uid from $VNET"
+	           if [ $EXECUTOR == "nft" ]; then
+                      # TODO nft
+                   else
+                      $IPT $IPT_FLAGS -A OUTPUT -p $PROTO  -s $VNET --dport $i --match owner --uid-owner $uid -j ACCEPT
+		      # TODO ipv6?
+		   fi
+                   eout "{glob} opening outbound $PROTO port $i for uid $uid from $VNET"
                 fi
         fi
 done
@@ -189,14 +269,30 @@ fi
 
 if [ "$EGF" == "1" ]; then
  if [ "$EG_DROP_CMD" == "1" ]; then
-		$IPT $IPT_FLAGS -N DEG
+	if [ $EXECUTOR == "nft" ]; then
+	   # TODO nft
+	else
+           $IPT $IPT_FLAGS -N DEG
+	fi
 	for i in `echo $EG_DROP_CMD | tr ',' ' '`; do
 		si=`echo $i | cut -c 1-6`		
 		if [ "LOG_DROP" == "1" ]; then 
-		  $IPT $IPT_FLAGS -A DEG -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** DEG_$si ** "
+		   if [ $EXECUTOR == "nft" ]; then
+                      # TODO nft
+                   else
+                      $IPT $IPT_FLAGS -A DEG -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** DEG_$si ** "
+		   fi
 		fi
-		$IPT $IPT_FLAGS -A DEG -s 0/0 -d 0/0 -m owner --cmd-owner=$i -j $ALL_STOP
+		if [ $EXECUTOR == "nft" ]; then
+                   # TODO nft
+                else
+                   $IPT $IPT_FLAGS -A DEG -s 0/0 -d 0/0 -m owner --cmd-owner=$i -j $ALL_STOP
+		fi
 	done
-		  $IPT $IPT_FLAGS -A OUTPUT -j DEG
+                if [ $EXECUTOR == "nft" ]; then
+                   # TODO nft
+                else
+		   $IPT $IPT_FLAGS -A OUTPUT -j DEG
+		fi
  fi
 fi
