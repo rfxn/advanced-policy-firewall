@@ -74,7 +74,16 @@ tosroute PREROUTING
 
 # Allow all traffic on the loopback interface
 if [ $EXECUTOR == "nft" ]; then
-   # TODO nft
+   #$IPT $IPT_FLAGS -A INPUT -i lo -s 0/0 -d 0/0 -j ACCEPT
+   $NFT add rule ip filter INPUT iifname "lo" counter accept
+   #$IPT $IPT_FLAGS -A OUTPUT -o lo -s 0/0 -d 0/0 -j ACCEPT
+   $NFT add rule ip filter OUTPUT oifname "lo" counter accept
+   if [ "$USE_IPV6" == "1" ]; then
+   #	$IP6T -A INPUT -i lo -s 0/0 -d 0/0 -j ACCEPT
+   #	$IP6T -A OUTPUT -o lo -s 0/0 -d 0/0 -j ACCEPT
+        $NFT add rule ip6 filter INPUT iifname "lo" counter accept
+        $NFT add rule ip6 filter OUTPUT oifname "lo" counter accept
+   fi
 else
    $IPT $IPT_FLAGS -A INPUT -i lo -s 0/0 -d 0/0 -j ACCEPT
    $IPT $IPT_FLAGS -A OUTPUT -o lo -s 0/0 -d 0/0 -j ACCEPT
@@ -94,7 +103,10 @@ if [ ! "$IFACE_TRUSTED" == "" ]; then
  else
         eout "{glob} allow all to/from trusted interface $i"
 	if [ $EXECUTOR == "nft" ]; then
-           # TODO nft
+          #$IPT $IPT_FLAGS -A INPUT -i $i -s 0/0 -d 0/0 -j ACCEPT
+          #$IPT $IPT_FLAGS -A OUTPUT -o $i -s 0/0 -d 0/0 -j ACCEPT
+	  $NFT add rule ip filter INPUT iifname "$i" counter accept
+	  $NFT add rule ip filter OUTPUT oifname "$i" counter accept
         else
           $IPT $IPT_FLAGS -A INPUT -i $i -s 0/0 -d 0/0 -j ACCEPT
           $IPT $IPT_FLAGS -A OUTPUT -o $i -s 0/0 -d 0/0 -j ACCEPT
@@ -105,7 +117,14 @@ fi
 
 # Create TCP RESET & UDP PROHIBIT chains
 if [ $EXECUTOR == "nft" ]; then
-   # TODO nft
+   #$IPT $IPT_FLAGS -N RESET
+   #$IPT $IPT_FLAGS -A RESET -p tcp -j REJECT --reject-with tcp-reset
+   #$IPT $IPT_FLAGS -N PROHIBIT
+   #$IPT $IPT_FLAGS -A PROHIBIT -j REJECT --reject-with icmp-host-prohibited
+   $NFT add chain ip filter RESET
+   $NFT add rule ip filter RESET ip protocol tcp counter reject with tcp reset
+   $NFT add chain ip filter PROHIBIT
+   $NFT add rule ip filter PROHIBIT counter reject with icmp type host-prohibited
 else
    $IPT $IPT_FLAGS -N RESET
    $IPT $IPT_FLAGS -A RESET -p tcp -j REJECT --reject-with tcp-reset
@@ -118,7 +137,8 @@ fi
 
 # Fix MTU/MSS Problems
 if [ $EXECUTOR == "nft" ]; then
-   # TODO nft
+   #$IPT $IPT_FLAGS -A OUTPUT -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu
+   $NFT add rule ip filter OUTPUT tcp flags & (syn|rst) == syn counter tcp option maxseg size set rt mtu
 else
    $IPT $IPT_FLAGS -A OUTPUT -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu
 fi
@@ -140,6 +160,36 @@ fi
 # Create (glob)trust system chains
 if [ $EXECUTOR == "nft" ]; then
   # TODO nft
+  $NFT add chain ip filter TALLOW
+  $NFT add chain ip filter TDENY
+  $NFT add chain ip filter TGALLOW
+  $NFT add chain ip filter TDDENY
+  $NFT add chain ip filter REFRESH_TEMP
+  $NFT add rule ip filter INPUT counter jump REFRESH_TEMP
+  $NFT add rule ip filter OUTPUT counter jump REFRESH_TEMP
+  $NFT add rule ip filter INPUT counter jump TALLOW
+  $NFT add rule ip filter OUTPUT counter jump TALLOW
+  $NFT add rule ip filter INPUT counter jump TGALLOW
+  $NFT add rule ip filter OUTPUT counter jump TGALLOW
+  $NFT add rule ip filter INPUT counter jump TDENY
+  $NFT add rule ip filter OUTPUT counter jump TDENY
+  $NFT add rule ip filter INPUT counter jump TGDENY
+  $NFT add rule ip filter OUTPUT counter jump TGDENY
+
+  if [ "$USE_IPV6" = "1" ]; then
+    $NFT add chain ip6 filter TALLOW
+    $NFT add chain ip6 filter TGALLOW
+    $NFT add chain ip6 filter TGDENY
+
+    $NFT add rule ip6 filter INPUT counter jump TALLOW
+    $NFT add rule ip6 filter OUTPUT counter jump TALLOW
+    $NFT add rule ip6 filter INPUT counter jump TGALLOW
+    $NFT add rule ip6 filter OUTPUT counter jump TGALLOW
+    $NFT add rule ip6 filter INPUT counter jump TDENY
+    $NFT add rule ip6 filter OUTPUT counter jump TDENY
+    $NFT add rule ip6 filter INPUT counter jump TGDENY
+    $NFT add rule ip6 filter OUTPUT counter jump TGDENY
+  fi
 else
   $IPT $IPT_FLAGS -N TALLOW
   $IPT $IPT_FLAGS -N TDENY
@@ -227,7 +277,7 @@ if [ "$RAB" == "1" ]; then
   esac
   eout "{rab} RAB_PSCAN monitored ports $RAB_PSCAN_PORTS"
   if [ $EXECUTOR == "nft" ]; then
-     # TODO nft
+     $NFT add chain ip filter RABPSCAN
   else
      $IPT $IPT_FLAGS -N RABPSCAN
   fi
@@ -235,7 +285,7 @@ if [ "$RAB" == "1" ]; then
   if [ "$LDNS" ]; then
 	for i in `echo $LDNS`; do
 	        if [ $EXECUTOR == "nft" ]; then
-                   # TODO nft
+		   $NFT insert rule ip filter RABPSCAN ip saddr $i counter return
                 else
 		   $IPT $IPT_FLAGS -I RABPSCAN -s $i -j RETURN
 		fi
@@ -244,7 +294,8 @@ if [ "$RAB" == "1" ]; then
   for i in `echo $RAB_PSCAN_PORTS | tr ',' ' '`; do
    if [ "$LOG_DROP" == "1" ] || [ "$RAB_LOG_HIT" == "1" ]; then
 	   if [ $EXECUTOR == "nft" ]; then
-              # TODO nft
+	      $NFT add rule ip filter RABPSCAN tcp dport $i limit rate $LOG_RATE/minute burst 5 packets counter log prefix \"** RABHIT ** \" level $LOG_LEVEL $LEXT
+	      $NFT add rule ip filter RABPSCAN udp dport $i limit rate $LOG_RATE/minute burst 5 packets counter log prefix \"** RABHIT ** \" level $LOG_LEVEL $LEXT
            else
 	      $IPT $IPT_FLAGS -A RABPSCAN -p tcp --dport $i -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** RABHIT ** "
 	      $IPT $IPT_FLAGS -A RABPSCAN -p udp --dport $i -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** RABHIT ** "
@@ -258,7 +309,7 @@ if [ "$RAB" == "1" ]; then
    fi
   done
   if [ $EXECUTOR == "nft" ]; then
-     # TODO nft
+     $NFT add rule ip filter INPUT counter jump RABPSCAN
   else
      $IPT $IPT_FLAGS -A INPUT -j RABPSCAN
   fi
@@ -291,7 +342,14 @@ fi
 
 # Drop NEW tcp connections after this point
 if [ $EXECUTOR == "nft" ]; then
-   # TODO nft
+   $NFT add rule ip filter INPUT tcp flags & (fin|syn|rst|ack) != syn ct state new  counter jump STOP
+   $NFT add rule ip filter INPUT ip protocol tcp ct state related,established  counter accept
+   $NFT add rule ip filter INPUT ip protocol udp ct state related,established  counter accept
+   $NFT nft add rule ip filter OUTPUT tcp dport 1024-65535 ct state related,established  counter accept
+   $NFT nft add rule ip filter OUTPUT udp dport 1024-65535 ct state related,established  counter accept
+   if [ "$USE_IPV6" == "1" ]; then
+	$NFT add rule ip6 filter INPUT ct state related,established counter accept
+   fi
 else
    $IPT $IPT_FLAGS -A INPUT  -p tcp ! --syn -m state --state NEW -j $ALL_STOP
    $IPT $IPT_FLAGS -A INPUT  -p tcp -m state --state ESTABLISHED,RELATED -j ACCEPT
@@ -310,7 +368,14 @@ LDNS=`cat /etc/resolv.conf  | grep -v "#" | grep -w nameserver | awk '{print$2}'
         for i in `echo $LDNS`; do
         eout "{glob} resolv dns discovery for $i"
 	if [ $EXECUTOR == "nft" ]; then
-           # TODO nft
+           $NFT add rule ip filter INPUT ip saddr $i udp sport 53 udp dport 1023-65535 counter accept
+	   $NFT add rule ip filter INPUT ip saddr $i tcp sport 53 tcp dport 1023-65535 counter accept
+	   $NFT add rule ip filter OUTPUT ip daddr $i udp sport 1023-65535 udp dport 53 counter accept
+	   $NFT add rule ip filter OUTPUT ip daddr $i tcp sport 1023-65535 tcp dport 53 counter accept
+	   if [ "$RESV_DNS_DROP" == "1" ]; then
+		$NFT add rule ip filter OUTPUT ip daddr $i udp sport 1023-65535 udp dport 53 counter accept
+		$NFT add rule ip filter OUTPUT ip daddr $i tcp sport 1023-65535 tcp dport 53 counter accept
+           fi
         else
            $IPT $IPT_FLAGS -A INPUT -p udp -s $i --sport 53 --dport 1023:65535 -j ACCEPT
            $IPT $IPT_FLAGS -A INPUT -p tcp -s $i --sport 53 --dport 1023:65535 -j ACCEPT
@@ -323,7 +388,10 @@ LDNS=`cat /etc/resolv.conf  | grep -v "#" | grep -w nameserver | awk '{print$2}'
 	fi
         done
 	if [ $EXECUTOR == "nft" ]; then
-           # TODO nft
+	   if [ "$RESV_DNS_DROP" == "1" ]; then
+		   $NFT add rule ip filter INPUT tcp sport 53 tcp dport 1023-65535 counter jump $ALL_STOP
+		   $NFT add rule ip filter INPUT udp sport 53 tcp dport 1023-65535 counter jump $ALL_STOP
+           fi
         else
            if [ "$RESV_DNS_DROP" == "1" ]; then
                    $IPT $IPT_FLAGS -A INPUT  -p tcp -s 0/0 --sport 53 --dport 1023:65535 -j $ALL_STOP
@@ -333,7 +401,10 @@ LDNS=`cat /etc/resolv.conf  | grep -v "#" | grep -w nameserver | awk '{print$2}'
   fi
 else
 	if [ $EXECUTOR == "nft" ]; then
-           # TODO nft
+           $NFT add rule ip filter INPUT udp sport 53 udp dport 1023-65535 counter accept
+           $NFT add rule ip filter INPUT tcp sport 53 tcp dport 1023-65535 counter accept
+           $NFT add rule ip filter OUTPUT udp sport 53 udp dport 1023-65535 counter accept
+           $NFT add rule ip filter OUTPUT tcp sport 53 tcp dport 1023-65535 counter accept
         else
            $IPT $IPT_FLAGS -A INPUT  -p udp --sport 53 --dport 1023:65535 -j ACCEPT
            $IPT $IPT_FLAGS -A INPUT  -p tcp --sport 53 --dport 1023:65535 -j ACCEPT
@@ -345,7 +416,12 @@ fi
 # FTP
 if [ "$HELPER_FTP" == "1" ]; then
 	if [ $EXECUTOR == "nft" ]; then
-           # TODO nft
+	   $NFT add rule ip filter INPUT tcp sport 1023-65535 tcp dport $HELPER_FTP_PORT ct state related,established  counter accept
+	   $NFT add rule ip filter INPUT ip protocol tcp tcp dport { $HELPER_FTP_PORT,$HELPER_FTP_DATA } ct state related,established  counter accept
+	   $NFT add rule ip filter INPUT ip protocol udp udp dport { $HELPER_FTP_PORT,$HELPER_FTP_DATA } ct state related,established  counter accept
+	   $NFT add rule ip filter OUTPUT tcp sport $HELPER_FTP_PORT tcp dport 1023-65535 ct state related,established  counter accept
+	   $NFT add rule ip filter OUTPUT ip protocol tcp tcp dport { $HELPER_FTP_PORT,$HELPER_FTP_DATA } ct state related,established  counter accept
+	   $NFT add rule ip filter OUTPUT ip protocol udp udp dport { $HELPER_FTP_PORT,$HELPER_FTP_DATA } ct state related,established  counter accept
         else
 	   $IPT $IPT_FLAGS -A INPUT  -p tcp --sport 1023:65535 --dport $HELPER_FTP_PORT -m state --state RELATED,ESTABLISHED -j ACCEPT
 	   $IPT $IPT_FLAGS -A INPUT  -p tcp -m multiport --dport $HELPER_FTP_PORT,$HELPER_FTP_DATA -m state --state ESTABLISHED,RELATED -j ACCEPT
@@ -359,7 +435,12 @@ fi
 # SSH
 if [ "$HELPER_SSH" == "1" ]; then
 	if [ $EXECUTOR == "nft" ]; then
-           # TODO nft
+	   $NFT add rule ip filter INPUT tcp sport  $HELPER_SSH_PORT tcp dport 513-65535 ct state related,established  counter accept
+	   $NFT add rule ip filter INPUT tcp sport 1024-65535 tcp dport $HELPER_SSH_PORT tcp flags & (fin|syn|rst|ack) == syn ct state related,established  counter accept
+	   $NFT add rule ip filter INPUT udp dport $HELPER_SSH_PORT ct state established  counter accept
+	   if [ "$USE_IPV6" == "1" ]; then
+		$NFT add rule ip6 filter INPUT ct state new  tcp dport $HELPER_SSH_PORT counter accept
+           fi
         else
 	   $IPT $IPT_FLAGS -A INPUT  -p tcp --sport $HELPER_SSH_PORT --dport 513:65535 -m state --state ESTABLISHED,RELATED -j ACCEPT
 	   $IPT $IPT_FLAGS -A INPUT  -p tcp --sport 1024:65535 --dport $HELPER_SSH_PORT --syn -m state --state ESTABLISHED,RELATED -j ACCEPT
@@ -374,7 +455,8 @@ fi
 # Traceroute
 if [ "$TCR_PASS" == "1" ]; then
 	if [ $EXECUTOR == "nft" ]; then
-           # TODO nft
+	   $NFT add rule ip filter INPUT ct state new  udp dport $TCR_PORTS counter accept
+	   $NFT add rule ip filter OUTPUT ct state new  udp dport $TCR_PORTS counter accept
         else
            $IPT $IPT_FLAGS -A INPUT  -p udp -m state --state NEW --dport $TCR_PORTS -j ACCEPT
            $IPT $IPT_FLAGS -A OUTPUT  -p udp -m state --state NEW --dport $TCR_PORTS -j ACCEPT
@@ -385,7 +467,8 @@ fi
 if [ "$LOG_DROP" == "1" ]; then
 # Default TCP/UDP INPUT log chain
          if [ $EXECUTOR == "nft" ]; then
-            # TODO nft
+	    $NFT add rule ip filter INPUT ip protocol tcp limit rate $LOG_RATE/minute burst 5 packets counter log prefix \"** IN_TCP DROP ** \" level $LOG_LEVEL $LEXT
+	    $NFT add rule ip filter INPUT ip protocol udp limit rate $LOG_RATE/minute burst 5 packets counter log prefix \"** IN_UDP DROP ** \" level $LOG_LEVEL $LEXT
          else
             $IPT $IPT_FLAGS -A INPUT -p tcp -m limit --limit $LOG_RATE/minute  -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** IN_TCP DROP ** "
             $IPT $IPT_FLAGS -A INPUT -p udp -m limit --limit $LOG_RATE/minute  -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** IN_UDP DROP ** "
@@ -395,7 +478,8 @@ fi
 if [ "$LOG_DROP" == "1" ] && [ "$EGF" == "1" ]; then
 # Default TCP/UDP OUTPUT log chain
          if [ $EXECUTOR == "nft" ]; then
-            # TODO nft
+	    $NFT add rule ip filter OUTPUT ip protocol tcp limit rate $LOG_RATE/minute burst 5 packets counter log prefix \"** OUT_TCP DROP ** \" level $LOG_LEVEL $LEXT
+	    $NFT add rule ip filter OUTPUT ip protocol udp limit rate $LOG_RATE/minute burst 5 packets counter log prefix \"** OUT_UDP DROP ** \" level $LOG_LEVEL $LEXT
          else
             $IPT $IPT_FLAGS -A OUTPUT -p tcp -m limit --limit $LOG_RATE/minute  -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** OUT_TCP DROP ** "
             $IPT $IPT_FLAGS -A OUTPUT -p udp -m limit --limit $LOG_RATE/minute  -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** OUT_UDP DROP ** "
@@ -416,14 +500,16 @@ tosroute POSTROUTING
 # Default Output Policies
 if [ ! "$EGF" == "1" ] || [ "$EGF" == "" ]; then
 	if [ $EXECUTOR == "nft" ]; then
-           # TODO nft
+	   $NFT add rule ip filter OUTPUT counter jump ACCEPT
         else
            $IPT $IPT_FLAGS -A OUTPUT -j ACCEPT
 	fi
         eout "{glob} default (egress) output accept"
 elif [ "$EGF" == "1" ]; then
 	if [ $EXECUTOR == "nft" ]; then
-           # TODO nft
+	   $NFT add rule ip filter OUTPUT ip protocol tcp counter jump $TCP_STOP
+	   $NFT add rule ip filter OUTPUT ip protocol udp counter jump $UDP_STOP
+	   $NFT add rule ip filter OUTPUT counter jump $ALL_STOP
         else
 	   $IPT $IPT_FLAGS -A OUTPUT -p tcp -j $TCP_STOP
 	   $IPT $IPT_FLAGS -A OUTPUT -p udp -j $UDP_STOP
@@ -435,7 +521,14 @@ fi
 # Default Input Policies
 eout "{glob} default (ingress) input drop"
 if [ $EXECUTOR == "nft" ]; then
-   # TODO nft
+   nft add rule ip filter INPUT ip protocol tcp counter jump $TCP_STOP
+   nft add rule ip filter INPUT ip protocol udp counter jump $UDP_STOP
+   nft add rule ip filter INPUT counter jump $ALL_STOP
+   if [ "$USE_IPV6" == "1" ]; then
+	$NFT add rule ip6 filter INPUT meta l4proto tcp counter jump STOP
+	$NFT add rule ip6 filter INPUT meta l4proto udp counter jump STOP
+	$NFT add rule ip6 filter INPUT counter jump STOP
+   fi
 else
    $IPT $IPT_FLAGS -A INPUT -p tcp -j $TCP_STOP
    $IPT $IPT_FLAGS -A INPUT -p udp -j $UDP_STOP
