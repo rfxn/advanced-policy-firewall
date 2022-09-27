@@ -155,7 +155,64 @@ trim() {
 cli_trust_remove() {
 	DIP="$1"
 	if [ $EXECUTOR == "nft" ]; then
-           # TODO
+      # TODO
+	   #$IPT $IPT_FLAGS -D INPUT -s $DIP -j ACCEPT
+	   #$IPT $IPT_FLAGS -D OUTPUT -d $DIP -j ACCEPT
+      #$IPT $IPT_FLAGS -D INPUT -s $DIP -j $ALL_STOP
+      #$IPT $IPT_FLAGS -D OUTPUT -d $DIP -j $ALL_STOP
+	   # TODO need to search for handle
+	   $NFT delete rule ip filter INPUT handle <handle_value>
+	   $NFT delete rule ip filter OUTPUT handle <handle_value>
+	   # todo 3rd
+	   # todo 4th
+
+	   #$IPT $IPT_FLAGS -D TALLOW -s $DIP -j ACCEPT
+	   #$IPT $IPT_FLAGS -D TALLOW -d $DIP -j ACCEPT
+      #$IPT $IPT_FLAGS -D TDENY -s $DIP -j $ALL_STOP
+      #$IPT $IPT_FLAGS -D TDENY -d $DIP -j $ALL_STOP
+	   # TODO need to search for handle
+	   $NFT delete rule ip filter TALLOW handle <handle_value>
+	   # todo 2nd
+	   $NFT delete rule ip filter TDENY handle <handle_value>
+	   # todo 4th
+
+	   #$IPT $IPT_FLAGS -D TGALLOW -s $DIP -j ACCEPT
+	   #$IPT $IPT_FLAGS -D TGALLOW -d $DIP -j ACCEPT
+      #$IPT $IPT_FLAGS -D TGDENY -s $DIP -j $ALL_STOP
+      #$IPT $IPT_FLAGS -D TGDENY -d $DIP -j $ALL_STOP
+	   # TODO need to search for handle
+      $NFT delete rule ip TGALLOW handle <handle_value>
+	   # todo 2nd
+      $NFT delete rule ip TGDENY handle <handle_value>
+	   # todo 4th
+
+	   sed -i "/$DIP/d" $ALLOW_HOSTS $DENY_HOSTS $GALLOW_HOSTS $GDENY_HOSTS
+	   #dil=`$IPT $IPT_FLAGS --numeric --list INPUT --line-numbers | grep -w $DIP | awk '{print$1}'`
+	   #dol=`$IPT $IPT_FLAGS --numeric --list OUTPUT --line-numbers | grep -w $DIP | awk '{print$1}'`
+	   #$IPT $IPT_FLAGS -D INPUT $dil >> /dev/null 2>&1
+	   #$IPT $IPT_FLAGS -D OUTPUT $dol >> /dev/null 2>&1
+
+	   dil=`$IPT $IPT_FLAGS --numeric --list TALLOW --line-numbers | grep -w $DIP | tac | awk '{print$1}'`
+	   dol=`$IPT $IPT_FLAGS --numeric --list TDENY --line-numbers | grep -w $DIP | tac | awk '{print$1}'`
+	   for i in `echo $dil`; do
+		$IPT $IPT_FLAGS -D TALLOW $i >> /dev/null 2>&1
+	   # TODO NFT
+	   done
+	   for i in `echo $dol`; do
+		$IPT $IPT_FLAGS -D TDENY $i >> /dev/null 2>&1
+	   # TODO NFT
+	   done
+
+	   dil=`$IPT $IPT_FLAGS --numeric --list TGALLOW --line-numbers | grep -w $DIP | tac | awk '{print$1}'`
+	   dol=`$IPT $IPT_FLAGS --numeric --list TGDENY --line-numbers | grep -w $DIP | tac | awk '{print$1}'`
+	   for i in `echo $dil`; do
+		$IPT $IPT_FLAGS -D TGALLOW $i >> /dev/null 2>&1
+	   # TODO NFT
+	   done
+	   for i in `echo $dol`; do
+		$IPT $IPT_FLAGS -D TGDENY $i >> /dev/null 2>&1
+	   # TODO NFT
+	   done
 	else
 	   $IPT $IPT_FLAGS -D INPUT -s $DIP -j ACCEPT
 	   $IPT $IPT_FLAGS -D OUTPUT -d $DIP -j ACCEPT
@@ -228,7 +285,8 @@ cli_trust() {
 			JACTION="ACCEPT"
 		fi
 		if [ $EXECUTOR == "nft" ]; then
-		   #TODO nft
+              $NFT insert rule ip filter $CHAIN ip saddr $HOST counter $JACTION
+              $NFT insert rule ip filter $CHAIN ip daddr $HOST counter $JACTION
 		else
 	           $IPT $IPT_FLAGS -I $CHAIN -s $HOST -j $JACTION
 	           $IPT $IPT_FLAGS -I $CHAIN -d $HOST -j $JACTION
@@ -262,7 +320,9 @@ if [ ! "$1" = "1" ]; then
 fi
 
 if [ $EXECUTOR == "nft" ]; then
-	chains=`cat /proc/net/ip_tables_names 2>/dev/null`
+   $NFT flush ruleset
+else
+   chains=`cat /proc/net/ip_tables_names 2>/dev/null`
 	for i in $chains; do $IPT $IPT_FLAGS -t $i -F; done
 	for i in $chains; do $IPT $IPT_FLAGS -t $i -X; done
 	$IPT $IPT_FLAGS -P INPUT ACCEPT
@@ -280,8 +340,6 @@ if [ $EXECUTOR == "nft" ]; then
 		$IP6T -P OUTPUT ACCEPT
 		$IP6T -P FORWARD ACCEPT
 	fi
-else
-        $NFT flush ruleset
 fi
 
 # TODO this is iptable module?
@@ -297,7 +355,18 @@ fi
 
 list() {
 if [ $EXECUTOR == "nft" ]; then
-   #TODO nft
+   echo "Loading iptables rules..."
+   iptc=/etc/apf/.iptrules.$$
+   :> $iptc ; chmod 600 $iptc
+   $NFT -n list ruleset >> $iptc
+   echo "Opening editor"
+   if [ -f "/usr/bin/pico" ]; then
+	/usr/bin/pico -w $iptc
+   elif [ -f "/usr/bin/nano" ]; then
+	/usr/bin/nano -w $iptc
+   elif [ -f "/bin/vi" ]; then
+	/bin/vi $iptc
+   fi
 else
    echo "Loading iptables rules..."
    iptc=/etc/apf/.iptrules.$$
@@ -356,7 +425,8 @@ if [ ! "$TOS_0" == "" ]; then
         for i in `echo $TOS_0 | tr ',' ' '`; do
                 i=`echo $i | tr '_' ':'`
 		if [ $EXECUTOR == "nft" ]; then
-                   # TODO nft
+                   $NFT add rule ip mangle $TYPE tcp dport $i counter ip6 dscp set 0x00
+                   $NFT add rule ip mangle $TYPE udp dport $i counter ip6 dscp set 0x00
 		else
                    $IPT $IPT_FLAGS -t mangle -A $TYPE -p tcp --dport $i -j TOS --set-tos 0
                    $IPT $IPT_FLAGS -t mangle -A $TYPE -p udp --dport $i -j TOS --set-tos 0
