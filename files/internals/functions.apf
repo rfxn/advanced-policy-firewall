@@ -983,7 +983,7 @@ if [ ! "$GA_URL" == "" ] && [ "$USE_RGT" == "1" ] && [ -f "$WGET" ]; then
    mkdir $URL_TMP
    cd $URL_TMP
    eout "{trust} downloading $GA_URL"
-   $WGET -4 -t 1 -T 4 $GA_URL >> /dev/null 2>&1
+   $WGET "$WGET_HEADER_GA" -4 -t 1 -T 4 $GA_URL >> /dev/null 2>&1
    if [ -f "$URL_TMP/$URL_FILE" ]; then
         eout "{trust} parsing $URL_FILE into $GALLOW_HOSTS"
         cat $URL_TMP/$URL_FILE > $GALLOW_HOSTS
@@ -1007,7 +1007,7 @@ if [ ! "$GD_URL" == "" ] && [ "$USE_RGT" == "1" ] && [ -f "$WGET" ]; then
    mkdir $URL_TMP
    cd $URL_TMP
    eout "{trust} downloading $GD_URL"
-   $WGET -4 -t 1 -T 4 $GD_URL >> /dev/null 2>&1
+   $WGET "$WGET_HEADER_GD" -4 -t 1 -T 4 $GD_URL >> /dev/null 2>&1
    if [ -f "$URL_TMP/$URL_FILE" ]; then
         eout "{trust} parsing $URL_FILE into $GDENY_HOSTS"
 	cat $URL_TMP/$URL_FILE > $GDENY_HOSTS

@@ -528,6 +528,16 @@ GA_URL="http://yourhost.com/glob_allow.rules"
 GD_URL="http://yourhost.com/glob_deny.rules"
 
 ##
+# header for ga_url and gd_url
+##
+# for GA_URL during wget
+# example WGET_HEADER_GA="--header=x-token: abcdefg"
+WGET_HEADER_GA=""
+# for GD_URL during wget
+# example WGET_HEADER_GD="--header=x-token: abcdefg"
+WGET_HEADER_GD=""
+
+##
 # [Logging and control settings]
 ##
 # Log all traffic that is filtered by the firewall
