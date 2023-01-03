@@ -6,7 +6,7 @@ if [ "$LOG_DROP" == "1" ]; then
 	  $NFT add chain ip filter TELNET_LOG
           $NFT add rule ip filter TELNET_LOG tcp dport 23 ct state new log prefix \"\*\* TELNET \*\* \" level crit flags tcp options flags ip options
           $NFT add chain ip filter SSH_LOG
-          $NFT add rule ip filter SSH_LOG tcp dport 22 ct state new log prefix \"\*\* SSH \*\* \" level crit flags tcp options flags ip options
+          $NFT add rule ip filter SSH_LOG tcp dport $HELPER_SSH_PORT ct state new log prefix \"\*\* SSH \*\* \" level crit flags tcp options flags ip options
           $NFT add rule ip filter INPUT jump TELNET_LOG
           $NFT add rule ip filter INPUT jump SSH_LOG
         else
