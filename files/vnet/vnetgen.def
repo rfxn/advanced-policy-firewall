@@ -20,7 +20,7 @@ VNET="$addr"
 # Or you can defined standard iptable rules such as:
 # \$IPT -A INPUT -p tcp -s 1.0.1.0.1 -d \$VNET --dport 10024 -j ACCEPT
 # or NFT
-# \$NFT nft add rule ip filter INPUT ip saddr 1.0.0.1 ip daddr 8.8.8.8 tcp dport 10024 accept
+# \$NFT add rule ip filter INPUT ip saddr 1.0.0.1 ip daddr 8.8.8.8 tcp dport 10024 accept
 
 
 
