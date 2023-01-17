@@ -157,7 +157,7 @@ if [ "$MD5_FIRSTRUN" == "1" ]; then
 fi
 
 if [ $EXECUTOR == "nft" ]; then
-	firewall_on=`$NFT -n list ruleset | grep -vE "chain|table"`
+	firewall_on=`$NFT -n list ruleset | grep -vE "chain|table|}|{|^$"`
 else
 	firewall_on=`$IPT $IPT_FLAGS -L --numeric | grep -vE "Chain|destination"`
 fi
