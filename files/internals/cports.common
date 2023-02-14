@@ -21,13 +21,14 @@ for i in `echo $IG_TCP_CPORTS`; do
          fi
         else
                 i=`echo $i | tr '_' ':'`
+                j=`echo $i | tr ':' '-'`
                 if [ ! "$i" == "" ]; then
 		   if [ $EXECUTOR == "nft" ]; then
 		      #$IPT $IPT_FLAGS -A INPUT -p $PROTO  -s 0/0 -d $VNET --dport $i -j ACCEPT
-		      $NFT add rule ip filter INPUT ip daddr $VNET $PROTO dport $i counter accept
+		      $NFT add rule ip filter INPUT ip daddr $VNET $PROTO dport $j counter accept
                       if [ "$USE_IPV6" == "1" ]; then
                          #$IP6T -A INPUT -m state --state NEW -m tcp -p $PROTO --dport $i -d $VNET -j ACCEPT
-		         $NFT add rule ip6 filter INPUT ip6 daddr $VNET ct state new $PROTO dport $i counter accept
+		         $NFT add rule ip6 filter INPUT ip6 daddr $VNET ct state new $PROTO dport $j counter accept
                       fi
 		   else
                       $IPT $IPT_FLAGS -A INPUT -p $PROTO  -s 0/0 -d $VNET --dport $i -j ACCEPT
@@ -58,10 +59,11 @@ for i in `echo $IG_UDP_CPORTS`; do
          fi
         else
                 i=`echo $i | tr '_' ':'`
+                j=`echo $i | tr ':' '-'`
                 if [ ! "$i" == "" ]; then
 		   if [ $EXECUTOR == "nft" ]; then
                       #$IPT $IPT_FLAGS -A INPUT -p $PROTO  -s 0/0 -d $VNET --dport $i -j ACCEPT
-                      $NFT add rule ip filter INPUT ip daddr $VNET $PROTO dport $i counter accept
+                      $NFT add rule ip filter INPUT ip daddr $VNET $PROTO dport $j counter accept
 		   else
                       $IPT $IPT_FLAGS -A INPUT -p $PROTO  -s 0/0 -d $VNET --dport $i -j ACCEPT
 		      # TODO ipv6?
@@ -90,10 +92,11 @@ for i in `echo $EG_TCP_CPORTS`; do
          fi
         else
                 i=`echo $i | tr '_' ':'`
+                j=`echo $i | tr ':' '-'`
                 if [ ! "$i" == "" ]; then
 		   if [ $EXECUTOR == "nft" ]; then
                         #$IPT $IPT_FLAGS -A OUTPUT -p $PROTO  -s $VNET --dport $i -j ACCEPT
-		        $NFT add rule ip filter OUTPUT ip saddr $VNET $PROTO dport $i counter accept
+		        $NFT add rule ip filter OUTPUT ip saddr $VNET $PROTO dport $j counter accept
 		   else
                         $IPT $IPT_FLAGS -A OUTPUT -p $PROTO  -s $VNET --dport $i -j ACCEPT
 		        # TODO ipv6?
@@ -123,10 +126,11 @@ for i in `echo $EG_UDP_CPORTS`; do
          fi
         else
                 i=`echo $i | tr '_' ':'`
+                j=`echo $i | tr ':' '-'`
                 if [ ! "$i" == "" ]; then
 	           if [ $EXECUTOR == "nft" ]; then
                       #$IPT $IPT_FLAGS -A OUTPUT -p $PROTO  -s $VNET --dport $i -j ACCEPT
-                      $NFT add rule ip filter OUTPUT ip saddr $VNET $PROTO dport $i counter accept		   
+                      $NFT add rule ip filter OUTPUT ip saddr $VNET $PROTO dport $j counter accept
                    else
                       $IPT $IPT_FLAGS -A OUTPUT -p $PROTO  -s $VNET --dport $i -j ACCEPT
 		      # TODO ipv6?
@@ -244,10 +248,11 @@ port=`echo $i | tr ':' ' ' | awk '{print$2}'`
          fi
         else
                 i=`echo $port | tr '_' ':'`
+                j=`echo $i | tr ':' '-'`
                 if [ ! "$i" == "" ]; then
 	           if [ $EXECUTOR == "nft" ]; then
                       #$IPT $IPT_FLAGS -A OUTPUT -p $PROTO  -s $VNET --dport $i --match owner --uid-owner $uid -j ACCEPT
-                      $NFT add rule ip filter OUTPUT $PROTO saddr $VNET tcp dport $port skuid $uid counter accept
+                      $NFT add rule ip filter OUTPUT $PROTO saddr $VNET tcp dport $j skuid $uid counter accept
                    else
                       $IPT $IPT_FLAGS -A OUTPUT -p $PROTO -s $VNET --dport $i --match owner --uid-owner $uid -j ACCEPT
 		      # TODO ipv6?
@@ -280,10 +285,11 @@ port=`echo $i | tr ':' ' ' | awk '{print$2}'`
          fi
         else
                 i=`echo $port | tr '_' ':'`
+                j=`echo $i | tr ':' '-'`
                 if [ ! "$i" == "" ]; then
 	           if [ $EXECUTOR == "nft" ]; then
                       #$IPT $IPT_FLAGS -A OUTPUT -p $PROTO  -s $VNET --dport $i --match owner --uid-owner $uid -j ACCEPT
-                      $NFT add rule ip filter OUTPUT ip saddr $VNET $PROTO dport $port skuid $uid counter accept
+                      $NFT add rule ip filter OUTPUT ip saddr $VNET $PROTO dport $j skuid $uid counter accept
                    else
                       $IPT $IPT_FLAGS -A OUTPUT -p $PROTO  -s $VNET --dport $i --match owner --uid-owner $uid -j ACCEPT
 		      # TODO ipv6?
