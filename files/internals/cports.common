@@ -247,7 +247,7 @@ EG_ICMP_TYPES=`echo $EG_ICMP_TYPES | tr ',' ' '`
 	          if [ $EXECUTOR == "nft" ]; then
                      #$IPT $IPT_FLAGS -A OUTPUT -p icmp  -s $VNET -d 0/0 $ICMP_EARGS  -j ACCEPT
 		     # TODO support limit for nft?
-		     $NFT add rule ip filter INPUT ip protocol icmp ip daddr $VNET counter accept
+		     $NFT add rule ip filter OUTPUT ip protocol icmp ip daddr $VNET counter accept
                   else
                      $IPT $IPT_FLAGS -A OUTPUT -p icmp  -s $VNET -d 0/0 $ICMP_EARGS  -j ACCEPT
 		     # TODO ipv6?
