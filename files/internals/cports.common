@@ -54,7 +54,11 @@ for i in `echo $IG_UDP_CPORTS`; do
          if [ ! "$i" == "" ]; then
 		if [ $EXECUTOR == "nft" ]; then
                    #$IPT $IPT_FLAGS -A INPUT -p $PROTO  -s 0/0 -d $VNET --dport $i -j ACCEPT
-		   $NFT add rule ip filter INPUT ip daddr $VNET $PROTO dport $i counter accept
+                   if [ "$USE_IPV6" == "1" ]; then
+		       $NFT add rule ip filter INPUT ip daddr $VNET $PROTO dport $i counter accept
+		   else
+                       # TODO for nftable ipv6
+		   fi
 		else
                    $IPT $IPT_FLAGS -A INPUT -p $PROTO  -s 0/0 -d $VNET --dport $i -j ACCEPT
 		   # TODO ipv6?
@@ -66,8 +70,12 @@ for i in `echo $IG_UDP_CPORTS`; do
                 j=`echo $i | tr ':' '-'`
                 if [ ! "$i" == "" ]; then
 		   if [ $EXECUTOR == "nft" ]; then
-                      #$IPT $IPT_FLAGS -A INPUT -p $PROTO  -s 0/0 -d $VNET --dport $i -j ACCEPT
-                      $NFT add rule ip filter INPUT ip daddr $VNET $PROTO dport $j counter accept
+                      if [ "$USE_IPV6" == "1" ]; then
+                          #$IPT $IPT_FLAGS -A INPUT -p $PROTO  -s 0/0 -d $VNET --dport $i -j ACCEPT
+                          $NFT add rule ip filter INPUT ip daddr $VNET $PROTO dport $j counter accept
+                      else
+                          # TODO for nftable ipv6
+                      fi
 		   else
                       $IPT $IPT_FLAGS -A INPUT -p $PROTO  -s 0/0 -d $VNET --dport $i -j ACCEPT
 		      # TODO ipv6?
