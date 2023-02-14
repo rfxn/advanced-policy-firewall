@@ -245,9 +245,11 @@ EG_ICMP_TYPES=`echo $EG_ICMP_TYPES | tr ',' ' '`
 		i=`echo $i | tr '[:upper:]' '[:lower:]'`
 		if [ "$i" == "all" ]; then
 	          if [ $EXECUTOR == "nft" ]; then
-                     #$IPT $IPT_FLAGS -A OUTPUT -p icmp  -s $VNET -d 0/0 $ICMP_EARGS  -j ACCEPT
-		     # TODO support limit for nft?
-		     $NFT add rule ip filter OUTPUT ip protocol icmp ip daddr $VNET counter accept
+	             if [ "$USE_IPV6" == "1" ]; then
+                        $NFT add rule ip6 filter OUTPUT meta l4proto icmp ip6 saddr $VNET $ICMP_EARGS counter accept
+	             else
+		        $NFT add rule ip filter OUTPUT ip protocol icmp ip saddr $VNET $ICMP_EARGS counter accept
+		     fi
                   else
                      $IPT $IPT_FLAGS -A OUTPUT -p icmp  -s $VNET -d 0/0 $ICMP_EARGS  -j ACCEPT
 		     # TODO ipv6?
@@ -255,9 +257,11 @@ EG_ICMP_TYPES=`echo $EG_ICMP_TYPES | tr ',' ' '`
                   eout "{glob} opening outbound $PROTO all on $VNET"
 		else
                   if [ $EXECUTOR == "nft" ]; then
-		     #$IPT $IPT_FLAGS -A OUTPUT -p icmp --icmp-type $i  -s $VNET -d 0/0 $ICMP_EARGS -j ACCEPT
-		     # TODO support limit for nft?
-		     $NFT add rule ip filter OUTPUT ip saddr $VNET icmp type echo-request counter accept
+                     if [ "$USE_IPV6" == "1" ]; then
+                         $NFT add rule ip6 filter OUTPUT ip6 saddr $VNET icmp code $i $ICMP_EARGS counter accept
+                     else
+		         $NFT add rule ip filter OUTPUT ip saddr $VNET icmp code $i $ICMP_EARGS counter accept
+		     fi
                   else
                      $IPT $IPT_FLAGS -A OUTPUT -p icmp --icmp-type $i  -s $VNET -d 0/0 $ICMP_EARGS -j ACCEPT
 		     # TODO ipv6?
