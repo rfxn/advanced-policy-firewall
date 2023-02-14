@@ -382,15 +382,15 @@ if [ "$EGF" == "1" ]; then
 	else
            $IPT $IPT_FLAGS -N DEG
 	fi
-	for i in `echo $EG_DROP_CMD | tr ',' ' '`; do
+	for i in `echo $EG_DROP_CMD_LIST | tr ',' ' '`; do
 		si=`echo $i | cut -c 1-6`		
-		if [ "LOG_DROP" == "1" ]; then 
+		if [ "$LOG_DROP" == "1" ]; then
 		   if [ $EXECUTOR == "nft" ]; then
 		      if [ "$USE_IPV6" == "1" ]; then
-		         $NFT add rule ip6 filter DEG limit rate $LOG_RATE/minute burst 5 packets counter log prefix \"** DEG_$si ** \" level $LOG_LEVEL $LEXT
+		         $NFT add rule ip6 filter DEG limit rate $LOG_RATE/minute burst 5 packets counter log prefix "\*\* DEG_$si \*\* " level $LOG_LEVEL $LEXT
 		      else
                          #$IPT $IPT_FLAGS -A DEG -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** DEG_$si ** "
-		         $NFT add rule ip filter DEG limit rate $LOG_RATE/minute burst 5 packets counter log prefix \"** DEG_$si ** \" level $LOG_LEVEL $LEXT
+		         $NFT add rule ip filter DEG limit rate $LOG_RATE/minute burst 5 packets counter log prefix '"** DEG_'$si' ** "' level $LOG_LEVEL $LEXT
 		      fi
                    else
                       $IPT $IPT_FLAGS -A DEG -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** DEG_$si ** "
@@ -404,11 +404,14 @@ if [ "$EGF" == "1" ]; then
                    # TODO is this good? or maybe eout said not supported?
                    # because this match socket uid than command owner id.
                    #
-                   if [ "$USE_IPV6" == "1" ]; then
-                      $NFT add rule ip6 filter DEG skuid $i counter jump $ALL_STOP
-                   else
-                      $NFT add rule ip filter DEG skuid $i counter jump $ALL_STOP
-                   fi
+                   # cmd-owner is the owner , probably evaluate on realtime?
+                   # skuid is username or uid , eggdrop not exists, commented out this solution
+                   #if [ "$USE_IPV6" == "1" ]; then
+                   #   $NFT add rule ip6 filter DEG skuid $i counter jump $ALL_STOP
+                   #else
+                   #   $NFT add rule ip filter DEG skuid $i counter jump $ALL_STOP
+                   #fi
+                   :
                 else
                    $IPT $IPT_FLAGS -A DEG -s 0/0 -d 0/0 -m owner --cmd-owner=$i -j $ALL_STOP
 		fi
