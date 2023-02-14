@@ -177,13 +177,13 @@ if [ "$ICMP_LIM" == "" ]; then
 fi
 if [ $EXECUTOR == "nft" ]; then
    if [ "$(echo $ICMP_LIM | tr '/' ' ' | awk '{print$1}')" -gt "0" ]; then
-	ICMP_EARGS="-m limit --limit $ICMP_LIM"
+	ICMP_EARGS="limit rate $ICMP_LIM burst 5 packets"
    else
 	ICMP_EARGS=""
    fi
 else
    if [ "$(echo $ICMP_LIM | tr '/' ' ' | awk '{print$1}')" -gt "0" ]; then
-	ICMP_EARGS="limit rate $ICMP_LIM burst 5 packets"
+	ICMP_EARGS="-m limit --limit $ICMP_LIM"
    else
 	ICMP_EARGS=""
    fi
@@ -219,13 +219,13 @@ IG_ICMP_TYPES=`echo $IG_ICMP_TYPES | tr ',' ' '`
                 fi
 	 fi
 	done
-	if [ "$USE_IPV6" == "1" ]; then
-           if [ $EXECUTOR == "nft" ]; then
-	      $NFT add rule ip6 filter INPUT meta l4proto ipv6-icmp counter accept
-	   else
-	      $IP6T -A INPUT -p ipv6-icmp -j ACCEPT
-	   fi
-	fi
+#	if [ "$USE_IPV6" == "1" ]; then
+#           if [ $EXECUTOR == "nft" ]; then
+#	      $NFT add rule ip6 filter INPUT meta l4proto ipv6-icmp counter accept
+#	   else
+#	      $IP6T -A INPUT -p ipv6-icmp -j ACCEPT
+#	   fi
+#	fi
 fi
 
 if [ "$EGF" == "1" ]; then
