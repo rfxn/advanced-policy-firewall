@@ -374,7 +374,11 @@ fi
 if [ "$EGF" == "1" ]; then
  if [ "$EG_DROP_CMD" == "1" ]; then
 	if [ $EXECUTOR == "nft" ]; then
-	   $NFT add chain ip filter DEG
+           if [ "$USE_IPV6" == "1" ]; then
+              $NFT add chain ip6 filter DEG
+           else
+	      $NFT add chain ip filter DEG
+	   fi
 	else
            $IPT $IPT_FLAGS -N DEG
 	fi
@@ -382,16 +386,29 @@ if [ "$EGF" == "1" ]; then
 		si=`echo $i | cut -c 1-6`		
 		if [ "LOG_DROP" == "1" ]; then 
 		   if [ $EXECUTOR == "nft" ]; then
-                      #$IPT $IPT_FLAGS -A DEG -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** DEG_$si ** "
-		      $NFT add rule ip filter DEG limit rate $LOG_RATE/minute burst 5 packets counter log prefix \"\*\* DEG_ \*\* \" level $LOG_LEVEL $LEXT
+		      if [ "$USE_IPV6" == "1" ]; then
+		         $NFT add rule ip6 filter DEG limit rate $LOG_RATE/minute burst 5 packets counter log prefix \"** DEG_$si ** \" level $LOG_LEVEL $LEXT
+		      else
+                         #$IPT $IPT_FLAGS -A DEG -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** DEG_$si ** "
+		         $NFT add rule ip filter DEG limit rate $LOG_RATE/minute burst 5 packets counter log prefix \"** DEG_$si ** \" level $LOG_LEVEL $LEXT
+		      fi
                    else
                       $IPT $IPT_FLAGS -A DEG -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** DEG_$si ** "
 		   fi
 		fi
 		if [ $EXECUTOR == "nft" ]; then
                    # --cmd-owner is removed in kernel 2.6.15 https://superuser.com/questions/34782/with-linux-iptables-is-it-possible-to-log-the-process-command-name-that-initiat
-                   #$IPT $IPT_FLAGS -A DEG -s 0/0 -d 0/0 -m owner --cmd-owner=$i -j $ALL_STOP
-                   :
+                   # https://android.googlesource.com/platform/external/iptables.git/+/eclair-sholes-release2/extensions/libipt_owner.c
+                   # https://www.spinics.net/lists/netfilter/msg49715.html
+                   #
+                   # TODO is this good? or maybe eout said not supported?
+                   # because this match socket uid than command owner id.
+                   #
+                   if [ "$USE_IPV6" == "1" ]; then
+                      $NFT add rule ip6 filter DEG skuid $i counter jump $ALL_STOP
+                   else
+                      $NFT add rule ip filter DEG skuid $i counter jump $ALL_STOP
+                   fi
                 else
                    $IPT $IPT_FLAGS -A DEG -s 0/0 -d 0/0 -m owner --cmd-owner=$i -j $ALL_STOP
 		fi
