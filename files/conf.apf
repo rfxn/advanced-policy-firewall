@@ -474,11 +474,12 @@ EG_UDP_UID=""
 # ACCESS CONTROL feature. That means EG_DROP_CMD is intended to DENY outbound
 # access for specified programs, not ALLOW.
 #
-# Format is comma separated list of executable names you wish to ban from being
+# Format is space separated list of executable names you wish to ban from being
 # able to transmit data out of your server.
 
 # CMD-Match outbound (egress) denied applications
-EG_DROP_CMD="eggdrop psybnc bitchx BitchX init udp.pl"
+EG_DROP_CMD="0"
+EG_DROP_CMD_LIST="eggdrop psybnc bitchx BitchX init udp.pl"
 
 ##
 # [Remote Rule Imports]
