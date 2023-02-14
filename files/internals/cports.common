@@ -5,16 +5,18 @@ for i in `echo $IG_TCP_CPORTS`; do
         if [ "$(echo $i | grep "_")" == "" ]; then
          if [ ! "$i" == "" ]; then
 		if [ $EXECUTOR == "nft" ]; then
-		   #$IPT $IPT_FLAGS -A INPUT -p $PROTO  -s 0/0 -d $VNET --dport $i -j ACCEPT
-		   $NFT add rule ip filter INPUT ip daddr $VNET $PROTO dport $i counter accept
                    if [ "$USE_IPV6" == "1" ]; then
                    #   $IP6T -A INPUT -m state --state NEW -m tcp -p $PROTO --dport $i -d $VNET -j ACCEPT
 		       $NFT add rule ip6 filter INPUT ip6 daddr $VNET ct state new $PROTO dport $i counter accept
+		   else
+                       #$IPT $IPT_FLAGS -A INPUT -p $PROTO  -s 0/0 -d $VNET --dport $i -j ACCEPT
+                       $NFT add rule ip filter INPUT ip daddr $VNET $PROTO dport $i counter accept
                    fi
 		else
-                   $IPT $IPT_FLAGS -A INPUT -p $PROTO  -s 0/0 -d $VNET --dport $i -j ACCEPT
                    if [ "$USE_IPV6" == "1" ]; then
                       $IP6T -A INPUT -m state --state NEW -m tcp -p $PROTO --dport $i -d $VNET -j ACCEPT
+                   else
+                      $IPT $IPT_FLAGS -A INPUT -p $PROTO  -s 0/0 -d $VNET --dport $i -j ACCEPT
                    fi
 		fi
                 eout "{glob} opening inbound $PROTO port $i on $VNET"
@@ -24,16 +26,18 @@ for i in `echo $IG_TCP_CPORTS`; do
                 j=`echo $i | tr ':' '-'`
                 if [ ! "$i" == "" ]; then
 		   if [ $EXECUTOR == "nft" ]; then
-		      #$IPT $IPT_FLAGS -A INPUT -p $PROTO  -s 0/0 -d $VNET --dport $i -j ACCEPT
-		      $NFT add rule ip filter INPUT ip daddr $VNET $PROTO dport $j counter accept
                       if [ "$USE_IPV6" == "1" ]; then
                          #$IP6T -A INPUT -m state --state NEW -m tcp -p $PROTO --dport $i -d $VNET -j ACCEPT
 		         $NFT add rule ip6 filter INPUT ip6 daddr $VNET ct state new $PROTO dport $j counter accept
+		      else
+                         #$IPT $IPT_FLAGS -A INPUT -p $PROTO  -s 0/0 -d $VNET --dport $i -j ACCEPT
+                         $NFT add rule ip filter INPUT ip daddr $VNET $PROTO dport $j counter accept
                       fi
 		   else
-                      $IPT $IPT_FLAGS -A INPUT -p $PROTO  -s 0/0 -d $VNET --dport $i -j ACCEPT
                       if [ "$USE_IPV6" == "1" ]; then
                          $IP6T -A INPUT -m state --state NEW -m tcp -p $PROTO --dport $i -d $VNET -j ACCEPT
+                      else
+                         $IPT $IPT_FLAGS -A INPUT -p $PROTO  -s 0/0 -d $VNET --dport $i -j ACCEPT
                       fi
 	           fi
                    eout "{glob} opening inbound $PROTO port $i on $VNET"
