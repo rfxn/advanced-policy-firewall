@@ -234,10 +234,18 @@ PROTO="icmp"
 if [ "$ICMP_LIM" == "" ]; then
         ICMP_LIM=0
 fi
-if [ "$(echo $ICMP_LIM | tr '/' ' ' | awk '{print$1}')" -gt "0" ]; then
-        ICMP_EARGS="-m limit --limit $ICMP_LIM"
-else
+if [ $EXECUTOR == "nft" ]; then
+   if [ "$(echo $ICMP_LIM | tr '/' ' ' | awk '{print$1}')" -gt "0" ]; then
+        ICMP_EARGS="limit rate $ICMP_LIM burst 5 packets"
+   else
         ICMP_EARGS=""
+   fi
+else
+   if [ "$(echo $ICMP_LIM | tr '/' ' ' | awk '{print$1}')" -gt "0" ]; then
+        ICMP_EARGS="-m limit --limit $ICMP_LIM"
+   else
+        ICMP_EARGS=""
+   fi
 fi
 EG_ICMP_TYPES=`echo $EG_ICMP_TYPES | tr ',' ' '`
         for i in `echo $EG_ICMP_TYPES`; do
