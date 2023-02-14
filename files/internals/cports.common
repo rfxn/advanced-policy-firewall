@@ -292,8 +292,12 @@ port=`echo $i | tr ':' ' ' | awk '{print$2}'`
         if [ "$(echo $port | grep "_")" == "" ]; then
          if [ ! "$port" == "" ]; then
                 if [ $EXECUTOR == "nft" ]; then
-                   #$IPT $IPT_FLAGS -A OUTPUT -p $PROTO  -s $VNET --dport $port --match owner --uid-owner $uid -j ACCEPT
-                   $NFT add rule ip filter OUTPUT $PROTO saddr $VNET tcp dport $port skuid $uid counter accept
+                   if [ "$USE_IPV6" == "1" ]; then
+                      $NFT add rule ip6 filter OUTPUT ip6 saddr $VNET $PROTO dport $port skuid $uid counter accept
+                   else
+                      #$IPT $IPT_FLAGS -A OUTPUT -p $PROTO  -s $VNET --dport $port --match owner --uid-owner $uid -j ACCEPT
+                      $NFT add rule ip filter OUTPUT ip saddr $VNET $PROTO dport $port skuid $uid counter accept
+                   fi
                 else
                    $IPT $IPT_FLAGS -A OUTPUT -p $PROTO -s $VNET --dport $port --match owner --uid-owner $uid -j ACCEPT
 		   # TODO ipv6?
@@ -305,8 +309,12 @@ port=`echo $i | tr ':' ' ' | awk '{print$2}'`
                 j=`echo $i | tr ':' '-'`
                 if [ ! "$i" == "" ]; then
 	           if [ $EXECUTOR == "nft" ]; then
-                      #$IPT $IPT_FLAGS -A OUTPUT -p $PROTO  -s $VNET --dport $i --match owner --uid-owner $uid -j ACCEPT
-                      $NFT add rule ip filter OUTPUT $PROTO saddr $VNET tcp dport $j skuid $uid counter accept
+	              if [ "$USE_IPV6" == "1" ]; then
+	                 $NFT add rule ip6 filter OUTPUT ip6 saddr $VNET $PROTO dport $j skuid $uid counter accept
+	              else
+                         #$IPT $IPT_FLAGS -A OUTPUT -p $PROTO  -s $VNET --dport $i --match owner --uid-owner $uid -j ACCEPT
+                         $NFT add rule ip filter OUTPUT $PROTO saddr $VNET tcp dport $j skuid $uid counter accept
+                      fi
                    else
                       $IPT $IPT_FLAGS -A OUTPUT -p $PROTO -s $VNET --dport $i --match owner --uid-owner $uid -j ACCEPT
 		      # TODO ipv6?
