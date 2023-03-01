@@ -313,7 +313,7 @@ port=`echo $i | tr ':' ' ' | awk '{print$2}'`
 	                 $NFT add rule ip6 filter OUTPUT ip6 saddr $VNET $PROTO dport $j skuid $uid counter accept
 	              else
                          #$IPT $IPT_FLAGS -A OUTPUT -p $PROTO  -s $VNET --dport $i --match owner --uid-owner $uid -j ACCEPT
-                         $NFT add rule ip filter OUTPUT $PROTO saddr $VNET tcp dport $j skuid $uid counter accept
+                         $NFT add rule ip filter OUTPUT ip saddr $VNET $PROTO dport $j skuid $uid counter accept
                       fi
                    else
                       $IPT $IPT_FLAGS -A OUTPUT -p $PROTO -s $VNET --dport $i --match owner --uid-owner $uid -j ACCEPT
@@ -387,7 +387,7 @@ if [ "$EGF" == "1" ]; then
 		if [ "$LOG_DROP" == "1" ]; then
 		   if [ $EXECUTOR == "nft" ]; then
 		      if [ "$USE_IPV6" == "1" ]; then
-		         $NFT add rule ip6 filter DEG limit rate $LOG_RATE/minute burst 5 packets counter log prefix "\*\* DEG_$si \*\* " level $LOG_LEVEL $LEXT
+		         $NFT add rule ip6 filter DEG limit rate $LOG_RATE/minute burst 5 packets counter log prefix '"** DEG_'$si' ** "' level $LOG_LEVEL $LEXT
 		      else
                          #$IPT $IPT_FLAGS -A DEG -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** DEG_$si ** "
 		         $NFT add rule ip filter DEG limit rate $LOG_RATE/minute burst 5 packets counter log prefix '"** DEG_'$si' ** "' level $LOG_LEVEL $LEXT
