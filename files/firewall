@@ -503,22 +503,22 @@ tosroute POSTROUTING
 # Default Output Policies
 if [ ! "$EGF" == "1" ] || [ "$EGF" == "" ]; then
 	if [ $EXECUTOR == "nft" ]; then
-	   $NFT add rule ip filter OUTPUT counter jump ACCEPT
-        else
-           $IPT $IPT_FLAGS -A OUTPUT -j ACCEPT
+	   $NFT add rule ip filter OUTPUT counter accept
+   else
+      $IPT $IPT_FLAGS -A OUTPUT -j ACCEPT
 	fi
-        eout "{glob} default (egress) output accept"
+   eout "{glob} default (egress) output accept"
 elif [ "$EGF" == "1" ]; then
 	if [ $EXECUTOR == "nft" ]; then
 	   $NFT add rule ip filter OUTPUT ip protocol tcp counter jump $TCP_STOP
 	   $NFT add rule ip filter OUTPUT ip protocol udp counter jump $UDP_STOP
 	   $NFT add rule ip filter OUTPUT counter jump $ALL_STOP
-        else
+   else
 	   $IPT $IPT_FLAGS -A OUTPUT -p tcp -j $TCP_STOP
 	   $IPT $IPT_FLAGS -A OUTPUT -p udp -j $UDP_STOP
-           $IPT $IPT_FLAGS -A OUTPUT -p all -j $ALL_STOP
+      $IPT $IPT_FLAGS -A OUTPUT -p all -j $ALL_STOP
 	fi
-        eout "{glob} default (egress) output drop"
+   eout "{glob} default (egress) output drop"
 fi
 
 # Default Input Policies
