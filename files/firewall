@@ -159,11 +159,10 @@ fi
 
 # Create (glob)trust system chains
 if [ $EXECUTOR == "nft" ]; then
-  # TODO nft
   $NFT add chain ip filter TALLOW
   $NFT add chain ip filter TDENY
   $NFT add chain ip filter TGALLOW
-  $NFT add chain ip filter TDDENY
+  $NFT add chain ip filter TGDENY
   $NFT add chain ip filter REFRESH_TEMP
   $NFT add rule ip filter INPUT counter jump REFRESH_TEMP
   $NFT add rule ip filter OUTPUT counter jump REFRESH_TEMP
