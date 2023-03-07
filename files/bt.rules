@@ -433,35 +433,35 @@ if [ "$PKT_SANITY" == "1" ]; then
            eout "{pkt_sanity} deny outbound tcp port 0"
            if [ $EXECUTOR == "nft" ]; then
               #$IPT $IPT_FLAGS -N PZERO
-              nft add chain ip filter PZERO
+              $NFT add chain ip filter PZERO
               if [ "$LOG_DROP" == "1" ]; then
                  #$IPT $IPT_FLAGS -A PZERO -p tcp --dport 0 -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** Port Zero ** "
-                 nft add rule ip filter PZERO tcp dport 0 limit rate $LOG_RATE/minute burst 5 packets counter $LOG_TARGET prefix \"** Port Zero ** \" level $LOG_LEVEL $LEXT
+                 $NFT add rule ip filter PZERO tcp dport 0 limit rate $LOG_RATE/minute burst 5 packets counter log prefix '"** Port Zero ** "' level $LOG_LEVEL $LEXT
               fi
               #$IPT $IPT_FLAGS -A PZERO -p tcp --dport 0 $RAB_SANITY_FLAGS -j $TCP_STOP
-              # TODO need more work
+              $NFT add rule ip filter PZERO tcp dport 0 counter $TCP_STOP
               if [ "$LOG_DROP" == "1" ]; then
                  #$IPT $IPT_FLAGS -A PZERO -p udp --dport 0 -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** Port Zero ** "
-                 nft add rule ip filter PZERO udp dport 0 limit rate $LOG_RATE/minute burst 5 packets counter $LOG_TARGET prefix \"** Port Zero ** \" level $LOG_LEVEL $LEXT
+                 $NFT add rule ip filter PZERO udp dport 0 limit rate $LOG_RATE/minute burst 5 packets counter log prefix '"** Port Zero ** "' level $LOG_LEVEL $LEXT
               fi
               #$IPT $IPT_FLAGS -A PZERO -p udp --dport 0 $RAB_SANITY_FLAGS -j $UDP_STOP
-              # TODO need more work
+              $NFT add rule ip filter PZERO udp dport 0 counter $RAB_SANITY_FLAGS $UDP_STOP
               if [ "$LOG_DROP" == "1" ]; then
                  #$IPT $IPT_FLAGS -A PZERO -p tcp --sport 0 -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** Port Zero ** "
-                 nft add rule ip filter PZERO tcp sport 0 limit rate $LOG_RATE/minute burst 5 packets counter $LOG_TARGET prefix \"** Port Zero ** \" level $LOG_LEVEL $LEXT
+                 $NFT add rule ip filter PZERO tcp sport 0 limit rate $LOG_RATE/minute burst 5 packets counter log prefix '"** Port Zero ** "' level $LOG_LEVEL $LEXT
               fi
               #$IPT $IPT_FLAGS -A PZERO -p tcp --sport 0 $RAB_SANITY_FLAGS -j $TCP_STOP
-              # TODO need more work
+              $NFT add rule ip filter PZERO tcp sport 0 counter $TCP_STOP
               if [ "$LOG_DROP" == "1" ]; then
                  #$IPT $IPT_FLAGS -A PZERO -p udp --sport 0 -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** Port Zero ** "
-                 nft add rule ip filter PZERO udp sport 0 limit rate $LOG_RATE/minute burst 5 packets counter $LOG_TARGET prefix \"** Port Zero ** \" level $LOG_LEVEL $LEXT
+                 $NFT add rule ip filter PZERO udp sport 0 limit rate $LOG_RATE/minute burst 5 packets counter log prefix '"** Port Zero ** "' level $LOG_LEVEL $LEXT
               fi
               #$IPT $IPT_FLAGS -A PZERO -p udp --sport 0 $RAB_SANITY_FLAGS -j $UDP_STOP
-              # TODO need more work
+              $NFT add rule ip filter PZERO udp sport 0 counter $UDP_STOP
               #$IPT $IPT_FLAGS -A INPUT -j PZERO
-              nft add rule ip filter INPUT counter jump PZERO
+              $NFT add rule ip filter INPUT counter jump PZERO
               #$IPT $IPT_FLAGS -A OUTPUT -j PZERO
-              nft add rule ip filter OUTPUT counter jump PZERO
+              $NFT add rule ip filter OUTPUT counter jump PZERO
            else
               $IPT $IPT_FLAGS -N PZERO
               if [ "$LOG_DROP" == "1" ]; then
