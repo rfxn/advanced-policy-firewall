@@ -388,8 +388,8 @@ if [ "$PKT_SANITY" == "1" ]; then
         fi
 
         if [ $EXECUTOR == "nft" ]; then
-           nft add rule ip filter OUTPUT counter jump OUT_SANITY
-           nft add rule ip filter INPUT counter jump IN_SANITY
+           $NFT add rule ip filter OUTPUT counter jump OUT_SANITY
+           $NFT add rule ip filter INPUT counter jump IN_SANITY
         else
            $IPT $IPT_FLAGS -A OUTPUT -j OUT_SANITY
            $IPT $IPT_FLAGS -A INPUT -j IN_SANITY
@@ -399,21 +399,21 @@ if [ "$PKT_SANITY" == "1" ]; then
            # Block fragmented UDP
            eout "{pkt_sanity} deny all fragmented udp"
            if [ $EXECUTOR == "nft" ]; then
-              nft add chain ip filter FRAG_UDP
+              $NFT add chain ip filter FRAG_UDP
               if [ "$LOG_DROP" == "1" ]; then
                  #$IPT $IPT_FLAGS -A FRAG_UDP -p udp -f -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** UDP Frag ** "
-                 nft add rule ip filter FRAG_UDP ip frag-off & 0x1fff != 0 ip protocol udp limit rate $LOG_RATE/minute burst 5 packets counter $LOG_TARGET prefix \"** UDP Frag ** \" level $LOG_LEVEL $LEXT
+                 $NFT add rule ip filter FRAG_UDP ip "frag-off & 0x1fff != 0" ip protocol udp limit rate $LOG_RATE/minute burst 5 packets counter log prefix '"** UDP Frag ** "' level $LOG_LEVEL $LEXT
               fi
               if [ "$RAB_LOG_HIT" == "1" ]; then
                  #$IPT $IPT_FLAGS -A FRAG_UDP -p udp -f -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** RABHIT ** "
-                 nft add rule ip filter FRAG_UDP ip frag-off & 0x1fff != 0 ip protocol udp limit rate $LOG_RATE/minute burst 5 packets counter $LOG_TARGET prefix \"** RABHIT ** \" level $LOG_LEVEL $LEXT
+                 $NFT add rule ip filter FRAG_UDP ip "frag-off & 0x1fff != 0" ip protocol udp limit rate $LOG_RATE/minute burst 5 packets counter log prefix '"** RABHIT ** "' level $LOG_LEVEL $LEXT
               fi
               #$IPT $IPT_FLAGS -A FRAG_UDP -p udp -f $RAB_SANITY_FLAGS -j $UDP_STOP
-              #TODO why this dont work
+              $NFT add rule ip filter FRAG_UDP ip frag-off & 0x1fff != 0 ip protocol udp counter $UDP_STOP
               #$IPT $IPT_FLAGS -A INPUT -j FRAG_UDP
-              nft add rule ip filter INPUT counter jump FRAG_UDP
+              $NFT add rule ip filter INPUT counter jump FRAG_UDP
               #$IPT $IPT_FLAGS -A OUTPUT -j FRAG_UDP
-              nft add rule ip filter OUTPUT counter jump FRAG_UDP
+              $NFT add rule ip filter OUTPUT counter jump FRAG_UDP
            else
               $IPT $IPT_FLAGS -N FRAG_UDP
               if [ "$LOG_DROP" == "1" ]; then
@@ -727,4 +727,4 @@ if [ "$BLK_TCP_SACK_PANIC" == "1" ] && [ ! "$SYSCTL_TCP_NOSACK" == "1" ]; then
               $IP6T -I INPUT -p tcp --tcp-flags SYN SYN -m tcpmss --mss 1:500 -j $TCP_STOP
            fi
         fi
-fi
+
