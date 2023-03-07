@@ -553,23 +553,23 @@ if [ "$BLK_MCATNET" == "1" ]; then
 	eout "{blk_mcat} deny all to 224.0.0.0/8"
         if [ $EXECUTOR == "nft" ]; then
            #$IPT $IPT_FLAGS -N MCAST
-           nft add chain ip filter MCAST
+           $NFT add chain ip filter MCAST
            if [ "$LOG_DROP" == "1" ]; then
               #$IPT $IPT_FLAGS -A MCAST -s 224.0.0.0/8 -d 0/0 -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** MCAST ** "
-              nft add rule ip filter MCAST ip saddr 224.0.0.0/8 limit rate $LOG_RATE/minute burst 5 packets counter $LOG_TARGET prefix \"** MCAST ** \" level $LOG_LEVEL $LEXT
+              $NFT add rule ip filter MCAST ip saddr 224.0.0.0/8 limit rate $LOG_RATE/minute burst 5 packets counter log prefix '"** MCAST ** "' level $LOG_LEVEL $LEXT
            fi
            #$IPT $IPT_FLAGS -A MCAST -s 224.0.0.0/8 -d 0/0 -j $ALL_STOP
-           nft add rule ip filter MCAST ip saddr 224.0.0.0/8 counter jump $ALL_STOP
+           $NFT add rule ip filter MCAST ip saddr 224.0.0.0/8 counter $ALL_STOP
            if [ "$LOG_DROP" == "1" ]; then
               #$IPT $IPT_FLAGS -A MCAST -s 0/0 -d 224.0.0.0/8 -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** MCAST ** "
-              nft add rule ip filter MCAST ip daddr 224.0.0.0/8 limit rate $LOG_RATE/minute burst 5 packets counter $LOG_TARGET prefix \"** MCAST ** \" level $LOG_LEVEL $LEXT
+              $NFT add rule ip filter MCAST ip daddr 224.0.0.0/8 limit rate $LOG_RATE/minute burst 5 packets counter log prefix '"** MCAST ** "' level $LOG_LEVEL $LEXT
            fi
            #$IPT $IPT_FLAGS -A MCAST -s 0/0 -d 224.0.0.0/8 -j $ALL_STOP
-           nft add rule ip filter MCAST ip daddr 224.0.0.0/8 counter jump $ALL_STOP
+           $NFT add rule ip filter MCAST ip daddr 224.0.0.0/8 counter $ALL_STOP
            #$IPT $IPT_FLAGS -A INPUT -j MCAST
-           nft add rule ip filter INPUT counter jump MCAST
+           $NFT add rule ip filter INPUT counter jump MCAST
            #$IPT $IPT_FLAGS -A OUTPUT -j MCAST
-           nft add rule ip filter OUTPUT counter jump MCAST
+           $NFT add rule ip filter OUTPUT counter jump MCAST
         else
            $IPT $IPT_FLAGS -N MCAST
            if [ "$LOG_DROP" == "1" ]; then
