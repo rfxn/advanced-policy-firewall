@@ -717,10 +717,10 @@ if [ "$BLK_TCP_SACK_PANIC" == "1" ] && [ ! "$SYSCTL_TCP_NOSACK" == "1" ]; then
 	eout "{blk_tcp_sack_panic} deny inbound tcp-flags SYN with MSS size 1 to 500 bytes "
         if [ $EXECUTOR == "nft" ]; then
            #$IPT $IPT_FLAGS -I INPUT -p tcp --tcp-flags SYN SYN -m tcpmss --mss 1:500 -j $TCP_STOP
-           nft -I INPUT -p tcp --tcp-flags SYN SYN -m tcpmss --mss 1:500 -j $TCP_STOP
+           $NFT insert rule ip filter INPUT tcp "flags & (syn) == syn" tcp option maxseg size 1-500 $TCP_STOP
            if [ "$USE_IPV6" == "1" ]; then
               #$IP6T -I INPUT -p tcp --tcp-flags SYN SYN -m tcpmss --mss 1:500 -j $TCP_STOP
-              nft -I INPUT -p tcp --tcp-flags SYN SYN -m tcpmss --mss 1:500 -j $TCP_STOP
+              $NFT insert rule ip6 filter INPUT tcp "flags & (syn) == syn" tcp option maxseg size 1-500 $TCP_STOP
            fi
         else
            $IPT $IPT_FLAGS -I INPUT -p tcp --tcp-flags SYN SYN -m tcpmss --mss 1:500 -j $TCP_STOP
@@ -728,4 +728,4 @@ if [ "$BLK_TCP_SACK_PANIC" == "1" ] && [ ! "$SYSCTL_TCP_NOSACK" == "1" ]; then
               $IP6T -I INPUT -p tcp --tcp-flags SYN SYN -m tcpmss --mss 1:500 -j $TCP_STOP
            fi
         fi
-
+fi
