@@ -550,6 +550,8 @@ LOG_LEVEL="crit"
 # ULOG (Allow ulogd to handle the logging)
 # LOG (Default; sends logging to kernel log)
 LOG_TARGET="LOG"
+# in nftables
+# LOG_TARGET="log"
 
 # Log interactive access over telnet & ssh; uses
 # custom log prefix of ** SSH ** & ** TELNET **
