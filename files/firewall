@@ -138,7 +138,7 @@ fi
 # Fix MTU/MSS Problems
 if [ $EXECUTOR == "nft" ]; then
    #$IPT $IPT_FLAGS -A OUTPUT -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu
-   $NFT add rule ip filter OUTPUT tcp flags & (syn|rst) == syn counter tcp option maxseg size set rt mtu
+   $NFT add rule ip filter OUTPUT tcp "flags & (syn|rst) == syn" counter tcp option maxseg size set rt mtu
 else
    $IPT $IPT_FLAGS -A OUTPUT -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu
 fi
