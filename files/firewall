@@ -105,8 +105,8 @@ if [ ! "$IFACE_TRUSTED" == "" ]; then
 	if [ $EXECUTOR == "nft" ]; then
           #$IPT $IPT_FLAGS -A INPUT -i $i -s 0/0 -d 0/0 -j ACCEPT
           #$IPT $IPT_FLAGS -A OUTPUT -o $i -s 0/0 -d 0/0 -j ACCEPT
-	  $NFT add rule ip filter INPUT iifname "$i" counter accept
-	  $NFT add rule ip filter OUTPUT oifname "$i" counter accept
+          $NFT add rule ip filter INPUT iifname "$i" counter accept
+          $NFT add rule ip filter OUTPUT oifname "$i" counter accept
         else
           $IPT $IPT_FLAGS -A INPUT -i $i -s 0/0 -d 0/0 -j ACCEPT
           $IPT $IPT_FLAGS -A OUTPUT -o $i -s 0/0 -d 0/0 -j ACCEPT
