@@ -524,13 +524,13 @@ fi
 # Default Input Policies
 eout "{glob} default (ingress) input drop"
 if [ $EXECUTOR == "nft" ]; then
-   nft add rule ip filter INPUT ip protocol tcp counter jump $TCP_STOP
-   nft add rule ip filter INPUT ip protocol udp counter jump $UDP_STOP
-   nft add rule ip filter INPUT counter jump $ALL_STOP
+   nft add rule ip filter INPUT ip protocol tcp counter $TCP_STOP
+   nft add rule ip filter INPUT ip protocol udp counter $UDP_STOP
+   nft add rule ip filter INPUT counter $ALL_STOP
    if [ "$USE_IPV6" == "1" ]; then
-	$NFT add rule ip6 filter INPUT meta l4proto tcp counter jump STOP
-	$NFT add rule ip6 filter INPUT meta l4proto udp counter jump STOP
-	$NFT add rule ip6 filter INPUT counter jump STOP
+      $NFT add rule ip6 filter INPUT meta l4proto tcp counter $TCP_STOP
+      $NFT add rule ip6 filter INPUT meta l4proto udp counter $UDP_STOP
+      $NFT add rule ip6 filter INPUT counter $ALL_STOP
    fi
 else
    $IPT $IPT_FLAGS -A INPUT -p tcp -j $TCP_STOP
