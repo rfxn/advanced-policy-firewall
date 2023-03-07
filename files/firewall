@@ -439,19 +439,19 @@ fi
 if [ "$HELPER_SSH" == "1" ]; then
 	if [ $EXECUTOR == "nft" ]; then
 	   $NFT add rule ip filter INPUT tcp sport  $HELPER_SSH_PORT tcp dport 513-65535 ct state related,established  counter accept
-	   $NFT add rule ip filter INPUT tcp sport 1024-65535 tcp dport $HELPER_SSH_PORT tcp flags & (fin|syn|rst|ack) == syn ct state related,established  counter accept
+	   $NFT add rule ip filter INPUT tcp sport 1024-65535 tcp dport $HELPER_SSH_PORT tcp "flags & (fin|syn|rst|ack) == syn" ct state related,established  counter accept
 	   $NFT add rule ip filter INPUT udp dport $HELPER_SSH_PORT ct state established  counter accept
 	   if [ "$USE_IPV6" == "1" ]; then
-		$NFT add rule ip6 filter INPUT ct state new  tcp dport $HELPER_SSH_PORT counter accept
-           fi
-        else
+		   $NFT add rule ip6 filter INPUT ct state new  tcp dport $HELPER_SSH_PORT counter accept
+      fi
+   else
 	   $IPT $IPT_FLAGS -A INPUT  -p tcp --sport $HELPER_SSH_PORT --dport 513:65535 -m state --state ESTABLISHED,RELATED -j ACCEPT
 	   $IPT $IPT_FLAGS -A INPUT  -p tcp --sport 1024:65535 --dport $HELPER_SSH_PORT --syn -m state --state ESTABLISHED,RELATED -j ACCEPT
 	   $IPT $IPT_FLAGS -A INPUT  -p udp --dport $HELPER_SSH_PORT -m state --state ESTABLISHED -j ACCEPT
 
 	   if [ "$USE_IPV6" == "1" ]; then
-                $IP6T -A INPUT -m state --state NEW -m tcp -p tcp --dport $HELPER_SSH_PORT -j ACCEPT
-           fi
+         $IP6T -A INPUT -m state --state NEW -m tcp -p tcp --dport $HELPER_SSH_PORT -j ACCEPT
+      fi
 	fi
 fi
 
