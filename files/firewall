@@ -370,14 +370,14 @@ LDNS=`cat /etc/resolv.conf  | grep -v "#" | grep -w nameserver | awk '{print$2}'
   if [ ! "$LDNS" == "" ]; then
         for i in `echo $LDNS`; do
         eout "{glob} resolv dns discovery for $i"
-	if [ $EXECUTOR == "nft" ]; then
+        if [ $EXECUTOR == "nft" ]; then
            $NFT add rule ip filter INPUT ip saddr $i udp sport 53 udp dport 1023-65535 counter accept
-	   $NFT add rule ip filter INPUT ip saddr $i tcp sport 53 tcp dport 1023-65535 counter accept
-	   $NFT add rule ip filter OUTPUT ip daddr $i udp sport 1023-65535 udp dport 53 counter accept
-	   $NFT add rule ip filter OUTPUT ip daddr $i tcp sport 1023-65535 tcp dport 53 counter accept
-	   if [ "$RESV_DNS_DROP" == "1" ]; then
-		$NFT add rule ip filter OUTPUT ip daddr $i udp sport 1023-65535 udp dport 53 counter accept
-		$NFT add rule ip filter OUTPUT ip daddr $i tcp sport 1023-65535 tcp dport 53 counter accept
+           $NFT add rule ip filter INPUT ip saddr $i tcp sport 53 tcp dport 1023-65535 counter accept
+           $NFT add rule ip filter OUTPUT ip daddr $i udp sport 1023-65535 udp dport 53 counter accept
+           $NFT add rule ip filter OUTPUT ip daddr $i tcp sport 1023-65535 tcp dport 53 counter accept
+           if [ "$RESV_DNS_DROP" == "1" ]; then
+              $NFT add rule ip filter OUTPUT ip daddr $i udp sport 1023-65535 udp dport 53 counter accept
+              $NFT add rule ip filter OUTPUT ip daddr $i tcp sport 1023-65535 tcp dport 53 counter accept
            fi
         else
            $IPT $IPT_FLAGS -A INPUT -p udp -s $i --sport 53 --dport 1023:65535 -j ACCEPT
@@ -388,19 +388,19 @@ LDNS=`cat /etc/resolv.conf  | grep -v "#" | grep -w nameserver | awk '{print$2}'
                 $IPT $IPT_FLAGS -A OUTPUT -p udp -d $i --dport 53 --sport 1023:65535 -j ACCEPT
                 $IPT $IPT_FLAGS -A OUTPUT -p tcp -d $i --dport 53 --sport 1023:65535 -j ACCEPT
            fi
-	fi
+        fi
         done
-	if [ $EXECUTOR == "nft" ]; then
-	   if [ "$RESV_DNS_DROP" == "1" ]; then
-		   $NFT add rule ip filter INPUT tcp sport 53 tcp dport 1023-65535 counter jump $ALL_STOP
-		   $NFT add rule ip filter INPUT udp sport 53 tcp dport 1023-65535 counter jump $ALL_STOP
+        if [ $EXECUTOR == "nft" ]; then
+           if [ "$RESV_DNS_DROP" == "1" ]; then
+              $NFT add rule ip filter INPUT tcp sport 53 tcp dport 1023-65535 counter jump $ALL_STOP
+              $NFT add rule ip filter INPUT udp sport 53 udp dport 1023-65535 counter jump $ALL_STOP
            fi
         else
            if [ "$RESV_DNS_DROP" == "1" ]; then
-                   $IPT $IPT_FLAGS -A INPUT  -p tcp -s 0/0 --sport 53 --dport 1023:65535 -j $ALL_STOP
-                   $IPT $IPT_FLAGS -A INPUT  -p udp -s 0/0 --sport 53 --dport 1023:65535 -j $ALL_STOP
+              $IPT $IPT_FLAGS -A INPUT  -p tcp -s 0/0 --sport 53 --dport 1023:65535 -j $ALL_STOP
+              $IPT $IPT_FLAGS -A INPUT  -p udp -s 0/0 --sport 53 --dport 1023:65535 -j $ALL_STOP
            fi
-	fi
+        fi
   fi
 else
 	if [ $EXECUTOR == "nft" ]; then
