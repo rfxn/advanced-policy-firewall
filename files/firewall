@@ -425,7 +425,7 @@ if [ "$HELPER_FTP" == "1" ]; then
 	   $NFT add rule ip filter OUTPUT tcp sport $HELPER_FTP_PORT tcp dport 1023-65535 ct state related,established  counter accept
 	   $NFT add rule ip filter OUTPUT ip protocol tcp tcp dport { $HELPER_FTP_PORT,$HELPER_FTP_DATA } ct state related,established  counter accept
 	   $NFT add rule ip filter OUTPUT ip protocol udp udp dport { $HELPER_FTP_PORT,$HELPER_FTP_DATA } ct state related,established  counter accept
-        else
+   else
 	   $IPT $IPT_FLAGS -A INPUT  -p tcp --sport 1023:65535 --dport $HELPER_FTP_PORT -m state --state RELATED,ESTABLISHED -j ACCEPT
 	   $IPT $IPT_FLAGS -A INPUT  -p tcp -m multiport --dport $HELPER_FTP_PORT,$HELPER_FTP_DATA -m state --state ESTABLISHED,RELATED -j ACCEPT
 	   $IPT $IPT_FLAGS -A INPUT  -p udp -m multiport --dport $HELPER_FTP_PORT,$HELPER_FTP_DATA -m state --state ESTABLISHED,RELATED -j ACCEPT
