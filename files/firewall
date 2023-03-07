@@ -177,6 +177,7 @@ if [ $EXECUTOR == "nft" ]; then
 
   if [ "$USE_IPV6" = "1" ]; then
     $NFT add chain ip6 filter TALLOW
+    $NFT add chain ip6 filter TDENY
     $NFT add chain ip6 filter TGALLOW
     $NFT add chain ip6 filter TGDENY
 
