@@ -345,13 +345,13 @@ fi
 
 # Drop NEW tcp connections after this point
 if [ $EXECUTOR == "nft" ]; then
-   $NFT add rule ip filter INPUT tcp flags & (fin|syn|rst|ack) != syn ct state new  counter jump STOP
+   $NFT add rule ip filter INPUT tcp "flags & (fin|syn|rst|ack) != syn" ct state new  counter jump $ALL_STOP
    $NFT add rule ip filter INPUT ip protocol tcp ct state related,established  counter accept
    $NFT add rule ip filter INPUT ip protocol udp ct state related,established  counter accept
-   $NFT nft add rule ip filter OUTPUT tcp dport 1024-65535 ct state related,established  counter accept
-   $NFT nft add rule ip filter OUTPUT udp dport 1024-65535 ct state related,established  counter accept
+   $NFT add rule ip filter OUTPUT tcp dport 1024-65535 ct state related,established  counter accept
+   $NFT add rule ip filter OUTPUT udp dport 1024-65535 ct state related,established  counter accept
    if [ "$USE_IPV6" == "1" ]; then
-	$NFT add rule ip6 filter INPUT ct state related,established counter accept
+      $NFT add rule ip6 filter INPUT ct state related,established counter accept
    fi
 else
    $IPT $IPT_FLAGS -A INPUT  -p tcp ! --syn -m state --state NEW -j $ALL_STOP
@@ -360,7 +360,7 @@ else
    $IPT $IPT_FLAGS -A OUTPUT  -p tcp --dport 1024:65535 -m state --state ESTABLISHED,RELATED -j ACCEPT
    $IPT $IPT_FLAGS -A OUTPUT  -p udp --dport 1024:65535 -m state --state ESTABLISHED,RELATED -j ACCEPT
    if [ "$USE_IPV6" == "1" ]; then
-	$IP6T -A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+      $IP6T -A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
    fi
 fi
 
