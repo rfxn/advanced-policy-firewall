@@ -493,28 +493,28 @@ if [ "$BLK_IDENT" = "1" ]; then
 		eout "{blk_ident} reject all to/from tcp port 113"
                 if [ $EXECUTOR == "nft" ]; then
                    #$IPT $IPT_FLAGS -N IDENT
-                   nft add chain ip filter IDENT
+                   $NFT add chain ip filter IDENT
                    if [ "$LOG_DROP" == "1" ]; then
                       #$IPT $IPT_FLAGS -A IDENT -p tcp -s 0/0 -d 0/0 --dport 113 -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** IDENT ** "
-                      nft add rule ip filter IDENT tcp dport 113 limit rate $LOG_RATE/minute burst 5 packets counter $LOG_TARGET prefix \"** IDENT ** \" level $LOG_LEVEL $LEXT
+                      $NFT add rule ip filter IDENT tcp dport 113 limit rate $LOG_RATE/minute burst 5 packets counter log prefix '"** IDENT ** "' level $LOG_LEVEL $LEXT
                    fi
                    #$IPT $IPT_FLAGS -A IDENT -p tcp -s 0/0 -d 0/0 --dport 113 -j REJECT
-                   nft add rule ip filter IDENT tcp dport 113 counter reject
+                   $NFT add rule ip filter IDENT tcp dport 113 counter reject
                    if [ "$LOG_DROP" == "1" ]; then
                       #$IPT $IPT_FLAGS -A IDENT -p tcp -s 0/0 -d 0/0 --sport 113 -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** IDENT ** "
-                      nft add rule ip filter IDENT tcp sport 113 limit rate $LOG_RATE/minute burst 5 packets counter $LOG_TARGET prefix \"** IDENT ** \" level $LOG_LEVEL $LEXT
+                      $NFT add rule ip filter IDENT tcp sport 113 limit rate $LOG_RATE/minute burst 5 packets counter log prefix '"** IDENT ** "' level $LOG_LEVEL $LEXT
                    fi
-                      #$IPT $IPT_FLAGS -A IDENT -p tcp -s 0/0 -d 0/0 --sport 113 -j REJECT
-                      nft add rule ip filter IDENT tcp sport 113 counter reject
+                   #$IPT $IPT_FLAGS -A IDENT -p tcp -s 0/0 -d 0/0 --sport 113 -j REJECT
+                   $NFT add rule ip filter IDENT tcp sport 113 counter reject
                    if [ "$LOG_DROP" == "1" ]; then
                       #$IPT $IPT_FLAGS -A IDENT -p udp -s 0/0 -d 0/0 --dport 113 -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** IDENT ** "
-                      nft add rule ip filter IDENT udp dport 113 limit rate $LOG_RATE/minute burst 5 packets counter $LOG_TARGET prefix \"** IDENT ** \" level $LOG_LEVEL $LEXT
+                      $NFT add rule ip filter IDENT udp dport 113 limit rate $LOG_RATE/minute burst 5 packets counter log prefix '"** IDENT ** "' level $LOG_LEVEL $LEXT
                    fi
-                      #$IPT $IPT_FLAGS -A IDENT -p udp -s 0/0 -d 0/0 --dport 113 -j REJECT
-                      nft add rule ip filter IDENT udp dport 113 counter reject
+                   #$IPT $IPT_FLAGS -A IDENT -p udp -s 0/0 -d 0/0 --dport 113 -j REJECT
+                   $NFT add rule ip filter IDENT udp dport 113 counter reject
                    if [ "$LOG_DROP" == "1" ]; then
                       #$IPT $IPT_FLAGS -A IDENT -p udp -s 0/0 -d 0/0 --sport 113 -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** IDENT ** "
-                      nft add rule ip filter IDENT udp sport 113 limit rate $LOG_RATE/minute burst 5 packets counter $LOG_TARGET prefix \"** IDENT ** \" level $LOG_LEVEL $LEXT
+                      $NFT add rule ip filter IDENT udp sport 113 limit rate $LOG_RATE/minute burst 5 packets counter log prefix '"** IDENT ** "' level $LOG_LEVEL $LEXT
                    fi
                    #$IPT $IPT_FLAGS -A IDENT -p udp -s 0/0 -d 0/0 --sport 113 -j REJECT
                    nft add rule ip filter IDENT udp sport 113 counter reject
