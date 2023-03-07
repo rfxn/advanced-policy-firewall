@@ -296,15 +296,16 @@ if [ "$RAB" == "1" ]; then
   for i in `echo $RAB_PSCAN_PORTS | tr ',' ' '`; do
    if [ "$LOG_DROP" == "1" ] || [ "$RAB_LOG_HIT" == "1" ]; then
 	   if [ $EXECUTOR == "nft" ]; then
-	      $NFT add rule ip filter RABPSCAN tcp dport $i limit rate $LOG_RATE/minute burst 5 packets counter log prefix \"** RABHIT ** \" level $LOG_LEVEL $LEXT
-	      $NFT add rule ip filter RABPSCAN udp dport $i limit rate $LOG_RATE/minute burst 5 packets counter log prefix \"** RABHIT ** \" level $LOG_LEVEL $LEXT
-           else
+	      $NFT add rule ip filter RABPSCAN tcp dport $i limit rate $LOG_RATE/minute burst 5 packets counter log prefix '"** RABHIT ** "' level $LOG_LEVEL $LEXT
+	      $NFT add rule ip filter RABPSCAN udp dport $i limit rate $LOG_RATE/minute burst 5 packets counter log prefix '"** RABHIT ** "' level $LOG_LEVEL $LEXT
+      else
 	      $IPT $IPT_FLAGS -A RABPSCAN -p tcp --dport $i -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** RABHIT ** "
 	      $IPT $IPT_FLAGS -A RABPSCAN -p udp --dport $i -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** RABHIT ** "
 	   fi
    fi
    if [ $EXECUTOR == "nft" ]; then
       # TODO nft
+      :
    else
       $IPT $IPT_FLAGS -A RABPSCAN -p tcp --dport $i -m recent --set -j $TCP_STOP
       $IPT $IPT_FLAGS -A RABPSCAN -p udp --dport $i -m recent --set -j $UDP_STOP
