@@ -591,7 +591,7 @@ if [ ! "$BLK_P2P_PORTS" == "" ]; then
         # winmx,napster,bittorrent,gnutella,edonkey,kazaa,morpheus
 	if [ $EXECUTOR == "nft" ]; then
         #$IPT $IPT_FLAGS -N P2P
-        nft add chain ip filter P2P
+        $NFT add chain ip filter P2P
         for i in `echo $BLK_P2P_PORTS | tr ',' ' '`; do
                 MVAL=`echo $i | grep "_"`
                 PORT=$i
@@ -600,64 +600,65 @@ if [ ! "$BLK_P2P_PORTS" == "" ]; then
                         eout "{blk_p2p} deny all to/from udp port $i"
                         if [ "$LOG_DROP" == "1" ]; then
                          #$IPT $IPT_FLAGS -A P2P  -p tcp -s 0/0 -d 0/0 --sport 1024:65534 --dport $PORT -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** P2P ** "
-                         nft add rule ip filter P2P tcp sport 1024-65534 tcp dport $PORT limit rate $LOG_RATE/minute burst 5 packets counter $LOG_TARGET prefix \"** P2P ** \" level $LOG_LEVEL $LEXT  
+                         $NFT add rule ip filter P2P tcp sport 1024-65534 tcp dport $PORT limit rate $LOG_RATE/minute burst 5 packets counter log prefix '"** P2P ** "' level $LOG_LEVEL $LEXT  
                         fi
                         #$IPT $IPT_FLAGS -A P2P  -p tcp -s 0/0 -d 0/0 --dport $PORT -j REJECT
-                        nft add rule ip filter P2P tcp dport $PORT counter reject
+                        $NFT add rule ip filter P2P tcp dport $PORT counter reject
                         if [ "$LOG_DROP" == "1" ]; then
                          #$IPT $IPT_FLAGS -A P2P  -p tcp -s 0/0 -d 0/0 --dport 1024:65534 --sport $PORT -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** P2P ** "
-                         nft add rule ip filter P2P tcp sport $PORT tcp dport 1024-65534 limit rate $LOG_RATE/minute burst 5 packets counter $LOG_TARGET prefix \"** P2P ** \" level $LOG_LEVEL $LEXT
+                         $NFT add rule ip filter P2P tcp sport $PORT tcp dport 1024-65534 limit rate $LOG_RATE/minute burst 5 packets counter log prefix '"** P2P ** "' level $LOG_LEVEL $LEXT
                         fi
                         #$IPT $IPT_FLAGS -A P2P  -p tcp -s 0/0 -d 0/0 --dport 1024:65534 --sport $PORT -j REJECT
-                        nft add rule ip filter P2P tcp sport $PORT tcp dport 1024-65534 counter reject
+                        $NFT add rule ip filter P2P tcp sport $PORT tcp dport 1024-65534 counter reject
                         if [ "$LOG_DROP" == "1" ]; then
                           #$IPT $IPT_FLAGS -A P2P  -p udp -s 0/0 -d 0/0 --sport 1024:65534 --dport $PORT -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** P2P ** "
-                          nft add rule ip filter P2P udp sport 1024-65534 udp dport $PORT limit rate $LOG_RATE/minute burst 5 packets counter $LOG_TARGET prefix \"** P2P ** \" level $LOG_LEVEL $LEXT
+                          $NFT add rule ip filter P2P udp sport 1024-65534 udp dport $PORT limit rate $LOG_RATE/minute burst 5 packets counter log prefix '"** P2P ** "' level $LOG_LEVEL $LEXT
                         fi
                         #$IPT $IPT_FLAGS -A P2P  -p udp -s 0/0 -d 0/0 --sport 1024:65534 --dport $PORT -j REJECT
-                        nft add rule ip filter P2P udp sport 1024-65534 udp dport $PORT counter reject
+                        $NFT add rule ip filter P2P udp sport 1024-65534 udp dport $PORT counter reject
                         if [ "$LOG_DROP" == "1" ]; then
                          #$IPT $IPT_FLAGS -A P2P  -p udp -s 0/0 -d 0/0 --dport 1024:65534 --sport $PORT -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** P2P ** "
-                         nft add rule ip filter P2P udp sport $PORT udp dport 1024-65534 limit rate $LOG_RATE/minute burst 5 packets counter $LOG_TARGET prefix \"** P2P ** \" level $LOG_LEVEL $LEXT
+                         $NFT add rule ip filter P2P udp sport $PORT udp dport 1024-65534 limit rate $LOG_RATE/minute burst 5 packets counter log prefix '"** P2P ** "' level $LOG_LEVEL $LEXT
                         fi
                         #$IPT $IPT_FLAGS -A P2P  -p udp -s 0/0 -d 0/0 --dport 1024:65534 --sport $PORT -j REJECT
-                        nft add rule ip filter P2P udp sport $PORT udp dport 1024-65534 counter reject
+                        $NFT add rule ip filter P2P udp sport $PORT udp dport 1024-65534 counter reject
                 else
                         PORT_BEG=`echo $i | tr '_' ' ' | awk '{print$1}'`
                         PORT_END=`echo $i | tr '_' ' ' | awk '{print$2}'`
                         PORTST="$PORT_BEG:$PORT_END"
+                        PORTTT="`echo $PORTST | tr ':' '-'`"
                         eout "{blk_p2p} deny all to/from tcp port $PORTST"
                         eout "{blk_p2p} deny all to/from udp port $PORTST"
                         if [ "$LOG_DROP" == "1" ]; then
                          #$IPT $IPT_FLAGS -A P2P  -p tcp -s 0/0 -d 0/0 --sport 1024:65534 --dport $PORTST -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** P2P ** "
-                         nft add rule ip filter P2P tcp sport 1024-65534 tcp dport $PORTST limit rate $LOG_RATE/minute burst 5 packets counter $LOG_TARGET prefix \"** P2P ** \" level $LOG_LEVEL $LEXT
+                         $NFT add rule ip filter P2P tcp sport 1024-65534 tcp dport $PORTTT limit rate $LOG_RATE/minute burst 5 packets counter log prefix '"** P2P ** "' level $LOG_LEVEL $LEXT
                         fi
                         #$IPT $IPT_FLAGS -A P2P  -p tcp -s 0/0 -d 0/0 --sport 1024:65534 --dport $PORTST -j REJECT
-                        nft add rule ip filter P2P tcp sport 1024-65534 tcp dport $PORTST counter reject
+                        $NFT add rule ip filter P2P tcp sport 1024-65534 tcp dport $PORTTT counter reject
                         if [ "$LOG_DROP" == "1" ]; then
                          #$IPT $IPT_FLAGS -A P2P  -p tcp -s 0/0 -d 0/0 --dport 1024:65534 --sport $PORTST -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** P2P ** "
-                         nft add rule ip filter P2P tcp sport $PORTST tcp dport 1024-65534 limit rate $LOG_RATE/minute burst 5 packets counter $LOG_TARGET prefix \"** P2P ** \" level $LOG_LEVEL $LEXT
+                         $NFT add rule ip filter P2P tcp sport $PORTTT tcp dport 1024-65534 limit rate $LOG_RATE/minute burst 5 packets counter log prefix '"** P2P ** "' level $LOG_LEVEL $LEXT
                         fi
                         #$IPT $IPT_FLAGS -A P2P  -p tcp -s 0/0 -d 0/0 --dport 1024:65534 --sport $PORTST -j REJECT
-                        nft add rule ip filter P2P tcp sport $PORTST tcp dport 1024-65534 counter reject
+                        $NFT add rule ip filter P2P tcp sport $PORTTT tcp dport 1024-65534 counter reject
                         if [ "$LOG_DROP" == "1" ]; then
                          #$IPT $IPT_FLAGS -A P2P  -p udp -s 0/0 -d 0/0 --sport 1024:65534 --dport $PORTST -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** P2P ** "
-                         nft add rule ip filter P2P udp sport 1024-65534 udp dport $PORTST limit rate $LOG_RATE/minute burst 5 packets counter $LOG_TARGET prefix \"** P2P ** \" level $LOG_LEVEL $LEXT
+                         $NFT add rule ip filter P2P udp sport 1024-65534 udp dport $PORTTT limit rate $LOG_RATE/minute burst 5 packets counter log prefix '"** P2P ** "' level $LOG_LEVEL $LEXT
                         fi
                         #$IPT $IPT_FLAGS -A P2P  -p udp -s 0/0 -d 0/0 --sport 1024:65534 --dport $PORTST -j REJECT
-                        nft add rule ip filter P2P udp sport 1024-65534 udp dport $PORTST counter reject
+                        $NFT add rule ip filter P2P udp sport 1024-65534 udp dport $PORTTT counter reject
                         if [ "$LOG_DROP" == "1" ]; then
                          #$IPT $IPT_FLAGS -A P2P  -p udp -s 0/0 -d 0/0 --dport 1024:65534 --sport $PORTST -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** P2P ** "
-                         nft add rule ip filter P2P udp sport $PORTST udp dport 1024-65534 limit rate $LOG_RATE/minute burst 5 packets counter $LOG_TARGET prefix \"** P2P ** \" level crit $LOG_LEVEL $LEXT
+                         $NFT add rule ip filter P2P udp sport $PORTTT udp dport 1024-65534 limit rate $LOG_RATE/minute burst 5 packets counter log prefix '"** P2P ** "' level crit level $LOG_LEVEL $LEXT
                         fi
                         #$IPT $IPT_FLAGS -A P2P  -p udp -s 0/0 -d 0/0 --dport 1024:65534 --sport $PORTST -j REJECT
-                        nft add rule ip filter P2P udp sport $PORTST udp dport 1024-65534 counter reject
+                        $NFT add rule ip filter P2P udp sport $PORTTT udp dport 1024-65534 counter reject
                 fi
         done
         #$IPT $IPT_FLAGS -A INPUT -j P2P
-        nft add rule ip filter INPUT counter jump P2P
+        $NFT add rule ip filter INPUT counter jump P2P
         #$IPT $IPT_FLAGS -A OUTPUT -j P2P
-        nft add rule ip filter OUTPUT counter jump P2P
+        $NFT add rule ip filter OUTPUT counter jump P2P
    else
         $IPT $IPT_FLAGS -N P2P
         for i in `echo $BLK_P2P_PORTS | tr ',' ' '`; do
