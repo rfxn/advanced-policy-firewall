@@ -250,14 +250,16 @@ if [ "$RAB" == "1" ]; then
  fi
 
  if [ "$LOG_DROP" == "1" ] || [ "$RAB_LOG_TRIP" == "1" ]; then
-	if [ $EXECUTOR == "nft" ]; then
+    if [ $EXECUTOR == "nft" ]; then
            # TODO nft
-        else
-	   $IPT $IPT_FLAGS -A INPUT -p all -m recent --rcheck --hitcount $RAB_HITCOUNT --seconds $RAB_TIMER -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** RABTRIP ** "
-        fi
+           :
+    else
+           $IPT $IPT_FLAGS -A INPUT -p all -m recent --rcheck --hitcount $RAB_HITCOUNT --seconds $RAB_TIMER -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** RABTRIP ** "
+    fi
  fi
  if [ $EXECUTOR == "nft" ]; then
     # TODO nft
+    :
  else
     $IPT $IPT_FLAGS -A INPUT -p all -m recent $RAB_TRIP_FLAGS --hitcount $RAB_HITCOUNT --seconds $RAB_TIMER -j $ALL_STOP
  fi
