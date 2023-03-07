@@ -341,28 +341,32 @@ if [ "$PKT_SANITY" == "1" ]; then
            if [ $EXECUTOR == "nft" ]; then
               if [ "$LOG_DROP" == "1" ]; then
                  #$IPT $IPT_FLAGS -A IN_SANITY -m state --state INVALID -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** SANITY ** "
-                 nft add rule ip filter IN_SANITY ct state invalid  limit rate $LOG_RATE/minute burst 5 packets counter $LOG_TARGET prefix \"** SANITY ** \" level $LOG_LEVEL $LEXT
+                 $NFT add rule ip filter IN_SANITY ct state invalid  limit rate $LOG_RATE/minute burst 5 packets counter log prefix '"** SANITY ** "' level $LOG_LEVEL $LEXT
               fi
               #$IPT $IPT_FLAGS -A IN_SANITY -m state --state INVALID -j $ALL_STOP
-              nft add rule ip filter IN_SANITY ct state invalid  counter jump $ALL_STOP
+              $NFT add rule ip filter IN_SANITY ct state invalid  counter $ALL_STOP
               if [ "$LOG_DROP" == "1" ]; then
                  #$IPT $IPT_FLAGS -A IN_SANITY -p tcp --tcp-option 64 -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** SANITY ** "
-                 #TODO need more work
+                 #TODO not sure if it is correct or not
+                 # $NFT add rule ip filter IN_SANITY tcp option 64 exists counter packets 0 bytes 0 limit rate $LOG_RATE/minute burst 1 packets log prefix '"** SANITY ** "' level $LOG_LEVEL $LEXT
+                 :
               fi
               #$IPT $IPT_FLAGS -A IN_SANITY -p tcp --tcp-option 64 -j $TCP_STOP
-              #TODO need more work
+              # TODO problem at the set
+              # nft add rule ip filter IN_SANITY tcp option set 64 counter drop
               if [ "$LOG_DROP" == "1" ]; then
                  #$IPT $IPT_FLAGS -A IN_SANITY -p tcp --tcp-option 128 -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** SANITY ** "
                  #TODO need more work
+                 :
               fi
               #$IPT $IPT_FLAGS -A IN_SANITY -p tcp --tcp-option 128 -j $TCP_STOP
               #TODO need more work
               if [ "$LOG_DROP" == "1" ]; then
                  #$IPT $IPT_FLAGS -A OUT_SANITY -m state --state INVALID -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** SANITY ** "
-                 nft add rule ip filter OUT_SANITY ct state invalid  limit rate $LOG_RATE/minute burst 5 packets counter $LOG_TARGET prefix \"** SANITY ** \" level $LOG_LEVEL $LEXT
+                 $NFT add rule ip filter OUT_SANITY ct state invalid  limit rate $LOG_RATE/minute burst 5 packets counter log prefix '"** SANITY ** "' level $LOG_LEVEL $LEXT
               fi
               #$IPT $IPT_FLAGS -A OUT_SANITY -m state --state INVALID -j $ALL_STOP
-              nft add rule ip filter OUT_SANITY ct state invalid  counter jump $ALL_STOP
+              $NFT add rule ip filter OUT_SANITY ct state invalid  counter $ALL_STOP
            else
               if [ "$LOG_DROP" == "1" ]; then
                  $IPT $IPT_FLAGS -A IN_SANITY -m state --state INVALID -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** SANITY ** "
