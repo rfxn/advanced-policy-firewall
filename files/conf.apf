@@ -182,12 +182,16 @@ TCP_STOP="DROP"
 #  REJECT (reject the packet)
 #  PROHIBIT (send an icmp-host-prohibited)
 UDP_STOP="DROP"
+# TODO need to convert to lowercase for nftable
+# DROP -> drop
 
 # How to handle all other packet filtering? 
 #
 #  DROP  (drop the packet)
 #  REJECT (reject the packet)
 ALL_STOP="DROP"
+# TODO need to convert to lowercase for nftable
+# DROP -> drop
 
 # The sanity options control the way packets are scrutinized as they flow 
 # through the firewall. The main PKT_SANITY option is a top level toggle for
