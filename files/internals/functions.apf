@@ -41,13 +41,24 @@ ml() {
         MEXT="ko"
  fi
 
- if [ "$FATAL" == "1" ] && [ ! -f "/lib/modules/$(uname -r)/kernel/net/ipv4/netfilter/$1.$MEXT" ] && [ ! -f "/lib/modules/$(uname -r)/kernel/net/ipv4/netfilter/$1.${MEXT}.xz" ]; then
+ if [ $EXECUTOR == "nft" ]; then
+    if [ "$FATAL" == "1" ] && [ ! -f "/lib/modules/$(uname -r)/kernel/net/netfilter/$1.$MEXT" ] && [ ! -f "/lib/modules/$(uname -r)/kernel/net/netfilter/$1.${MEXT}.xz" ]; then
+        if [ ! "$SET_VERBOSE" == "1" ]; then
+                echo "Unable to load nftables module ($1), aborting."
+        fi
+        eout "{glob} unable to load nftables module ($1), aborting."
+        mutex_unlock
+        exit 1
+    fi
+ else
+    if [ "$FATAL" == "1" ] && [ ! -f "/lib/modules/$(uname -r)/kernel/net/ipv4/netfilter/$1.$MEXT" ] && [ ! -f "/lib/modules/$(uname -r)/kernel/net/ipv4/netfilter/$1.${MEXT}.xz" ]; then
         if [ ! "$SET_VERBOSE" == "1" ]; then
                 echo "Unable to load iptables module ($1), aborting."
         fi
         eout "{glob} unable to load iptables module ($1), aborting."
         mutex_unlock
         exit 1
+    fi
  fi
  if [ -f "/lib/modules/$(uname -r)/kernel/net/ipv4/netfilter/$1.$MEXT" ] || [ -f "/lib/modules/$(uname -r)/kernel/net/netfilter/$1.$MEXT" ] || [ -f "/lib/modules/$(uname -r)/kernel/net/ipv4/netfilter/$1.${MEXT}.xz" ] || [ -f "/lib/modules/$(uname -r)/kernel/net/netfilter/$1.${MEXT}.xz" ]; then
         $MPB $1 >> /dev/null 2>&1 &
