@@ -307,15 +307,20 @@ cli_trust() {
        echo "# added $HOST on $TIME" >> $FILE
      fi
      echo "$HOST" >> $FILE
-     if [ "$ACTION" == "DENY" ]; then
-       JACTION="$ALL_STOP"
-     elif [ "$ACTION" == "ALLOW" ]; then
-       JACTION="ACCEPT"
-     fi
      if [ $EXECUTOR == "nft" ]; then
+       if [ "$ACTION" == "DENY" ]; then
+         JACTION="$ALL_STOP"
+       elif [ "$ACTION" == "ALLOW" ]; then
+         JACTION="accept"
+       fi
        $NFT insert rule ip filter $CHAIN ip saddr $HOST counter $JACTION
        $NFT insert rule ip filter $CHAIN ip daddr $HOST counter $JACTION
      else
+       if [ "$ACTION" == "DENY" ]; then
+         JACTION="$ALL_STOP"
+       elif [ "$ACTION" == "ALLOW" ]; then
+         JACTION="ACCEPT"
+       fi
        $IPT $IPT_FLAGS -I $CHAIN -s $HOST -j $JACTION
        $IPT $IPT_FLAGS -I $CHAIN -d $HOST -j $JACTION
      fi
