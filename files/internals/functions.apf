@@ -290,42 +290,42 @@ cli_trust() {
  HOST="$4"
  CMT="$5"
  if [ ! "$HOST" == "" ]; then
-        valtrust=`cat $DENY_HOSTS $ALLOW_HOSTS $GALLOW_HOSTS $GDENY_HOSTS | grep -F -w $HOST`
-	if [ "$valtrust" ]; then
-		tlist=`grep -l $HOST $DENY_HOSTS $ALLOW_HOSTS $GALLOW_HOSTS $GDENY_HOSTS | tr '\n' ' '`
-	fi
-        valip=`cat /etc/apf/internals/.localaddrs | grep -w $HOST`
-        if [ "$valtrust" ]; then
-                echo "$HOST already exists in $tlist"
-        elif [ "$valip" ]; then
-                echo "$HOST is a local address and can not be added to the trust system"
-        else
-	        TIME=`date +"%D %H:%M:%S"`
-		if [ "$CMT" ]; then
-			echo "# added $HOST on $TIME with comment: $CMT" >> $FILE
-		else
-			echo "# added $HOST on $TIME" >> $FILE
-		fi
-	        echo "$HOST" >> $FILE
-		if [ "$ACTION" == "DENY" ]; then
-			JACTION="$ALL_STOP"
-		elif [ "$ACTION" == "ALLOW" ]; then
-			JACTION="ACCEPT"
-		fi
-		if [ $EXECUTOR == "nft" ]; then
-              $NFT insert rule ip filter $CHAIN ip saddr $HOST counter $JACTION
-              $NFT insert rule ip filter $CHAIN ip daddr $HOST counter $JACTION
-		else
-	           $IPT $IPT_FLAGS -I $CHAIN -s $HOST -j $JACTION
-	           $IPT $IPT_FLAGS -I $CHAIN -d $HOST -j $JACTION
-		fi
-	        eout "(trust) added $ACTION all to/from $HOST"
-	        if [ ! "$SET_VERBOSE" == "1" ]; then
-		        echo "Inserted into firewall: $ACTION all to/from $HOST"
-		fi
-        fi
+   valtrust=`cat $DENY_HOSTS $ALLOW_HOSTS $GALLOW_HOSTS $GDENY_HOSTS | grep -F -w $HOST`
+   if [ "$valtrust" ]; then
+     tlist=`grep -l $HOST $DENY_HOSTS $ALLOW_HOSTS $GALLOW_HOSTS $GDENY_HOSTS | tr '\n' ' '`
+   fi
+   valip=`cat /etc/apf/internals/.localaddrs | grep -w $HOST`
+   if [ "$valtrust" ]; then
+     echo "$HOST already exists in $tlist"
+   elif [ "$valip" ]; then
+     echo "$HOST is a local address and can not be added to the trust system"
+   else
+     TIME=`date +"%D %H:%M:%S"`
+     if [ "$CMT" ]; then
+       echo "# added $HOST on $TIME with comment: $CMT" >> $FILE
+     else
+       echo "# added $HOST on $TIME" >> $FILE
+     fi
+     echo "$HOST" >> $FILE
+     if [ "$ACTION" == "DENY" ]; then
+       JACTION="$ALL_STOP"
+     elif [ "$ACTION" == "ALLOW" ]; then
+       JACTION="ACCEPT"
+     fi
+     if [ $EXECUTOR == "nft" ]; then
+       $NFT insert rule ip filter $CHAIN ip saddr $HOST counter $JACTION
+       $NFT insert rule ip filter $CHAIN ip daddr $HOST counter $JACTION
+     else
+       $IPT $IPT_FLAGS -I $CHAIN -s $HOST -j $JACTION
+       $IPT $IPT_FLAGS -I $CHAIN -d $HOST -j $JACTION
+     fi
+     eout "(trust) added $ACTION all to/from $HOST"
+     if [ ! "$SET_VERBOSE" == "1" ]; then
+       echo "Inserted into firewall: $ACTION all to/from $HOST"
+     fi
+   fi
  else
-        echo "an FQDN or IP address is required for this option"
+   echo "an FQDN or IP address is required for this option"
  fi
 }
 
