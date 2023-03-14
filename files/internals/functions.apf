@@ -375,7 +375,6 @@ else
 	fi
 fi
 
-# TODO this is iptable module?
 if [ -f "/proc/net/ipt_recent/DEFAULT" ]; then
 	eout "{glob} flushing xt/ipt_recent bans"
 	echo clear > /proc/net/ipt_recent/DEFAULT
