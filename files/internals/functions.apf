@@ -387,7 +387,7 @@ fi
 
 list() {
 if [ $EXECUTOR == "nft" ]; then
-   echo "Loading iptables rules..."
+   echo "Loading nftables rules..."
    iptc=/etc/apf/.iptrules.$$
    :> $iptc ; chmod 600 $iptc
    $NFT -n list ruleset >> $iptc
