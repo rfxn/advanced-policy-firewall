@@ -81,7 +81,7 @@ modinit() {
  fi
 
  if [ $EXECUTOR == "nft" ]; then
-	modlist="nfnetlink nft_compat nft_counter nft_chain_nat nft_limit nft_chain_nat nft_counter nft_chain_nat"
+	modlist="nfnetlink nft_compat nft_counter nft_chain_nat nft_limit nft_counter"
  else
 	modlist="ip_conntrack ip_conntrack_ftp ip_conntrack_irc iptable_filter iptable_mangle ipt_ecn ipt_length ipt_limit ipt_LOG ipt_mac ipt_multiport ipt_owner ipt_recent ipt_REJECT ipt_state ipt_TCPMSS ipt_TOS ipt_ttl ipt_ULOG nf_conntrack nf_conntrack_ftp nf_conntrack_irc xt_conntrack xt_conntrack_ftp xt_conntrack_irc xt_ecn xt_length xt_limit xt_LOG xt_mac xt_multiport xt_owner xt_recent xt_REJECT xt_state xt_TCPMSS xt_TOS xt_ttl xt_ULOG iptable_nat ip6_tables"
  fi
