@@ -454,16 +454,16 @@ if [ -z "$TYPE" ]; then
 fi
 
 if [ ! "$TOS_0" == "" ]; then
-        for i in `echo $TOS_0 | tr ',' ' '`; do
-                i=`echo $i | tr '_' ':'`
-		if [ $EXECUTOR == "nft" ]; then
-                   $NFT add rule ip mangle $TYPE tcp dport $i counter ip6 dscp set 0x00
-                   $NFT add rule ip mangle $TYPE udp dport $i counter ip6 dscp set 0x00
-		else
-                   $IPT $IPT_FLAGS -t mangle -A $TYPE -p tcp --dport $i -j TOS --set-tos 0
-                   $IPT $IPT_FLAGS -t mangle -A $TYPE -p udp --dport $i -j TOS --set-tos 0
-		fi
-        done
+  for i in `echo $TOS_0 | tr ',' ' '`; do
+    i=`echo $i | tr '_' ':'`
+    if [ $EXECUTOR == "nft" ]; then
+      $NFT add rule ip mangle $TYPE tcp dport $i counter ip6 dscp set 0x00
+      $NFT add rule ip mangle $TYPE udp dport $i counter ip6 dscp set 0x00
+    else
+      $IPT $IPT_FLAGS -t mangle -A $TYPE -p tcp --dport $i -j TOS --set-tos 0
+      $IPT $IPT_FLAGS -t mangle -A $TYPE -p udp --dport $i -j TOS --set-tos 0
+    fi
+  done
 fi
 
 if [ ! "$TOS_2" == "" ]; then
