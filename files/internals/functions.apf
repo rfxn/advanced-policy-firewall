@@ -166,67 +166,80 @@ trim() {
 cli_trust_remove() {
 	DIP="$1"
 	if [ $EXECUTOR == "nft" ]; then
-      # TODO
 	   #$IPT $IPT_FLAGS -D INPUT -s $DIP -j ACCEPT
 	   #$IPT $IPT_FLAGS -D OUTPUT -d $DIP -j ACCEPT
       #$IPT $IPT_FLAGS -D INPUT -s $DIP -j $ALL_STOP
       #$IPT $IPT_FLAGS -D OUTPUT -d $DIP -j $ALL_STOP
-	   # TODO need to search for handle
-	   $NFT delete rule ip filter INPUT handle <handle_value>
-	   $NFT delete rule ip filter OUTPUT handle <handle_value>
-	   # todo 3rd
-	   # todo 4th
+      handle=`$NFT -a list chain ip filter INPUT  | grep -m1 $DIP | grep saddr | grep accept | grep -oP '(?<=handle )[0-9]*'`
+      $NFT delete rule ip filter INPUT handle $handle
+      handle=`$NFT -a list chain ip filter OUTPUT  | grep -m1 $DIP | grep daddr | grep accept |  grep -oP '(?<=handle )[0-9]*'`
+      $NFT delete rule ip filter OUTPUT handle $handle
+      handle=`$NFT -a list chain ip filter INPUT  | grep -m1 $DIP | grep saddr | grep $ALL_STOP | grep -oP '(?<=handle )[0-9]*'`
+      $NFT delete rule ip filter INPUT handle $handle
+      handle=`$NFT -a list chain ip filter OUTPUT  | grep -m1 $DIP | grep daddr | grep $ALL_STOP |  grep -oP '(?<=handle )[0-9]*'`
+      $NFT delete rule ip filter OUTPUT handle $handle
 
 	   #$IPT $IPT_FLAGS -D TALLOW -s $DIP -j ACCEPT
 	   #$IPT $IPT_FLAGS -D TALLOW -d $DIP -j ACCEPT
       #$IPT $IPT_FLAGS -D TDENY -s $DIP -j $ALL_STOP
       #$IPT $IPT_FLAGS -D TDENY -d $DIP -j $ALL_STOP
-	   # TODO need to search for handle
-	   $NFT delete rule ip filter TALLOW handle <handle_value>
-	   # todo 2nd
-	   $NFT delete rule ip filter TDENY handle <handle_value>
-	   # todo 4th
+      handle=`$NFT -a list chain ip filter TALLOW  | grep -m1 $DIP | grep saddr | grep accept | grep -oP '(?<=handle )[0-9]*'`
+      $NFT delete rule ip filter TALLOW handle $handle
+      handle=`$NFT -a list chain ip filter TALLOW  | grep -m1 $DIP | grep daddr | grep accept | grep -oP '(?<=handle )[0-9]*'`
+      $NFT delete rule ip filter TALLOW handle $handle
+      handle=`$NFT -a list chain ip filter TDENY  | grep -m1 $DIP | grep saddr | grep $ALL_STOP | grep -oP '(?<=handle )[0-9]*'`
+      $NFT delete rule ip filter TDENY handle $handle
+      handle=`$NFT -a list chain ip filter TDENY  | grep -m1 $DIP | grep daddr | grep $ALL_STOP | grep -oP '(?<=handle )[0-9]*'`
+      $NFT delete rule ip filter TDENY handle $handle
 
 	   #$IPT $IPT_FLAGS -D TGALLOW -s $DIP -j ACCEPT
 	   #$IPT $IPT_FLAGS -D TGALLOW -d $DIP -j ACCEPT
       #$IPT $IPT_FLAGS -D TGDENY -s $DIP -j $ALL_STOP
       #$IPT $IPT_FLAGS -D TGDENY -d $DIP -j $ALL_STOP
-	   # TODO need to search for handle
-      $NFT delete rule ip TGALLOW handle <handle_value>
-	   # todo 2nd
-      $NFT delete rule ip TGDENY handle <handle_value>
-	   # todo 4th
+      handle=`$NFT -a list chain ip filter TGALLOW  | grep -m1 $DIP | grep saddr | grep accept | grep -oP '(?<=handle )[0-9]*'`
+      $NFT delete rule ip filter TGALLOW handle $handle
+      handle=`$NFT -a list chain ip filter TGALLOW  | grep -m1 $DIP | grep daddr | grep accept | grep -oP '(?<=handle )[0-9]*'`
+      $NFT delete rule ip filter TGALLOW handle $handle
+      handle=`$NFT -a list chain ip filter TGDENY  | grep -m1 $DIP | grep saddr | grep $ALL_STOP | grep -oP '(?<=handle )[0-9]*'`
+      $NFT delete rule ip filter TGDENY handle $handle
+      handle=`$NFT -a list chain ip filter TGDENY  | grep -m1 $DIP | grep daddr | grep $ALL_STOP | grep -oP '(?<=handle )[0-9]*'`
+      $NFT delete rule ip filter TGDENY handle $handle
 
 	   sed -i "/$DIP/d" $ALLOW_HOSTS $DENY_HOSTS $GALLOW_HOSTS $GDENY_HOSTS
 	   #dil=`$IPT $IPT_FLAGS --numeric --list INPUT --line-numbers | grep -w $DIP | awk '{print$1}'`
 	   #dol=`$IPT $IPT_FLAGS --numeric --list OUTPUT --line-numbers | grep -w $DIP | awk '{print$1}'`
 	   #$IPT $IPT_FLAGS -D INPUT $dil >> /dev/null 2>&1
 	   #$IPT $IPT_FLAGS -D OUTPUT $dol >> /dev/null 2>&1
+      dil=`$NFT -a list chain ip filter INPUT | grep -m1 $DIP | grep -oP '(?<=handle )[0-9]*'`
+      dol=`$NFT -a list chain ip filter OUTPUT | grep -m1 $DIP | grep -oP '(?<=handle )[0-9]*'`
+      $NFT delete rule ip filter INPUT handle $dil
+      $NFT delete rule ip filter OUTPUT handle $dol
+
 
 	   #dil=`$IPT $IPT_FLAGS --numeric --list TALLOW --line-numbers | grep -w $DIP | tac | awk '{print$1}'`
-	   dil=`$NFT list table ip filter | grep -w $DIP | tac | awk '{print$1}'`
 	   #dol=`$IPT $IPT_FLAGS --numeric --list TDENY --line-numbers | grep -w $DIP | tac | awk '{print$1}'`
-	   dol=`$NFT list table ip filter | grep -w $DIP | tac | awk '{print$1}'`
+	   dil=`$NFT -a list chain ip filter TALLOW | grep $DIP | tac | grep -oP '(?<=handle )[0-9]*'`
+	   dol=`$NFT -a list chain ip filter TDENY | grep $DIP | tac | grep -oP '(?<=handle )[0-9]*'`
 	   for i in `echo $dil`; do
 		  #$IPT $IPT_FLAGS -D TALLOW $i >> /dev/null 2>&1
-	     # TODO NFT
+        $NFT delete rule ip filter TALLOW handle $i
 	   done
 	   for i in `echo $dol`; do
 		  #$IPT $IPT_FLAGS -D TDENY $i >> /dev/null 2>&1
-	     # TODO NFT
+        $NFT delete rule ip filter TDENY handle $i
 	   done
 
 	   #dil=`$IPT $IPT_FLAGS --numeric --list TGALLOW --line-numbers | grep -w $DIP | tac | awk '{print$1}'`
-	   dil=`$NFT list table ip filter | grep -w $DIP | tac | awk '{print$1}'`
 	   #dol=`$IPT $IPT_FLAGS --numeric --list TGDENY --line-numbers | grep -w $DIP | tac | awk '{print$1}'`
-	   dol=`$NFT list table ip filter | grep -w $DIP | tac | awk '{print$1}'`
+	   dil=`$NFT -a list table ip filter TGALLOW | grep -w $DIP | tac | awk '{print$1}'`
+	   dol=`$NFT -a list table ip filter TGDENY | grep -w $DIP | tac | awk '{print$1}'`
 	   for i in `echo $dil`; do
 		  #$IPT $IPT_FLAGS -D TGALLOW $i >> /dev/null 2>&1
-	     # TODO NFT
+        $NFT delete rule ip filter TGALLOW handle $i
 	   done
 	   for i in `echo $dol`; do
 		  #$IPT $IPT_FLAGS -D TGDENY $i >> /dev/null 2>&1
-	     # TODO NFT
+        $NFT delete rule ip filter TGDENY handle $i
 	   done
 	else
 	   $IPT $IPT_FLAGS -D INPUT -s $DIP -j ACCEPT
