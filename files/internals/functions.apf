@@ -560,64 +560,64 @@ if [ ! "`cat $file | grep -v "#"`" == "" ]; then
                 val=`cat /etc/apf/internals/.localaddrs | grep -w $i`
                 if [ ! "$val" ]; then
                  if [ ! "$i" == "" ] && [ -f "$file" ]; then
-                        eout "{trust} allow all to/from $i"
-			if [ $EXECUTOR == "nft" ]; then
+                   eout "{trust} allow all to/from $i"
+                   if [ $EXECUTOR == "nft" ]; then
                            $NFT add rule ip filter $chain ip saddr $i counter accept
                            $NFT add rule ip filter $chain ip daddr $i counter accept
 	                else
                            $IPT $IPT_FLAGS -A $chain -s $i -d 0/0 -j ACCEPT
                            $IPT $IPT_FLAGS -A $chain -d $i -s 0/0 -j ACCEPT
-			fi
+                   fi
                  fi
-		fi
+                fi
         done
         #
         #
         for i in `cat $file | grep -v "#" | grep ":" | grep "=" | grep -vw in | grep -vw out | grep -v tcp | grep -v udp`; do
                 if [ ! "$i" == "" ] && [ -f "$file" ]; then
 
-                        PFLOW=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$1}'`
-                if [ "$PFLOW" == "s" ]; then
-                                PFLOW="sport"
-                                PFLOW_T="from"
-                        elif [ "$PFLOW" == "d" ]; then
-                                PFLOW="dport"
-                                PFLOW_T="to"
-                        fi
-                        PPORT=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$2}'`
-                        if [ ! "$(echo $PPORT | grep _)" == "" ]; then
-                                PPORT_BEG=`echo $PPORT | tr '_' ' ' | awk '{print$1}'`
-                                PPORT_END=`echo $PPORT | tr '_' ' ' | awk '{print$2}'`
-                                PPORT="$PPORT_BEG:$PPORT_END"
-                        fi
+                  PFLOW=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$1}'`
+                  if [ "$PFLOW" == "s" ]; then
+                    PFLOW="sport"
+                    PFLOW_T="from"
+                  elif [ "$PFLOW" == "d" ]; then
+                    PFLOW="dport"
+                    PFLOW_T="to"
+                  fi
+                  PPORT=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$2}'`
+                  if [ ! "$(echo $PPORT | grep _)" == "" ]; then
+                    PPORT_BEG=`echo $PPORT | tr '_' ' ' | awk '{print$1}'`
+                    PPORT_END=`echo $PPORT | tr '_' ' ' | awk '{print$2}'`
+                    PPORT="$PPORT_BEG:$PPORT_END"
+                  fi
 
-                        IPFLOW=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$3}'`
-                        if [ "$IPFLOW" == "s" ]; then
-                                IPFLOW="s"
-                        elif [ "$IPFLOW" == "d" ]; then
-                                IPFLOW="d"
-                        fi
-                        PIP=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$4}'`
+                  IPFLOW=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$3}'`
+                  if [ "$IPFLOW" == "s" ]; then
+                    IPFLOW="s"
+                  elif [ "$IPFLOW" == "d" ]; then
+                    IPFLOW="d"
+                  fi
+                  PIP=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$4}'`
 
-                        if [ ! "$IPFLOW" == "" ] && [ ! "$PIP" == "" ] && [ ! "$IPFLOW" == "" ] && [ ! "$PPORT" == "" ]; then
-                                eout "{trust} allow $PIP $PFLOW_T port $PPORT"
-				if [ $EXECUTOR == "nft" ]; then
-                                   $NFT add rule ip filter $chain ip protocol tcp ip $IPFLOW $PIP tcp $PFLOW $PPORT counter accept
-                                   $NFT add rule ip filter $chain ip protocol udp ip $IPFLOW $PIP udp $PFLOW $PPORT counter accept
-                                   # TODO support for ipv6
-				else
-                                   $IPT $IPT_FLAGS -A $chain -p tcp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j ACCEPT
-                                   $IPT $IPT_FLAGS -A $chain -p udp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j ACCEPT
-                                   if [ "$USE_IPV6" == "1" ]; then
-                                      if [[ $PIP =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-                                         eout "ignoring ipv4 address $PIP"
-                                         continue
-                                      fi
-                                      $IP6T -A $chain -m state --state NEW -m tcp -p tcp -$IPFLOW $PIP --$PFLOW $PPORT -j ACCEPT
-                                      $IP6T -A $chain -m state --state NEW -m udp -p udp -$IPFLOW $PIP --$PFLOW $PPORT -j ACCEPT
-                                   fi
-				fi
+                  if [ ! "$IPFLOW" == "" ] && [ ! "$PIP" == "" ] && [ ! "$IPFLOW" == "" ] && [ ! "$PPORT" == "" ]; then
+                    eout "{trust} allow $PIP $PFLOW_T port $PPORT"
+                    if [ $EXECUTOR == "nft" ]; then
+                      $NFT add rule ip filter $chain ip protocol tcp ip $IPFLOW $PIP tcp $PFLOW $PPORT counter accept
+                      $NFT add rule ip filter $chain ip protocol udp ip $IPFLOW $PIP udp $PFLOW $PPORT counter accept
+                      # TODO support for ipv6
+                    else
+                      $IPT $IPT_FLAGS -A $chain -p tcp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j ACCEPT
+                      $IPT $IPT_FLAGS -A $chain -p udp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j ACCEPT
+                      if [ "$USE_IPV6" == "1" ]; then
+                        if [[ $PIP =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+                          eout "ignoring ipv4 address $PIP"
+                          continue
                         fi
+                        $IP6T -A $chain -m state --state NEW -m tcp -p tcp -$IPFLOW $PIP --$PFLOW $PPORT -j ACCEPT
+                        $IP6T -A $chain -m state --state NEW -m udp -p udp -$IPFLOW $PIP --$PFLOW $PPORT -j ACCEPT
+                      fi
+                    fi
+                  fi
                 fi
         done
         #
@@ -665,11 +665,11 @@ if [ ! "`cat $file | grep -v "#"`" == "" ]; then
                                 eout "{trust} ignored local ip allow rule '$NFLOW_T $PIP $PFLOW_T port $PPORT'"
                          else
                                 eout "{trust} allow $NFLOW_T $PIP $PFLOW_T port $PPORT"
-				if [ $EXECUTOR == "nft" ]; then
-               $NFT add rule ip filter $chain ip protocol tcp ip $IPFLOW $PIP tcp $PFLOW $PPORT counter accept
-               $NFT add rule ip filter $CHAIN ip protocol udp ip $IPFLOW $PIP udp $PFLOW $PPORT counter accept
-				   # TODO support ipv6
-				else
+                                if [ $EXECUTOR == "nft" ]; then
+                                  $NFT add rule ip filter $chain ip protocol tcp ip $IPFLOW $PIP tcp $PFLOW $PPORT counter accept
+                                  $NFT add rule ip filter $CHAIN ip protocol udp ip $IPFLOW $PIP udp $PFLOW $PPORT counter accept
+                                  # TODO support ipv6
+                                else
                                    $IPT $IPT_FLAGS -A $chain -p tcp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j ACCEPT
                                    $IPT $IPT_FLAGS -A $chain -p udp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j ACCEPT
                                    if [ "$USE_IPV6" == "1" ]; then
@@ -680,7 +680,7 @@ if [ ! "`cat $file | grep -v "#"`" == "" ]; then
                                       $IP6T -A $chain -m state --state NEW -m tcp -p tcp -$IPFLOW $PIP --$PFLOW $PPORT -j ACCEPT
                                       $IP6T -A $chain -m state --state NEW -m udp -p udp -$IPFLOW $PIP --$PFLOW $PPORT -j ACCEPT
                                    fi
-				fi
+                                fi
                          fi
                         fi
                 fi
