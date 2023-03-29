@@ -498,9 +498,10 @@ fi
 if [ ! "$TOS_8" == "" ]; then
   for i in `echo $TOS_8 | tr ',' ' '`; do
     i=`echo $i | tr '_' ':'`
+    j=`echo $i | tr ':' '-'`
 	 if [ $EXECUTOR == "nft" ]; then
-      $NFT add rule ip mangle $TYPE tcp dport $i counter ip6 dscp set 0x02
-      $NFT add rule ip mangle $TYPE udp dport $i counter ip6 dscp set 0x02
+      $NFT add rule ip mangle $TYPE tcp dport $j counter ip dscp set 0x02
+      $NFT add rule ip mangle $TYPE udp dport $j counter ip dscp set 0x02
 	 else
       $IPT $IPT_FLAGS -t mangle -A $TYPE -p tcp --dport $i -j TOS --set-tos 8
       $IPT $IPT_FLAGS -t mangle -A $TYPE -p udp --dport $i -j TOS --set-tos 8
@@ -511,9 +512,10 @@ fi
 if [ ! "$TOS_16" == "" ]; then
   for i in `echo $TOS_16 | tr ',' ' '`; do
     i=`echo $i | tr '_' ':'`
+    j=`echo $i | tr ':' '-'`
 	 if [ $EXECUTOR == "nft" ]; then
-      $NFT add rule ip mangle $TYPE tcp dport $i counter ip6 dscp set 0x04
-      $NFT add rule ip mangle $TYPE udp dport $i counter ip6 dscp set 0x04
+      $NFT add rule ip mangle $TYPE tcp dport $j counter ip dscp set 0x04
+      $NFT add rule ip mangle $TYPE udp dport $j counter ip dscp set 0x04
 	 else
       $IPT $IPT_FLAGS -t mangle -A $TYPE -p tcp --dport $i -j TOS --set-tos 16
       $IPT $IPT_FLAGS -t mangle -A $TYPE -p udp --dport $i -j TOS --set-tos 16
@@ -522,16 +524,17 @@ if [ ! "$TOS_16" == "" ]; then
 fi
 
 if [ ! "$TOS_DEF_RANGE" == "" ]; then
-        for i in `echo $TOS_DEF_RANGE | tr ',' ' '`; do
-                i=`echo $i | tr '_' ':'`
-		if [ $EXECUTOR == "nft" ]; then
-                   $NFT add rule ip mangle $TYPE tcp dport $i counter ip6 dscp set $TOS_DEF
-                   $NFT add rule ip mangle $TYPE udp dport $i counter ip6 dscp set $TOS_DEF
-		else
-                   $IPT $IPT_FLAGS -t mangle -A $TYPE -p tcp --dport $i -j TOS --set-tos $TOS_DEF
-                   $IPT $IPT_FLAGS -t mangle -A $TYPE -p udp --dport $i -j TOS --set-tos $TOS_DEF
-		fi
-        done
+    for i in `echo $TOS_DEF_RANGE | tr ',' ' '`; do
+      i=`echo $i | tr '_' ':'`
+      j=`echo $i | tr ':' '-'`
+      if [ $EXECUTOR == "nft" ]; then
+        $NFT add rule ip mangle $TYPE tcp dport $j counter ip dscp set $TOS_DEF
+        $NFT add rule ip mangle $TYPE udp dport $j counter ip dscp set $TOS_DEF
+      else
+        $IPT $IPT_FLAGS -t mangle -A $TYPE -p tcp --dport $i -j TOS --set-tos $TOS_DEF
+        $IPT $IPT_FLAGS -t mangle -A $TYPE -p udp --dport $i -j TOS --set-tos $TOS_DEF
+      fi
+    done
 fi
 }
 
