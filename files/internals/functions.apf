@@ -1075,10 +1075,10 @@ fi
 
 
 dlist_resnet() {
- if [ -f "$RESNET" ]; then
-        cp $RESNET $RESNET.bk
-        chmod 600 $RESNET $RESNET.bk
- fi
+if [ -f "$RESNET" ]; then
+   cp $RESNET $RESNET.bk
+   chmod 600 $RESNET $RESNET.bk
+fi
 if [ -f "$WGET" ] && [ -f "$RESNET" ]; then
    URL_TMP="/etc/apf/.apf-$$"
    rm -rf $URL_TMP
@@ -1088,22 +1088,22 @@ if [ -f "$WGET" ] && [ -f "$RESNET" ]; then
    eout "{resnet} downloading $DLIST_RESERVED_URL"
    $WGET -4 -t 1 -T 4 $DLIST_RESERVED_URL >> /dev/null 2>&1
    if [ -f "$URL_TMP/$URL_FILE" ]; then
-        eout "{resnet} parsing $URL_FILE into $RESNET"
-        cat $URL_TMP/$URL_FILE > $RESNET
+     eout "{resnet} parsing $URL_FILE into $RESNET"
+     cat $URL_TMP/$URL_FILE > $RESNET
    else
-        eout "{resnet} download of $DLIST_RESERVED_URL failed"
-	 if [ -f "$RESNET" ]; then
-	     cp $RESNET.bk $RESNET
-   	     chmod 600 $RESNET $RESNET.bk
-	 fi
+     eout "{resnet} download of $DLIST_RESERVED_URL failed"
+     if [ -f "$RESNET" ]; then
+       cp $RESNET.bk $RESNET
+       chmod 600 $RESNET $RESNET.bk
+     fi
    fi
    rm -rf $URL_TMP
    cd /etc/apf
 else
- if [ -f "$RESNET" ]; then
-	cp $RESNET.bk $RESNET
-	chmod 600 $RESNET $RESNET.bk
- fi
+   if [ -f "$RESNET" ]; then
+     cp $RESNET.bk $RESNET
+     chmod 600 $RESNET $RESNET.bk
+   fi
 fi
 }
 
@@ -1140,32 +1140,32 @@ fi
 
 dlist_php_hosts() {
 if [ ! "`cat $PHP_HOSTS | grep -v "#"`" == "" ]; then
-        eout "{php} loading php_hosts.rules"
-	if [ $EXECUTOR == "nft" ]; then
-           $NFT add chain ip filter PHP
-           for i in `cat $PHP_HOSTS | grep -v "#"`; do
-                if [ ! "$i" == "" ] && [ -f "$PHP_HOSTS" ]; then
-		        if [ "$LOG_DROP" == "1" ]; then
-                         $NFT add rule ip filter PHP ip saddr $i limit rate $LOG_RATE/minute burst 5 packets counter $LOG_TARGET prefix \"** PHP ** \" level $LOG_LEVEL $LEXT
-			fi
-                        $NFT add rule ip filter PHP ip saddr $i counter jump $ALL_STOP
-                fi
-           done
-           nft add rule ip filter INPUT counter jump PHP
-           nft add rule ip filter OUTPUT counter jump PHP
-	else
-           $IPT $IPT_FLAGS -N PHP
-           for i in `cat $PHP_HOSTS | grep -v "#"`; do
-                if [ ! "$i" == "" ] && [ -f "$PHP_HOSTS" ]; then
-		        if [ "$LOG_DROP" == "1" ]; then
+   eout "{php} loading php_hosts.rules"
+   if [ $EXECUTOR == "nft" ]; then
+      $NFT add chain ip filter PHP
+      for i in `cat $PHP_HOSTS | grep -v "#"`; do
+         if [ ! "$i" == "" ] && [ -f "$PHP_HOSTS" ]; then
+            if [ "$LOG_DROP" == "1" ]; then
+               $NFT add rule ip filter PHP ip saddr $i limit rate $LOG_RATE/minute burst 5 packets counter $LOG_TARGET prefix \"** PHP ** \" level $LOG_LEVEL $LEXT
+            fi
+            $NFT add rule ip filter PHP ip saddr $i counter jump $ALL_STOP
+         fi
+      done
+      nft add rule ip filter INPUT counter jump PHP
+      nft add rule ip filter OUTPUT counter jump PHP
+   else
+      $IPT $IPT_FLAGS -N PHP
+      for i in `cat $PHP_HOSTS | grep -v "#"`; do
+        if [ ! "$i" == "" ] && [ -f "$PHP_HOSTS" ]; then
+          if [ "$LOG_DROP" == "1" ]; then
                          $IPT $IPT_FLAGS -A PHP -s $i -d 0/0 -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** PHP ** "
-			fi
+          fi
                         $IPT $IPT_FLAGS -A PHP -s $i -d 0/0 -j $ALL_STOP
-                fi
-           done
-           $IPT $IPT_FLAGS -A INPUT -j PHP
-           $IPT $IPT_FLAGS -A OUTPUT -j PHP
-	fi
+        fi
+      done
+      $IPT $IPT_FLAGS -A INPUT -j PHP
+      $IPT $IPT_FLAGS -A OUTPUT -j PHP
+   fi
 fi
 }
 
