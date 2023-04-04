@@ -894,6 +894,10 @@ if [ ! "`cat $file | grep -v "#"`" == "" ]; then
                     $IPT $IPT_FLAGS -A $chain -p tcp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j $TCP_STOP
                     $IPT $IPT_FLAGS -A $chain -p udp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j $UDP_STOP
                     if [ "$USE_IPV6" == "1" ]; then
+                       if [[ $PIP =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+                          eout "ignoring ipv4 address $PIP"
+                          continue
+                       fi
                        $IP6T -A $chain -m state --state NEW -m tcp -p tcp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j $TCP_STOP
                        $IP6T -A $chain -m state --state NEW -m udp -p udp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j $UDP_STOP
                     fi
@@ -929,26 +933,40 @@ if [ ! "`cat $file | grep -v "#"`" == "" ]; then
                   PPORT_BEG=`echo $PPORT | tr '_' ' ' | awk '{print$1}'`
                   PPORT_END=`echo $PPORT | tr '_' ' ' | awk '{print$2}'`
                   PPORT="$PPORT_BEG:$PPORT_END"
+                  PPORT_NFT="$PPORT_BEG-$PPORT_END"
                fi
 
                IPFLOW=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$4}'`
                if [ "$IPFLOW" == "s" ]; then
                   IPFLOW="s"
+                  IPFLOW_NFT="saddr"
                elif [ "$IPFLOW" == "d" ]; then
                   IPFLOW="d"
+                  IPFLOW_NFT="daddr"
                fi
                PIP=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$5}'`
 
                if [ ! "$NFLOW" == "" ] && [ ! "$IPFLOW" == "" ] && [ ! "$PIP" == "" ] && [ ! "$IPFLOW" == "" ] && [ ! "$PPORT" == "" ]; then
                   eout "{trust} deny ($NFLOW_T) $PIP $PFLOW_T port $PPORT"
                   if [ $EXECUTOR == "nft" ]; then
-                     $NFT add rule ip filter $chain ip protocol tcp ip $IPFLOW $PIP tcp $PFLOW $PPORT counter jump $TCP_STOP
-                     $NFT add rule ip filter $chain ip protocol udp ip $IPFLOW $PIP udp $PFLOW $PPORT counter jump $UDP_STOP
-                     # TODO support ipv6
+                     $NFT add rule ip filter $chain ip protocol tcp ip $IPFLOW_NFT $PIP tcp $PFLOW $PPORT_NFT counter $TCP_STOP
+                     $NFT add rule ip filter $chain ip protocol udp ip $IPFLOW_NFT $PIP udp $PFLOW $PPORT_NFT counter $UDP_STOP
+                     if [ "$USE_IPV6" == "1" ]; then
+                        if [[ $PIP =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+                          eout "ignoring ipv4 address $PIP"
+                          continue
+                        fi
+                        $NFT add rule ip6 filter $chain meta l4proto tcp ip6 $IPFLOW_NFT $PIP ct state new  tcp $PFLOW $PPORT_NFT counter $TCP_STOP
+                        $NFT add rule ip6 filter $chain meta l4proto udp ip6 $IPFLOW_NFT $PIP ct state new  udp $PFLOW $PPORT_NFT counter $TCP_STOP
+                     fi
                   else
                      $IPT $IPT_FLAGS -A $chain -p tcp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j $TCP_STOP
                      $IPT $IPT_FLAGS -A $chain -p udp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j $UDP_STOP
                      if [ "$USE_IPV6" == "1" ]; then
+                        if [[ $PIP =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+                          eout "ignoring ipv4 address $PIP"
+                          continue
+                        fi
                         $IP6T -A $chain -m state --state NEW -p tcp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j $TCP_STOP
                         $IP6T -A $chain -m state --state NEW -p udp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j $UDP_STOP
                      fi
@@ -992,13 +1010,16 @@ if [ ! "`cat $file | grep -v "#"`" == "" ]; then
                                 PPORT_BEG=`echo $PPORT | tr '_' ' ' | awk '{print$1}'`
                                 PPORT_END=`echo $PPORT | tr '_' ' ' | awk '{print$2}'`
                                 PPORT="$PPORT_BEG:$PPORT_END"
+                                PPORT_NFT="$PPORT_BEG-$PPORT_END"
                         fi
 
                         IPFLOW=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$5}'`
                         if [ "$IPFLOW" == "s" ]; then
                                 IPFLOW="s"
+                                IPFLOW_NFT="saddr"
                         elif [ "$IPFLOW" == "d" ]; then
                                 IPFLOW="d"
+                                IPFLOW_NFT="daddr"
                         fi
                         PIP=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$6}'`
 
@@ -1006,22 +1027,42 @@ if [ ! "`cat $file | grep -v "#"`" == "" ]; then
                            if [ "$PTYPE" == "tcp" ]; then
                                eout "{trust} deny $NFLOW_T $PTYPE $PIP $PFLOW_T port $PPORT"
                                if [ $EXECUTOR == "nft" ]; then
-                                      $NFT add rule ip filter $chain ip protocol $PTYPE ip $IPFLOW $PIP $PTYPE $PFLOW $PPORT counter jump $TCP_STOP
-                                      #TODO should do for ipv6
+                                  $NFT add rule ip filter $chain ip protocol $PTYPE ip $IPFLOW_NFT $PIP $PTYPE $PFLOW $PPORT_NFT counter $TCP_STOP
+                                  if [ "$USE_IPV6" == "1" ]; then
+                                     if [[ $PIP =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+                                        eout "ignoring ipv4 address $PIP"
+                                        continue
+                                     fi
+                                     $NFT add rule ip6 filter $chain meta l4proto $PTYPE ip6 $IPFLOW_NFT $PIP ct state new  $PTYPE $PFLOW $PPORT_NFT counter $TCP_STOP
+                                  fi
                                else
-                                      $IPT $IPT_FLAGS -A $chain -p $PTYPE -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j $TCP_STOP
-                                           if [ "$USE_IPV6" == "1" ]; then
-                                              $IP6T -A $chain -m state --state NEW -p $PTYPE -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j $TCP_STOP
-                                           fi
+                                  $IPT $IPT_FLAGS -A $chain -p $PTYPE -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j $TCP_STOP
+                                  if [ "$USE_IPV6" == "1" ]; then
+                                     if [[ $PIP =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+                                        eout "ignoring ipv4 address $PIP"
+                                        continue
+                                     fi
+                                     $IP6T -A $chain -m state --state NEW -p $PTYPE -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j $TCP_STOP
+                                  fi
                                fi
                            elif [ "$PTYPE" == "udp" ]; then
                                eout "{trust} deny $NFLOW_T $PTYPE $PIP $PFLOW_T port $PPORT"
                                if [ $EXECUTOR == "nft" ]; then
-                                  $NFT add rule ip filter $chain ip protocol $PTYPE ip $IPFLOW $PIP $PTYPE $PPORT counter jump $UDP_STOP
-                                  #TODO should do for ipv6
+                                  $NFT add rule ip filter $chain ip protocol $PTYPE ip $IPFLOW_NFT $PIP $PTYPE $PFLOW $PPORT_NFT counter $UDP_STOP
+                                  if [ "$USE_IPV6" == "1" ]; then
+                                     if [[ $PIP =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+                                        eout "ignoring ipv4 address $PIP"
+                                        continue
+                                     fi
+                                     $NFT add rule ip6 filter $chain meta l4proto $PTYPE ip6 $IPFLOW_NFT $PIP ct state new  $PTYPE $PFLOW $PPORT_NFT counter $UDP_STOP
+                                  fi
                                else
                                   $IPT $IPT_FLAGS -A $chain -p $PTYPE -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j $UDP_STOP
                                   if [ "$USE_IPV6" == "1" ]; then
+                                     if [[ $PIP =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+                                        eout "ignoring ipv4 address $PIP"
+                                        continue
+                                     fi
                                      $IP6T -A $chain -m state --state NEW -p $PTYPE -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j $UDP_STOP
                                   fi
                                fi
