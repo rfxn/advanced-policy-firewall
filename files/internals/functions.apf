@@ -819,9 +819,17 @@ if [ ! "`cat $file | grep -v "#"`" == "" ]; then
               if [ ! "$i" == "" ] && [ -f "$file" ]; then
                  eout "{trust} deny all to/from $i"
                  if [ $EXECUTOR == "nft" ]; then
-                    $NFT add rule ip filter $chain ip saddr $i counter jump $ALL_STOP
-                    $NFT add rule ip filter $CHAIN ip daddr $i counter jump $ALL_STOP
-                    # TODO support ipv6
+                    $NFT add rule ip filter $chain ip saddr $i counter $ALL_STOP
+                    $NFT add rule ip filter $chain ip daddr $i counter $ALL_STOP
+                    if [ "$USE_IPV6" == "1" ]; then
+                       subnet=`echo $i | awk -F'/' '{print $1}'`
+                       if [[ $subnet =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+                          eout "ignoring ipv4 address $i"
+                          continue
+                       fi
+                       $NFT add rule ip6 filter $chain ip6 saddr $i ct state new  counter $ALL_STOP
+                       $NFT add rule ip6 filter $chain ip6 daddr $i ct state new  counter $ALL_STOP
+                    fi
                  else
                     $IPT $IPT_FLAGS -A $chain -s $i -d 0/0 -j $ALL_STOP
                     $IPT $IPT_FLAGS -A $chain -d $i -s 0/0 -j $ALL_STOP
