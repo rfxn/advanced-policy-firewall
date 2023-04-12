@@ -1433,10 +1433,10 @@ if [ ! "$BLK_PORTS" == "" ]; then
     if [ "$(echo $i | grep "_")" == "" ]; then
       if [ ! "$i" == "" ]; then
         if [ $EXECUTOR == "nft" ]; then
-          nft add rule ip filter INPUT tcp dport $i counter jump $TCP_STOP
-          nft add rule ip filter INPUT udp dport $i counter jump $UDP_STOP
-          nft add rule ip filter OUTPUT tcp dport $i counter jump $TCP_STOP
-          nft add rule ip filter OUTPUT udp dport $i counter jump $UDP_STOP
+          $NFT add rule ip filter INPUT tcp dport $i counter $TCP_STOP
+          $NFT add rule ip filter INPUT udp dport $i counter $UDP_STOP
+          $NFT add rule ip filter OUTPUT tcp dport $i counter $TCP_STOP
+          $NFT add rule ip filter OUTPUT udp dport $i counter $UDP_STOP
         else
           $IPT $IPT_FLAGS -A INPUT  -p tcp --dport $i -j $TCP_STOP
           $IPT $IPT_FLAGS -A INPUT  -p udp --dport $i -j $UDP_STOP
@@ -1450,11 +1450,11 @@ if [ ! "$BLK_PORTS" == "" ]; then
       i=`echo $i | tr '_' ':'`
       if [ ! "$i" == "" ]; then
         if [ $EXECUTOR == "nft" ]; then
-          i=`echo $i | tr ':' '_'`
-          nft add rule ip filter INPUT tcp dport $i counter jump $TCP_STOP
-          nft add rule ip filter INPUT udp dport $i counter jump $UDP_STOP
-          nft add rule ip filter OUTPUT tcp dport $i counter jump $TCP_STOP
-          nft add rule ip filter OUTPUT udp dport $i counter jump $UDP_STOP
+          j=`echo $i | tr ':' '-'`
+          $NFT add rule ip filter INPUT tcp dport $j counter $TCP_STOP
+          $NFT add rule ip filter INPUT udp dport $j counter $UDP_STOP
+          $NFT add rule ip filter OUTPUT tcp dport $j counter $TCP_STOP
+          $NFT add rule ip filter OUTPUT udp dport $j counter $UDP_STOP
         else
           $IPT $IPT_FLAGS -A INPUT  -p tcp --dport $i -j $TCP_STOP
           $IPT $IPT_FLAGS -A INPUT  -p udp --dport $i -j $UDP_STOP
