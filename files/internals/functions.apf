@@ -1428,44 +1428,44 @@ fi
 
 cdports() {
 if [ ! "$BLK_PORTS" == "" ]; then
-	eout "{glob} loading common drop ports"
-for i in `echo $BLK_PORTS | tr ',' ' '`; do
-	if [ "$(echo $i | grep "_")" == "" ]; then
-         if [ ! "$i" == "" ]; then
-		if [ $EXECUTOR == "nft" ]; then
-         nft add rule ip filter INPUT tcp dport $i counter jump $TCP_STOP
-         nft add rule ip filter INPUT udp dport $i counter jump $UDP_STOP
-         nft add rule ip filter OUTPUT tcp dport $i counter jump $TCP_STOP
-         nft add rule ip filter OUTPUT udp dport $i counter jump $UDP_STOP
-		else
-		   $IPT $IPT_FLAGS -A INPUT  -p tcp --dport $i -j $TCP_STOP
-		   $IPT $IPT_FLAGS -A INPUT  -p udp --dport $i -j $UDP_STOP
-		   $IPT $IPT_FLAGS -A OUTPUT  -p tcp --dport $i -j $TCP_STOP
-		   $IPT $IPT_FLAGS -A OUTPUT  -p udp --dport $i -j $UDP_STOP
-		fi
-		eout "{blk_ports} deny all to/from tcp port $i"
-                eout "{blk_ports} deny all to/from udp port $i"
-         fi
+  eout "{glob} loading common drop ports"
+  for i in `echo $BLK_PORTS | tr ',' ' '`; do
+    if [ "$(echo $i | grep "_")" == "" ]; then
+      if [ ! "$i" == "" ]; then
+        if [ $EXECUTOR == "nft" ]; then
+          nft add rule ip filter INPUT tcp dport $i counter jump $TCP_STOP
+          nft add rule ip filter INPUT udp dport $i counter jump $UDP_STOP
+          nft add rule ip filter OUTPUT tcp dport $i counter jump $TCP_STOP
+          nft add rule ip filter OUTPUT udp dport $i counter jump $UDP_STOP
         else
-                i=`echo $i | tr '_' ':'`
-                if [ ! "$i" == "" ]; then
-			if [ $EXECUTOR == "nft" ]; then
-            i=`echo $i | tr ':' '_'`
-            nft add rule ip filter INPUT tcp dport $i counter jump $TCP_STOP
-            nft add rule ip filter INPUT udp dport $i counter jump $UDP_STOP
-            nft add rule ip filter OUTPUT tcp dport $i counter jump $TCP_STOP
-            nft add rule ip filter OUTPUT udp dport $i counter jump $UDP_STOP
-			else
-			   $IPT $IPT_FLAGS -A INPUT  -p tcp --dport $i -j $TCP_STOP
-			   $IPT $IPT_FLAGS -A INPUT  -p udp --dport $i -j $UDP_STOP
-			   $IPT $IPT_FLAGS -A OUTPUT  -p tcp --dport $i -j $TCP_STOP
-			   $IPT $IPT_FLAGS -A OUTPUT  -p udp --dport $i -j $UDP_STOP
-			fi
-        	        eout "{blk_ports} deny all to/from tcp port $i"
-	                eout "{blk_ports} deny all to/from udp port $i"
-                fi
+          $IPT $IPT_FLAGS -A INPUT  -p tcp --dport $i -j $TCP_STOP
+          $IPT $IPT_FLAGS -A INPUT  -p udp --dport $i -j $UDP_STOP
+          $IPT $IPT_FLAGS -A OUTPUT  -p tcp --dport $i -j $TCP_STOP
+          $IPT $IPT_FLAGS -A OUTPUT  -p udp --dport $i -j $UDP_STOP
         fi
-done
+        eout "{blk_ports} deny all to/from tcp port $i"
+        eout "{blk_ports} deny all to/from udp port $i"
+      fi
+    else
+      i=`echo $i | tr '_' ':'`
+      if [ ! "$i" == "" ]; then
+        if [ $EXECUTOR == "nft" ]; then
+          i=`echo $i | tr ':' '_'`
+          nft add rule ip filter INPUT tcp dport $i counter jump $TCP_STOP
+          nft add rule ip filter INPUT udp dport $i counter jump $UDP_STOP
+          nft add rule ip filter OUTPUT tcp dport $i counter jump $TCP_STOP
+          nft add rule ip filter OUTPUT udp dport $i counter jump $UDP_STOP
+        else
+          $IPT $IPT_FLAGS -A INPUT  -p tcp --dport $i -j $TCP_STOP
+          $IPT $IPT_FLAGS -A INPUT  -p udp --dport $i -j $UDP_STOP
+          $IPT $IPT_FLAGS -A OUTPUT  -p tcp --dport $i -j $TCP_STOP
+          $IPT $IPT_FLAGS -A OUTPUT  -p udp --dport $i -j $UDP_STOP
+        fi
+        eout "{blk_ports} deny all to/from tcp port $i"
+        eout "{blk_ports} deny all to/from udp port $i"
+      fi
+    fi
+  done
 fi
 }
 
