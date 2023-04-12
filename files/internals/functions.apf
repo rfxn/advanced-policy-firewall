@@ -1146,22 +1146,22 @@ if [ ! "`cat $PHP_HOSTS | grep -v "#"`" == "" ]; then
       for i in `cat $PHP_HOSTS | grep -v "#"`; do
          if [ ! "$i" == "" ] && [ -f "$PHP_HOSTS" ]; then
             if [ "$LOG_DROP" == "1" ]; then
-               $NFT add rule ip filter PHP ip saddr $i limit rate $LOG_RATE/minute burst 5 packets counter $LOG_TARGET prefix \"** PHP ** \" level $LOG_LEVEL $LEXT
+               $NFT add rule ip filter PHP ip saddr $i limit rate $LOG_RATE/minute burst 5 packets counter $LOG_TARGET prefix '"** PHP ** "' level $LOG_LEVEL $LEXT
             fi
-            $NFT add rule ip filter PHP ip saddr $i counter jump $ALL_STOP
+            $NFT add rule ip filter PHP ip saddr $i counter $ALL_STOP
          fi
       done
-      nft add rule ip filter INPUT counter jump PHP
-      nft add rule ip filter OUTPUT counter jump PHP
+      $NFT add rule ip filter INPUT counter jump PHP
+      $NFT add rule ip filter OUTPUT counter jump PHP
    else
       $IPT $IPT_FLAGS -N PHP
       for i in `cat $PHP_HOSTS | grep -v "#"`; do
-        if [ ! "$i" == "" ] && [ -f "$PHP_HOSTS" ]; then
-          if [ "$LOG_DROP" == "1" ]; then
-                         $IPT $IPT_FLAGS -A PHP -s $i -d 0/0 -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** PHP ** "
-          fi
-                        $IPT $IPT_FLAGS -A PHP -s $i -d 0/0 -j $ALL_STOP
-        fi
+         if [ ! "$i" == "" ] && [ -f "$PHP_HOSTS" ]; then
+            if [ "$LOG_DROP" == "1" ]; then
+               $IPT $IPT_FLAGS -A PHP -s $i -d 0/0 -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** PHP ** "
+            fi
+            $IPT $IPT_FLAGS -A PHP -s $i -d 0/0 -j $ALL_STOP
+         fi
       done
       $IPT $IPT_FLAGS -A INPUT -j PHP
       $IPT $IPT_FLAGS -A OUTPUT -j PHP
@@ -1202,35 +1202,37 @@ fi
 
 dlist_dshield_hosts() {
 if [ ! "`cat $DS_HOSTS | grep -v "#"`" == "" ]; then
-        eout "{dshield} loading ds_hosts.rules"
-	if [ $EXECUTOR == "nft" ]; then
-           #$IPT $IPT_FLAGS -N DSHIELD
-           nft add chain ip filter DSHIELD
-           for i in `cat $DS_HOSTS | grep -v "#"`; do
-                if [ ! "$i" == "" ] && [ -f "$DS_HOSTS" ]; then
-		        if [ "$LOG_DROP" == "1" ]; then
-                         #$IPT $IPT_FLAGS -A DSHIELD -s $i -d 0/0 -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** DSHIELD ** "
-                         nft add rule ip filter DSHIELD ip saddr $i limit rate $LOG_RATE/minute burst 5 packets counter $LOG_TARGET prefix \"** DSHIELD ** \" level $LOG_LEVEL $LEXT 
-			fi
-                        #$IPT $IPT_FLAGS -A DSHIELD -s $i -d 0/0 -j $ALL_STOP
-                        nft add rule ip filter DSHIELD ip saddr $i counter jump $ALL_STOP
-                fi
-           done
-           $IPT $IPT_FLAGS -A INPUT -j DSHIELD
-           $IPT $IPT_FLAGS -A OUTPUT -j DSHIELD
-	else
-           $IPT $IPT_FLAGS -N DSHIELD
-           for i in `cat $DS_HOSTS | grep -v "#"`; do
-                if [ ! "$i" == "" ] && [ -f "$DS_HOSTS" ]; then
-		        if [ "$LOG_DROP" == "1" ]; then
-                         $IPT $IPT_FLAGS -A DSHIELD -s $i -d 0/0 -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** DSHIELD ** "
-			fi
-                        $IPT $IPT_FLAGS -A DSHIELD -s $i -d 0/0 -j $ALL_STOP
-                fi
-           done
-           $IPT $IPT_FLAGS -A INPUT -j DSHIELD
-           $IPT $IPT_FLAGS -A OUTPUT -j DSHIELD
-	fi
+   eout "{dshield} loading ds_hosts.rules"
+   if [ $EXECUTOR == "nft" ]; then
+      #$IPT $IPT_FLAGS -N DSHIELD
+      $NFT add chain ip filter DSHIELD
+      for i in `cat $DS_HOSTS | grep -v "#"`; do
+         if [ ! "$i" == "" ] && [ -f "$DS_HOSTS" ]; then
+            if [ "$LOG_DROP" == "1" ]; then
+               #$IPT $IPT_FLAGS -A DSHIELD -s $i -d 0/0 -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** DSHIELD ** "
+               $NFT add rule ip filter DSHIELD ip saddr $i limit rate $LOG_RATE/minute burst 5 packets counter $LOG_TARGET prefix '"** DSHIELD ** "' level $LOG_LEVEL $LEXT 
+            fi
+            #$IPT $IPT_FLAGS -A DSHIELD -s $i -d 0/0 -j $ALL_STOP
+            $NFT add rule ip filter DSHIELD ip saddr $i counter $ALL_STOP
+         fi
+      done
+      #$IPT $IPT_FLAGS -A INPUT -j DSHIELD
+      #$IPT $IPT_FLAGS -A OUTPUT -j DSHIELD
+      $NFT add rule ip filter INPUT counter jump DSHIELD
+      $NFT add rule ip filter OUTPUT counter jump DSHIELD
+   else
+      $IPT $IPT_FLAGS -N DSHIELD
+      for i in `cat $DS_HOSTS | grep -v "#"`; do
+         if [ ! "$i" == "" ] && [ -f "$DS_HOSTS" ]; then
+            if [ "$LOG_DROP" == "1" ]; then
+               $IPT $IPT_FLAGS -A DSHIELD -s $i -d 0/0 -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** DSHIELD ** "
+            fi
+            $IPT $IPT_FLAGS -A DSHIELD -s $i -d 0/0 -j $ALL_STOP
+         fi
+      done
+      $IPT $IPT_FLAGS -A INPUT -j DSHIELD
+      $IPT $IPT_FLAGS -A OUTPUT -j DSHIELD
+   fi
 fi
 }
 
@@ -1268,34 +1270,36 @@ fi
 
 dlist_spamhaus_hosts() {
 if [ ! "`cat $DROP_HOSTS | grep -v "#"`" == "" ]; then
-        eout "{sdrop} loading sdrop_hosts.rules"
-	if [ $EXECUTOR == "nft" ]; then
-           nft add chain ip filter SDROP
-           for i in `cat $DROP_HOSTS | grep -v "#"`; do
-                if [ ! "$i" == "" ] && [ -f "$DROP_HOSTS" ]; then
-		        if [ "$LOG_DROP" == "1" ]; then
-                        #$IPT $IPT_FLAGS -A SDROP -s $i -d 0/0 -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** SDROP ** "
-                        nft add rule ip filter SDROP ip saddr $i limit rate $LOG_RATE/minute burst 5 packets counter $LOG_TARGET prefix \"** SDROP ** \" level $LOG_LEVEL $LEXT
-		        fi
-                        #$IPT $IPT_FLAGS -A SDROP -s $i -d 0/0 -j $ALL_STOP
-                        nft add rule ip filter SDROP ip saddr $i counter jump $ALL_STOP
-                fi
-           done
-           $IPT $IPT_FLAGS -A INPUT -j SDROP
-           $IPT $IPT_FLAGS -A OUTPUT -j SDROP
-	else
-           $IPT $IPT_FLAGS -N SDROP
-           for i in `cat $DROP_HOSTS | grep -v "#"`; do
-                if [ ! "$i" == "" ] && [ -f "$DROP_HOSTS" ]; then
-		        if [ "$LOG_DROP" == "1" ]; then
-                         $IPT $IPT_FLAGS -A SDROP -s $i -d 0/0 -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** SDROP ** "
-		        fi
-                        $IPT $IPT_FLAGS -A SDROP -s $i -d 0/0 -j $ALL_STOP
-                fi
-           done
-           $IPT $IPT_FLAGS -A INPUT -j SDROP
-           $IPT $IPT_FLAGS -A OUTPUT -j SDROP
-	fi
+   eout "{sdrop} loading sdrop_hosts.rules"
+   if [ $EXECUTOR == "nft" ]; then
+      $NFT add chain ip filter SDROP
+      for i in `cat $DROP_HOSTS | grep -v "#"`; do
+         if [ ! "$i" == "" ] && [ -f "$DROP_HOSTS" ]; then
+            if [ "$LOG_DROP" == "1" ]; then
+               #$IPT $IPT_FLAGS -A SDROP -s $i -d 0/0 -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** SDROP ** "
+               $NFT add rule ip filter SDROP ip saddr $i limit rate $LOG_RATE/minute burst 5 packets counter $LOG_TARGET prefix '"** SDROP ** "' level $LOG_LEVEL $LEXT
+            fi
+            #$IPT $IPT_FLAGS -A SDROP -s $i -d 0/0 -j $ALL_STOP
+            $NFT add rule ip filter SDROP ip saddr $i counter $ALL_STOP
+         fi
+      done
+      #$IPT $IPT_FLAGS -A INPUT -j SDROP
+      #$IPT $IPT_FLAGS -A OUTPUT -j SDROP
+      $NFT add rule ip filter INPUT counter jump SDROP
+      $NFT add rule ip filter OUTPUT counter jump SDROP
+   else
+      $IPT $IPT_FLAGS -N SDROP
+      for i in `cat $DROP_HOSTS | grep -v "#"`; do
+         if [ ! "$i" == "" ] && [ -f "$DROP_HOSTS" ]; then
+            if [ "$LOG_DROP" == "1" ]; then
+               $IPT $IPT_FLAGS -A SDROP -s $i -d 0/0 -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** SDROP ** "
+            fi
+            $IPT $IPT_FLAGS -A SDROP -s $i -d 0/0 -j $ALL_STOP
+         fi
+      done
+      $IPT $IPT_FLAGS -A INPUT -j SDROP
+      $IPT $IPT_FLAGS -A OUTPUT -j SDROP
+   fi
 fi
 }
 
@@ -1332,17 +1336,19 @@ fi
 
 dlist_ecnshame_hosts() {
 if [ ! "`cat $ECNSHAME_HOSTS | grep -v "#"`" == "" ]; then
-        eout "{ecnshame} loading ecnshame_hosts.rules"
-        for i in `cat $ECNSHAME_HOSTS | grep -v "#"`; do
-                if [ ! "$i" == "" ] && [ -f "$ECNSHAME_HOSTS" ]; then
-			if [ $EXECUTOR == "nft" ]; then
-			   # TODO nft
-			   # dont work
-			else
-			   $IPT $IPT_FLAGS -t mangle -A POSTROUTING -p tcp -d $i -j ECN --ecn-tcp-remove
-			fi
-                fi
-        done
+   eout "{ecnshame} loading ecnshame_hosts.rules"
+   for i in `cat $ECNSHAME_HOSTS | grep -v "#"`; do
+      if [ ! "$i" == "" ] && [ -f "$ECNSHAME_HOSTS" ]; then
+         if [ $EXECUTOR == "nft" ]; then
+            # TODO nft
+            # dont work
+            # https://www.linuxtopia.org/Linux_Firewall_iptables/x4212.html
+            :
+         else
+            $IPT $IPT_FLAGS -t mangle -A POSTROUTING -p tcp -d $i -j ECN --ecn-tcp-remove
+         fi
+      fi
+   done
 fi
 }
 
@@ -1381,7 +1387,7 @@ if [ ! "$GD_URL" == "" ] && [ "$USE_RGT" == "1" ] && [ -f "$WGET" ]; then
    $WGET -4 -t 1 -T 4 $GD_URL >> /dev/null 2>&1
    if [ -f "$URL_TMP/$URL_FILE" ]; then
         eout "{trust} parsing $URL_FILE into $GDENY_HOSTS"
-	cat $URL_TMP/$URL_FILE > $GDENY_HOSTS
+        cat $URL_TMP/$URL_FILE > $GDENY_HOSTS
    else
         eout "{trust} download of $GD_URL failed"
    fi
@@ -1397,19 +1403,19 @@ fi
 dnet() {
 FILE="$1"
 if [ -f "$FILE" ]; then
-FNAME=`echo $FILE | tr '/' '\n' | tail -n 1`
-eout "{glob} loading $FNAME"
- for i in `cat $FILE | grep -v "#"`; do
-  if [ ! "$i" == "" ]; then
-   if [ $EXECUTOR == "nft" ]; then
-           nft add rule ip filter INPUT ip saddr $i counter jump $ALL_STOP
-           nft add rule ip filter OUTPUT ip daddr $i counter jump $ALL_STOP
-	else
-           $IPT $IPT_FLAGS -A INPUT -s $i -j $ALL_STOP
-           $IPT $IPT_FLAGS -A OUTPUT -d $i -j $ALL_STOP
-	fi
-  fi
- done
+  FNAME=`echo $FILE | tr '/' '\n' | tail -n 1`
+  eout "{glob} loading $FNAME"
+  for i in `cat $FILE | grep -v "#"`; do
+    if [ ! "$i" == "" ]; then
+      if [ $EXECUTOR == "nft" ]; then
+        $NFT add rule ip filter INPUT ip saddr $i counter $ALL_STOP
+        $NFT add rule ip filter OUTPUT ip daddr $i counter $ALL_STOP
+      else
+        $IPT $IPT_FLAGS -A INPUT -s $i -j $ALL_STOP
+        $IPT $IPT_FLAGS -A OUTPUT -d $i -j $ALL_STOP
+      fi
+    fi
+  done
 fi
 }
 
