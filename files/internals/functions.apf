@@ -1552,39 +1552,39 @@ refresh() {
 	   apf_loaded=`$IPT $IPT_FLAGS --list --numeric | grep PROHIBIT`
 	fi
 	if [ -z "$apf_loaded" ]; then
-	        eout "{glob} apf does not appear to have rules loaded, doing nothing."
-	        mutex_unlock
+      eout "{glob} apf does not appear to have rules loaded, doing nothing."
+      mutex_unlock
 		exit 1
 	fi
 
-        eout "{glob} refreshing trust system rules"
+   eout "{glob} refreshing trust system rules"
 	tmpra="/etc/apf/internals/refresh.allow.temp.$$"
 
-        if [ "$SET_EXPIRE" -ge "60" ]; then
-                # expire deny_hosts bans
-                expirebans
-        fi
+   if [ "$SET_EXPIRE" -ge "60" ]; then
+      # expire deny_hosts bans
+      expirebans
+   fi
 
 	if [ "$SET_REFRESH_MD5" == "1" ] && [ "$MD5" ]; then
- 	 glob_allow_download
-	 glob_deny_download
-	 trusts_md5=`$MD5 $DENY_HOSTS $GDENY_HOSTS $ALLOW_HOSTS $GALLOW_HOSTS | $MD5 | awk '{print$1}'`
-	 if [ -f "/etc/apf/internals/.trusts.md5" ]; then
-		last_trusts_md5=`cat /etc/apf/internals/.trusts.md5`
-		if [ "$trusts_md5" == "$last_trusts_md5" ]; then
-		        eout "{glob} trust rules unchanged since last refresh, doing nothing."
-	                echo "$trusts_md5" > /etc/apf/internals/.trusts.md5
-		        mutex_unlock
-			exit 1
-		else
-	                echo "$trusts_md5" > /etc/apf/internals/.trusts.md5
-		fi
-	 else
-		echo "$trusts_md5" > /etc/apf/internals/.trusts.md5
-	 fi
+      glob_allow_download
+      glob_deny_download
+      trusts_md5=`$MD5 $DENY_HOSTS $GDENY_HOSTS $ALLOW_HOSTS $GALLOW_HOSTS | $MD5 | awk '{print$1}'`
+      if [ -f "/etc/apf/internals/.trusts.md5" ]; then
+		  last_trusts_md5=`cat /etc/apf/internals/.trusts.md5`
+        if [ "$trusts_md5" == "$last_trusts_md5" ]; then
+		    eout "{glob} trust rules unchanged since last refresh, doing nothing."
+	       echo "$trusts_md5" > /etc/apf/internals/.trusts.md5
+		    mutex_unlock
+			 exit 1
+         else
+	       echo "$trusts_md5" > /etc/apf/internals/.trusts.md5
+		  fi
+      else
+        echo "$trusts_md5" > /etc/apf/internals/.trusts.md5
+      fi
 	else
-		glob_allow_download
-		glob_deny_download
+      glob_allow_download
+      glob_deny_download
 	fi
 
 	if [ $EXECUTOR == "nft" ]; then
@@ -1617,12 +1617,11 @@ refresh() {
            nft flush chain ip filter TALLOW
            nft flush chain ip filter TGALLOW
         fi
-	allow_hosts $GALLOW_HOSTS TGALLOW
-	allow_hosts $ALLOW_HOSTS TALLOW
-	deny_hosts $GDENY_HOSTS TGDENY
-	deny_hosts $DENY_HOSTS TDENY
+        allow_hosts $GALLOW_HOSTS TGALLOW
+        allow_hosts $ALLOW_HOSTS TALLOW
+        deny_hosts $GDENY_HOSTS TGDENY
+        deny_hosts $DENY_HOSTS TDENY
         nft flush chain ip filter REFRESH_TEMP
-	fi
         rm -f $tmpra $tmprd
 	else
         /sbin/iptables-save | grep -E "TALLOW|TGALLOW" | grep -E '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | awk '{print$4}' | sort -n | uniq > $tmpra
@@ -1654,13 +1653,13 @@ refresh() {
            $IP6T -F TALLOW
            $IP6T -F TGALLOW
         fi
-	allow_hosts $GALLOW_HOSTS TGALLOW
-	allow_hosts $ALLOW_HOSTS TALLOW
-	deny_hosts $GDENY_HOSTS TGDENY
-	deny_hosts $DENY_HOSTS TDENY
+        allow_hosts $GALLOW_HOSTS TGALLOW
+        allow_hosts $ALLOW_HOSTS TALLOW
+        deny_hosts $GDENY_HOSTS TGDENY
+        deny_hosts $DENY_HOSTS TDENY
         $IPT $IPT_FLAGS -F REFRESH_TEMP
-	fi
         rm -f $tmpra $tmprd
+	fi
 }
 
 cron_refresh() {
