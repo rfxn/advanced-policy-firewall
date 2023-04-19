@@ -1471,27 +1471,35 @@ fi
 
 lgate_mac() {
 if [ $EXECUTOR == "nft" ]; then
-nft add chain ip filter LMAC
-for mac in `echo $LGATE_MAC | tr ',' ' '`; do
-MAC=$mac
-if [ ! "$MAC" == "" ]; then
-  nft add rule ip filter INPUT ether saddr != $MAC counter jump LMAC
-  eout "{glob} gateway ($MAC) route verification enabled"
-fi
+  $NFT add chain ip filter LMAC
+  for mac in `echo $LGATE_MAC | tr ',' ' '`; do
+    MAC=$mac
+    if [ ! "$MAC" == "" ]; then
+      #$IPT $IPT_FLAGS -A INPUT  -m mac ! --mac-source "$MAC" -j LMAC
+      $NFT add rule ip filter INPUT ether saddr != $MAC counter jump LMAC
+      eout "{glob} gateway ($MAC) route verification enabled"
+    fi
+  done
+  if [ "$LOG_LGATE" == "1" ]; then
+    #$IPT $IPT_FLAGS -A LMAC -m limit --limit $LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix=" ** DROP FORIGN MAC ** "
+    $NFT add rule ip filter LMAC limit rate $LOG_RATE/minute burst 5 packets counter $LOG_TARGET prefix '" ** DROP FORIGN MAC ** "' level $LOG_LEVEL $LEXT
+  fi
+  #$IPT $IPT_FLAGS -A LMAC  -j REJECT --reject-with icmp-net-prohibited
+  $NFT add rule ip filter LMAC counter reject with icmp type net-prohibited
 else
-$IPT $IPT_FLAGS -N LMAC
-for mac in `echo $LGATE_MAC | tr ',' ' '`; do
-MAC=$mac
-if [ ! "$MAC" == "" ]; then
-  $IPT $IPT_FLAGS -A INPUT  -m mac ! --mac-source "$MAC" -j LMAC
-  eout "{glob} gateway ($MAC) route verification enabled"
-fi
-done
+  $IPT $IPT_FLAGS -N LMAC
+  for mac in `echo $LGATE_MAC | tr ',' ' '`; do
+    MAC=$mac
+    if [ ! "$MAC" == "" ]; then
+      $IPT $IPT_FLAGS -A INPUT  -m mac ! --mac-source "$MAC" -j LMAC
+      eout "{glob} gateway ($MAC) route verification enabled"
+    fi
+  done
 
-if [ "$LOG_LGATE" == "1" ]; then
- $IPT $IPT_FLAGS -A LMAC -m limit --limit $LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix=" ** DROP FORIGN MAC ** "
-fi
-$IPT $IPT_FLAGS -A LMAC  -j REJECT --reject-with icmp-net-prohibited
+  if [ "$LOG_LGATE" == "1" ]; then
+    $IPT $IPT_FLAGS -A LMAC -m limit --limit $LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix=" ** DROP FORIGN MAC ** "
+  fi
+  $IPT $IPT_FLAGS -A LMAC  -j REJECT --reject-with icmp-net-prohibited
 fi
 }
 
@@ -1508,32 +1516,32 @@ cl_cports() {
 
 expirebans() {
 if [ -z "$SET_EXPIRE" ]; then
-        SET_EXPIRE=0
+  SET_EXPIRE=0
 fi
 if [ "$SET_EXPIRE" -ge "60" ]; then
- REFRESH_TIME=$[SET_REFRESH*60]
- if [ "$SET_EXPIRE" -lt "$REFRESH_TIME" ]; then
-        SET_EXPIRE="$REFRESH_TIME"
- fi
- if [ -f "/etc/apf/deny_hosts.rules" ]; then
-         expire_time="$SET_EXPIRE"
-         check_time=$(date +%s)
-         for i in `cat /etc/apf/deny_hosts.rules | grep -vE "static|noexpire" | grep -iE "# added.*on.*" | awk '{print$3"|"$5"|"$6}'`; do
-                declare -a arr
-                arr=(`echo ${i//|/ }`)
-                ip=${arr[0]}
-                date_d=${arr[1]}
-                date_t=${arr[2]}
-                ban_time=$(date --date "$date_d $date_t" +%s)
-                time_diff=$[$check_time-$ban_time]
-                if [ "$time_diff" -ge "$expire_time" ]; then
-                        eout "{trust} removed expired ban for $ip (${time_diff}s/${expire_time}s)"
-                        sdel=`echo $ip | sed 's%/%\\\/%'`
-                        sed -i "/$sdel/d" /etc/apf/deny_hosts.rules
-                        /etc/apf/apf -u "$ip" >> /dev/null 2>&1
-                fi
-         done
- fi
+  REFRESH_TIME=$[SET_REFRESH*60]
+  if [ "$SET_EXPIRE" -lt "$REFRESH_TIME" ]; then
+    SET_EXPIRE="$REFRESH_TIME"
+  fi
+  if [ -f "/etc/apf/deny_hosts.rules" ]; then
+    expire_time="$SET_EXPIRE"
+    check_time=$(date +%s)
+    for i in `cat /etc/apf/deny_hosts.rules | grep -vE "static|noexpire" | grep -iE "# added.*on.*" | awk '{print$3"|"$5"|"$6}'`; do
+      declare -a arr
+      arr=(`echo ${i//|/ }`)
+      ip=${arr[0]}
+      date_d=${arr[1]}
+      date_t=${arr[2]}
+      ban_time=$(date --date "$date_d $date_t" +%s)
+      time_diff=$[$check_time-$ban_time]
+      if [ "$time_diff" -ge "$expire_time" ]; then
+        eout "{trust} removed expired ban for $ip (${time_diff}s/${expire_time}s)"
+        sdel=`echo $ip | sed 's%/%\\\/%'`
+        sed -i "/$sdel/d" /etc/apf/deny_hosts.rules
+        /etc/apf/apf -u "$ip" >> /dev/null 2>&1
+      fi
+    done
+  fi
 fi
 }
 
