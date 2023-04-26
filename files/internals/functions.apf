@@ -1547,7 +1547,7 @@ fi
 
 refresh() {
 	if [ $EXECUTOR == "nft" ]; then
-      apf_loaded=`nft list table ip filter | grep PROHIBIT`
+      apf_loaded=`$NFT list table ip filter | grep PROHIBIT`
 	else
 	   apf_loaded=`$IPT $IPT_FLAGS --list --numeric | grep PROHIBIT`
 	fi
@@ -1588,40 +1588,42 @@ refresh() {
 	fi
 
 	if [ $EXECUTOR == "nft" ]; then
-        nft list ruleset | grep -E "TALLOW|TGALLOW" | grep -E '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | awk '{print$4}' | sort -n | uniq > $tmpra
-        nft flush chain ip filter REFRESH_TEMP
+        #$NFT list ruleset | grep -E "TALLOW|TGALLOW" | grep -E '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | awk '{print$4}' | sort -n | uniq > $tmpra
+        ($NFT list chain ip filter TALLOW; $NFT list chain ip filter TGALLOW) | grep -E '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | awk '{print$3}' | sort -n | uniq > $tmpra
+        $NFT flush chain ip filter REFRESH_TEMP
         for i in `cat $tmpra | grep -v "#"`; do
                 if [ ! "$i" == "" ]; then
-                 nft add rule ip filter REFRESH_TEMP ip saddr $i counter accept
-                 nft add rule ip filter REFRESH_TEMP ip daddr $i counter accept
+                 $NFT add rule ip filter REFRESH_TEMP ip saddr $i counter accept
+                 $NFT add rule ip filter REFRESH_TEMP ip daddr $i counter accept
                 fi
         done
         tmprd="/etc/apf/internals/refresh.drop.temp.$$"
-        nft list ruleset | grep -E "TDENY|TGDENY" | grep -E '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | awk '{print$4}' | sort -n | uniq > $tmprd
-        nft flush chain ip filter REFRESH_TEMP
+        #$NFT list ruleset | grep -E "TDENY|TGDENY" | grep -E '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | awk '{print$4}' | sort -n | uniq > $tmprd
+        ($NFT list chain ip filter TDENY; $NFT list chain ip filter TGDENY) | grep -E '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | awk '{print$3}' | sort -n | uniq > $tmprd
+        $NFT flush chain ip filter REFRESH_TEMP
         for i in `cat $tmprd | grep -v "#"`; do
                 if [ ! "$i" == "" ]; then
-                 nft add rule ip filter REFRESH_TEMP ip saddr $i counter jump STOP
-                 nft add rule ip filter REFRESH_TEMP ip daddr $i counter jump STOP
+                 $NFT add rule ip filter REFRESH_TEMP ip saddr $i counter jump $ALL_STOP
+                 $NFT add rule ip filter REFRESH_TEMP ip daddr $i counter jump $ALL_STOP
                 fi
         done
         trim $DENY_HOSTS $SET_TRIM
         trim $GDENY_HOSTS $SET_TRIM
-        nft flush chain ip filter TDENY
-        nft flush chain ip filter TGDENY
-        nft flush chain ip filter TALLOW
-        nft flush chain ip filter TGALLOW
+        $NFT flush chain ip filter TDENY
+        $NFT flush chain ip filter TGDENY
+        $NFT flush chain ip filter TALLOW
+        $NFT flush chain ip filter TGALLOW
         if [ $USE_IPV6 == "1" ]; then
-           nft flush chain ip6 filter TDENY
-           nft flush chain ip filter TGDENY
-           nft flush chain ip filter TALLOW
-           nft flush chain ip filter TGALLOW
+           $NFT flush chain ip6 filter TDENY
+           $NFT flush chain ip6 filter TGDENY
+           $NFT flush chain ip6 filter TALLOW
+           $NFT flush chain ip6 filter TGALLOW
         fi
         allow_hosts $GALLOW_HOSTS TGALLOW
         allow_hosts $ALLOW_HOSTS TALLOW
         deny_hosts $GDENY_HOSTS TGDENY
         deny_hosts $DENY_HOSTS TDENY
-        nft flush chain ip filter REFRESH_TEMP
+        $NFT flush chain ip filter REFRESH_TEMP
         rm -f $tmpra $tmprd
 	else
         /sbin/iptables-save | grep -E "TALLOW|TGALLOW" | grep -E '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | awk '{print$4}' | sort -n | uniq > $tmpra
