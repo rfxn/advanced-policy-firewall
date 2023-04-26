@@ -39,7 +39,7 @@ USE_IPV6="0"
 
 # If nft is detected, apf will automatically to use that. If this is set to 1
 # fallback to the old iptables to set the rulesets.
-USE_IPTABLES="0"
+USE_IPTABLES="1"
 
 # This option will allow for all status events to be displayed in real time on
 # the console as you use the firewall. Typically, APF used to operate silent
