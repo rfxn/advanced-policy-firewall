@@ -296,8 +296,8 @@ if [ "$RAB" == "1" ]; then
   for i in `echo $RAB_PSCAN_PORTS | tr ',' ' '`; do
    if [ "$LOG_DROP" == "1" ] || [ "$RAB_LOG_HIT" == "1" ]; then
 	   if [ $EXECUTOR == "nft" ]; then
-	      $NFT add rule ip filter RABPSCAN tcp dport $i limit rate $LOG_RATE/minute burst 5 packets counter log prefix '"** RABHIT ** "' level $LOG_LEVEL $LEXT
-	      $NFT add rule ip filter RABPSCAN udp dport $i limit rate $LOG_RATE/minute burst 5 packets counter log prefix '"** RABHIT ** "' level $LOG_LEVEL $LEXT
+	      $NFT add rule ip filter RABPSCAN tcp dport $i limit rate $LOG_RATE/minute burst 5 packets counter $LOG_TARGET prefix '"** RABHIT ** "' level $LOG_LEVEL $LEXT
+	      $NFT add rule ip filter RABPSCAN udp dport $i limit rate $LOG_RATE/minute burst 5 packets counter $LOG_TARGET prefix '"** RABHIT ** "' level $LOG_LEVEL $LEXT
       else
 	      $IPT $IPT_FLAGS -A RABPSCAN -p tcp --dport $i -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** RABHIT ** "
 	      $IPT $IPT_FLAGS -A RABPSCAN -p udp --dport $i -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** RABHIT ** "
@@ -470,8 +470,8 @@ fi
 if [ "$LOG_DROP" == "1" ]; then
     # Default TCP/UDP INPUT log chain
     if [ $EXECUTOR == "nft" ]; then
-	    $NFT add rule ip filter INPUT ip protocol tcp limit rate $LOG_RATE/minute burst 5 packets counter log prefix '"** IN_TCP DROP ** "' level $LOG_LEVEL $LEXT
-	    $NFT add rule ip filter INPUT ip protocol udp limit rate $LOG_RATE/minute burst 5 packets counter log prefix '"** IN_UDP DROP ** "' level $LOG_LEVEL $LEXT
+	    $NFT add rule ip filter INPUT ip protocol tcp limit rate $LOG_RATE/minute burst 5 packets counter $LOG_LEVEL prefix '"** IN_TCP DROP ** "' level $LOG_LEVEL $LEXT
+	    $NFT add rule ip filter INPUT ip protocol udp limit rate $LOG_RATE/minute burst 5 packets counter $LOG_LEVEL prefix '"** IN_UDP DROP ** "' level $LOG_LEVEL $LEXT
     else
        $IPT $IPT_FLAGS -A INPUT -p tcp -m limit --limit $LOG_RATE/minute  -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** IN_TCP DROP ** "
        $IPT $IPT_FLAGS -A INPUT -p udp -m limit --limit $LOG_RATE/minute  -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** IN_UDP DROP ** "
@@ -481,8 +481,8 @@ fi
 if [ "$LOG_DROP" == "1" ] && [ "$EGF" == "1" ]; then
     # Default TCP/UDP OUTPUT log chain
     if [ $EXECUTOR == "nft" ]; then
-	    $NFT add rule ip filter OUTPUT ip protocol tcp limit rate $LOG_RATE/minute burst 5 packets counter log prefix '"** OUT_TCP DROP ** "' level $LOG_LEVEL $LEXT
-	    $NFT add rule ip filter OUTPUT ip protocol udp limit rate $LOG_RATE/minute burst 5 packets counter log prefix '"** OUT_UDP DROP ** "' level $LOG_LEVEL $LEXT
+	    $NFT add rule ip filter OUTPUT ip protocol tcp limit rate $LOG_RATE/minute burst 5 packets counter $LOG_LEVEL prefix '"** OUT_TCP DROP ** "' level $LOG_LEVEL $LEXT
+	    $NFT add rule ip filter OUTPUT ip protocol udp limit rate $LOG_RATE/minute burst 5 packets counter $LOG_LEVEL prefix '"** OUT_UDP DROP ** "' level $LOG_LEVEL $LEXT
     else
        $IPT $IPT_FLAGS -A OUTPUT -p tcp -m limit --limit $LOG_RATE/minute  -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** OUT_TCP DROP ** "
        $IPT $IPT_FLAGS -A OUTPUT -p udp -m limit --limit $LOG_RATE/minute  -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** OUT_UDP DROP ** "
