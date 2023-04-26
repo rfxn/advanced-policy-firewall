@@ -174,8 +174,6 @@ RAB_LOG_TRIP="0"
 #  DROP  (drop the packet; stealth ?)
 #  REJECT (reject the packet)
 TCP_STOP="DROP"
-# TODO need to convert to lowercase for nftable
-# DROP -> drop
 
 # How to handle UDP packet filtering?
 #
@@ -184,16 +182,12 @@ TCP_STOP="DROP"
 #  REJECT (reject the packet)
 #  PROHIBIT (send an icmp-host-prohibited)
 UDP_STOP="DROP"
-# TODO need to convert to lowercase for nftable
-# DROP -> drop
 
 # How to handle all other packet filtering? 
 #
 #  DROP  (drop the packet)
 #  REJECT (reject the packet)
 ALL_STOP="DROP"
-# TODO need to convert to lowercase for nftable
-# DROP -> drop
 
 # The sanity options control the way packets are scrutinized as they flow 
 # through the firewall. The main PKT_SANITY option is a top level toggle for
@@ -252,8 +246,6 @@ TCR_PASS="1"		TCR_PORTS="33434:33534"
 # Set value to 0 for unlimited, anything above is enabled.
 # for nft, see https://wiki.nftables.org/wiki-nftables/index.php/Quick_reference-nftables_in_10_minutes#Limit
 ICMP_LIM="30/s"
-# or if it is nft enabled
-# ICMP_LIM="30/second"
 
 # Creates firewall rules based on the local name servers as defined in the
 # /etc/resolv.conf file. This is the preferred secure method for client side
@@ -556,8 +548,6 @@ LOG_LEVEL="crit"
 # ULOG (Allow ulogd to handle the logging)
 # LOG (Default; sends logging to kernel log)
 LOG_TARGET="LOG"
-# in nftables
-# LOG_TARGET="log"
 
 # Log interactive access over telnet & ssh; uses
 # custom log prefix of ** SSH ** & ** TELNET **
