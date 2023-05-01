@@ -453,6 +453,12 @@ if [ -z "$TYPE" ]; then
 	break
 fi
 
+if [ $EXECUTOR == "nft" ]; then
+   $NFT add table ip mangle
+   $NFT add chain ip mangle $TYPE
+fi
+
+
 if [ ! "$TOS_0" == "" ]; then
   for i in `echo $TOS_0 | tr ',' ' '`; do
     i=`echo $i | tr '_' ':'`
