@@ -37,6 +37,10 @@ IFACE_TRUSTED=""
 # Note: The VNET (virtual network) feature does not currently support IPv6.
 USE_IPV6="0"
 
+# If nft is detected, apf will automatically to use that. If this is set to 1
+# fallback to the old iptables to set the rulesets.
+USE_IPTABLES="1"
+
 # This option will allow for all status events to be displayed in real time on
 # the console as you use the firewall. Typically, APF used to operate silent
 # with all logging piped to $LOG_APF. The use of this option will not disable
@@ -240,6 +244,7 @@ TCR_PASS="1"		TCR_PORTS="33434:33534"
 # will result in dropped ICMP packets. Supported values are in the form of: 
 # pkt/s (packets/seconds), pkt/m (packets/minutes)
 # Set value to 0 for unlimited, anything above is enabled.
+# for nft, see https://wiki.nftables.org/wiki-nftables/index.php/Quick_reference-nftables_in_10_minutes#Limit
 ICMP_LIM="30/s"
 
 # Creates firewall rules based on the local name servers as defined in the
@@ -411,6 +416,7 @@ IG_UDP_CPORTS=""
 
 # Common ICMP inbound (ingress) types
 # 'internals/icmp.types' for type definition; 'all' is wildcard for any
+# for nft, see https://wiki.nftables.org/wiki-nftables/index.php/Quick_reference-nftables_in_10_minutes#Icmpv6
 IG_ICMP_TYPES="3,5,11,0,30,8"
 
 # Configure outbound (egress) accepted services. This is an optional
@@ -466,11 +472,12 @@ EG_UDP_UID=""
 # ACCESS CONTROL feature. That means EG_DROP_CMD is intended to DENY outbound
 # access for specified programs, not ALLOW.
 #
-# Format is comma separated list of executable names you wish to ban from being
+# Format is space separated list of executable names you wish to ban from being
 # able to transmit data out of your server.
 
 # CMD-Match outbound (egress) denied applications
-EG_DROP_CMD="eggdrop psybnc bitchx BitchX init udp.pl"
+EG_DROP_CMD="0"
+EG_DROP_CMD_LIST="eggdrop psybnc bitchx BitchX init udp.pl"
 
 ##
 # [Remote Rule Imports]

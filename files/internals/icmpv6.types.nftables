@@ -1,0 +1,25 @@
+##########
+#  man nftables
+#  ICMPV6 TYPE TYPE
+#
+#
+# 1    destination-unreachable
+# 2    packet-too-big
+# 3    time-exceeded
+# 4    parameter-problem
+# 128  echo-request
+# 129  echo-reply
+# 130  mld-listener-query
+# 131  mld-listener-report
+# 132  mld-listener-done
+# 132  mld-listener-reduction
+# 133  nd-router-solicit
+# 134  nd-router-advert
+# 135  nd-neighbor-solicit
+# 136  nd-neighbor-advert
+# 137  nd-redirect
+# 138  router-renumbering
+# 141  ind-neighbor-solicit
+# 142  ind-neighbor-advert
+# 143  mld2-listener-report
+##########
