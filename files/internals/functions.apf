@@ -1552,122 +1552,122 @@ fi
 }
 
 refresh() {
-	if [ $EXECUTOR == "nft" ]; then
-      apf_loaded=`$NFT list table ip filter | grep PROHIBIT`
-	else
-	   apf_loaded=`$IPT $IPT_FLAGS --list --numeric | grep PROHIBIT`
-	fi
-	if [ -z "$apf_loaded" ]; then
-      eout "{glob} apf does not appear to have rules loaded, doing nothing."
+if [ $EXECUTOR == "nft" ]; then
+  apf_loaded=`$NFT list table ip filter | grep PROHIBIT`
+else
+  apf_loaded=`$IPT $IPT_FLAGS --list --numeric | grep PROHIBIT`
+fi
+if [ -z "$apf_loaded" ]; then
+  eout "{glob} apf does not appear to have rules loaded, doing nothing."
+  mutex_unlock
+  exit 1
+fi
+
+eout "{glob} refreshing trust system rules"
+tmpra="/etc/apf/internals/refresh.allow.temp.$$"
+
+if [ "$SET_EXPIRE" -ge "60" ]; then
+  # expire deny_hosts bans
+  expirebans
+fi
+
+if [ "$SET_REFRESH_MD5" == "1" ] && [ "$MD5" ]; then
+  glob_allow_download
+  glob_deny_download
+  trusts_md5=`$MD5 $DENY_HOSTS $GDENY_HOSTS $ALLOW_HOSTS $GALLOW_HOSTS | $MD5 | awk '{print$1}'`
+  if [ -f "/etc/apf/internals/.trusts.md5" ]; then
+    last_trusts_md5=`cat /etc/apf/internals/.trusts.md5`
+    if [ "$trusts_md5" == "$last_trusts_md5" ]; then
+      eout "{glob} trust rules unchanged since last refresh, doing nothing."
+      echo "$trusts_md5" > /etc/apf/internals/.trusts.md5
       mutex_unlock
-		exit 1
-	fi
+      exit 1
+    else
+      echo "$trusts_md5" > /etc/apf/internals/.trusts.md5
+    fi
+  else
+    echo "$trusts_md5" > /etc/apf/internals/.trusts.md5
+  fi
+else
+  glob_allow_download
+  glob_deny_download
+fi
 
-   eout "{glob} refreshing trust system rules"
-	tmpra="/etc/apf/internals/refresh.allow.temp.$$"
-
-   if [ "$SET_EXPIRE" -ge "60" ]; then
-      # expire deny_hosts bans
-      expirebans
-   fi
-
-	if [ "$SET_REFRESH_MD5" == "1" ] && [ "$MD5" ]; then
-      glob_allow_download
-      glob_deny_download
-      trusts_md5=`$MD5 $DENY_HOSTS $GDENY_HOSTS $ALLOW_HOSTS $GALLOW_HOSTS | $MD5 | awk '{print$1}'`
-      if [ -f "/etc/apf/internals/.trusts.md5" ]; then
-		  last_trusts_md5=`cat /etc/apf/internals/.trusts.md5`
-        if [ "$trusts_md5" == "$last_trusts_md5" ]; then
-		    eout "{glob} trust rules unchanged since last refresh, doing nothing."
-	       echo "$trusts_md5" > /etc/apf/internals/.trusts.md5
-		    mutex_unlock
-			 exit 1
-         else
-	       echo "$trusts_md5" > /etc/apf/internals/.trusts.md5
-		  fi
-      else
-        echo "$trusts_md5" > /etc/apf/internals/.trusts.md5
-      fi
-	else
-      glob_allow_download
-      glob_deny_download
-	fi
-
-	if [ $EXECUTOR == "nft" ]; then
-        #$NFT list ruleset | grep -E "TALLOW|TGALLOW" | grep -E '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | awk '{print$4}' | sort -n | uniq > $tmpra
-        ($NFT list chain ip filter TALLOW; $NFT list chain ip filter TGALLOW) | grep -E '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | awk '{print$3}' | sort -n | uniq > $tmpra
-        $NFT flush chain ip filter REFRESH_TEMP
-        for i in `cat $tmpra | grep -v "#"`; do
-                if [ ! "$i" == "" ]; then
-                 $NFT add rule ip filter REFRESH_TEMP ip saddr $i counter accept
-                 $NFT add rule ip filter REFRESH_TEMP ip daddr $i counter accept
-                fi
-        done
-        tmprd="/etc/apf/internals/refresh.drop.temp.$$"
-        #$NFT list ruleset | grep -E "TDENY|TGDENY" | grep -E '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | awk '{print$4}' | sort -n | uniq > $tmprd
-        ($NFT list chain ip filter TDENY; $NFT list chain ip filter TGDENY) | grep -E '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | awk '{print$3}' | sort -n | uniq > $tmprd
-        $NFT flush chain ip filter REFRESH_TEMP
-        for i in `cat $tmprd | grep -v "#"`; do
-                if [ ! "$i" == "" ]; then
-                 $NFT add rule ip filter REFRESH_TEMP ip saddr $i counter jump $ALL_STOP
-                 $NFT add rule ip filter REFRESH_TEMP ip daddr $i counter jump $ALL_STOP
-                fi
-        done
-        trim $DENY_HOSTS $SET_TRIM
-        trim $GDENY_HOSTS $SET_TRIM
-        $NFT flush chain ip filter TDENY
-        $NFT flush chain ip filter TGDENY
-        $NFT flush chain ip filter TALLOW
-        $NFT flush chain ip filter TGALLOW
-        if [ $USE_IPV6 == "1" ]; then
-           $NFT flush chain ip6 filter TDENY
-           $NFT flush chain ip6 filter TGDENY
-           $NFT flush chain ip6 filter TALLOW
-           $NFT flush chain ip6 filter TGALLOW
-        fi
-        allow_hosts $GALLOW_HOSTS TGALLOW
-        allow_hosts $ALLOW_HOSTS TALLOW
-        deny_hosts $GDENY_HOSTS TGDENY
-        deny_hosts $DENY_HOSTS TDENY
-        $NFT flush chain ip filter REFRESH_TEMP
-        rm -f $tmpra $tmprd
-	else
-        /sbin/iptables-save | grep -E "TALLOW|TGALLOW" | grep -E '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | awk '{print$4}' | sort -n | uniq > $tmpra
-        $IPT $IPT_FLAGS -F REFRESH_TEMP
-        for i in `cat $tmpra | grep -v "#"`; do
-                if [ ! "$i" == "" ]; then
-                 $IPT $IPT_FLAGS -A REFRESH_TEMP -s $i -d 0/0 -j ACCEPT
-                 $IPT $IPT_FLAGS -A REFRESH_TEMP -d $i -s 0/0 -j ACCEPT
-                fi
-        done
-        tmprd="/etc/apf/internals/refresh.drop.temp.$$"
-        /sbin/iptables-save | grep -E "TDENY|TGDENY" | grep -E '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | awk '{print$4}' | sort -n | uniq > $tmprd
-        $IPT $IPT_FLAGS -F REFRESH_TEMP
-        for i in `cat $tmprd | grep -v "#"`; do
-                if [ ! "$i" == "" ]; then
-                 $IPT $IPT_FLAGS -A REFRESH_TEMP -s $i -d 0/0 -j $ALL_STOP
-                 $IPT $IPT_FLAGS -A REFRESH_TEMP -d $i -s 0/0 -j $ALL_STOP
-                fi
-        done
-        trim $DENY_HOSTS $SET_TRIM
-        trim $GDENY_HOSTS $SET_TRIM
-        $IPT $IPT_FLAGS -F TDENY
-        $IPT $IPT_FLAGS -F TGDENY
-        $IPT $IPT_FLAGS -F TALLOW
-        $IPT $IPT_FLAGS -F TGALLOW
-        if [ $USE_IPV6 == "1" ]; then
-           $IP6T -F TDENY
-           $IP6T -F TGDENY
-           $IP6T -F TALLOW
-           $IP6T -F TGALLOW
-        fi
-        allow_hosts $GALLOW_HOSTS TGALLOW
-        allow_hosts $ALLOW_HOSTS TALLOW
-        deny_hosts $GDENY_HOSTS TGDENY
-        deny_hosts $DENY_HOSTS TDENY
-        $IPT $IPT_FLAGS -F REFRESH_TEMP
-        rm -f $tmpra $tmprd
-	fi
+if [ $EXECUTOR == "nft" ]; then
+  #$NFT list ruleset | grep -E "TALLOW|TGALLOW" | grep -E '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | awk '{print$4}' | sort -n | uniq > $tmpra
+  ($NFT list chain ip filter TALLOW; $NFT list chain ip filter TGALLOW) | grep -E '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | awk '{print$3}' | sort -n | uniq > $tmpra
+  $NFT flush chain ip filter REFRESH_TEMP
+  for i in `cat $tmpra | grep -v "#"`; do
+    if [ ! "$i" == "" ]; then
+      $NFT add rule ip filter REFRESH_TEMP ip saddr $i counter accept
+      $NFT add rule ip filter REFRESH_TEMP ip daddr $i counter accept
+    fi
+  done
+  tmprd="/etc/apf/internals/refresh.drop.temp.$$"
+  #$NFT list ruleset | grep -E "TDENY|TGDENY" | grep -E '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | awk '{print$4}' | sort -n | uniq > $tmprd
+  ($NFT list chain ip filter TDENY; $NFT list chain ip filter TGDENY) | grep -E '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | awk '{print$3}' | sort -n | uniq > $tmprd
+  $NFT flush chain ip filter REFRESH_TEMP
+  for i in `cat $tmprd | grep -v "#"`; do
+    if [ ! "$i" == "" ]; then
+      $NFT add rule ip filter REFRESH_TEMP ip saddr $i counter jump $ALL_STOP
+      $NFT add rule ip filter REFRESH_TEMP ip daddr $i counter jump $ALL_STOP
+    fi
+  done
+  trim $DENY_HOSTS $SET_TRIM
+  trim $GDENY_HOSTS $SET_TRIM
+  $NFT flush chain ip filter TDENY
+  $NFT flush chain ip filter TGDENY
+  $NFT flush chain ip filter TALLOW
+  $NFT flush chain ip filter TGALLOW
+  if [ $USE_IPV6 == "1" ]; then
+    $NFT flush chain ip6 filter TDENY
+    $NFT flush chain ip6 filter TGDENY
+    $NFT flush chain ip6 filter TALLOW
+    $NFT flush chain ip6 filter TGALLOW
+  fi
+  allow_hosts $GALLOW_HOSTS TGALLOW
+  allow_hosts $ALLOW_HOSTS TALLOW
+  deny_hosts $GDENY_HOSTS TGDENY
+  deny_hosts $DENY_HOSTS TDENY
+  $NFT flush chain ip filter REFRESH_TEMP
+  rm -f $tmpra $tmprd
+else
+  /sbin/iptables-save | grep -E "TALLOW|TGALLOW" | grep -E '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | awk '{print$4}' | sort -n | uniq > $tmpra
+  $IPT $IPT_FLAGS -F REFRESH_TEMP
+  for i in `cat $tmpra | grep -v "#"`; do
+    if [ ! "$i" == "" ]; then
+      $IPT $IPT_FLAGS -A REFRESH_TEMP -s $i -d 0/0 -j ACCEPT
+      $IPT $IPT_FLAGS -A REFRESH_TEMP -d $i -s 0/0 -j ACCEPT
+    fi
+  done
+  tmprd="/etc/apf/internals/refresh.drop.temp.$$"
+  /sbin/iptables-save | grep -E "TDENY|TGDENY" | grep -E '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | awk '{print$4}' | sort -n | uniq > $tmprd
+  $IPT $IPT_FLAGS -F REFRESH_TEMP
+  for i in `cat $tmprd | grep -v "#"`; do
+    if [ ! "$i" == "" ]; then
+      $IPT $IPT_FLAGS -A REFRESH_TEMP -s $i -d 0/0 -j $ALL_STOP
+      $IPT $IPT_FLAGS -A REFRESH_TEMP -d $i -s 0/0 -j $ALL_STOP
+    fi
+  done
+  trim $DENY_HOSTS $SET_TRIM
+  trim $GDENY_HOSTS $SET_TRIM
+  $IPT $IPT_FLAGS -F TDENY
+  $IPT $IPT_FLAGS -F TGDENY
+  $IPT $IPT_FLAGS -F TALLOW
+  $IPT $IPT_FLAGS -F TGALLOW
+  if [ $USE_IPV6 == "1" ]; then
+    $IP6T -F TDENY
+    $IP6T -F TGDENY
+    $IP6T -F TALLOW
+    $IP6T -F TGALLOW
+  fi
+  allow_hosts $GALLOW_HOSTS TGALLOW
+  allow_hosts $ALLOW_HOSTS TALLOW
+  deny_hosts $GDENY_HOSTS TGDENY
+  deny_hosts $DENY_HOSTS TDENY
+  $IPT $IPT_FLAGS -F REFRESH_TEMP
+  rm -f $tmpra $tmprd
+fi
 }
 
 cron_refresh() {
