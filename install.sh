@@ -47,6 +47,11 @@ install() {
 			fi
 		fi
         fi
+	if [ ! -f "/etc/rc.d/init.d/functions" ]; then
+		mkdir -p /etc/rc.d/init.d/
+		cd /etc/rc.d/init.d/
+		ln -s /etc/apf/internals/functions.os functions
+	fi
 	if [ -f "/var/log/apf_log" ] || [ -f "/var/log/apfados_log" ]; then
 	rm -f /var/log/apf_log /var/log/apfados_log
 	fi

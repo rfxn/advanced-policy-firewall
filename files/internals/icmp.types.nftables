@@ -1,0 +1,21 @@
+##########
+#  man nftables
+#  ICMP TYPE TYPE
+#
+#
+# 0    echo-reply
+# 3    destination-unreachable
+# 4    source-quench
+# 5    redirect
+# 8    echo-request
+# 9    router-advertisement
+# 10   router-solicitation
+# 11   time-exceeded
+# 12   parameter-problem
+# 13   timestamp-request
+# 14   timestamp-reply
+# 15   info-request
+# 16   info-reply
+# 17   address-mask-request
+# 18   address-mask-reply
+##########

@@ -1,8 +1,8 @@
 cat > .conf.apf <<EOF
-#!/bin/sh
+#!/bin/bash
 #
 ##
-# Advanced Policy Firewall (APF) v1.7.5
+# Advanced Policy Firewall (APF) v1.7.6
 #             (C) 2002-2019, R-fx Networks <proj@rfxn.com>
 #             (C) 2019, Ryan MacDonald <ryan@rfxn.com>
 # This program may be freely redistributed under the terms of the GNU GPL v2
@@ -37,6 +37,10 @@ IFACE_TRUSTED="$IFACE_TRUSTED"
 # you do not have IPv6 disabled via modprobe.conf/.d or in sysconfig files.
 # Note: The VNET (virtual network) feature does not currently support IPv6.
 USE_IPV6="$USE_IPV6"
+
+# If nft is detected, apf will automatically to use that. If this is set to 1
+# fallback to the old iptables to set the rulesets.
+USE_IPTABLES="$USE_IPTABLES"
 
 # This option will allow for all status events to be displayed in real time on
 # the console as you use the firewall. Typically, APF used to operate silent
@@ -92,7 +96,7 @@ SET_REFRESH="$SET_REFRESH"
 # feature checks for changes to trust files between refreshes and only performs
 # a refresh if contents have changed. If you are using dynamic DNS names in trust
 # rules, which require regular DNS refreshes, you should keep this disabled.
-# [value in minutes, 0 to disable]
+# [value 1 to enable, 0 to disable]
 SET_REFRESH_MD5="$SET_REFRESH_MD5"
 
 # This is the total amount of rules allowed inside of the deny trust system.
@@ -102,13 +106,13 @@ SET_TRIM="250"
 
 # Verifies that the IFACE_* and IFACE_TRUSTED interfaces are actually routed
 # to something. If configured interfaces are found with no routes setup then
-# APF will exit with an error to prevent further issues (such as being locked 
+# APF will exit with an error to prevent further issues (such as being locked
 # out of the system).
 VF_ROUTE="$VF_ROUTE"
 
 # Verifies that all inbound traffic is sourced from a defined local gateway MAC
 # address. All other traffic that does not match this MAC address will be
-# rejected as untrusted traffic. It is quite easy to forge a MAC address and as 
+# rejected as untrusted traffic. It is quite easy to forge a MAC address and as
 # such this feature executes NO default accept policy. Leave this option empty
 # to disable or enter a 48-bit MAC address to enable.
 VF_LGATE="$VF_LGATE"
@@ -116,17 +120,16 @@ VF_LGATE="$VF_LGATE"
 ##
 # [Reactive Address Blocking]
 ##
-# The use of RAB is such that it allows the firewall to track an address as it
-# traverses the firewall rules and subsequently associate that address across
-# any number of violations. This allows the firewall to react to critical
-# policy violations by blocking addresses temporarily on the assumed precaution
-# that we are protecting the host from what the address may do on the pretext
-# of what the address has already done. The interface that allows RAB to work
-# resides inside the kernel and makes use of the iptables 'ipt_recent' module,
-# so there is no external programs causing any additional load.
+# Reactive Address Blocking (RAB) monitors addresses as they traverse the firewall
+# rules and tracks all policy violations attempted by an address. The firewall then
+# reacts to the violations by blocking addresses temporarily on the assumption that
+# we are protecting the host from what an attacker may do under the pretext of what
+# an attacker has already done. The interface that powers RAB is the iptables kernel
+# module 'xt/ipt_recent'; as such there is no external programs required for this
+# feature or additional load imposed by it.
 RAB="$RAB"
 
-# This enables RAB for sanity violations, which is when an address breaks a
+# This enables RAB for sanity violations, which is when an address breaks a 
 # strict conformity standard such as trying to spoof an address or modify
 # packet flags. It is strongly recommended that this option NOT be disabled.
 RAB_SANITY="$RAB_SANITY"
@@ -134,14 +137,14 @@ RAB_SANITY="$RAB_SANITY"
 # This enables RAB for port scan violations, which is when an address attempts
 # to connect to a port that has been classified as malicious. These types of
 # ports are those which are not commonly used in today's Internet but are
-# the subject of scrutiny by attackers, such as ports 1,7,9,11. Each security
-# level defines the amount of ports that RAB will react against. The port
-# security groups can be customized in 'internals/rab.ports'.
+# the subject of scrutiny by attackers, such as 1,7,9,11 and so on. The security
+# level defines the group of ports that RAB will react against. The port groups
+# can be customized in 'internals/rab.ports'.
 # 0 = disabled | 1 = low security  | 2 = medium security | 3 = high security
 RAB_PSCAN_LEVEL="$RAB_PSCAN_LEVEL"
 
 # This controls the amount of violation hits an address must have before it
-# is blocked. It is a good idea to keep this very low to prevent evasive
+# is blocked. It is a good idea to keep this very low to prevent evasive 
 # measures. The default is 0 or 1, meaning instant block on first violation.
 RAB_HITCOUNT="$RAB_HITCOUNT"
 
@@ -157,8 +160,8 @@ RAB_TRIP="$RAB_TRIP"
 # The use of LOG_DROP variable set to 1 will override this to force logging.
 RAB_LOG_HIT="$RAB_LOG_HIT"
 
-# This controls if the firewall should log all subsiqent traffic from an address
-# that is already blocked for a violation hit, this can generate allot of logs.
+# This controls if the firewall should log all subsequent traffic from an address
+# that is already blocked for a violation hit, this can generate a lot of logs.
 # The use of LOG_DROP variable set to 1 will override this to force logging.
 RAB_LOG_TRIP="$RAB_LOG_TRIP"
 
@@ -186,7 +189,7 @@ UDP_STOP="$UDP_STOP"
 #  REJECT (reject the packet)
 ALL_STOP="$ALL_STOP"
 
-# The sanity options control the way packets are scrutinized as they flow
+# The sanity options control the way packets are scrutinized as they flow 
 # through the firewall. The main PKT_SANITY option is a top level toggle for
 # all SANITY options and provides general packet flag sanity as a pre-scrub
 # for the other sanity options. In short, this makes sure that all packets
@@ -208,14 +211,8 @@ PKT_SANITY_FUDP="$PKT_SANITY_FUDP"
 # nothing should ever communicate on port 0 (technically does not exist).
 PKT_SANITY_PZERO="$PKT_SANITY_PZERO"
 
-# The implementation of Type of Service (TOS) in APF is such that it allows
-# you to classify service priorities by port. These priorities are broken down
-# into 5 groups and they are:
-# 0 = No Change
-# 2 = Minimize-Cost
-# 4 = Minimize Delay - Maximize Reliability
-# 8 = Maximum Throughput - Minimum Delay
-# 16 = No Delay - Moderate Throughput - High Reliability
+# Default Type of Service (TOS); These values should be set to a comma
+# separated list of ports which you would like marked with the given TOS level.
 #
 # Set the default TOS value [0,2,4,8,16]
 TOS_DEF="$TOS_DEF"
@@ -296,15 +293,9 @@ BLK_PRVNET="$BLK_PRVNET"
 # to the 'internals/reserved.networks' file for listing of address space.
 BLK_RESNET="$BLK_RESNET"
 
-# Block all ident (tcp 113) requests in and out of the server IF the port is
-# not already opened in *_TCP_CPORTS. This uses a REJECT target to make sure
-# the ident requests terminate quickly. You can see an increase in irc and 
-# other connection performance with this feature.
-BLK_IDENT="$BLK_IDENT"
-
 # Three related flaws were found in the Linux kernel’s handling of TCP Selective
 # Acknowledgement (SACK) packets handling with low MSS size. The extent of impact
-# is understood to be limited to denial of service at this time.
+# is understood to be limited to denial of service at this time. 
 #
 # ref: https://access.redhat.com/security/vulnerabilities/tcpsack
 #      CVE-2019-11477, CVE-2019-11478, CVE-2019-11479
@@ -317,12 +308,23 @@ BLK_IDENT="$BLK_IDENT"
 # than June 16th 2019.
 BLK_TCP_SACK_PANIC="$BLK_TCP_SACK_PANIC"
 
+# Block all ident (tcp 113) requests in and out of the server IF the port is
+# not already opened in *_TCP_CPORTS. This uses a REJECT target to make sure
+# the ident requests terminate quickly. You can see an increase in irc and 
+# other connection performance with this feature.
+BLK_IDENT="$BLK_IDENT"
+
 # This is the maximum number of "sessions" (connection tracking entries) that
 # can be handled simultaneously by the firewall in kernel memory. Increasing
-# this value too high will simply waste memory - setting it too low may result
-# in some or all connections being refused, in particular during denial of
-# service attacks.
+# this value too high will simply waste memory and add latency but setting it
+# too low may result in some or all connections being refused, in particular
+# during denial of service attacks.
 SYSCTL_CONNTRACK="$SYSCTL_CONNTRACK"
+
+SYSCTL_CONNTRACK_ADAPTIVE="$SYSCTL_CONNTRACK_ADAPTIVE"
+SYSCTL_CONNTRACK_INCREMENT="$SYSCTL_CONNTRACK_INCREMENT"
+SYSCTL_CONNTRACK_HIGH="$SYSCTL_CONNTRACK_HIGH"
+SYSCTL_CONNTRACK_BUCKETS="$SYSCTL_CONNTRACK_BUCKETS"
 
 # These are system control (sysctl) option changes to disable TCP features
 # that can be abused in addition to tweaking other TCP features for increased
@@ -477,12 +479,12 @@ EG_DROP_CMD="$EG_DROP_CMD"
 ##
 # [Remote Rule Imports]
 ##
-# Project Honey Pot is the first and only distributed system for identifying
+# Project Honey Pot is the first and only distributed system for identifying 
 # spammers and the spambots they use to scrape addresses from your website.
 # This aggregate list combines Harvesters, Spammers and SMTP Dictionary attacks
 # from the PHP IP Data at:  http://www.projecthoneypot.org/list_of_ips.php
 DLIST_PHP="$DLIST_PHP"
-DLIST_PHP_URL="http://rfxn.com/downloads/php_list"
+DLIST_PHP_URL="http://cdn.rfxn.com/downloads/php_list"
 
 # The Spamhaus Don't Route Or Peer List (DROP) is an advisory "drop all
 # traffic" list, consisting of stolen 'zombie' netblocks and netblocks
@@ -501,11 +503,11 @@ DLIST_DSHIELD_URL="http://feeds.dshield.org/top10-2.txt"
 # The reserved networks list is addresses which ARIN has marked as reserved
 # for future assignement and have no business as valid traffic on the internet.
 # Such addresses are often used as spoofed (Fake) hosts during attacks, this
-# will update the reserved networks list in order to prevent new ip assignments
+# will update the reserved networks list in order to prevent new ip assignments 
 # on the internet from getting blocked; this option is only important when
 # BLK_RESNET is set to enabled.
 DLIST_RESERVED="1"
-DLIST_RESERVED_URL="http://rfxn.com/downloads/reserved.networks"
+DLIST_RESERVED_URL="http://cdn.rfxn.com/downloads/reserved.networks"
 
 # ECN is an extension which helps reduce congestion. Unfortunately some
 # clueless software/hardware vendors have setup their sites or implemented
@@ -515,7 +517,7 @@ DLIST_RESERVED_URL="http://rfxn.com/downloads/reserved.networks"
 # is accepted as intended. This option is dependent on setting SYSCTL_ECN="1"
 # otherwise it stays disabled.
 DLIST_ECNSHAME="$DLIST_ECNSHAME"
-DLIST_ECNSHAME_URL="http://rfxn.com/downloads/ecnshame.lst"
+DLIST_ECNSHAME_URL="http://cdn.rfxn.com/downloads/ecnshame.lst"
 
 ##
 # Global Trust
@@ -526,7 +528,6 @@ DLIST_ECNSHAME_URL="http://rfxn.com/downloads/ecnshame.lst"
 # a daily basis. The files can be maintained in a static fashion by
 # leaving USE_RGT=0, ideal for a host serving the files.
 USE_RGT="$USE_RGT"
-
 GA_URL="$GA_URL"
 GD_URL="$GD_URL"
 
@@ -568,6 +569,10 @@ LOG_APF="$LOG_APF"
 # on iptables >= 1.4.20, but if supported you probably want this.
 IPT_LOCK_SUPPORT="$IPT_LOCK_SUPPORT"
 IPT_LOCK_TIMEOUT="$IPT_LOCK_TIMEOUT"
+
+# support for docker. when apf start, docker will be restart. Because docker
+# rules are adhoc and change as container start/stop.
+SET_DOCKER="$SET_DOCKER"
 
 ##
 # [Import misc. conf]

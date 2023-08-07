@@ -46,14 +46,26 @@ restart)
         $0 start
         ;;
 condrestart)
-	if $ipt $IPT_FLAGS -n -L TALLOW > /dev/null 2>&1 && \
-	    $ipt $IPT_FLAGS -n -L TDENY > /dev/null 2>&1 && \
-	    $ipt $IPT_FLAGS -n -L TGALLOW > /dev/null 2>&1 && \
-	    $ipt $IPT_FLAGS -n -L TGDENY > /dev/null 2>&1; then
-	    $0 stop
-	    $0 start
-	else
+	if [ $EXECUTOR == "nft" ]; then
+	   if $NFT -n list chain ip filter TALLOW > /dev/null 2>&1 && \
+	       $NFT -n list chain ip filter TDENY > /dev/null 2>&1 && \
+               $NFT -n list chain ip filter TGALLOW > /dev/null 2>&1 && \
+               $NFT -n list chain ip filter TGDENY > /dev/null 2>&1; then
+	       $0 stop
+	       $0 start
+            else
 		echo "APF not running, doing nothing."
+	    fi
+	else
+	    if $ipt $IPT_FLAGS -n -L TALLOW > /dev/null 2>&1 && \
+	        $ipt $IPT_FLAGS -n -L TDENY > /dev/null 2>&1 && \
+	        $ipt $IPT_FLAGS -n -L TGALLOW > /dev/null 2>&1 && \
+	        $ipt $IPT_FLAGS -n -L TGDENY > /dev/null 2>&1; then
+	        $0 stop
+	        $0 start
+	    else
+		echo "APF not running, doing nothing."
+	    fi
 	fi
 	;;
 *)

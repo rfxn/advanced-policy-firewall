@@ -37,6 +37,10 @@ IFACE_TRUSTED=""
 # Note: The VNET (virtual network) feature does not currently support IPv6.
 USE_IPV6="0"
 
+# If nft is detected, apf will automatically to use that. If this is set to 1
+# fallback to the old iptables to set the rulesets.
+USE_IPTABLES="1"
+
 # This option will allow for all status events to be displayed in real time on
 # the console as you use the firewall. Typically, APF used to operate silent
 # with all logging piped to $LOG_APF. The use of this option will not disable
@@ -156,8 +160,8 @@ RAB_TRIP="1"
 # The use of LOG_DROP variable set to 1 will override this to force logging.
 RAB_LOG_HIT="1"
 
-# This controls if the firewall should log all subsiqent traffic from an address
-# that is already blocked for a violation hit, this can generate allot of logs.
+# This controls if the firewall should log all subsequent traffic from an address
+# that is already blocked for a violation hit, this can generate a lot of logs.
 # The use of LOG_DROP variable set to 1 will override this to force logging.
 RAB_LOG_TRIP="0"
 
@@ -240,6 +244,7 @@ TCR_PASS="1"		TCR_PORTS="33434:33534"
 # will result in dropped ICMP packets. Supported values are in the form of: 
 # pkt/s (packets/seconds), pkt/m (packets/minutes)
 # Set value to 0 for unlimited, anything above is enabled.
+# for nft, see https://wiki.nftables.org/wiki-nftables/index.php/Quick_reference-nftables_in_10_minutes#Limit
 ICMP_LIM="30/s"
 
 # Creates firewall rules based on the local name servers as defined in the
@@ -411,6 +416,7 @@ IG_UDP_CPORTS=""
 
 # Common ICMP inbound (ingress) types
 # 'internals/icmp.types' for type definition; 'all' is wildcard for any
+# for nft, see https://wiki.nftables.org/wiki-nftables/index.php/Quick_reference-nftables_in_10_minutes#Icmpv6
 IG_ICMP_TYPES="3,5,11,0,30,8"
 
 # Configure outbound (egress) accepted services. This is an optional
@@ -466,11 +472,12 @@ EG_UDP_UID=""
 # ACCESS CONTROL feature. That means EG_DROP_CMD is intended to DENY outbound
 # access for specified programs, not ALLOW.
 #
-# Format is comma separated list of executable names you wish to ban from being
+# Format is space separated list of executable names you wish to ban from being
 # able to transmit data out of your server.
 
 # CMD-Match outbound (egress) denied applications
-EG_DROP_CMD="eggdrop psybnc bitchx BitchX init udp.pl"
+EG_DROP_CMD="0"
+EG_DROP_CMD_LIST="eggdrop psybnc bitchx BitchX init udp.pl"
 
 ##
 # [Remote Rule Imports]
@@ -528,6 +535,16 @@ GA_URL="http://yourhost.com/glob_allow.rules"
 GD_URL="http://yourhost.com/glob_deny.rules"
 
 ##
+# header for ga_url and gd_url
+##
+# for GA_URL during wget
+# example WGET_HEADER_GA="--header=x-token: abcdefg"
+WGET_HEADER_GA=""
+# for GD_URL during wget
+# example WGET_HEADER_GD="--header=x-token: abcdefg"
+WGET_HEADER_GD=""
+
+##
 # [Logging and control settings]
 ##
 # Log all traffic that is filtered by the firewall
@@ -565,6 +582,10 @@ LOG_APF="/var/log/apf_log"
 # on iptables >= 1.4.20, but if supported you probably want this.
 IPT_LOCK_SUPPORT="0"
 IPT_LOCK_TIMEOUT="3"
+
+# support for docker. when apf start, docker will be restart. Because docker
+# rules are adhoc and change as container start/stop.
+SET_DOCKER="0"
 
 ##
 # [Import misc. conf]

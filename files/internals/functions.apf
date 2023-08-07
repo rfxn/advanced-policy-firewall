@@ -41,13 +41,24 @@ ml() {
         MEXT="ko"
  fi
 
- if [ "$FATAL" == "1" ] && [ ! -f "/lib/modules/$(uname -r)/kernel/net/ipv4/netfilter/$1.$MEXT" ] && [ ! -f "/lib/modules/$(uname -r)/kernel/net/ipv4/netfilter/$1.${MEXT}.xz" ]; then
+ if [ $EXECUTOR == "nft" ]; then
+    if [ "$FATAL" == "1" ] && [ ! -f "/lib/modules/$(uname -r)/kernel/net/netfilter/$1.$MEXT" ] && [ ! -f "/lib/modules/$(uname -r)/kernel/net/netfilter/$1.${MEXT}.xz" ]; then
+        if [ ! "$SET_VERBOSE" == "1" ]; then
+                echo "Unable to load nftables module ($1), aborting."
+        fi
+        eout "{glob} unable to load nftables module ($1), aborting."
+        mutex_unlock
+        exit 1
+    fi
+ else
+    if [ "$FATAL" == "1" ] && [ ! -f "/lib/modules/$(uname -r)/kernel/net/ipv4/netfilter/$1.$MEXT" ] && [ ! -f "/lib/modules/$(uname -r)/kernel/net/ipv4/netfilter/$1.${MEXT}.xz" ]; then
         if [ ! "$SET_VERBOSE" == "1" ]; then
                 echo "Unable to load iptables module ($1), aborting."
         fi
         eout "{glob} unable to load iptables module ($1), aborting."
         mutex_unlock
         exit 1
+    fi
  fi
  if [ -f "/lib/modules/$(uname -r)/kernel/net/ipv4/netfilter/$1.$MEXT" ] || [ -f "/lib/modules/$(uname -r)/kernel/net/netfilter/$1.$MEXT" ] || [ -f "/lib/modules/$(uname -r)/kernel/net/ipv4/netfilter/$1.${MEXT}.xz" ] || [ -f "/lib/modules/$(uname -r)/kernel/net/netfilter/$1.${MEXT}.xz" ]; then
         $MPB $1 >> /dev/null 2>&1 &
@@ -62,9 +73,18 @@ modinit() {
  fi
  if [ ! "$SET_MONOKERN" == "1" ]; then
         # Loading Kernel Modules
-        ml ip_tables 1
+        if [ $EXECUTOR == "nft" ]; then
+           ml nf_tables 1
+        else
+           ml ip_tables 1
+        fi
  fi
-	modlist="ip_conntrack ip_conntrack_ftp ip_conntrack_irc iptable_filter iptable_mangle ipt_ecn ipt_length ipt_limit ipt_LOG ipt_mac ipt_multiport ipt_owner ipt_recent ipt_REJECT ipt_state ipt_TCPMSS ipt_TOS ipt_ttl ipt_ULOG nf_conntrack nf_conntrack_ftp nf_conntrack_irc xt_conntrack xt_conntrack_ftp xt_conntrack_irc xt_ecn xt_length xt_limit xt_LOG xt_mac xt_multiport xt_owner xt_recent xt_REJECT xt_state xt_TCPMSS xt_TOS xt_ttl xt_ULOG"
+
+ if [ $EXECUTOR == "nft" ]; then
+	modlist="nfnetlink nft_compat nft_counter nft_chain_nat nft_limit nft_log nft_reject_ipv4 nft_reject nf_tables nf_nat nf_reject_ipv4 nf_nat nf_conntrack nf_reject_ipv4 ipt_MASQUERADE ipt_REJECT"
+ else
+	modlist="ip_conntrack ip_conntrack_ftp ip_conntrack_irc iptable_filter iptable_mangle ipt_ecn ipt_length ipt_limit ipt_LOG ipt_mac ipt_multiport ipt_owner ipt_recent ipt_REJECT ipt_state ipt_TCPMSS ipt_TOS ipt_ttl ipt_ULOG nf_conntrack nf_conntrack_ftp nf_conntrack_irc xt_conntrack xt_conntrack_ftp xt_conntrack_irc xt_ecn xt_length xt_limit xt_LOG xt_mac xt_multiport xt_owner xt_recent xt_REJECT xt_state xt_TCPMSS xt_TOS xt_ttl xt_ULOG iptable_nat ip6_tables iptable_raw iptable_security ip6table_filter ip6table_mangle ip6table_nat ip6table_raw ip6table_security"
+ fi
 	for mod in $modlist; do
 		ml $mod
 	done
@@ -145,44 +165,122 @@ trim() {
 
 cli_trust_remove() {
 	DIP="$1"
-	$IPT $IPT_FLAGS -D INPUT -s $DIP -j ACCEPT
-	$IPT $IPT_FLAGS -D OUTPUT -d $DIP -j ACCEPT
-        $IPT $IPT_FLAGS -D INPUT -s $DIP -j $ALL_STOP
-        $IPT $IPT_FLAGS -D OUTPUT -d $DIP -j $ALL_STOP
+	if [ $EXECUTOR == "nft" ]; then
+	   #$IPT $IPT_FLAGS -D INPUT -s $DIP -j ACCEPT
+	   #$IPT $IPT_FLAGS -D OUTPUT -d $DIP -j ACCEPT
+      #$IPT $IPT_FLAGS -D INPUT -s $DIP -j $ALL_STOP
+      #$IPT $IPT_FLAGS -D OUTPUT -d $DIP -j $ALL_STOP
+      handle=`$NFT -a list chain ip filter INPUT  | grep -m1 $DIP | grep saddr | grep accept | grep -oP '(?<=handle )[0-9]*'`
+      $NFT delete rule ip filter INPUT handle $handle
+      handle=`$NFT -a list chain ip filter OUTPUT  | grep -m1 $DIP | grep daddr | grep accept |  grep -oP '(?<=handle )[0-9]*'`
+      $NFT delete rule ip filter OUTPUT handle $handle
+      handle=`$NFT -a list chain ip filter INPUT  | grep -m1 $DIP | grep saddr | grep $ALL_STOP | grep -oP '(?<=handle )[0-9]*'`
+      $NFT delete rule ip filter INPUT handle $handle
+      handle=`$NFT -a list chain ip filter OUTPUT  | grep -m1 $DIP | grep daddr | grep $ALL_STOP |  grep -oP '(?<=handle )[0-9]*'`
+      $NFT delete rule ip filter OUTPUT handle $handle
 
-	$IPT $IPT_FLAGS -D TALLOW -s $DIP -j ACCEPT
-	$IPT $IPT_FLAGS -D TALLOW -d $DIP -j ACCEPT
-        $IPT $IPT_FLAGS -D TDENY -s $DIP -j $ALL_STOP
-        $IPT $IPT_FLAGS -D TDENY -d $DIP -j $ALL_STOP
+	   #$IPT $IPT_FLAGS -D TALLOW -s $DIP -j ACCEPT
+	   #$IPT $IPT_FLAGS -D TALLOW -d $DIP -j ACCEPT
+      #$IPT $IPT_FLAGS -D TDENY -s $DIP -j $ALL_STOP
+      #$IPT $IPT_FLAGS -D TDENY -d $DIP -j $ALL_STOP
+      handle=`$NFT -a list chain ip filter TALLOW  | grep -m1 $DIP | grep saddr | grep accept | grep -oP '(?<=handle )[0-9]*'`
+      $NFT delete rule ip filter TALLOW handle $handle
+      handle=`$NFT -a list chain ip filter TALLOW  | grep -m1 $DIP | grep daddr | grep accept | grep -oP '(?<=handle )[0-9]*'`
+      $NFT delete rule ip filter TALLOW handle $handle
+      handle=`$NFT -a list chain ip filter TDENY  | grep -m1 $DIP | grep saddr | grep $ALL_STOP | grep -oP '(?<=handle )[0-9]*'`
+      $NFT delete rule ip filter TDENY handle $handle
+      handle=`$NFT -a list chain ip filter TDENY  | grep -m1 $DIP | grep daddr | grep $ALL_STOP | grep -oP '(?<=handle )[0-9]*'`
+      $NFT delete rule ip filter TDENY handle $handle
 
-	$IPT $IPT_FLAGS -D TGALLOW -s $DIP -j ACCEPT
-	$IPT $IPT_FLAGS -D TGALLOW -d $DIP -j ACCEPT
-        $IPT $IPT_FLAGS -D TGDENY -s $DIP -j $ALL_STOP
-        $IPT $IPT_FLAGS -D TGDENY -d $DIP -j $ALL_STOP
+	   #$IPT $IPT_FLAGS -D TGALLOW -s $DIP -j ACCEPT
+	   #$IPT $IPT_FLAGS -D TGALLOW -d $DIP -j ACCEPT
+      #$IPT $IPT_FLAGS -D TGDENY -s $DIP -j $ALL_STOP
+      #$IPT $IPT_FLAGS -D TGDENY -d $DIP -j $ALL_STOP
+      handle=`$NFT -a list chain ip filter TGALLOW  | grep -m1 $DIP | grep saddr | grep accept | grep -oP '(?<=handle )[0-9]*'`
+      $NFT delete rule ip filter TGALLOW handle $handle
+      handle=`$NFT -a list chain ip filter TGALLOW  | grep -m1 $DIP | grep daddr | grep accept | grep -oP '(?<=handle )[0-9]*'`
+      $NFT delete rule ip filter TGALLOW handle $handle
+      handle=`$NFT -a list chain ip filter TGDENY  | grep -m1 $DIP | grep saddr | grep $ALL_STOP | grep -oP '(?<=handle )[0-9]*'`
+      $NFT delete rule ip filter TGDENY handle $handle
+      handle=`$NFT -a list chain ip filter TGDENY  | grep -m1 $DIP | grep daddr | grep $ALL_STOP | grep -oP '(?<=handle )[0-9]*'`
+      $NFT delete rule ip filter TGDENY handle $handle
 
-	sed -i "/$DIP/d" $ALLOW_HOSTS $DENY_HOSTS $GALLOW_HOSTS $GDENY_HOSTS
-	dil=`$IPT $IPT_FLAGS --numeric --list INPUT --line-numbers | grep -w $DIP | awk '{print$1}'`
-	dol=`$IPT $IPT_FLAGS --numeric --list OUTPUT --line-numbers | grep -w $DIP | awk '{print$1}'`
-	$IPT $IPT_FLAGS -D INPUT $dil >> /dev/null 2>&1
-	$IPT $IPT_FLAGS -D OUTPUT $dol >> /dev/null 2>&1
+	   sed -i "/$DIP/d" $ALLOW_HOSTS $DENY_HOSTS $GALLOW_HOSTS $GDENY_HOSTS
+	   #dil=`$IPT $IPT_FLAGS --numeric --list INPUT --line-numbers | grep -w $DIP | awk '{print$1}'`
+	   #dol=`$IPT $IPT_FLAGS --numeric --list OUTPUT --line-numbers | grep -w $DIP | awk '{print$1}'`
+	   #$IPT $IPT_FLAGS -D INPUT $dil >> /dev/null 2>&1
+	   #$IPT $IPT_FLAGS -D OUTPUT $dol >> /dev/null 2>&1
+      dil=`$NFT -a list chain ip filter INPUT | grep -m1 $DIP | grep -oP '(?<=handle )[0-9]*'`
+      dol=`$NFT -a list chain ip filter OUTPUT | grep -m1 $DIP | grep -oP '(?<=handle )[0-9]*'`
+      $NFT delete rule ip filter INPUT handle $dil
+      $NFT delete rule ip filter OUTPUT handle $dol
 
-	dil=`$IPT $IPT_FLAGS --numeric --list TALLOW --line-numbers | grep -w $DIP | tac | awk '{print$1}'`
-	dol=`$IPT $IPT_FLAGS --numeric --list TDENY --line-numbers | grep -w $DIP | tac | awk '{print$1}'`
-	for i in `echo $dil`; do
+
+	   #dil=`$IPT $IPT_FLAGS --numeric --list TALLOW --line-numbers | grep -w $DIP | tac | awk '{print$1}'`
+	   #dol=`$IPT $IPT_FLAGS --numeric --list TDENY --line-numbers | grep -w $DIP | tac | awk '{print$1}'`
+	   dil=`$NFT -a list chain ip filter TALLOW | grep $DIP | tac | grep -oP '(?<=handle )[0-9]*'`
+	   dol=`$NFT -a list chain ip filter TDENY | grep $DIP | tac | grep -oP '(?<=handle )[0-9]*'`
+	   for i in `echo $dil`; do
+		  #$IPT $IPT_FLAGS -D TALLOW $i >> /dev/null 2>&1
+        $NFT delete rule ip filter TALLOW handle $i
+	   done
+	   for i in `echo $dol`; do
+		  #$IPT $IPT_FLAGS -D TDENY $i >> /dev/null 2>&1
+        $NFT delete rule ip filter TDENY handle $i
+	   done
+
+	   #dil=`$IPT $IPT_FLAGS --numeric --list TGALLOW --line-numbers | grep -w $DIP | tac | awk '{print$1}'`
+	   #dol=`$IPT $IPT_FLAGS --numeric --list TGDENY --line-numbers | grep -w $DIP | tac | awk '{print$1}'`
+	   dil=`$NFT -a list table ip filter TGALLOW | grep -w $DIP | tac | awk '{print$1}'`
+	   dol=`$NFT -a list table ip filter TGDENY | grep -w $DIP | tac | awk '{print$1}'`
+	   for i in `echo $dil`; do
+		  #$IPT $IPT_FLAGS -D TGALLOW $i >> /dev/null 2>&1
+        $NFT delete rule ip filter TGALLOW handle $i
+	   done
+	   for i in `echo $dol`; do
+		  #$IPT $IPT_FLAGS -D TGDENY $i >> /dev/null 2>&1
+        $NFT delete rule ip filter TGDENY handle $i
+	   done
+	else
+	   $IPT $IPT_FLAGS -D INPUT -s $DIP -j ACCEPT
+	   $IPT $IPT_FLAGS -D OUTPUT -d $DIP -j ACCEPT
+           $IPT $IPT_FLAGS -D INPUT -s $DIP -j $ALL_STOP
+           $IPT $IPT_FLAGS -D OUTPUT -d $DIP -j $ALL_STOP
+
+	   $IPT $IPT_FLAGS -D TALLOW -s $DIP -j ACCEPT
+	   $IPT $IPT_FLAGS -D TALLOW -d $DIP -j ACCEPT
+           $IPT $IPT_FLAGS -D TDENY -s $DIP -j $ALL_STOP
+           $IPT $IPT_FLAGS -D TDENY -d $DIP -j $ALL_STOP
+
+	   $IPT $IPT_FLAGS -D TGALLOW -s $DIP -j ACCEPT
+	   $IPT $IPT_FLAGS -D TGALLOW -d $DIP -j ACCEPT
+           $IPT $IPT_FLAGS -D TGDENY -s $DIP -j $ALL_STOP
+           $IPT $IPT_FLAGS -D TGDENY -d $DIP -j $ALL_STOP
+
+	   sed -i "/$DIP/d" $ALLOW_HOSTS $DENY_HOSTS $GALLOW_HOSTS $GDENY_HOSTS
+	   dil=`$IPT $IPT_FLAGS --numeric --list INPUT --line-numbers | grep -w $DIP | awk '{print$1}'`
+	   dol=`$IPT $IPT_FLAGS --numeric --list OUTPUT --line-numbers | grep -w $DIP | awk '{print$1}'`
+	   $IPT $IPT_FLAGS -D INPUT $dil >> /dev/null 2>&1
+	   $IPT $IPT_FLAGS -D OUTPUT $dol >> /dev/null 2>&1
+
+	   dil=`$IPT $IPT_FLAGS --numeric --list TALLOW --line-numbers | grep -w $DIP | tac | awk '{print$1}'`
+	   dol=`$IPT $IPT_FLAGS --numeric --list TDENY --line-numbers | grep -w $DIP | tac | awk '{print$1}'`
+	   for i in `echo $dil`; do
 		$IPT $IPT_FLAGS -D TALLOW $i >> /dev/null 2>&1
-	done
-	for i in `echo $dol`; do
+	   done
+	   for i in `echo $dol`; do
 		$IPT $IPT_FLAGS -D TDENY $i >> /dev/null 2>&1
-	done
+	   done
 
-	dil=`$IPT $IPT_FLAGS --numeric --list TGALLOW --line-numbers | grep -w $DIP | tac | awk '{print$1}'`
-	dol=`$IPT $IPT_FLAGS --numeric --list TGDENY --line-numbers | grep -w $DIP | tac | awk '{print$1}'`
-	for i in `echo $dil`; do
+	   dil=`$IPT $IPT_FLAGS --numeric --list TGALLOW --line-numbers | grep -w $DIP | tac | awk '{print$1}'`
+	   dol=`$IPT $IPT_FLAGS --numeric --list TGDENY --line-numbers | grep -w $DIP | tac | awk '{print$1}'`
+	   for i in `echo $dil`; do
 		$IPT $IPT_FLAGS -D TGALLOW $i >> /dev/null 2>&1
-	done
-	for i in `echo $dol`; do
+	   done
+	   for i in `echo $dol`; do
 		$IPT $IPT_FLAGS -D TGDENY $i >> /dev/null 2>&1
-	done
+	   done
+	fi
 }
 
 cli_trust() {
@@ -192,63 +290,89 @@ cli_trust() {
  HOST="$4"
  CMT="$5"
  if [ ! "$HOST" == "" ]; then
-        valtrust=`cat $DENY_HOSTS $ALLOW_HOSTS $GALLOW_HOSTS $GDENY_HOSTS | grep -F -w $HOST`
-	if [ "$valtrust" ]; then
-		tlist=`grep -l $HOST $DENY_HOSTS $ALLOW_HOSTS $GALLOW_HOSTS $GDENY_HOSTS | tr '\n' ' '`
-	fi
-        valip=`cat /etc/apf/internals/.localaddrs | grep -w $HOST`
-        if [ "$valtrust" ]; then
-                echo "$HOST already exists in $tlist"
-        elif [ "$valip" ]; then
-                echo "$HOST is a local address and can not be added to the trust system"
-        else
-	        TIME=`date +"%D %H:%M:%S"`
-		if [ "$CMT" ]; then
-			echo "# added $HOST on $TIME with comment: $CMT" >> $FILE
-		else
-			echo "# added $HOST on $TIME" >> $FILE
-		fi
-	        echo "$HOST" >> $FILE
-		if [ "$ACTION" == "DENY" ]; then
-			JACTION="$ALL_STOP"
-		elif [ "$ACTION" == "ALLOW" ]; then
-			JACTION="ACCEPT"
-		fi
-	        $IPT $IPT_FLAGS -I $CHAIN -s $HOST -j $JACTION
-	       	$IPT $IPT_FLAGS -I $CHAIN -d $HOST -j $JACTION
-	        eout "(trust) added $ACTION all to/from $HOST"
-	        if [ ! "$SET_VERBOSE" == "1" ]; then
-		        echo "Inserted into firewall: $ACTION all to/from $HOST"
-		fi
-        fi
+   valtrust=`cat $DENY_HOSTS $ALLOW_HOSTS $GALLOW_HOSTS $GDENY_HOSTS | grep -F -w $HOST`
+   if [ "$valtrust" ]; then
+     tlist=`grep -l $HOST $DENY_HOSTS $ALLOW_HOSTS $GALLOW_HOSTS $GDENY_HOSTS | tr '\n' ' '`
+   fi
+   valip=`cat /etc/apf/internals/.localaddrs | grep -w $HOST`
+   if [ "$valtrust" ]; then
+     echo "$HOST already exists in $tlist"
+   elif [ "$valip" ]; then
+     echo "$HOST is a local address and can not be added to the trust system"
+   else
+     TIME=`date +"%D %H:%M:%S"`
+     if [ "$CMT" ]; then
+       echo "# added $HOST on $TIME with comment: $CMT" >> $FILE
+     else
+       echo "# added $HOST on $TIME" >> $FILE
+     fi
+     echo "$HOST" >> $FILE
+     if [ $EXECUTOR == "nft" ]; then
+       if [ "$ACTION" == "DENY" ]; then
+         JACTION="$ALL_STOP"
+       elif [ "$ACTION" == "ALLOW" ]; then
+         JACTION="accept"
+       fi
+       $NFT insert rule ip filter $CHAIN ip saddr $HOST counter $JACTION
+       $NFT insert rule ip filter $CHAIN ip daddr $HOST counter $JACTION
+     else
+       if [ "$ACTION" == "DENY" ]; then
+         JACTION="$ALL_STOP"
+       elif [ "$ACTION" == "ALLOW" ]; then
+         JACTION="ACCEPT"
+       fi
+       $IPT $IPT_FLAGS -I $CHAIN -s $HOST -j $JACTION
+       $IPT $IPT_FLAGS -I $CHAIN -d $HOST -j $JACTION
+     fi
+     eout "(trust) added $ACTION all to/from $HOST"
+     if [ ! "$SET_VERBOSE" == "1" ]; then
+       echo "Inserted into firewall: $ACTION all to/from $HOST"
+     fi
+   fi
  else
-        echo "an FQDN or IP address is required for this option"
+   echo "an FQDN or IP address is required for this option"
  fi
 }
 
 flush() {
-firewall_on=`$IPT $IPT_FLAGS -L --numeric | grep -vE "Chain|destination"`
+if [ $EXECUTOR == "nft" ]; then
+	firewall_on=`$NFT -n list ruleset | grep -vE "chain|table|{|}|^$"`
+else
+	firewall_on=`$IPT $IPT_FLAGS -L --numeric | grep -vE "Chain|destination"`
+fi
 if [ "$SET_FASTLOAD" == "1" ] && [ ! "$1" == "1" ] && [ ! "$DEVEL_ON" == "1" ] && [ ! "$firewall_on" == "" ]; then
-	$IPTS > $INSTALL_PATH/internals/.apf.restore
+	if [ $EXECUTOR == "nft" ]; then
+		$NFT list ruleset > $INSTALL_PATH/internals/.apf.restore
+	else
+		$IPTS > $INSTALL_PATH/internals/.apf.restore
+	fi
 	eout "{glob} fast load snapshot saved"
 fi
 if [ ! "$1" = "1" ]; then
 	eout "{glob} flushing & zeroing chain policies"
 fi
-chains=`cat /proc/net/ip_tables_names 2>/dev/null`
-for i in $chains; do $IPT $IPT_FLAGS -t $i -F; done
-for i in $chains; do $IPT $IPT_FLAGS -t $i -X; done
-$IPT $IPT_FLAGS -P INPUT ACCEPT
-$IPT $IPT_FLAGS -P OUTPUT ACCEPT
-$IPT $IPT_FLAGS -P FORWARD ACCEPT
 
-if [ "$USE_IPV6" == "1" ]; then
-	chains6=`cat /proc/net/ip6_tables_names 2>/dev/null`
-	for i in $chains6; do $IP6T -t $i -F; done
-	for i in $chains6; do $IP6T -t $i -X; done
-	$IP6T -P INPUT ACCEPT
-	$IP6T -P OUTPUT ACCEPT
-	$IP6T -P FORWARD ACCEPT
+if [ $EXECUTOR == "nft" ]; then
+   $NFT flush ruleset
+else
+   chains=`cat /proc/net/ip_tables_names 2>/dev/null`
+	for i in $chains; do $IPT $IPT_FLAGS -t $i -F; done
+	for i in $chains; do $IPT $IPT_FLAGS -t $i -X; done
+	$IPT $IPT_FLAGS -P INPUT ACCEPT
+	$IPT $IPT_FLAGS -P OUTPUT ACCEPT
+	$IPT $IPT_FLAGS -P FORWARD ACCEPT
+
+	if [ "$USE_IPV6" == "1" ]; then
+		chains6=`cat /proc/net/ip6_tables_names 2>/dev/null`
+		if [ -z "$chain6" ] && [ -x "$NFT" ] ; then
+		   chains6="`$NFT list tables ip6 | awk '{print $3}'`"
+		fi
+		for i in $chains6; do $IP6T -t $i -F; done
+		for i in $chains6; do $IP6T -t $i -X; done
+		$IP6T -P INPUT ACCEPT
+		$IP6T -P OUTPUT ACCEPT
+		$IP6T -P FORWARD ACCEPT
+	fi
 fi
 
 if [ -f "/proc/net/ipt_recent/DEFAULT" ]; then
@@ -262,17 +386,32 @@ fi
 }
 
 list() {
-echo "Loading iptables rules..."
-iptc=/etc/apf/.iptrules.$$
-:> $iptc ; chmod 600 $iptc
-$IPT $IPT_FLAGS --verbose --numeric --line-numbers --list >> $iptc
-echo "Opening editor"
-if [ -f "/usr/bin/pico" ]; then
+if [ $EXECUTOR == "nft" ]; then
+   echo "Loading nftables rules..."
+   iptc=/etc/apf/.iptrules.$$
+   :> $iptc ; chmod 600 $iptc
+   $NFT -n list ruleset >> $iptc
+   echo "Opening editor"
+   if [ -f "/usr/bin/pico" ]; then
 	/usr/bin/pico -w $iptc
-elif [ -f "/usr/bin/nano" ]; then
+   elif [ -f "/usr/bin/nano" ]; then
 	/usr/bin/nano -w $iptc
-elif [ -f "/bin/vi" ]; then
+   elif [ -f "/bin/vi" ]; then
 	/bin/vi $iptc
+   fi
+else
+   echo "Loading iptables rules..."
+   iptc=/etc/apf/.iptrules.$$
+   :> $iptc ; chmod 600 $iptc
+   $IPT $IPT_FLAGS --verbose --numeric --line-numbers --list >> $iptc
+   echo "Opening editor"
+   if [ -f "/usr/bin/pico" ]; then
+	/usr/bin/pico -w $iptc
+   elif [ -f "/usr/bin/nano" ]; then
+	/usr/bin/nano -w $iptc
+   elif [ -f "/bin/vi" ]; then
+	/bin/vi $iptc
+   fi
 fi
 clear
 rm -f $iptc
@@ -314,52 +453,94 @@ if [ -z "$TYPE" ]; then
 	break
 fi
 
+if [ $EXECUTOR == "nft" ]; then
+   $NFT add table ip mangle
+   $NFT add chain ip mangle $TYPE
+fi
+
+
 if [ ! "$TOS_0" == "" ]; then
-        for i in `echo $TOS_0 | tr ',' ' '`; do
-                i=`echo $i | tr '_' ':'`
-                $IPT $IPT_FLAGS -t mangle -A $TYPE -p tcp --dport $i -j TOS --set-tos 0
-                $IPT $IPT_FLAGS -t mangle -A $TYPE -p udp --dport $i -j TOS --set-tos 0
-        done
+  for i in `echo $TOS_0 | tr ',' ' '`; do
+    i=`echo $i | tr '_' ':'`
+    j=`echo $i | tr ':' '-'`
+    if [ $EXECUTOR == "nft" ]; then
+      $NFT add rule ip mangle $TYPE tcp dport $j counter ip dscp set 0x00
+      $NFT add rule ip mangle $TYPE udp dport $j counter ip dscp set 0x00
+    else
+      $IPT $IPT_FLAGS -t mangle -A $TYPE -p tcp --dport $i -j TOS --set-tos 0
+      $IPT $IPT_FLAGS -t mangle -A $TYPE -p udp --dport $i -j TOS --set-tos 0
+    fi
+  done
 fi
 
 if [ ! "$TOS_2" == "" ]; then
-        for i in `echo $TOS_2 | tr ',' ' '`; do
-                i=`echo $i | tr '_' ':'`
-                $IPT $IPT_FLAGS -t mangle -A $TYPE -p tcp --dport $i -j TOS --set-tos 2
-                $IPT $IPT_FLAGS -t mangle -A $TYPE -p udp --dport $i -j TOS --set-tos 2
-        done
+  for i in `echo $TOS_2 | tr ',' ' '`; do
+    i=`echo $i | tr '_' ':'`
+    j=`echo $i | tr ':' '-'`
+	 if [ $EXECUTOR == "nft" ]; then
+       $NFT add rule ip mangle $TYPE tcp dport $j counter ip dscp set 0x00
+       $NFT add rule ip mangle $TYPE udp dport $j counter ip dscp set 0x00
+	 else
+       $IPT $IPT_FLAGS -t mangle -A $TYPE -p tcp --dport $i -j TOS --set-tos 2
+       $IPT $IPT_FLAGS -t mangle -A $TYPE -p udp --dport $i -j TOS --set-tos 2
+	 fi
+  done
 fi
 
 if [ ! "$TOS_4" == "" ]; then
-        for i in `echo $TOS_4 | tr ',' ' '`; do
-                i=`echo $i | tr '_' ':'`
-                $IPT $IPT_FLAGS -t mangle -A $TYPE -p tcp --dport $i -j TOS --set-tos 4
-                $IPT $IPT_FLAGS -t mangle -A $TYPE -p udp --dport $i -j TOS --set-tos 4
-        done
+  for i in `echo $TOS_4 | tr ',' ' '`; do
+    i=`echo $i | tr '_' ':'`
+    j=`echo $i | tr ':' '-'`
+	 if [ $EXECUTOR == "nft" ]; then
+      $NFT add rule ip mangle $TYPE tcp dport $j counter ip dscp set 0x01
+      $NFT add rule ip mangle $TYPE udp dport $j counter ip dscp set 0x01
+    else
+      $IPT $IPT_FLAGS -t mangle -A $TYPE -p tcp --dport $i -j TOS --set-tos 4
+      $IPT $IPT_FLAGS -t mangle -A $TYPE -p udp --dport $i -j TOS --set-tos 4
+	 fi
+  done
 fi
 
 if [ ! "$TOS_8" == "" ]; then
-        for i in `echo $TOS_8 | tr ',' ' '`; do
-                i=`echo $i | tr '_' ':'`
-                $IPT $IPT_FLAGS -t mangle -A $TYPE -p tcp --dport $i -j TOS --set-tos 8
-                $IPT $IPT_FLAGS -t mangle -A $TYPE -p udp --dport $i -j TOS --set-tos 8
-        done
+  for i in `echo $TOS_8 | tr ',' ' '`; do
+    i=`echo $i | tr '_' ':'`
+    j=`echo $i | tr ':' '-'`
+	 if [ $EXECUTOR == "nft" ]; then
+      $NFT add rule ip mangle $TYPE tcp dport $j counter ip dscp set 0x02
+      $NFT add rule ip mangle $TYPE udp dport $j counter ip dscp set 0x02
+	 else
+      $IPT $IPT_FLAGS -t mangle -A $TYPE -p tcp --dport $i -j TOS --set-tos 8
+      $IPT $IPT_FLAGS -t mangle -A $TYPE -p udp --dport $i -j TOS --set-tos 8
+	 fi
+  done
 fi
 
 if [ ! "$TOS_16" == "" ]; then
-        for i in `echo $TOS_16 | tr ',' ' '`; do
-                i=`echo $i | tr '_' ':'`
-                $IPT $IPT_FLAGS -t mangle -A $TYPE -p tcp --dport $i -j TOS --set-tos 16
-                $IPT $IPT_FLAGS -t mangle -A $TYPE -p udp --dport $i -j TOS --set-tos 16
-        done
+  for i in `echo $TOS_16 | tr ',' ' '`; do
+    i=`echo $i | tr '_' ':'`
+    j=`echo $i | tr ':' '-'`
+	 if [ $EXECUTOR == "nft" ]; then
+      $NFT add rule ip mangle $TYPE tcp dport $j counter ip dscp set 0x04
+      $NFT add rule ip mangle $TYPE udp dport $j counter ip dscp set 0x04
+	 else
+      $IPT $IPT_FLAGS -t mangle -A $TYPE -p tcp --dport $i -j TOS --set-tos 16
+      $IPT $IPT_FLAGS -t mangle -A $TYPE -p udp --dport $i -j TOS --set-tos 16
+	 fi
+  done
 fi
 
 if [ ! "$TOS_DEF_RANGE" == "" ]; then
-        for i in `echo $TOS_DEF_RANGE | tr ',' ' '`; do
-                i=`echo $i | tr '_' ':'`
-                $IPT $IPT_FLAGS -t mangle -A $TYPE -p tcp --dport $i -j TOS --set-tos $TOS_DEF
-                $IPT $IPT_FLAGS -t mangle -A $TYPE -p udp --dport $i -j TOS --set-tos $TOS_DEF
-        done
+    for i in `echo $TOS_DEF_RANGE | tr ',' ' '`; do
+      i=`echo $i | tr '_' ':'`
+      j=`echo $i | tr ':' '-'`
+      if [ $EXECUTOR == "nft" ]; then
+        $NFT add rule ip mangle $TYPE tcp dport $j counter ip dscp set $TOS_DEF
+        $NFT add rule ip mangle $TYPE udp dport $j counter ip dscp set $TOS_DEF
+      else
+        $IPT $IPT_FLAGS -t mangle -A $TYPE -p tcp --dport $i -j TOS --set-tos $TOS_DEF
+        $IPT $IPT_FLAGS -t mangle -A $TYPE -p udp --dport $i -j TOS --set-tos $TOS_DEF
+      fi
+    done
 fi
 }
 
@@ -385,45 +566,73 @@ if [ ! "`cat $file | grep -v "#"`" == "" ]; then
                 val=`cat /etc/apf/internals/.localaddrs | grep -w $i`
                 if [ ! "$val" ]; then
                  if [ ! "$i" == "" ] && [ -f "$file" ]; then
-                        eout "{trust} allow all to/from $i"
-                        $IPT $IPT_FLAGS -A $chain -s $i -d 0/0 -j ACCEPT
-                        $IPT $IPT_FLAGS -A $chain -d $i -s 0/0 -j ACCEPT
+                   eout "{trust} allow all to/from $i"
+                   if [ $EXECUTOR == "nft" ]; then
+                           $NFT add rule ip filter $chain ip saddr $i counter accept
+                           $NFT add rule ip filter $chain ip daddr $i counter accept
+	                else
+                           $IPT $IPT_FLAGS -A $chain -s $i -d 0/0 -j ACCEPT
+                           $IPT $IPT_FLAGS -A $chain -d $i -s 0/0 -j ACCEPT
+                   fi
                  fi
-		fi
+                fi
         done
         #
         #
         for i in `cat $file | grep -v "#" | grep ":" | grep "=" | grep -vw in | grep -vw out | grep -v tcp | grep -v udp`; do
                 if [ ! "$i" == "" ] && [ -f "$file" ]; then
 
-                        PFLOW=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$1}'`
-                if [ "$PFLOW" == "s" ]; then
-                                PFLOW="sport"
-                                PFLOW_T="from"
-                        elif [ "$PFLOW" == "d" ]; then
-                                PFLOW="dport"
-                                PFLOW_T="to"
-                        fi
-                        PPORT=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$2}'`
-                        if [ ! "$(echo $PPORT | grep _)" == "" ]; then
-                                PPORT_BEG=`echo $PPORT | tr '_' ' ' | awk '{print$1}'`
-                                PPORT_END=`echo $PPORT | tr '_' ' ' | awk '{print$2}'`
-                                PPORT="$PPORT_BEG:$PPORT_END"
-                        fi
+                  PFLOW=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$1}'`
+                  if [ "$PFLOW" == "s" ]; then
+                    PFLOW="sport"
+                    PFLOW_T="from"
+                  elif [ "$PFLOW" == "d" ]; then
+                    PFLOW="dport"
+                    PFLOW_T="to"
+                  fi
+                  PPORT=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$2}'`
+                  if [ ! "$(echo $PPORT | grep _)" == "" ]; then
+                    PPORT_BEG=`echo $PPORT | tr '_' ' ' | awk '{print$1}'`
+                    PPORT_END=`echo $PPORT | tr '_' ' ' | awk '{print$2}'`
+                    PPORT="$PPORT_BEG:$PPORT_END"
+                  fi
 
-                        IPFLOW=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$3}'`
-                        if [ "$IPFLOW" == "s" ]; then
-                                IPFLOW="s"
-                        elif [ "$IPFLOW" == "d" ]; then
-                                IPFLOW="d"
-                        fi
-                        PIP=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$4}'`
+                  IPFLOW=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$3}'`
+                  if [ "$IPFLOW" == "s" ]; then
+                    IPFLOW="s"
+                    IPFLOW_NFT="saddr"
+                  elif [ "$IPFLOW" == "d" ]; then
+                    IPFLOW="d"
+                    IPFLOW_NFT="daddr"
+                  fi
+                  PIP=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$4}'`
 
-                        if [ ! "$IPFLOW" == "" ] && [ ! "$PIP" == "" ] && [ ! "$IPFLOW" == "" ] && [ ! "$PPORT" == "" ]; then
-                                eout "{trust} allow $PIP $PFLOW_T port $PPORT"
-                                $IPT $IPT_FLAGS -A $chain -p tcp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j ACCEPT
-                                $IPT $IPT_FLAGS -A $chain -p udp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j ACCEPT
+                  if [ ! "$IPFLOW" == "" ] && [ ! "$PIP" == "" ] && [ ! "$IPFLOW" == "" ] && [ ! "$PPORT" == "" ]; then
+                    eout "{trust} allow $PIP $PFLOW_T port $PPORT"
+                    if [ $EXECUTOR == "nft" ]; then
+                      $NFT add rule ip filter $chain ip protocol tcp ip $IPFLOW_NFT $PIP tcp $PFLOW $PPORT counter accept
+                      $NFT add rule ip filter $chain ip protocol udp ip $IPFLOW_NFT $PIP udp $PFLOW $PPORT counter accept
+                      if [ "$USE_IPV6" == "1" ]; then
+                        if [[ $PIP =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+                          eout "ignoring ipv4 address $PIP"
+                          continue
                         fi
+                        $NFT add rule ip6 filter $chain ip6 $IPFLOW_NFT $PIP ct state new  tcp $PFLOW $PPORT counter accept
+                        $NFT add rule ip6 filter $chain ip6 $IPFLOW_NFT $PIP ct state new  udp $PFLOW $PPORT counter accept
+                      fi
+                    else
+                      $IPT $IPT_FLAGS -A $chain -p tcp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j ACCEPT
+                      $IPT $IPT_FLAGS -A $chain -p udp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j ACCEPT
+                      if [ "$USE_IPV6" == "1" ]; then
+                        if [[ $PIP =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+                          eout "ignoring ipv4 address $PIP"
+                          continue
+                        fi
+                        $IP6T -A $chain -m state --state NEW -m tcp -p tcp -$IPFLOW $PIP --$PFLOW $PPORT -j ACCEPT
+                        $IP6T -A $chain -m state --state NEW -m udp -p udp -$IPFLOW $PIP --$PFLOW $PPORT -j ACCEPT
+                      fi
+                    fi
+                  fi
                 fi
         done
         #
@@ -459,8 +668,10 @@ if [ ! "`cat $file | grep -v "#"`" == "" ]; then
                         IPFLOW=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$4}'`
                         if [ "$IPFLOW" == "s" ]; then
                                 IPFLOW="s"
+                                IPFLOW_NFT="saddr"
                         elif [ "$IPFLOW" == "d" ]; then
                                 IPFLOW="d"
+                                IPFLOW_NFT="daddr"
                         fi
                         PIP=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$5}'`
 
@@ -471,8 +682,29 @@ if [ ! "`cat $file | grep -v "#"`" == "" ]; then
                                 eout "{trust} ignored local ip allow rule '$NFLOW_T $PIP $PFLOW_T port $PPORT'"
                          else
                                 eout "{trust} allow $NFLOW_T $PIP $PFLOW_T port $PPORT"
-                                $IPT $IPT_FLAGS -A $chain -p tcp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j ACCEPT
-                                $IPT $IPT_FLAGS -A $chain -p udp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j ACCEPT
+                                if [ $EXECUTOR == "nft" ]; then
+                                   $NFT add rule ip filter $chain ip protocol tcp ip $IPFLOW_NFT $PIP tcp $PFLOW $PPORT counter accept
+                                   $NFT add rule ip filter $chain ip protocol udp ip $IPFLOW_NFT $PIP udp $PFLOW $PPORT counter accept
+                                   if [ "$USE_IPV6" == "1" ]; then
+                                     if [[ $PIP =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+                                       eout "ignoring ipv4 address $PIP"
+                                       continue
+                                     fi
+                                     $NFT add rule ip6 filter $chain ip6 $IPFLOW_NFT $PIP ct state new  tcp $PFLOW $PPORT counter accept
+                                     $NFT add rule ip6 filter $chain ip6 $IPFLOW_NFT $PIP ct state new  udp $PFLOW $PPORT counter accept
+                                   fi
+                                else
+                                   $IPT $IPT_FLAGS -A $chain -p tcp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j ACCEPT
+                                   $IPT $IPT_FLAGS -A $chain -p udp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j ACCEPT
+                                   if [ "$USE_IPV6" == "1" ]; then
+                                      if [[ $PIP =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+                                         eout "ignoring ipv4 address $PIP"
+                                         continue
+                                      fi
+                                      $IP6T -A $chain -m state --state NEW -m tcp -p tcp -$IPFLOW $PIP --$PFLOW $PPORT -j ACCEPT
+                                      $IP6T -A $chain -m state --state NEW -m udp -p udp -$IPFLOW $PIP --$PFLOW $PPORT -j ACCEPT
+                                   fi
+                                fi
                          fi
                         fi
                 fi
@@ -517,8 +749,10 @@ if [ ! "`cat $file | grep -v "#"`" == "" ]; then
                         IPFLOW=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$5}'`
                         if [ "$IPFLOW" == "s" ]; then
                                 IPFLOW="s"
+                                IPFLOW_NFT="saddr"
                         elif [ "$IPFLOW" == "d" ]; then
                                 IPFLOW="d"
+                                IPFLOW_NFT="daddr"
                         fi
                         PIP=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$6}'`
 
@@ -529,11 +763,39 @@ if [ ! "`cat $file | grep -v "#"`" == "" ]; then
                                 eout "{trust} ignored local ip allow rule '$NFLOW_T $PIP $PFLOW_T port $PPORT'"
                          else
                                 if [ "$PTYPE" == "tcp" ]; then
-	                                eout "{trust} allow $NFLOW_T $PTYPE $PIP $PFLOW_T port $PPORT"
-	                                $IPT $IPT_FLAGS -A $chain -p $PTYPE -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j ACCEPT
+                                  eout "{trust} allow $NFLOW_T $PTYPE $PIP $PFLOW_T port $PPORT"
+                                  if [ $EXECUTOR == "nft" ]; then
+                                      $NFT add rule ip filter $chain ip protocol tcp ip $IPFLOW_NFT $PIP $PTYPE $PFLOW $PPORT counter accept
+                                      if [ "$USE_IPV6" == "1" ]; then
+                                         if [[ $PIP =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+                                           eout "ignoring ipv4 address $PIP"
+                                           continue
+                                         fi
+                                         $NFT add rule ip6 filter $chain meta l4proto tcp ip6 $IPFLOW_NFT $PIP ct state new $PTYPE $PFLOW $PPORT counter accept
+                                      fi
+                                  else
+                                      $IPT $IPT_FLAGS -A $chain -p $PTYPE -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j ACCEPT
+                                      if [ "$USE_IPV6" == "1" ]; then
+                                              $IP6T -A $chain -m state --state NEW -p $PTYPE -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j ACCEPT
+                                      fi
+                                  fi
                                 elif [ "$PTYPE" == "udp" ]; then
-                                        eout "{trust} allow $NFLOW_T $PTYPE $PIP $PFLOW_T port $PPORT"
-		                        $IPT $IPT_FLAGS -A $chain -p $PTYPE -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j ACCEPT
+                                  eout "{trust} allow $NFLOW_T $PTYPE $PIP $PFLOW_T port $PPORT"
+                                  if [ $EXECUTOR == "nft" ]; then
+                                      $NFT add rule ip filter $chain ip protocol udp ip $IPFLOW $PIP $PTYPE $PFLOW $PPORT counter accept
+                                      if [ "$USE_IPV6" == "1" ]; then
+                                         if [[ $PIP =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+                                           eout "ignoring ipv4 address $PIP"
+                                           continue
+                                         fi
+                                         $NFT add rule ip6 filter $chain meta l4proto tcp ip6 $IPFLOW_NFT $PIP ct state new  $PTYPE $PFLOW $PPORT counter accept
+                                      fi
+                                  else
+                                      $IPT $IPT_FLAGS -A $chain -p $PTYPE -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j ACCEPT
+                                      if [ "$USE_IPV6" == "1" ]; then
+                                              $IP6T -A $chain -m state --state NEW -p $PTYPE -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j ACCEPT
+                                     fi
+                                  fi
                                 fi
                          fi
                         fi
@@ -547,10 +809,10 @@ deny_hosts() {
 file=$1
 chain=$2
 if [ -z "$file" ] || [ -z "$chain" ]; then
-	eout "could not process deny_hosts $file $chain, fatal error, aborting!"
-	/etc/init.d/apf stop
+        eout "could not process deny_hosts $file $chain, fatal error, aborting!"
+        /etc/init.d/apf stop
         mutex_unlock
-	exit 1
+        exit 1
 fi
 
 if [ ! "`cat $file | grep -v "#"`" == "" ]; then
@@ -558,94 +820,166 @@ if [ ! "`cat $file | grep -v "#"`" == "" ]; then
         #
         #
         for i in `cat $file | grep -v "#" | grep -v ":" | grep -v "="`; do
-                val="$(cat /etc/apf/internals/.localaddrs | grep -w $i)"
-                if [ ! "$val" ]; then
-                 if [ ! "$i" == "" ] && [ -f "$file" ]; then
-                        eout "{trust} deny all to/from $i"
-                        $IPT $IPT_FLAGS -A $chain -s $i -d 0/0 -j $ALL_STOP
-                        $IPT $IPT_FLAGS -A $chain -d $i -s 0/0 -j $ALL_STOP
+           val="$(cat /etc/apf/internals/.localaddrs | grep -w $i)"
+           if [ ! "$val" ]; then
+              if [ ! "$i" == "" ] && [ -f "$file" ]; then
+                 eout "{trust} deny all to/from $i"
+                 if [ $EXECUTOR == "nft" ]; then
+                    $NFT add rule ip filter $chain ip saddr $i counter $ALL_STOP
+                    $NFT add rule ip filter $chain ip daddr $i counter $ALL_STOP
+                    if [ "$USE_IPV6" == "1" ]; then
+                       subnet=`echo $i | awk -F'/' '{print $1}'`
+                       if [[ $subnet =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+                          eout "ignoring ipv4 address $i"
+                          continue
+                       fi
+                       $NFT add rule ip6 filter $chain ip6 saddr $i ct state new  counter $ALL_STOP
+                       $NFT add rule ip6 filter $chain ip6 daddr $i ct state new  counter $ALL_STOP
+                    fi
+                 else
+                    $IPT $IPT_FLAGS -A $chain -s $i -d 0/0 -j $ALL_STOP
+                    $IPT $IPT_FLAGS -A $chain -d $i -s 0/0 -j $ALL_STOP
+                    if [ "$USE_IPV6" == "1" ]; then
+                       subnet=`echo $i | awk -F'/' '{print $1}'`
+                       if [[ $subnet =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+                          eout "ignoring ipv4 address $i"
+                          continue
+                       fi
+                       $IP6T -A $chain -m state --state NEW -s $i -d 0/0 -j $ALL_STOP
+                       $IP6T -A $chain -m state --state NEW -d $i -s 0/0 -j $ALL_STOP
+                    fi
                  fi
-		fi
+              fi
+           fi
         done
         #
         #
-	for i in `cat $file | grep -v "#" | grep ":" | grep "=" | grep -vw in | grep -vw out | grep -v tcp | grep -v udp`; do
-                if [ ! "$i" == "" ] && [ -f "$file" ]; then
+        for i in `cat $file | grep -v "#" | grep ":" | grep "=" | grep -vw in | grep -vw out | grep -v tcp | grep -v udp`; do
+            if [ ! "$i" == "" ] && [ -f "$file" ]; then
 
-                        PFLOW=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$1}'`
-                        if [ "$PFLOW" == "s" ]; then
-                                PFLOW="sport"
-                                PFLOW_T="from"
-                        elif [ "$PFLOW" == "d" ]; then
-                                PFLOW="dport"
-                                PFLOW_T="to"
-                        fi
-                        PPORT=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$2}'`
-                        if [ ! "$(echo $PPORT | grep _)" == "" ]; then
-                                PPORT_BEG=`echo $PPORT | tr '_' ' ' | awk '{print$1}'`
-                                PPORT_END=`echo $PPORT | tr '_' ' ' | awk '{print$2}'`
-                                PPORT="$PPORT_BEG:$PPORT_END"
-                        fi
+               PFLOW=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$1}'`
+               if [ "$PFLOW" == "s" ]; then
+                  PFLOW="sport"
+                  PFLOW_T="from"
+               elif [ "$PFLOW" == "d" ]; then
+                  PFLOW="dport"
+                  PFLOW_T="to"
+               fi
+               PPORT=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$2}'`
+               if [ ! "$(echo $PPORT | grep _)" == "" ]; then
+                  PPORT_BEG=`echo $PPORT | tr '_' ' ' | awk '{print$1}'`
+                  PPORT_END=`echo $PPORT | tr '_' ' ' | awk '{print$2}'`
+                  PPORT="$PPORT_BEG:$PPORT_END"
+                  PPORT_NFT="$PPORT_BEG-$PPORT_END"
+               fi
 
-                        IPFLOW=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$3}'`
-                        if [ "$IPFLOW" == "s" ]; then
-                                IPFLOW="s"
-                        elif [ "$IPFLOW" == "d" ]; then
-                                IPFLOW="d"
-                        fi
-                        PIP=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$4}'`
+               IPFLOW=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$3}'`
+               if [ "$IPFLOW" == "s" ]; then
+                  IPFLOW="s"
+                  IPFLOW_NFT="saddr"
+               elif [ "$IPFLOW" == "d" ]; then
+                  IPFLOW="d"
+                  IPFLOW_NFT="daddr"
+               fi
+               PIP=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$4}'`
 
-                        if [ ! "$IPFLOW" == "" ] && [ ! "$PIP" == "" ] && [ ! "$IPFLOW" == "" ] && [ ! "$PPORT" == "" ]; then
-                                eout "{trust} deny $PIP $PFLOW_T port $PPORT"
-                                $IPT $IPT_FLAGS -A $chain -p tcp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j $TCP_STOP
-				$IPT $IPT_FLAGS -A $chain -p udp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j $UDP_STOP
-                        fi
-                fi
+               if [ ! "$IPFLOW" == "" ] && [ ! "$PIP" == "" ] && [ ! "$IPFLOW" == "" ] && [ ! "$PPORT" == "" ]; then
+                  eout "{trust} deny $PIP $PFLOW_T port $PPORT"
+                  if [ $EXECUTOR == "nft" ]; then
+                    $NFT add rule ip filter $chain ip protocol tcp ip $IPFLOW_NFT $PIP tcp $PFLOW $PPORT_NFT counter $TCP_STOP
+                    $NFT add rule ip filter $chain ip protocol udp ip $IPFLOW_NFT $PIP udp $PFLOW $PPORT_NFT counter $UDP_STOP
+                    if [ "$USE_IPV6" == "1" ]; then
+                       if [[ $PIP =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+                          eout "ignoring ipv4 address $PIP"
+                          continue
+                       fi
+                       $NFT add rule ip6 filter $chain ip6 $IPFLOW_NFT $PIP ct state new  tcp $PFLOW $PPORT_NFT counter $TCP_STOP
+                       $NFT add rule ip6 filter $chain ip6 $IPFLOW_NFT $PIP ct state new  udp $PFLOW $PPORT_NFT counter $UDP_STOP
+                    fi
+                  else
+                    $IPT $IPT_FLAGS -A $chain -p tcp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j $TCP_STOP
+                    $IPT $IPT_FLAGS -A $chain -p udp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j $UDP_STOP
+                    if [ "$USE_IPV6" == "1" ]; then
+                       if [[ $PIP =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+                          eout "ignoring ipv4 address $PIP"
+                          continue
+                       fi
+                       $IP6T -A $chain -m state --state NEW -m tcp -p tcp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j $TCP_STOP
+                       $IP6T -A $chain -m state --state NEW -m udp -p udp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j $UDP_STOP
+                    fi
+                  fi
+               fi
+            fi
         done
         #
         #
         for i in `cat $file | grep -v "#" | grep ":" | grep "=" | grep -v "tcp" | grep -v "udp"`; do
-                if [ ! "$i" == "" ] && [ -f "$file" ]; then
+            if [ ! "$i" == "" ] && [ -f "$file" ]; then
 
-                        NFLOW=`echo $i | tr ':' ' ' | tr '=' ' '| awk '{print$1}'`
-                        if [ "$NFLOW" == "in" ]; then
-                                NFLOW="INPUT"
-                                NFLOW_T="inbound"
-                        elif [ "$NFLOW" == "out" ]; then
-                                NFLOW="OUTPUT"
-                                NFLOW_T="outbound"
-                        fi
+               NFLOW=`echo $i | tr ':' ' ' | tr '=' ' '| awk '{print$1}'`
+               if [ "$NFLOW" == "in" ]; then
+                  NFLOW="INPUT"
+                  NFLOW_T="inbound"
+               elif [ "$NFLOW" == "out" ]; then
+                  NFLOW="OUTPUT"
+                  NFLOW_T="outbound"
+               fi
 
-                        PFLOW=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$2}'`
-                        if [ "$PFLOW" == "s" ]; then
-                                PFLOW="sport"
-                                PFLOW_T="from"
-                        elif [ "$PFLOW" == "d" ]; then
-                                PFLOW="dport"
-                                PFLOW_T="to"
-                        fi
+               PFLOW=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$2}'`
+               if [ "$PFLOW" == "s" ]; then
+                  PFLOW="sport"
+                  PFLOW_T="from"
+               elif [ "$PFLOW" == "d" ]; then
+                  PFLOW="dport"
+                  PFLOW_T="to"
+               fi
 
-                        PPORT=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$3}'`
-                        if [ ! "$(echo $PPORT | grep _)" == "" ]; then
-                                PPORT_BEG=`echo $PPORT | tr '_' ' ' | awk '{print$1}'`
-                                PPORT_END=`echo $PPORT | tr '_' ' ' | awk '{print$2}'`
-                                PPORT="$PPORT_BEG:$PPORT_END"
-                        fi
+               PPORT=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$3}'`
+               if [ ! "$(echo $PPORT | grep _)" == "" ]; then
+                  PPORT_BEG=`echo $PPORT | tr '_' ' ' | awk '{print$1}'`
+                  PPORT_END=`echo $PPORT | tr '_' ' ' | awk '{print$2}'`
+                  PPORT="$PPORT_BEG:$PPORT_END"
+                  PPORT_NFT="$PPORT_BEG-$PPORT_END"
+               fi
 
-                        IPFLOW=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$4}'`
-                        if [ "$IPFLOW" == "s" ]; then
-                                IPFLOW="s"
-                        elif [ "$IPFLOW" == "d" ]; then
-                                IPFLOW="d"
-                        fi
-                        PIP=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$5}'`
+               IPFLOW=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$4}'`
+               if [ "$IPFLOW" == "s" ]; then
+                  IPFLOW="s"
+                  IPFLOW_NFT="saddr"
+               elif [ "$IPFLOW" == "d" ]; then
+                  IPFLOW="d"
+                  IPFLOW_NFT="daddr"
+               fi
+               PIP=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$5}'`
 
-                        if [ ! "$NFLOW" == "" ] && [ ! "$IPFLOW" == "" ] && [ ! "$PIP" == "" ] && [ ! "$IPFLOW" == "" ] && [ ! "$PPORT" == "" ]; then
-                                eout "{trust} deny ($NFLOW_T) $PIP $PFLOW_T port $PPORT"
-                                $IPT $IPT_FLAGS -A $chain -p tcp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j $TCP_STOP
-				$IPT $IPT_FLAGS -A $chain -p udp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j $UDP_STOP
+               if [ ! "$NFLOW" == "" ] && [ ! "$IPFLOW" == "" ] && [ ! "$PIP" == "" ] && [ ! "$IPFLOW" == "" ] && [ ! "$PPORT" == "" ]; then
+                  eout "{trust} deny ($NFLOW_T) $PIP $PFLOW_T port $PPORT"
+                  if [ $EXECUTOR == "nft" ]; then
+                     $NFT add rule ip filter $chain ip protocol tcp ip $IPFLOW_NFT $PIP tcp $PFLOW $PPORT_NFT counter $TCP_STOP
+                     $NFT add rule ip filter $chain ip protocol udp ip $IPFLOW_NFT $PIP udp $PFLOW $PPORT_NFT counter $UDP_STOP
+                     if [ "$USE_IPV6" == "1" ]; then
+                        if [[ $PIP =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+                          eout "ignoring ipv4 address $PIP"
+                          continue
                         fi
-                fi
+                        $NFT add rule ip6 filter $chain meta l4proto tcp ip6 $IPFLOW_NFT $PIP ct state new  tcp $PFLOW $PPORT_NFT counter $TCP_STOP
+                        $NFT add rule ip6 filter $chain meta l4proto udp ip6 $IPFLOW_NFT $PIP ct state new  udp $PFLOW $PPORT_NFT counter $TCP_STOP
+                     fi
+                  else
+                     $IPT $IPT_FLAGS -A $chain -p tcp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j $TCP_STOP
+                     $IPT $IPT_FLAGS -A $chain -p udp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j $UDP_STOP
+                     if [ "$USE_IPV6" == "1" ]; then
+                        if [[ $PIP =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+                          eout "ignoring ipv4 address $PIP"
+                          continue
+                        fi
+                        $IP6T -A $chain -m state --state NEW -p tcp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j $TCP_STOP
+                        $IP6T -A $chain -m state --state NEW -p udp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j $UDP_STOP
+                     fi
+                  fi
+               fi
+
+            fi
         done
         #
         #
@@ -682,24 +1016,63 @@ if [ ! "`cat $file | grep -v "#"`" == "" ]; then
                                 PPORT_BEG=`echo $PPORT | tr '_' ' ' | awk '{print$1}'`
                                 PPORT_END=`echo $PPORT | tr '_' ' ' | awk '{print$2}'`
                                 PPORT="$PPORT_BEG:$PPORT_END"
+                                PPORT_NFT="$PPORT_BEG-$PPORT_END"
                         fi
 
                         IPFLOW=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$5}'`
                         if [ "$IPFLOW" == "s" ]; then
                                 IPFLOW="s"
+                                IPFLOW_NFT="saddr"
                         elif [ "$IPFLOW" == "d" ]; then
                                 IPFLOW="d"
+                                IPFLOW_NFT="daddr"
                         fi
                         PIP=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$6}'`
 
                         if [ ! "$PTYPE" == "" ] && [ ! "$NFLOW" == "" ] && [ ! "$IPFLOW" == "" ] && [ ! "$PIP" == "" ] && [ ! "$IPFLOW" == "" ] && [ ! "$PPORT" == "" ]; then
-				if [ "$PTYPE" == "tcp" ]; then
-        	                        eout "{trust} deny $NFLOW_T $PTYPE $PIP $PFLOW_T port $PPORT"
-	                                $IPT $IPT_FLAGS -A $chain -p $PTYPE -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j $TCP_STOP
-				elif [ "$PTYPE" == "udp" ]; then
-	                                eout "{trust} deny $NFLOW_T $PTYPE $PIP $PFLOW_T port $PPORT"
-					$IPT $IPT_FLAGS -A $chain -p $PTYPE -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j $UDP_STOP
-				fi
+                           if [ "$PTYPE" == "tcp" ]; then
+                               eout "{trust} deny $NFLOW_T $PTYPE $PIP $PFLOW_T port $PPORT"
+                               if [ $EXECUTOR == "nft" ]; then
+                                  $NFT add rule ip filter $chain ip protocol $PTYPE ip $IPFLOW_NFT $PIP $PTYPE $PFLOW $PPORT_NFT counter $TCP_STOP
+                                  if [ "$USE_IPV6" == "1" ]; then
+                                     if [[ $PIP =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+                                        eout "ignoring ipv4 address $PIP"
+                                        continue
+                                     fi
+                                     $NFT add rule ip6 filter $chain meta l4proto $PTYPE ip6 $IPFLOW_NFT $PIP ct state new  $PTYPE $PFLOW $PPORT_NFT counter $TCP_STOP
+                                  fi
+                               else
+                                  $IPT $IPT_FLAGS -A $chain -p $PTYPE -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j $TCP_STOP
+                                  if [ "$USE_IPV6" == "1" ]; then
+                                     if [[ $PIP =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+                                        eout "ignoring ipv4 address $PIP"
+                                        continue
+                                     fi
+                                     $IP6T -A $chain -m state --state NEW -p $PTYPE -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j $TCP_STOP
+                                  fi
+                               fi
+                           elif [ "$PTYPE" == "udp" ]; then
+                               eout "{trust} deny $NFLOW_T $PTYPE $PIP $PFLOW_T port $PPORT"
+                               if [ $EXECUTOR == "nft" ]; then
+                                  $NFT add rule ip filter $chain ip protocol $PTYPE ip $IPFLOW_NFT $PIP $PTYPE $PFLOW $PPORT_NFT counter $UDP_STOP
+                                  if [ "$USE_IPV6" == "1" ]; then
+                                     if [[ $PIP =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+                                        eout "ignoring ipv4 address $PIP"
+                                        continue
+                                     fi
+                                     $NFT add rule ip6 filter $chain meta l4proto $PTYPE ip6 $IPFLOW_NFT $PIP ct state new  $PTYPE $PFLOW $PPORT_NFT counter $UDP_STOP
+                                  fi
+                               else
+                                  $IPT $IPT_FLAGS -A $chain -p $PTYPE -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j $UDP_STOP
+                                  if [ "$USE_IPV6" == "1" ]; then
+                                     if [[ $PIP =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+                                        eout "ignoring ipv4 address $PIP"
+                                        continue
+                                     fi
+                                     $IP6T -A $chain -m state --state NEW -p $PTYPE -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j $UDP_STOP
+                                  fi
+                               fi
+                           fi
                         fi
                 fi
         done
@@ -708,10 +1081,10 @@ fi
 
 
 dlist_resnet() {
- if [ -f "$RESNET" ]; then
-        cp $RESNET $RESNET.bk
-        chmod 600 $RESNET $RESNET.bk
- fi
+if [ -f "$RESNET" ]; then
+   cp $RESNET $RESNET.bk
+   chmod 600 $RESNET $RESNET.bk
+fi
 if [ -f "$WGET" ] && [ -f "$RESNET" ]; then
    URL_TMP="/etc/apf/.apf-$$"
    rm -rf $URL_TMP
@@ -721,22 +1094,22 @@ if [ -f "$WGET" ] && [ -f "$RESNET" ]; then
    eout "{resnet} downloading $DLIST_RESERVED_URL"
    $WGET -4 -t 1 -T 4 $DLIST_RESERVED_URL >> /dev/null 2>&1
    if [ -f "$URL_TMP/$URL_FILE" ]; then
-        eout "{resnet} parsing $URL_FILE into $RESNET"
-        cat $URL_TMP/$URL_FILE > $RESNET
+     eout "{resnet} parsing $URL_FILE into $RESNET"
+     cat $URL_TMP/$URL_FILE > $RESNET
    else
-        eout "{resnet} download of $DLIST_RESERVED_URL failed"
-	 if [ -f "$RESNET" ]; then
-	     cp $RESNET.bk $RESNET
-   	     chmod 600 $RESNET $RESNET.bk
-	 fi
+     eout "{resnet} download of $DLIST_RESERVED_URL failed"
+     if [ -f "$RESNET" ]; then
+       cp $RESNET.bk $RESNET
+       chmod 600 $RESNET $RESNET.bk
+     fi
    fi
    rm -rf $URL_TMP
    cd /etc/apf
 else
- if [ -f "$RESNET" ]; then
-	cp $RESNET.bk $RESNET
-	chmod 600 $RESNET $RESNET.bk
- fi
+   if [ -f "$RESNET" ]; then
+     cp $RESNET.bk $RESNET
+     chmod 600 $RESNET $RESNET.bk
+   fi
 fi
 }
 
@@ -773,18 +1146,32 @@ fi
 
 dlist_php_hosts() {
 if [ ! "`cat $PHP_HOSTS | grep -v "#"`" == "" ]; then
-        eout "{php} loading php_hosts.rules"
-        $IPT $IPT_FLAGS -N PHP
-        for i in `cat $PHP_HOSTS | grep -v "#"`; do
-                if [ ! "$i" == "" ] && [ -f "$PHP_HOSTS" ]; then
-		        if [ "$LOG_DROP" == "1" ]; then
-                         $IPT $IPT_FLAGS -A PHP -s $i -d 0/0 -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** PHP ** "
-			fi
-                        $IPT $IPT_FLAGS -A PHP -s $i -d 0/0 -j $ALL_STOP
-                fi
-        done
-        $IPT $IPT_FLAGS -A INPUT -j PHP
-        $IPT $IPT_FLAGS -A OUTPUT -j PHP
+   eout "{php} loading php_hosts.rules"
+   if [ $EXECUTOR == "nft" ]; then
+      $NFT add chain ip filter PHP
+      for i in `cat $PHP_HOSTS | grep -v "#"`; do
+         if [ ! "$i" == "" ] && [ -f "$PHP_HOSTS" ]; then
+            if [ "$LOG_DROP" == "1" ]; then
+               $NFT add rule ip filter PHP ip saddr $i limit rate $LOG_RATE/minute burst 5 packets counter $LOG_TARGET prefix '"** PHP ** "' level $LOG_LEVEL $LEXT
+            fi
+            $NFT add rule ip filter PHP ip saddr $i counter $ALL_STOP
+         fi
+      done
+      $NFT add rule ip filter INPUT counter jump PHP
+      $NFT add rule ip filter OUTPUT counter jump PHP
+   else
+      $IPT $IPT_FLAGS -N PHP
+      for i in `cat $PHP_HOSTS | grep -v "#"`; do
+         if [ ! "$i" == "" ] && [ -f "$PHP_HOSTS" ]; then
+            if [ "$LOG_DROP" == "1" ]; then
+               $IPT $IPT_FLAGS -A PHP -s $i -d 0/0 -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** PHP ** "
+            fi
+            $IPT $IPT_FLAGS -A PHP -s $i -d 0/0 -j $ALL_STOP
+         fi
+      done
+      $IPT $IPT_FLAGS -A INPUT -j PHP
+      $IPT $IPT_FLAGS -A OUTPUT -j PHP
+   fi
 fi
 }
 
@@ -821,18 +1208,37 @@ fi
 
 dlist_dshield_hosts() {
 if [ ! "`cat $DS_HOSTS | grep -v "#"`" == "" ]; then
-        eout "{dshield} loading ds_hosts.rules"
-        $IPT $IPT_FLAGS -N DSHIELD
-        for i in `cat $DS_HOSTS | grep -v "#"`; do
-                if [ ! "$i" == "" ] && [ -f "$DS_HOSTS" ]; then
-		        if [ "$LOG_DROP" == "1" ]; then
-                         $IPT $IPT_FLAGS -A DSHIELD -s $i -d 0/0 -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** DSHIELD ** "
-			fi
-                        $IPT $IPT_FLAGS -A DSHIELD -s $i -d 0/0 -j $ALL_STOP
-                fi
-        done
-        $IPT $IPT_FLAGS -A INPUT -j DSHIELD
-        $IPT $IPT_FLAGS -A OUTPUT -j DSHIELD
+   eout "{dshield} loading ds_hosts.rules"
+   if [ $EXECUTOR == "nft" ]; then
+      #$IPT $IPT_FLAGS -N DSHIELD
+      $NFT add chain ip filter DSHIELD
+      for i in `cat $DS_HOSTS | grep -v "#"`; do
+         if [ ! "$i" == "" ] && [ -f "$DS_HOSTS" ]; then
+            if [ "$LOG_DROP" == "1" ]; then
+               #$IPT $IPT_FLAGS -A DSHIELD -s $i -d 0/0 -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** DSHIELD ** "
+               $NFT add rule ip filter DSHIELD ip saddr $i limit rate $LOG_RATE/minute burst 5 packets counter $LOG_TARGET prefix '"** DSHIELD ** "' level $LOG_LEVEL $LEXT 
+            fi
+            #$IPT $IPT_FLAGS -A DSHIELD -s $i -d 0/0 -j $ALL_STOP
+            $NFT add rule ip filter DSHIELD ip saddr $i counter $ALL_STOP
+         fi
+      done
+      #$IPT $IPT_FLAGS -A INPUT -j DSHIELD
+      #$IPT $IPT_FLAGS -A OUTPUT -j DSHIELD
+      $NFT add rule ip filter INPUT counter jump DSHIELD
+      $NFT add rule ip filter OUTPUT counter jump DSHIELD
+   else
+      $IPT $IPT_FLAGS -N DSHIELD
+      for i in `cat $DS_HOSTS | grep -v "#"`; do
+         if [ ! "$i" == "" ] && [ -f "$DS_HOSTS" ]; then
+            if [ "$LOG_DROP" == "1" ]; then
+               $IPT $IPT_FLAGS -A DSHIELD -s $i -d 0/0 -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** DSHIELD ** "
+            fi
+            $IPT $IPT_FLAGS -A DSHIELD -s $i -d 0/0 -j $ALL_STOP
+         fi
+      done
+      $IPT $IPT_FLAGS -A INPUT -j DSHIELD
+      $IPT $IPT_FLAGS -A OUTPUT -j DSHIELD
+   fi
 fi
 }
 
@@ -870,18 +1276,36 @@ fi
 
 dlist_spamhaus_hosts() {
 if [ ! "`cat $DROP_HOSTS | grep -v "#"`" == "" ]; then
-        eout "{sdrop} loading sdrop_hosts.rules"
-        $IPT $IPT_FLAGS -N SDROP
-        for i in `cat $DROP_HOSTS | grep -v "#"`; do
-                if [ ! "$i" == "" ] && [ -f "$DROP_HOSTS" ]; then
-		        if [ "$LOG_DROP" == "1" ]; then
-                         $IPT $IPT_FLAGS -A SDROP -s $i -d 0/0 -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** SDROP ** "
-		        fi
-                        $IPT $IPT_FLAGS -A SDROP -s $i -d 0/0 -j $ALL_STOP
-                fi
-        done
-        $IPT $IPT_FLAGS -A INPUT -j SDROP
-        $IPT $IPT_FLAGS -A OUTPUT -j SDROP
+   eout "{sdrop} loading sdrop_hosts.rules"
+   if [ $EXECUTOR == "nft" ]; then
+      $NFT add chain ip filter SDROP
+      for i in `cat $DROP_HOSTS | grep -v "#"`; do
+         if [ ! "$i" == "" ] && [ -f "$DROP_HOSTS" ]; then
+            if [ "$LOG_DROP" == "1" ]; then
+               #$IPT $IPT_FLAGS -A SDROP -s $i -d 0/0 -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** SDROP ** "
+               $NFT add rule ip filter SDROP ip saddr $i limit rate $LOG_RATE/minute burst 5 packets counter $LOG_TARGET prefix '"** SDROP ** "' level $LOG_LEVEL $LEXT
+            fi
+            #$IPT $IPT_FLAGS -A SDROP -s $i -d 0/0 -j $ALL_STOP
+            $NFT add rule ip filter SDROP ip saddr $i counter $ALL_STOP
+         fi
+      done
+      #$IPT $IPT_FLAGS -A INPUT -j SDROP
+      #$IPT $IPT_FLAGS -A OUTPUT -j SDROP
+      $NFT add rule ip filter INPUT counter jump SDROP
+      $NFT add rule ip filter OUTPUT counter jump SDROP
+   else
+      $IPT $IPT_FLAGS -N SDROP
+      for i in `cat $DROP_HOSTS | grep -v "#"`; do
+         if [ ! "$i" == "" ] && [ -f "$DROP_HOSTS" ]; then
+            if [ "$LOG_DROP" == "1" ]; then
+               $IPT $IPT_FLAGS -A SDROP -s $i -d 0/0 -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** SDROP ** "
+            fi
+            $IPT $IPT_FLAGS -A SDROP -s $i -d 0/0 -j $ALL_STOP
+         fi
+      done
+      $IPT $IPT_FLAGS -A INPUT -j SDROP
+      $IPT $IPT_FLAGS -A OUTPUT -j SDROP
+   fi
 fi
 }
 
@@ -918,12 +1342,19 @@ fi
 
 dlist_ecnshame_hosts() {
 if [ ! "`cat $ECNSHAME_HOSTS | grep -v "#"`" == "" ]; then
-        eout "{ecnshame} loading ecnshame_hosts.rules"
-        for i in `cat $ECNSHAME_HOSTS | grep -v "#"`; do
-                if [ ! "$i" == "" ] && [ -f "$ECNSHAME_HOSTS" ]; then
-			$IPT $IPT_FLAGS -t mangle -A POSTROUTING -p tcp -d $i -j ECN --ecn-tcp-remove
-                fi
-        done
+   eout "{ecnshame} loading ecnshame_hosts.rules"
+   for i in `cat $ECNSHAME_HOSTS | grep -v "#"`; do
+      if [ ! "$i" == "" ] && [ -f "$ECNSHAME_HOSTS" ]; then
+         if [ $EXECUTOR == "nft" ]; then
+            # TODO nft
+            # dont work
+            # https://www.linuxtopia.org/Linux_Firewall_iptables/x4212.html
+            :
+         else
+            $IPT $IPT_FLAGS -t mangle -A POSTROUTING -p tcp -d $i -j ECN --ecn-tcp-remove
+         fi
+      fi
+   done
 fi
 }
 
@@ -935,7 +1366,7 @@ if [ ! "$GA_URL" == "" ] && [ "$USE_RGT" == "1" ] && [ -f "$WGET" ]; then
    mkdir $URL_TMP
    cd $URL_TMP
    eout "{trust} downloading $GA_URL"
-   $WGET -4 -t 1 -T 4 $GA_URL >> /dev/null 2>&1
+   $WGET "$WGET_HEADER_GA" -4 -t 1 -T 4 $GA_URL >> /dev/null 2>&1
    if [ -f "$URL_TMP/$URL_FILE" ]; then
         eout "{trust} parsing $URL_FILE into $GALLOW_HOSTS"
         cat $URL_TMP/$URL_FILE > $GALLOW_HOSTS
@@ -959,10 +1390,10 @@ if [ ! "$GD_URL" == "" ] && [ "$USE_RGT" == "1" ] && [ -f "$WGET" ]; then
    mkdir $URL_TMP
    cd $URL_TMP
    eout "{trust} downloading $GD_URL"
-   $WGET -4 -t 1 -T 4 $GD_URL >> /dev/null 2>&1
+   $WGET "$WGET_HEADER_GD" -4 -t 1 -T 4 $GD_URL >> /dev/null 2>&1
    if [ -f "$URL_TMP/$URL_FILE" ]; then
         eout "{trust} parsing $URL_FILE into $GDENY_HOSTS"
-	cat $URL_TMP/$URL_FILE > $GDENY_HOSTS
+        cat $URL_TMP/$URL_FILE > $GDENY_HOSTS
    else
         eout "{trust} download of $GD_URL failed"
    fi
@@ -978,14 +1409,19 @@ fi
 dnet() {
 FILE="$1"
 if [ -f "$FILE" ]; then
-FNAME=`echo $FILE | tr '/' '\n' | tail -n 1`
-eout "{glob} loading $FNAME"
- for i in `cat $FILE | grep -v "#"`; do
-  if [ ! "$i" == "" ]; then
+  FNAME=`echo $FILE | tr '/' '\n' | tail -n 1`
+  eout "{glob} loading $FNAME"
+  for i in `cat $FILE | grep -v "#"`; do
+    if [ ! "$i" == "" ]; then
+      if [ $EXECUTOR == "nft" ]; then
+        $NFT add rule ip filter INPUT ip saddr $i counter $ALL_STOP
+        $NFT add rule ip filter OUTPUT ip daddr $i counter $ALL_STOP
+      else
         $IPT $IPT_FLAGS -A INPUT -s $i -j $ALL_STOP
-	$IPT $IPT_FLAGS -A OUTPUT -d $i -j $ALL_STOP
-  fi
- done
+        $IPT $IPT_FLAGS -A OUTPUT -d $i -j $ALL_STOP
+      fi
+    fi
+  done
 fi
 }
 
@@ -998,46 +1434,79 @@ fi
 
 cdports() {
 if [ ! "$BLK_PORTS" == "" ]; then
-	eout "{glob} loading common drop ports"
-for i in `echo $BLK_PORTS | tr ',' ' '`; do
-	if [ "$(echo $i | grep "_")" == "" ]; then
-         if [ ! "$i" == "" ]; then
-		$IPT $IPT_FLAGS -A INPUT  -p tcp --dport $i -j $TCP_STOP
-		$IPT $IPT_FLAGS -A INPUT  -p udp --dport $i -j $UDP_STOP
-		$IPT $IPT_FLAGS -A OUTPUT  -p tcp --dport $i -j $TCP_STOP
-		$IPT $IPT_FLAGS -A OUTPUT  -p udp --dport $i -j $UDP_STOP
-		eout "{blk_ports} deny all to/from tcp port $i"
-                eout "{blk_ports} deny all to/from udp port $i"
-         fi
+  eout "{glob} loading common drop ports"
+  for i in `echo $BLK_PORTS | tr ',' ' '`; do
+    if [ "$(echo $i | grep "_")" == "" ]; then
+      if [ ! "$i" == "" ]; then
+        if [ $EXECUTOR == "nft" ]; then
+          $NFT add rule ip filter INPUT tcp dport $i counter $TCP_STOP
+          $NFT add rule ip filter INPUT udp dport $i counter $UDP_STOP
+          $NFT add rule ip filter OUTPUT tcp dport $i counter $TCP_STOP
+          $NFT add rule ip filter OUTPUT udp dport $i counter $UDP_STOP
         else
-                i=`echo $i | tr '_' ':'`
-                if [ ! "$i" == "" ]; then
-			$IPT $IPT_FLAGS -A INPUT  -p tcp --dport $i -j $TCP_STOP
-			$IPT $IPT_FLAGS -A INPUT  -p udp --dport $i -j $UDP_STOP
-			$IPT $IPT_FLAGS -A OUTPUT  -p tcp --dport $i -j $TCP_STOP
-			$IPT $IPT_FLAGS -A OUTPUT  -p udp --dport $i -j $UDP_STOP
-        	        eout "{blk_ports} deny all to/from tcp port $i"
-	                eout "{blk_ports} deny all to/from udp port $i"
-                fi
+          $IPT $IPT_FLAGS -A INPUT  -p tcp --dport $i -j $TCP_STOP
+          $IPT $IPT_FLAGS -A INPUT  -p udp --dport $i -j $UDP_STOP
+          $IPT $IPT_FLAGS -A OUTPUT  -p tcp --dport $i -j $TCP_STOP
+          $IPT $IPT_FLAGS -A OUTPUT  -p udp --dport $i -j $UDP_STOP
         fi
-done
+        eout "{blk_ports} deny all to/from tcp port $i"
+        eout "{blk_ports} deny all to/from udp port $i"
+      fi
+    else
+      i=`echo $i | tr '_' ':'`
+      if [ ! "$i" == "" ]; then
+        if [ $EXECUTOR == "nft" ]; then
+          j=`echo $i | tr ':' '-'`
+          $NFT add rule ip filter INPUT tcp dport $j counter $TCP_STOP
+          $NFT add rule ip filter INPUT udp dport $j counter $UDP_STOP
+          $NFT add rule ip filter OUTPUT tcp dport $j counter $TCP_STOP
+          $NFT add rule ip filter OUTPUT udp dport $j counter $UDP_STOP
+        else
+          $IPT $IPT_FLAGS -A INPUT  -p tcp --dport $i -j $TCP_STOP
+          $IPT $IPT_FLAGS -A INPUT  -p udp --dport $i -j $UDP_STOP
+          $IPT $IPT_FLAGS -A OUTPUT  -p tcp --dport $i -j $TCP_STOP
+          $IPT $IPT_FLAGS -A OUTPUT  -p udp --dport $i -j $UDP_STOP
+        fi
+        eout "{blk_ports} deny all to/from tcp port $i"
+        eout "{blk_ports} deny all to/from udp port $i"
+      fi
+    fi
+  done
 fi
 }
 
 lgate_mac() {
-$IPT $IPT_FLAGS -N LMAC
-for mac in `echo $LGATE_MAC | tr ',' ' '`; do
-MAC=$mac
-if [ ! "$MAC" == "" ]; then
-  $IPT $IPT_FLAGS -A INPUT  -m mac ! --mac-source "$MAC" -j LMAC
-  eout "{glob} gateway ($MAC) route verification enabled"
-fi
-done
+if [ $EXECUTOR == "nft" ]; then
+  $NFT add chain ip filter LMAC
+  for mac in `echo $LGATE_MAC | tr ',' ' '`; do
+    MAC=$mac
+    if [ ! "$MAC" == "" ]; then
+      #$IPT $IPT_FLAGS -A INPUT  -m mac ! --mac-source "$MAC" -j LMAC
+      $NFT add rule ip filter INPUT ether saddr != $MAC counter jump LMAC
+      eout "{glob} gateway ($MAC) route verification enabled"
+    fi
+  done
+  if [ "$LOG_LGATE" == "1" ]; then
+    #$IPT $IPT_FLAGS -A LMAC -m limit --limit $LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix=" ** DROP FORIGN MAC ** "
+    $NFT add rule ip filter LMAC limit rate $LOG_RATE/minute burst 5 packets counter $LOG_TARGET prefix '" ** DROP FORIGN MAC ** "' level $LOG_LEVEL $LEXT
+  fi
+  #$IPT $IPT_FLAGS -A LMAC  -j REJECT --reject-with icmp-net-prohibited
+  $NFT add rule ip filter LMAC counter reject with icmp type net-prohibited
+else
+  $IPT $IPT_FLAGS -N LMAC
+  for mac in `echo $LGATE_MAC | tr ',' ' '`; do
+    MAC=$mac
+    if [ ! "$MAC" == "" ]; then
+      $IPT $IPT_FLAGS -A INPUT  -m mac ! --mac-source "$MAC" -j LMAC
+      eout "{glob} gateway ($MAC) route verification enabled"
+    fi
+  done
 
-if [ "$LOG_LGATE" == "1" ]; then
- $IPT $IPT_FLAGS -A LMAC -m limit --limit $LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix=" ** DROP FORIGN MAC ** "
+  if [ "$LOG_LGATE" == "1" ]; then
+    $IPT $IPT_FLAGS -A LMAC -m limit --limit $LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix=" ** DROP FORIGN MAC ** "
+  fi
+  $IPT $IPT_FLAGS -A LMAC  -j REJECT --reject-with icmp-net-prohibited
 fi
-$IPT $IPT_FLAGS -A LMAC  -j REJECT --reject-with icmp-net-prohibited
 }
 
 cl_cports() {
@@ -1053,102 +1522,152 @@ cl_cports() {
 
 expirebans() {
 if [ -z "$SET_EXPIRE" ]; then
-        SET_EXPIRE=0
+  SET_EXPIRE=0
 fi
 if [ "$SET_EXPIRE" -ge "60" ]; then
- REFRESH_TIME=$[SET_REFRESH*60]
- if [ "$SET_EXPIRE" -lt "$REFRESH_TIME" ]; then
-        SET_EXPIRE="$REFRESH_TIME"
- fi
- if [ -f "/etc/apf/deny_hosts.rules" ]; then
-         expire_time="$SET_EXPIRE"
-         check_time=$(date +%s)
-         for i in `cat /etc/apf/deny_hosts.rules | grep -vE "static|noexpire" | grep -iE "# added.*on.*" | awk '{print$3"|"$5"|"$6}'`; do
-                declare -a arr
-                arr=(`echo ${i//|/ }`)
-                ip=${arr[0]}
-                date_d=${arr[1]}
-                date_t=${arr[2]}
-                ban_time=$(date --date "$date_d $date_t" +%s)
-                time_diff=$[$check_time-$ban_time]
-                if [ "$time_diff" -ge "$expire_time" ]; then
-                        eout "{trust} removed expired ban for $ip (${time_diff}s/${expire_time}s)"
-                        sdel=`echo $ip | sed 's%/%\\\/%'`
-                        sed -i "/$sdel/d" /etc/apf/deny_hosts.rules
-                        /etc/apf/apf -u "$ip" >> /dev/null 2>&1
-                fi
-         done
- fi
+  REFRESH_TIME=$[SET_REFRESH*60]
+  if [ "$SET_EXPIRE" -lt "$REFRESH_TIME" ]; then
+    SET_EXPIRE="$REFRESH_TIME"
+  fi
+  if [ -f "/etc/apf/deny_hosts.rules" ]; then
+    expire_time="$SET_EXPIRE"
+    check_time=$(date +%s)
+    for i in `cat /etc/apf/deny_hosts.rules | grep -vE "static|noexpire" | grep -iE "# added.*on.*" | awk '{print$3"|"$5"|"$6}'`; do
+      declare -a arr
+      arr=(`echo ${i//|/ }`)
+      ip=${arr[0]}
+      date_d=${arr[1]}
+      date_t=${arr[2]}
+      ban_time=$(date --date "$date_d $date_t" +%s)
+      time_diff=$[$check_time-$ban_time]
+      if [ "$time_diff" -ge "$expire_time" ]; then
+        eout "{trust} removed expired ban for $ip (${time_diff}s/${expire_time}s)"
+        sdel=`echo $ip | sed 's%/%\\\/%'`
+        sed -i "/$sdel/d" /etc/apf/deny_hosts.rules
+        /etc/apf/apf -u "$ip" >> /dev/null 2>&1
+      fi
+    done
+  fi
 fi
 }
 
 refresh() {
-	apf_loaded=`$IPT $IPT_FLAGS --list --numeric | grep PROHIBIT`
-	if [ -z "$apf_loaded" ]; then
-	        eout "{glob} apf does not appear to have rules loaded, doing nothing."
-	        mutex_unlock
-		exit 1
-	fi
+if [ $EXECUTOR == "nft" ]; then
+  apf_loaded=`$NFT list table ip filter | grep PROHIBIT`
+else
+  apf_loaded=`$IPT $IPT_FLAGS --list --numeric | grep PROHIBIT`
+fi
+if [ -z "$apf_loaded" ]; then
+  eout "{glob} apf does not appear to have rules loaded, doing nothing."
+  mutex_unlock
+  exit 1
+fi
 
-        eout "{glob} refreshing trust system rules"
-	tmpra="/etc/apf/internals/refresh.allow.temp.$$"
+eout "{glob} refreshing trust system rules"
+tmpra="/etc/apf/internals/refresh.allow.temp.$$"
 
-        if [ "$SET_EXPIRE" -ge "60" ]; then
-                # expire deny_hosts bans
-                expirebans
-        fi
+if [ "$SET_EXPIRE" -ge "60" ]; then
+  # expire deny_hosts bans
+  expirebans
+fi
 
-	if [ "$SET_REFRESH_MD5" == "1" ] && [ "$MD5" ]; then
- 	 glob_allow_download
-	 glob_deny_download
-	 trusts_md5=`$MD5 $DENY_HOSTS $GDENY_HOSTS $ALLOW_HOSTS $GALLOW_HOSTS | $MD5 | awk '{print$1}'`
-	 if [ -f "/etc/apf/internals/.trusts.md5" ]; then
-		last_trusts_md5=`cat /etc/apf/internals/.trusts.md5`
-		if [ "$trusts_md5" == "$last_trusts_md5" ]; then
-		        eout "{glob} trust rules unchanged since last refresh, doing nothing."
-	                echo "$trusts_md5" > /etc/apf/internals/.trusts.md5
-		        mutex_unlock
-			exit 1
-		else
-	                echo "$trusts_md5" > /etc/apf/internals/.trusts.md5
-		fi
-	 else
-		echo "$trusts_md5" > /etc/apf/internals/.trusts.md5
-	 fi
-	else
-		glob_allow_download
-		glob_deny_download
-	fi
+if [ "$SET_REFRESH_MD5" == "1" ] && [ "$MD5" ]; then
+  glob_allow_download
+  glob_deny_download
+  trusts_md5=`$MD5 $DENY_HOSTS $GDENY_HOSTS $ALLOW_HOSTS $GALLOW_HOSTS | $MD5 | awk '{print$1}'`
+  if [ -f "/etc/apf/internals/.trusts.md5" ]; then
+    last_trusts_md5=`cat /etc/apf/internals/.trusts.md5`
+    if [ "$trusts_md5" == "$last_trusts_md5" ]; then
+      eout "{glob} trust rules unchanged since last refresh, doing nothing."
+      echo "$trusts_md5" > /etc/apf/internals/.trusts.md5
+      mutex_unlock
+      exit 1
+    else
+      echo "$trusts_md5" > /etc/apf/internals/.trusts.md5
+    fi
+  else
+    echo "$trusts_md5" > /etc/apf/internals/.trusts.md5
+  fi
+else
+  glob_allow_download
+  glob_deny_download
+fi
 
-        /sbin/iptables-save | grep -E "TALLOW|TGALLOW" | grep -E '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | awk '{print$4}' | sort -n | uniq > $tmpra
-        $IPT $IPT_FLAGS -F REFRESH_TEMP
-        for i in `cat $tmpra | grep -v "#"`; do
-                if [ ! "$i" == "" ]; then
-                 $IPT $IPT_FLAGS -A REFRESH_TEMP -s $i -d 0/0 -j ACCEPT
-                 $IPT $IPT_FLAGS -A REFRESH_TEMP -d $i -s 0/0 -j ACCEPT
-                fi
-        done
-        tmprd="/etc/apf/internals/refresh.drop.temp.$$"
-        /sbin/iptables-save | grep -E "TDENY|TGDENY" | grep -E '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | awk '{print$4}' | sort -n | uniq > $tmprd
-        $IPT $IPT_FLAGS -F REFRESH_TEMP
-        for i in `cat $tmprd | grep -v "#"`; do
-                if [ ! "$i" == "" ]; then
-                 $IPT $IPT_FLAGS -A REFRESH_TEMP -s $i -d 0/0 -j $ALL_STOP
-                 $IPT $IPT_FLAGS -A REFRESH_TEMP -d $i -s 0/0 -j $ALL_STOP
-                fi
-        done
-        trim $DENY_HOSTS $SET_TRIM
-        trim $GDENY_HOSTS $SET_TRIM
-        $IPT $IPT_FLAGS -F TDENY
-        $IPT $IPT_FLAGS -F TGDENY
-        $IPT $IPT_FLAGS -F TALLOW
-        $IPT $IPT_FLAGS -F TGALLOW
-	allow_hosts $GALLOW_HOSTS TGALLOW
-	allow_hosts $ALLOW_HOSTS TALLOW
-	deny_hosts $GDENY_HOSTS TGDENY
-	deny_hosts $DENY_HOSTS TDENY
-        $IPT $IPT_FLAGS -F REFRESH_TEMP
-        rm -f $tmpra $tmprd
+if [ $EXECUTOR == "nft" ]; then
+  #$NFT list ruleset | grep -E "TALLOW|TGALLOW" | grep -E '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | awk '{print$4}' | sort -n | uniq > $tmpra
+  ($NFT list chain ip filter TALLOW; $NFT list chain ip filter TGALLOW) | grep -E '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | awk '{print$3}' | sort -n | uniq > $tmpra
+  $NFT flush chain ip filter REFRESH_TEMP
+  for i in `cat $tmpra | grep -v "#"`; do
+    if [ ! "$i" == "" ]; then
+      $NFT add rule ip filter REFRESH_TEMP ip saddr $i counter accept
+      $NFT add rule ip filter REFRESH_TEMP ip daddr $i counter accept
+    fi
+  done
+  tmprd="/etc/apf/internals/refresh.drop.temp.$$"
+  #$NFT list ruleset | grep -E "TDENY|TGDENY" | grep -E '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | awk '{print$4}' | sort -n | uniq > $tmprd
+  ($NFT list chain ip filter TDENY; $NFT list chain ip filter TGDENY) | grep -E '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | awk '{print$3}' | sort -n | uniq > $tmprd
+  $NFT flush chain ip filter REFRESH_TEMP
+  for i in `cat $tmprd | grep -v "#"`; do
+    if [ ! "$i" == "" ]; then
+      $NFT add rule ip filter REFRESH_TEMP ip saddr $i counter jump $ALL_STOP
+      $NFT add rule ip filter REFRESH_TEMP ip daddr $i counter jump $ALL_STOP
+    fi
+  done
+  trim $DENY_HOSTS $SET_TRIM
+  trim $GDENY_HOSTS $SET_TRIM
+  $NFT flush chain ip filter TDENY
+  $NFT flush chain ip filter TGDENY
+  $NFT flush chain ip filter TALLOW
+  $NFT flush chain ip filter TGALLOW
+  if [ $USE_IPV6 == "1" ]; then
+    $NFT flush chain ip6 filter TDENY
+    $NFT flush chain ip6 filter TGDENY
+    $NFT flush chain ip6 filter TALLOW
+    $NFT flush chain ip6 filter TGALLOW
+  fi
+  allow_hosts $GALLOW_HOSTS TGALLOW
+  allow_hosts $ALLOW_HOSTS TALLOW
+  deny_hosts $GDENY_HOSTS TGDENY
+  deny_hosts $DENY_HOSTS TDENY
+  $NFT flush chain ip filter REFRESH_TEMP
+  rm -f $tmpra $tmprd
+else
+  /sbin/iptables-save | grep -E "TALLOW|TGALLOW" | grep -E '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | awk '{print$4}' | sort -n | uniq > $tmpra
+  $IPT $IPT_FLAGS -F REFRESH_TEMP
+  for i in `cat $tmpra | grep -v "#"`; do
+    if [ ! "$i" == "" ]; then
+      $IPT $IPT_FLAGS -A REFRESH_TEMP -s $i -d 0/0 -j ACCEPT
+      $IPT $IPT_FLAGS -A REFRESH_TEMP -d $i -s 0/0 -j ACCEPT
+    fi
+  done
+  tmprd="/etc/apf/internals/refresh.drop.temp.$$"
+  /sbin/iptables-save | grep -E "TDENY|TGDENY" | grep -E '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | awk '{print$4}' | sort -n | uniq > $tmprd
+  $IPT $IPT_FLAGS -F REFRESH_TEMP
+  for i in `cat $tmprd | grep -v "#"`; do
+    if [ ! "$i" == "" ]; then
+      $IPT $IPT_FLAGS -A REFRESH_TEMP -s $i -d 0/0 -j $ALL_STOP
+      $IPT $IPT_FLAGS -A REFRESH_TEMP -d $i -s 0/0 -j $ALL_STOP
+    fi
+  done
+  trim $DENY_HOSTS $SET_TRIM
+  trim $GDENY_HOSTS $SET_TRIM
+  $IPT $IPT_FLAGS -F TDENY
+  $IPT $IPT_FLAGS -F TGDENY
+  $IPT $IPT_FLAGS -F TALLOW
+  $IPT $IPT_FLAGS -F TGALLOW
+  if [ $USE_IPV6 == "1" ]; then
+    $IP6T -F TDENY
+    $IP6T -F TGDENY
+    $IP6T -F TALLOW
+    $IP6T -F TGALLOW
+  fi
+  allow_hosts $GALLOW_HOSTS TGALLOW
+  allow_hosts $ALLOW_HOSTS TALLOW
+  deny_hosts $GDENY_HOSTS TGDENY
+  deny_hosts $DENY_HOSTS TDENY
+  $IPT $IPT_FLAGS -F REFRESH_TEMP
+  rm -f $tmpra $tmprd
+fi
 }
 
 cron_refresh() {

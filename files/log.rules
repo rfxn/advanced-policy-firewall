@@ -1,12 +1,22 @@
 eout "{glob} loading log.rules"
 
 if [ "$LOG_DROP" == "1" ]; then
- if [ "$LOG_IA" == "1" ]; then
-	$IPT $IPT_FLAGS -N TELNET_LOG
-	$IPT $IPT_FLAGS -A TELNET_LOG -p tcp -s 0/0 -d 0/0 --dport 23 -m state --state NEW -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** TELNET ** "
-	$IPT $IPT_FLAGS -N SSH_LOG
-	$IPT $IPT_FLAGS -A SSH_LOG -p tcp -s 0/0 -d 0/0 --dport $HELPER_SSH_PORT -m state --state NEW -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** SSH ** "
-	$IPT $IPT_FLAGS -A INPUT -j TELNET_LOG
-	$IPT $IPT_FLAGS -A INPUT -j SSH_LOG
- fi
+   if [ "$LOG_IA" == "1" ]; then
+       if [ $EXECUTOR == "nft" ]; then
+          $NFT add chain ip filter TELNET_LOG
+          $NFT add rule ip filter TELNET_LOG tcp dport 23 ct state new log prefix \"\*\* TELNET \*\* \" level crit flags tcp options flags ip options
+          $NFT add chain ip filter SSH_LOG
+          $NFT add rule ip filter SSH_LOG tcp dport $HELPER_SSH_PORT ct state new $LOG_TARGET prefix \"\*\* SSH \*\* \" level $LOG_LEVEL $LEXT
+          $NFT add chain filter INPUT
+          $NFT add rule ip filter INPUT jump TELNET_LOG
+          $NFT add rule ip filter INPUT jump SSH_LOG
+       else
+          $IPT $IPT_FLAGS -N TELNET_LOG
+          $IPT $IPT_FLAGS -A TELNET_LOG -p tcp -s 0/0 -d 0/0 --dport 23 -m state --state NEW -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** TELNET ** "
+          $IPT $IPT_FLAGS -N SSH_LOG
+          $IPT $IPT_FLAGS -A SSH_LOG -p tcp -s 0/0 -d 0/0 --dport $HELPER_SSH_PORT -m state --state NEW -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** SSH ** "
+          $IPT $IPT_FLAGS -A INPUT -j TELNET_LOG
+          $IPT $IPT_FLAGS -A INPUT -j SSH_LOG
+       fi
+   fi
 fi
