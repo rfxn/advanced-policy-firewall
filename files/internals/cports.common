@@ -1,49 +1,45 @@
 if [ ! "$IG_TCP_CPORTS" == "" ]; then
-IG_TCP_CPORTS=`echo "$IG_TCP_CPORTS" | tr ',' ' '`
-PROTO="tcp"
-for i in `echo $IG_TCP_CPORTS`; do
-        if [ "$(echo $i | grep "_")" == "" ]; then
+   IG_TCP_CPORTS=`echo "$IG_TCP_CPORTS" | tr ',' ' '`
+   PROTO="tcp"
+   for i in `echo $IG_TCP_CPORTS`; do
+      if [ "$(echo $i | grep "_")" == "" ]; then
          if [ ! "$i" == "" ]; then
-		if [ $EXECUTOR == "nft" ]; then
-                   if [ "$USE_IPV6" == "1" ]; then
-                   #   $IP6T -A INPUT -m state --state NEW -m tcp -p $PROTO --dport $i -d $VNET -j ACCEPT
-		       $NFT add rule ip6 filter INPUT ip6 daddr $VNET ct state new $PROTO dport $i counter accept
-		   else
-                       #$IPT $IPT_FLAGS -A INPUT -p $PROTO  -s 0/0 -d $VNET --dport $i -j ACCEPT
-                       $NFT add rule ip filter INPUT ip daddr $VNET $PROTO dport $i counter accept
-                   fi
-		else
-                   if [ "$USE_IPV6" == "1" ]; then
-                      $IP6T -A INPUT -m state --state NEW -m tcp -p $PROTO --dport $i -d $VNET -j ACCEPT
-                   else
-                      $IPT $IPT_FLAGS -A INPUT -p $PROTO  -s 0/0 -d $VNET --dport $i -j ACCEPT
-                   fi
-		fi
-                eout "{glob} opening inbound $PROTO port $i on $VNET"
+            if [ $EXECUTOR == "nft" ]; then
+               if [ "$USE_IPV6" == "1" ]; then
+                  # $IP6T -A INPUT -m state --state NEW -m tcp -p $PROTO --dport $i -d $VNET -j ACCEPT
+		  $NFT add rule ip6 filter INPUT ip6 daddr $VNET ct state new $PROTO dport $i counter accept
+               fi
+               # $IPT $IPT_FLAGS -A INPUT -p $PROTO  -s 0/0 -d $VNET --dport $i -j ACCEPT
+               $NFT add rule ip filter INPUT ip daddr $VNET $PROTO dport $i counter accept
+	    else
+               if [ "$USE_IPV6" == "1" ]; then
+                  $IP6T -A INPUT -m state --state NEW -m tcp -p $PROTO --dport $i -d $VNET -j ACCEPT
+               fi
+               $IPT $IPT_FLAGS -A INPUT -p $PROTO  -s 0/0 -d $VNET --dport $i -j ACCEPT
+	    fi
+            eout "{glob} opening inbound $PROTO port $i on $VNET"
          fi
-        else
-                i=`echo $i | tr '_' ':'`
-                j=`echo $i | tr ':' '-'`
-                if [ ! "$i" == "" ]; then
-		   if [ $EXECUTOR == "nft" ]; then
-                      if [ "$USE_IPV6" == "1" ]; then
-                         #$IP6T -A INPUT -m state --state NEW -m tcp -p $PROTO --dport $i -d $VNET -j ACCEPT
-		         $NFT add rule ip6 filter INPUT ip6 daddr $VNET ct state new $PROTO dport $j counter accept
-		      else
-                         #$IPT $IPT_FLAGS -A INPUT -p $PROTO  -s 0/0 -d $VNET --dport $i -j ACCEPT
-                         $NFT add rule ip filter INPUT ip daddr $VNET $PROTO dport $j counter accept
-                      fi
-		   else
-                      if [ "$USE_IPV6" == "1" ]; then
-                         $IP6T -A INPUT -m state --state NEW -m tcp -p $PROTO --dport $i -d $VNET -j ACCEPT
-                      else
-                         $IPT $IPT_FLAGS -A INPUT -p $PROTO  -s 0/0 -d $VNET --dport $i -j ACCEPT
-                      fi
-	           fi
-                   eout "{glob} opening inbound $PROTO port $i on $VNET"
-                fi
-        fi
-done
+      else
+         i=`echo $i | tr '_' ':'`
+         j=`echo $i | tr ':' '-'`
+         if [ ! "$i" == "" ]; then
+            if [ $EXECUTOR == "nft" ]; then
+               if [ "$USE_IPV6" == "1" ]; then
+                  # $IP6T -A INPUT -m state --state NEW -m tcp -p $PROTO --dport $i -d $VNET -j ACCEPT
+		  $NFT add rule ip6 filter INPUT ip6 daddr $VNET ct state new $PROTO dport $j counter accept
+	       fi
+               # $IPT $IPT_FLAGS -A INPUT -p $PROTO  -s 0/0 -d $VNET --dport $i -j ACCEPT
+               $NFT add rule ip filter INPUT ip daddr $VNET $PROTO dport $j counter accept
+	    else
+               if [ "$USE_IPV6" == "1" ]; then
+                  $IP6T -A INPUT -m state --state NEW -m tcp -p $PROTO --dport $i -d $VNET -j ACCEPT
+               fi
+               $IPT $IPT_FLAGS -A INPUT -p $PROTO  -s 0/0 -d $VNET --dport $i -j ACCEPT
+	    fi
+            eout "{glob} opening inbound $PROTO port $i on $VNET"
+         fi
+      fi
+   done
 fi
 
 if [ ! "$IG_UDP_CPORTS" == "" ]; then
@@ -56,9 +52,8 @@ for i in `echo $IG_UDP_CPORTS`; do
                    #$IPT $IPT_FLAGS -A INPUT -p $PROTO  -s 0/0 -d $VNET --dport $i -j ACCEPT
                    if [ "$USE_IPV6" == "1" ]; then
 		       $NFT add rule ip6 filter INPUT ip6 daddr $VNET $PROTO dport $i counter accept
-		   else
-                       $NFT add rule ip filter INPUT ip daddr $VNET $PROTO dport $i counter accept
 		   fi
+                   $NFT add rule ip filter INPUT ip daddr $VNET $PROTO dport $i counter accept
 		else
                    $IPT $IPT_FLAGS -A INPUT -p $PROTO  -s 0/0 -d $VNET --dport $i -j ACCEPT
 		   # TODO ipv6?
@@ -72,10 +67,9 @@ for i in `echo $IG_UDP_CPORTS`; do
 		   if [ $EXECUTOR == "nft" ]; then
                       if [ "$USE_IPV6" == "1" ]; then
                           $NFT add rule ip6 filter INPUT ip6 daddr $VNET $PROTO dport $j counter accept
-                      else
-                          #$IPT $IPT_FLAGS -A INPUT -p $PROTO  -s 0/0 -d $VNET --dport $i -j ACCEPT
-                          $NFT add rule ip filter INPUT ip daddr $VNET $PROTO dport $j counter accept
                       fi
+                      #$IPT $IPT_FLAGS -A INPUT -p $PROTO  -s 0/0 -d $VNET --dport $i -j ACCEPT
+                      $NFT add rule ip filter INPUT ip daddr $VNET $PROTO dport $j counter accept
 		   else
                       $IPT $IPT_FLAGS -A INPUT -p $PROTO  -s 0/0 -d $VNET --dport $i -j ACCEPT
 		      # TODO ipv6?
@@ -96,10 +90,9 @@ for i in `echo $EG_TCP_CPORTS`; do
 		if [ $EXECUTOR == "nft" ]; then
                    if [ "$USE_IPV6" == "1" ]; then
                       $NFT add rule ip6 filter OUTPUT ip6 saddr $VNET $PROTO dport $i counter accept
-                   else
-                      #$IPT $IPT_FLAGS -A OUTPUT -p $PROTO  -s $VNET --dport $i -j ACCEPT
-                      $NFT add rule ip filter OUTPUT ip saddr $VNET $PROTO dport $i counter accept
-		   fi
+                   fi
+                   #$IPT $IPT_FLAGS -A OUTPUT -p $PROTO  -s $VNET --dport $i -j ACCEPT
+                   $NFT add rule ip filter OUTPUT ip saddr $VNET $PROTO dport $i counter accept
 		else
                    $IPT $IPT_FLAGS -A OUTPUT -p $PROTO  -s $VNET --dport $i -j ACCEPT
 		   # TODO ipv6?
@@ -113,10 +106,9 @@ for i in `echo $EG_TCP_CPORTS`; do
 		   if [ $EXECUTOR == "nft" ]; then
                         if [ "$USE_IPV6" == "1" ]; then
                            $NFT add rule ip6 filter OUTPUT ip6 saddr $VNET $PROTO dport $j counter accept
-                        else
-                           #$IPT $IPT_FLAGS -A OUTPUT -p $PROTO  -s $VNET --dport $i -j ACCEPT
-		           $NFT add rule ip filter OUTPUT ip saddr $VNET $PROTO dport $j counter accept
-		        fi
+                        fi
+                        #$IPT $IPT_FLAGS -A OUTPUT -p $PROTO  -s $VNET --dport $i -j ACCEPT
+		        $NFT add rule ip filter OUTPUT ip saddr $VNET $PROTO dport $j counter accept
 		   else
                         $IPT $IPT_FLAGS -A OUTPUT -p $PROTO  -s $VNET --dport $i -j ACCEPT
 		        # TODO ipv6?
@@ -138,10 +130,9 @@ for i in `echo $EG_UDP_CPORTS`; do
 		if [ $EXECUTOR == "nft" ]; then
                    if [ "$USE_IPV6" == "1" ]; then
                       $NFT add rule ip6 filter OUTPUT ip6 saddr $VNET udp dport $i counter accept
-                   else
-                      #$IPT $IPT_FLAGS -A OUTPUT -p $PROTO  -s $VNET --dport $i -j ACCEPT
-                      $NFT add rule ip filter OUTPUT ip saddr $VNET $PROTO dport $i counter accept
                    fi
+                   #$IPT $IPT_FLAGS -A OUTPUT -p $PROTO  -s $VNET --dport $i -j ACCEPT
+                   $NFT add rule ip filter OUTPUT ip saddr $VNET $PROTO dport $i counter accept
                 else
                    $IPT $IPT_FLAGS -A OUTPUT -p $PROTO  -s $VNET --dport $i -j ACCEPT
 		   # TODO ipv6?
@@ -155,10 +146,9 @@ for i in `echo $EG_UDP_CPORTS`; do
 	           if [ $EXECUTOR == "nft" ]; then
 	              if [ "$USE_IPV6" == "1" ]; then
 	                 $NFT add rule ip6 filter OUTPUT ip6 saddr $VNET $PROTO dport $j counter accept
-	              else
-                         #$IPT $IPT_FLAGS -A OUTPUT -p $PROTO  -s $VNET --dport $i -j ACCEPT
-                         $NFT add rule ip filter OUTPUT ip saddr $VNET $PROTO dport $j counter accept
-                      fi
+	              fi
+                      #$IPT $IPT_FLAGS -A OUTPUT -p $PROTO  -s $VNET --dport $i -j ACCEPT
+                      $NFT add rule ip filter OUTPUT ip saddr $VNET $PROTO dport $j counter accept
                    else
                       $IPT $IPT_FLAGS -A OUTPUT -p $PROTO  -s $VNET --dport $i -j ACCEPT
 		      # TODO ipv6?
@@ -196,10 +186,9 @@ IG_ICMP_TYPES=`echo $IG_ICMP_TYPES | tr ',' ' '`
 	          if [ $EXECUTOR == "nft" ]; then
                      if [ "$USE_IPV6" == "1" ]; then
                         $NFT add rule ip6 filter INPUT meta l4proto icmp ip6 daddr $VNET $ICMP_EARGS counter accept
-                     else
-                        #$IPT $IPT_FLAGS -A INPUT -p icmp -d $VNET  -s 0/0 $ICMP_EARGS -j ACCEPT
-                        $NFT add rule ip filter INPUT ip protocol icmp ip daddr $VNET $ICMP_EARGS counter accept
                      fi
+                     #$IPT $IPT_FLAGS -A INPUT -p icmp -d $VNET  -s 0/0 $ICMP_EARGS -j ACCEPT
+                     $NFT add rule ip filter INPUT ip protocol icmp ip daddr $VNET $ICMP_EARGS counter accept
 		  else
                      $IPT $IPT_FLAGS -A INPUT -p icmp -d $VNET  -s 0/0 $ICMP_EARGS -j ACCEPT
 		  fi
@@ -208,10 +197,9 @@ IG_ICMP_TYPES=`echo $IG_ICMP_TYPES | tr ',' ' '`
 	          if [ $EXECUTOR == "nft" ]; then
 	             if [ "$USE_IPV6" == "1" ]; then
 	                 $NFT add rule ip6 filter INPUT ip6 daddr $VNET icmp code $i $ICMP_EARGS counter accept
-	             else
-                         #$IPT $IPT_FLAGS -A INPUT -p icmp --icmp-type $i -d $VNET  -s 0/0 $ICMP_EARGS -j ACCEPT
-                         $NFT add rule ip filter INPUT ip daddr $VNET icmp code $i $ICMP_EARGS counter accept
-                     fi
+	             fi
+                     #$IPT $IPT_FLAGS -A INPUT -p icmp --icmp-type $i -d $VNET  -s 0/0 $ICMP_EARGS -j ACCEPT
+                     $NFT add rule ip filter INPUT ip daddr $VNET icmp code $i $ICMP_EARGS counter accept
 	          else
                      $IPT $IPT_FLAGS -A INPUT -p icmp --icmp-type $i -d $VNET  -s 0/0 $ICMP_EARGS -j ACCEPT
 		  fi
@@ -255,9 +243,8 @@ EG_ICMP_TYPES=`echo $EG_ICMP_TYPES | tr ',' ' '`
 	          if [ $EXECUTOR == "nft" ]; then
 	             if [ "$USE_IPV6" == "1" ]; then
                         $NFT add rule ip6 filter OUTPUT meta l4proto icmp ip6 saddr $VNET $ICMP_EARGS counter accept
-	             else
-		        $NFT add rule ip filter OUTPUT ip protocol icmp ip saddr $VNET $ICMP_EARGS counter accept
-		     fi
+	             fi
+		     $NFT add rule ip filter OUTPUT ip protocol icmp ip saddr $VNET $ICMP_EARGS counter accept
                   else
                      $IPT $IPT_FLAGS -A OUTPUT -p icmp  -s $VNET -d 0/0 $ICMP_EARGS  -j ACCEPT
 		     # TODO ipv6?
@@ -267,9 +254,8 @@ EG_ICMP_TYPES=`echo $EG_ICMP_TYPES | tr ',' ' '`
                   if [ $EXECUTOR == "nft" ]; then
                      if [ "$USE_IPV6" == "1" ]; then
                          $NFT add rule ip6 filter OUTPUT ip6 saddr $VNET icmp code $i $ICMP_EARGS counter accept
-                     else
-		         $NFT add rule ip filter OUTPUT ip saddr $VNET icmp code $i $ICMP_EARGS counter accept
-		     fi
+                     fi
+		     $NFT add rule ip filter OUTPUT ip saddr $VNET icmp code $i $ICMP_EARGS counter accept
                   else
                      $IPT $IPT_FLAGS -A OUTPUT -p icmp --icmp-type $i  -s $VNET -d 0/0 $ICMP_EARGS -j ACCEPT
 		     # TODO ipv6?
@@ -294,10 +280,9 @@ port=`echo $i | tr ':' ' ' | awk '{print$2}'`
                 if [ $EXECUTOR == "nft" ]; then
                    if [ "$USE_IPV6" == "1" ]; then
                       $NFT add rule ip6 filter OUTPUT ip6 saddr $VNET $PROTO dport $port skuid $uid counter accept
-                   else
-                      #$IPT $IPT_FLAGS -A OUTPUT -p $PROTO  -s $VNET --dport $port --match owner --uid-owner $uid -j ACCEPT
-                      $NFT add rule ip filter OUTPUT ip saddr $VNET $PROTO dport $port skuid $uid counter accept
                    fi
+                   #$IPT $IPT_FLAGS -A OUTPUT -p $PROTO  -s $VNET --dport $port --match owner --uid-owner $uid -j ACCEPT
+                   $NFT add rule ip filter OUTPUT ip saddr $VNET $PROTO dport $port skuid $uid counter accept
                 else
                    $IPT $IPT_FLAGS -A OUTPUT -p $PROTO -s $VNET --dport $port --match owner --uid-owner $uid -j ACCEPT
 		   # TODO ipv6?
@@ -311,10 +296,9 @@ port=`echo $i | tr ':' ' ' | awk '{print$2}'`
 	           if [ $EXECUTOR == "nft" ]; then
 	              if [ "$USE_IPV6" == "1" ]; then
 	                 $NFT add rule ip6 filter OUTPUT ip6 saddr $VNET $PROTO dport $j skuid $uid counter accept
-	              else
-                         #$IPT $IPT_FLAGS -A OUTPUT -p $PROTO  -s $VNET --dport $i --match owner --uid-owner $uid -j ACCEPT
-                         $NFT add rule ip filter OUTPUT ip saddr $VNET $PROTO dport $j skuid $uid counter accept
-                      fi
+	              fi
+                      #$IPT $IPT_FLAGS -A OUTPUT -p $PROTO  -s $VNET --dport $i --match owner --uid-owner $uid -j ACCEPT
+                      $NFT add rule ip filter OUTPUT ip saddr $VNET $PROTO dport $j skuid $uid counter accept
                    else
                       $IPT $IPT_FLAGS -A OUTPUT -p $PROTO -s $VNET --dport $i --match owner --uid-owner $uid -j ACCEPT
 		      # TODO ipv6?
@@ -339,10 +323,9 @@ port=`echo $i | tr ':' ' ' | awk '{print$2}'`
                 if [ $EXECUTOR == "nft" ]; then
                    if [ "$USE_IPV6" == "1" ]; then
                       $NFT add rule ip6 filter OUTPUT ip6 saddr $VNET $PROTO dport $port skuid $uid counter accept
-                   else
-                      #$IPT $IPT_FLAGS -A OUTPUT -p $PROTO  -s $VNET --dport $port --match owner --uid-owner $uid -j ACCEPT
-                      $NFT add rule ip filter OUTPUT ip saddr $VNET $PROTO dport $port skuid $uid counter accept
                    fi
+                   #$IPT $IPT_FLAGS -A OUTPUT -p $PROTO  -s $VNET --dport $port --match owner --uid-owner $uid -j ACCEPT
+                   $NFT add rule ip filter OUTPUT ip saddr $VNET $PROTO dport $port skuid $uid counter accept
                 else
                    $IPT $IPT_FLAGS -A OUTPUT -p $PROTO  -s $VNET --dport $port --match owner --uid-owner $uid -j ACCEPT
 		   # TODO ipv6?
@@ -356,10 +339,9 @@ port=`echo $i | tr ':' ' ' | awk '{print$2}'`
 	           if [ $EXECUTOR == "nft" ]; then
 	              if [ "$USE_IPV6" == "1" ]; then
 	                 $NFT add rule ip6 filter OUTPUT ip6 saddr $VNET $PROTO dport $j skuid $uid counter accept
-	              else
-                         #$IPT $IPT_FLAGS -A OUTPUT -p $PROTO  -s $VNET --dport $i --match owner --uid-owner $uid -j ACCEPT
-                         $NFT add rule ip filter OUTPUT ip saddr $VNET $PROTO dport $j skuid $uid counter accept
-                      fi
+	              fi
+                      #$IPT $IPT_FLAGS -A OUTPUT -p $PROTO  -s $VNET --dport $i --match owner --uid-owner $uid -j ACCEPT
+                      $NFT add rule ip filter OUTPUT ip saddr $VNET $PROTO dport $j skuid $uid counter accept
                    else
                       $IPT $IPT_FLAGS -A OUTPUT -p $PROTO  -s $VNET --dport $i --match owner --uid-owner $uid -j ACCEPT
 		      # TODO ipv6?
@@ -376,9 +358,8 @@ if [ "$EGF" == "1" ]; then
 	if [ $EXECUTOR == "nft" ]; then
            if [ "$USE_IPV6" == "1" ]; then
               $NFT add chain ip6 filter DEG
-           else
-	      $NFT add chain ip filter DEG
-	   fi
+           fi
+	   $NFT add chain ip filter DEG
 	else
            $IPT $IPT_FLAGS -N DEG
 	fi
@@ -388,10 +369,9 @@ if [ "$EGF" == "1" ]; then
 		   if [ $EXECUTOR == "nft" ]; then
 		      if [ "$USE_IPV6" == "1" ]; then
 		         $NFT add rule ip6 filter DEG limit rate $LOG_RATE/minute burst 5 packets counter $LOG_TARGET prefix '"** DEG_'$si' ** "' level $LOG_LEVEL $LEXT
-		      else
-                         #$IPT $IPT_FLAGS -A DEG -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** DEG_$si ** "
-		         $NFT add rule ip filter DEG limit rate $LOG_RATE/minute burst 5 packets counter $LOG_TARGET prefix '"** DEG_'$si' ** "' level $LOG_LEVEL $LEXT
 		      fi
+                      #$IPT $IPT_FLAGS -A DEG -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** DEG_$si ** "
+		      $NFT add rule ip filter DEG limit rate $LOG_RATE/minute burst 5 packets counter $LOG_TARGET prefix '"** DEG_'$si' ** "' level $LOG_LEVEL $LEXT
                    else
                       $IPT $IPT_FLAGS -A DEG -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** DEG_$si ** "
 		   fi
