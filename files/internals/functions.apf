@@ -32,6 +32,17 @@ devm() {
  fi
 }
 
+is_ipv6_resolveable() {
+ current_hostname=$1
+ $HOST -W5 -t aaaa $current_hostname &>/dev/null
+ if [ $? -eq 0 ]; then
+   # all good
+   return 0
+ fi
+ # not resolvable or timeout
+ return 1
+}
+
 ml() {
  MOD="$1"
  FATAL="$2"
@@ -617,6 +628,11 @@ if [ ! "`cat $file | grep -v "#"`" == "" ]; then
                           eout "ignoring ipv4 address $PIP"
                           continue
                         fi
+                        is_ipv6_resolveable $PIP
+                        if [ $? -ne 0 ]; then
+                          eout "$PIP not resolvable to ipv6 address"
+                          continue
+                        fi
                         $NFT add rule ip6 filter $chain ip6 $IPFLOW_NFT $PIP ct state new  tcp $PFLOW $PPORT counter accept
                         $NFT add rule ip6 filter $chain ip6 $IPFLOW_NFT $PIP ct state new  udp $PFLOW $PPORT counter accept
                       fi
@@ -626,6 +642,11 @@ if [ ! "`cat $file | grep -v "#"`" == "" ]; then
                       if [ "$USE_IPV6" == "1" ]; then
                         if [[ $PIP =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
                           eout "ignoring ipv4 address $PIP"
+                          continue
+                        fi
+                        is_ipv6_resolveable $PIP
+                        if [ $? -ne 0 ]; then
+                          eout "$PIP not resolvable to ipv6 address"
                           continue
                         fi
                         $IP6T -A $chain -m state --state NEW -m tcp -p tcp -$IPFLOW $PIP --$PFLOW $PPORT -j ACCEPT
@@ -690,6 +711,11 @@ if [ ! "`cat $file | grep -v "#"`" == "" ]; then
                                        eout "ignoring ipv4 address $PIP"
                                        continue
                                      fi
+                                     is_ipv6_resolveable $PIP
+                                     if [ $? -ne 0 ]; then
+                                         eout "$PIP not resolvable to ipv6 address"
+                                         continue
+                                     fi
                                      $NFT add rule ip6 filter $chain ip6 $IPFLOW_NFT $PIP ct state new  tcp $PFLOW $PPORT counter accept
                                      $NFT add rule ip6 filter $chain ip6 $IPFLOW_NFT $PIP ct state new  udp $PFLOW $PPORT counter accept
                                    fi
@@ -699,6 +725,11 @@ if [ ! "`cat $file | grep -v "#"`" == "" ]; then
                                    if [ "$USE_IPV6" == "1" ]; then
                                       if [[ $PIP =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
                                          eout "ignoring ipv4 address $PIP"
+                                         continue
+                                      fi
+                                      is_ipv6_resolveable $PIP
+                                      if [ $? -ne 0 ]; then
+                                         eout "$PIP not resolvable to ipv6 address"
                                          continue
                                       fi
                                       $IP6T -A $chain -m state --state NEW -m tcp -p tcp -$IPFLOW $PIP --$PFLOW $PPORT -j ACCEPT
@@ -771,12 +802,22 @@ if [ ! "`cat $file | grep -v "#"`" == "" ]; then
                                            eout "ignoring ipv4 address $PIP"
                                            continue
                                          fi
+                                         is_ipv6_resolveable $PIP
+                                         if [ $? -ne 0 ]; then
+                                           eout "$PIP not resolvable to ipv6 address"
+                                           continue
+                                         fi
                                          $NFT add rule ip6 filter $chain meta l4proto tcp ip6 $IPFLOW_NFT $PIP ct state new $PTYPE $PFLOW $PPORT counter accept
                                       fi
                                   else
                                       $IPT $IPT_FLAGS -A $chain -p $PTYPE -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j ACCEPT
                                       if [ "$USE_IPV6" == "1" ]; then
-                                              $IP6T -A $chain -m state --state NEW -p $PTYPE -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j ACCEPT
+                                         is_ipv6_resolveable $PIP
+                                         if [ $? -ne 0 ]; then
+                                           eout "$PIP not resolvable to ipv6 address"
+                                           continue
+                                         fi
+                                         $IP6T -A $chain -m state --state NEW -p $PTYPE -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j ACCEPT
                                       fi
                                   fi
                                 elif [ "$PTYPE" == "udp" ]; then
@@ -788,12 +829,22 @@ if [ ! "`cat $file | grep -v "#"`" == "" ]; then
                                            eout "ignoring ipv4 address $PIP"
                                            continue
                                          fi
+                                         is_ipv6_resolveable $PIP
+                                         if [ $? -ne 0 ]; then
+                                           eout "$PIP not resolvable to ipv6 address"
+                                           continue
+                                         fi
                                          $NFT add rule ip6 filter $chain meta l4proto tcp ip6 $IPFLOW_NFT $PIP ct state new  $PTYPE $PFLOW $PPORT counter accept
                                       fi
                                   else
                                       $IPT $IPT_FLAGS -A $chain -p $PTYPE -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j ACCEPT
                                       if [ "$USE_IPV6" == "1" ]; then
-                                              $IP6T -A $chain -m state --state NEW -p $PTYPE -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j ACCEPT
+                                         is_ipv6_resolveable $PIP
+                                         if [ $? -ne 0 ]; then
+                                           eout "$PIP not resolvable to ipv6 address"
+                                           continue
+                                         fi
+                                         $IP6T -A $chain -m state --state NEW -p $PTYPE -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j ACCEPT
                                      fi
                                   fi
                                 fi
@@ -833,6 +884,11 @@ if [ ! "`cat $file | grep -v "#"`" == "" ]; then
                           eout "ignoring ipv4 address $i"
                           continue
                        fi
+                       is_ipv6_resolveable $i
+                       if [ $? -ne 0 ]; then
+                          eout "$i not resolvable to ipv6 address"
+                          continue
+                       fi
                        $NFT add rule ip6 filter $chain ip6 saddr $i ct state new  counter $ALL_STOP
                        $NFT add rule ip6 filter $chain ip6 daddr $i ct state new  counter $ALL_STOP
                     fi
@@ -843,6 +899,11 @@ if [ ! "`cat $file | grep -v "#"`" == "" ]; then
                        subnet=`echo $i | awk -F'/' '{print $1}'`
                        if [[ $subnet =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
                           eout "ignoring ipv4 address $i"
+                          continue
+                       fi
+                       is_ipv6_resolveable $i
+                       if [ $? -ne 0 ]; then
+                          eout "$i not resolvable to ipv6 address"
                           continue
                        fi
                        $IP6T -A $chain -m state --state NEW -s $i -d 0/0 -j $ALL_STOP
@@ -893,6 +954,11 @@ if [ ! "`cat $file | grep -v "#"`" == "" ]; then
                           eout "ignoring ipv4 address $PIP"
                           continue
                        fi
+                       is_ipv6_resolveable $PIP
+                       if [ $? -ne 0 ]; then
+                          eout "$PIP not resolvable to ipv6 address"
+                          continue
+                       fi
                        $NFT add rule ip6 filter $chain ip6 $IPFLOW_NFT $PIP ct state new  tcp $PFLOW $PPORT_NFT counter $TCP_STOP
                        $NFT add rule ip6 filter $chain ip6 $IPFLOW_NFT $PIP ct state new  udp $PFLOW $PPORT_NFT counter $UDP_STOP
                     fi
@@ -902,6 +968,11 @@ if [ ! "`cat $file | grep -v "#"`" == "" ]; then
                     if [ "$USE_IPV6" == "1" ]; then
                        if [[ $PIP =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
                           eout "ignoring ipv4 address $PIP"
+                          continue
+                       fi
+                       is_ipv6_resolveable $PIP
+                       if [ $? -ne 0 ]; then
+                          eout "$PIP not resolvable to ipv6 address"
                           continue
                        fi
                        $IP6T -A $chain -m state --state NEW -m tcp -p tcp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j $TCP_STOP
@@ -962,6 +1033,11 @@ if [ ! "`cat $file | grep -v "#"`" == "" ]; then
                           eout "ignoring ipv4 address $PIP"
                           continue
                         fi
+                        is_ipv6_resolveable $PIP
+                        if [ $? -ne 0 ]; then
+                          eout "$PIP not resolvable to ipv6 address"
+                          continue
+                        fi
                         $NFT add rule ip6 filter $chain meta l4proto tcp ip6 $IPFLOW_NFT $PIP ct state new  tcp $PFLOW $PPORT_NFT counter $TCP_STOP
                         $NFT add rule ip6 filter $chain meta l4proto udp ip6 $IPFLOW_NFT $PIP ct state new  udp $PFLOW $PPORT_NFT counter $TCP_STOP
                      fi
@@ -971,6 +1047,11 @@ if [ ! "`cat $file | grep -v "#"`" == "" ]; then
                      if [ "$USE_IPV6" == "1" ]; then
                         if [[ $PIP =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
                           eout "ignoring ipv4 address $PIP"
+                          continue
+                        fi
+                        is_ipv6_resolveable $PIP
+                        if [ $? -ne 0 ]; then
+                          eout "$PIP not resolvable to ipv6 address"
                           continue
                         fi
                         $IP6T -A $chain -m state --state NEW -p tcp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j $TCP_STOP
@@ -1039,6 +1120,11 @@ if [ ! "`cat $file | grep -v "#"`" == "" ]; then
                                         eout "ignoring ipv4 address $PIP"
                                         continue
                                      fi
+                                     is_ipv6_resolveable $PIP
+                                     if [ $? -ne 0 ]; then
+                                         eout "$PIP not resolvable to ipv6 address"
+                                         continue
+                                     fi
                                      $NFT add rule ip6 filter $chain meta l4proto $PTYPE ip6 $IPFLOW_NFT $PIP ct state new  $PTYPE $PFLOW $PPORT_NFT counter $TCP_STOP
                                   fi
                                else
@@ -1046,6 +1132,11 @@ if [ ! "`cat $file | grep -v "#"`" == "" ]; then
                                   if [ "$USE_IPV6" == "1" ]; then
                                      if [[ $PIP =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
                                         eout "ignoring ipv4 address $PIP"
+                                        continue
+                                     fi
+                                     is_ipv6_resolveable $PIP
+                                     if [ $? -ne 0 ]; then
+                                        eout "$PIP not resolvable to ipv6 address"
                                         continue
                                      fi
                                      $IP6T -A $chain -m state --state NEW -p $PTYPE -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j $TCP_STOP
@@ -1060,6 +1151,11 @@ if [ ! "`cat $file | grep -v "#"`" == "" ]; then
                                         eout "ignoring ipv4 address $PIP"
                                         continue
                                      fi
+                                     is_ipv6_resolveable $PIP
+                                     if [ $? -ne 0 ]; then
+                                       eout "$PIP not resolvable to ipv6 address"
+                                       continue
+                                     fi
                                      $NFT add rule ip6 filter $chain meta l4proto $PTYPE ip6 $IPFLOW_NFT $PIP ct state new  $PTYPE $PFLOW $PPORT_NFT counter $UDP_STOP
                                   fi
                                else
@@ -1067,6 +1163,11 @@ if [ ! "`cat $file | grep -v "#"`" == "" ]; then
                                   if [ "$USE_IPV6" == "1" ]; then
                                      if [[ $PIP =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
                                         eout "ignoring ipv4 address $PIP"
+                                        continue
+                                     fi
+                                     is_ipv6_resolveable $PIP
+                                     if [ $? -ne 0 ]; then
+                                        eout "$PIP not resolvable to ipv6 address"
                                         continue
                                      fi
                                      $IP6T -A $chain -m state --state NEW -p $PTYPE -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j $UDP_STOP
