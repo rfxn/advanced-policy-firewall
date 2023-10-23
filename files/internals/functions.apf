@@ -34,9 +34,17 @@ devm() {
 
 is_ipv6_resolveable() {
  current_hostname=$1
- $HOST -W5 -t aaaa $current_hostname &>/dev/null
+ OUTPUT=`$HOST -W5 -t aaaa $current_hostname`
  if [ $? -eq 0 ]; then
    # all good
+   if [ `echo $OUTPUT | grep -c "has no AAAA record"` -eq 1 ]; then
+     return 1
+   fi
+   if [ `echo $OUTPUT | grep -c "is an alias for"` -eq 1 ]; then
+      new_hostname=`echo $OUTPUT | awk -F " is an alias for " '{print $2}'`
+      is_ipv6_resolveable $new_hostname
+      return $?
+   fi
    return 0
  fi
  # not resolvable or timeout
@@ -52,7 +60,7 @@ ml() {
         MEXT="ko"
  fi
 
- if [ $EXECUTOR == "nft" ]; then
+ if [ "$EXECUTOR" == "nft" ]; then
     if [ "$FATAL" == "1" ] && [ ! -f "/lib/modules/$(uname -r)/kernel/net/netfilter/$1.$MEXT" ] && [ ! -f "/lib/modules/$(uname -r)/kernel/net/netfilter/$1.${MEXT}.xz" ]; then
         if [ ! "$SET_VERBOSE" == "1" ]; then
                 echo "Unable to load nftables module ($1), aborting."
@@ -84,14 +92,14 @@ modinit() {
  fi
  if [ ! "$SET_MONOKERN" == "1" ]; then
         # Loading Kernel Modules
-        if [ $EXECUTOR == "nft" ]; then
+        if [ "$EXECUTOR" == "nft" ]; then
            ml nf_tables 1
         else
            ml ip_tables 1
         fi
  fi
 
- if [ $EXECUTOR == "nft" ]; then
+ if [ "$EXECUTOR" == "nft" ]; then
 	modlist="nfnetlink nft_compat nft_counter nft_chain_nat nft_limit nft_log nft_reject_ipv4 nft_reject nf_tables nf_nat nf_reject_ipv4 nf_nat nf_conntrack nf_reject_ipv4 ipt_MASQUERADE ipt_REJECT"
  else
 	modlist="ip_conntrack ip_conntrack_ftp ip_conntrack_irc iptable_filter iptable_mangle ipt_ecn ipt_length ipt_limit ipt_LOG ipt_mac ipt_multiport ipt_owner ipt_recent ipt_REJECT ipt_state ipt_TCPMSS ipt_TOS ipt_ttl ipt_ULOG nf_conntrack nf_conntrack_ftp nf_conntrack_irc xt_conntrack xt_conntrack_ftp xt_conntrack_irc xt_ecn xt_length xt_limit xt_LOG xt_mac xt_multiport xt_owner xt_recent xt_REJECT xt_state xt_TCPMSS xt_TOS xt_ttl xt_ULOG iptable_nat ip6_tables iptable_raw iptable_security ip6table_filter ip6table_mangle ip6table_nat ip6table_raw ip6table_security"
@@ -176,7 +184,7 @@ trim() {
 
 cli_trust_remove() {
 	DIP="$1"
-	if [ $EXECUTOR == "nft" ]; then
+	if [ "$EXECUTOR" == "nft" ]; then
 	   #$IPT $IPT_FLAGS -D INPUT -s $DIP -j ACCEPT
 	   #$IPT $IPT_FLAGS -D OUTPUT -d $DIP -j ACCEPT
       #$IPT $IPT_FLAGS -D INPUT -s $DIP -j $ALL_STOP
@@ -318,7 +326,7 @@ cli_trust() {
        echo "# added $HOST on $TIME" >> $FILE
      fi
      echo "$HOST" >> $FILE
-     if [ $EXECUTOR == "nft" ]; then
+     if [ "$EXECUTOR" == "nft" ]; then
        if [ "$ACTION" == "DENY" ]; then
          JACTION="$ALL_STOP"
        elif [ "$ACTION" == "ALLOW" ]; then
@@ -346,13 +354,13 @@ cli_trust() {
 }
 
 flush() {
-if [ $EXECUTOR == "nft" ]; then
+if [ "$EXECUTOR" == "nft" ]; then
 	firewall_on=`$NFT -n list ruleset | grep -vE "chain|table|{|}|^$"`
 else
 	firewall_on=`$IPT $IPT_FLAGS -L --numeric | grep -vE "Chain|destination"`
 fi
 if [ "$SET_FASTLOAD" == "1" ] && [ ! "$1" == "1" ] && [ ! "$DEVEL_ON" == "1" ] && [ ! "$firewall_on" == "" ]; then
-	if [ $EXECUTOR == "nft" ]; then
+	if [ "$EXECUTOR" == "nft" ]; then
 		$NFT list ruleset > $INSTALL_PATH/internals/.apf.restore
 	else
 		$IPTS > $INSTALL_PATH/internals/.apf.restore
@@ -363,7 +371,7 @@ if [ ! "$1" = "1" ]; then
 	eout "{glob} flushing & zeroing chain policies"
 fi
 
-if [ $EXECUTOR == "nft" ]; then
+if [ "$EXECUTOR" == "nft" ]; then
    $NFT flush ruleset
 else
    chains=`cat /proc/net/ip_tables_names 2>/dev/null`
@@ -397,7 +405,7 @@ fi
 }
 
 list() {
-if [ $EXECUTOR == "nft" ]; then
+if [ "$EXECUTOR" == "nft" ]; then
    echo "Loading nftables rules..."
    iptc=/etc/apf/.iptrules.$$
    :> $iptc ; chmod 600 $iptc
@@ -464,7 +472,7 @@ if [ -z "$TYPE" ]; then
 	break
 fi
 
-if [ $EXECUTOR == "nft" ]; then
+if [ "$EXECUTOR" == "nft" ]; then
    $NFT add table ip mangle
    $NFT add chain ip mangle $TYPE
 fi
@@ -474,7 +482,7 @@ if [ ! "$TOS_0" == "" ]; then
   for i in `echo $TOS_0 | tr ',' ' '`; do
     i=`echo $i | tr '_' ':'`
     j=`echo $i | tr ':' '-'`
-    if [ $EXECUTOR == "nft" ]; then
+    if [ "$EXECUTOR" == "nft" ]; then
       $NFT add rule ip mangle $TYPE tcp dport $j counter ip dscp set 0x00
       $NFT add rule ip mangle $TYPE udp dport $j counter ip dscp set 0x00
     else
@@ -488,7 +496,7 @@ if [ ! "$TOS_2" == "" ]; then
   for i in `echo $TOS_2 | tr ',' ' '`; do
     i=`echo $i | tr '_' ':'`
     j=`echo $i | tr ':' '-'`
-	 if [ $EXECUTOR == "nft" ]; then
+	 if [ "$EXECUTOR" == "nft" ]; then
        $NFT add rule ip mangle $TYPE tcp dport $j counter ip dscp set 0x00
        $NFT add rule ip mangle $TYPE udp dport $j counter ip dscp set 0x00
 	 else
@@ -502,7 +510,7 @@ if [ ! "$TOS_4" == "" ]; then
   for i in `echo $TOS_4 | tr ',' ' '`; do
     i=`echo $i | tr '_' ':'`
     j=`echo $i | tr ':' '-'`
-	 if [ $EXECUTOR == "nft" ]; then
+	 if [ "$EXECUTOR" == "nft" ]; then
       $NFT add rule ip mangle $TYPE tcp dport $j counter ip dscp set 0x01
       $NFT add rule ip mangle $TYPE udp dport $j counter ip dscp set 0x01
     else
@@ -516,7 +524,7 @@ if [ ! "$TOS_8" == "" ]; then
   for i in `echo $TOS_8 | tr ',' ' '`; do
     i=`echo $i | tr '_' ':'`
     j=`echo $i | tr ':' '-'`
-	 if [ $EXECUTOR == "nft" ]; then
+	 if [ "$EXECUTOR" == "nft" ]; then
       $NFT add rule ip mangle $TYPE tcp dport $j counter ip dscp set 0x02
       $NFT add rule ip mangle $TYPE udp dport $j counter ip dscp set 0x02
 	 else
@@ -530,7 +538,7 @@ if [ ! "$TOS_16" == "" ]; then
   for i in `echo $TOS_16 | tr ',' ' '`; do
     i=`echo $i | tr '_' ':'`
     j=`echo $i | tr ':' '-'`
-	 if [ $EXECUTOR == "nft" ]; then
+	 if [ "$EXECUTOR" == "nft" ]; then
       $NFT add rule ip mangle $TYPE tcp dport $j counter ip dscp set 0x04
       $NFT add rule ip mangle $TYPE udp dport $j counter ip dscp set 0x04
 	 else
@@ -544,7 +552,7 @@ if [ ! "$TOS_DEF_RANGE" == "" ]; then
     for i in `echo $TOS_DEF_RANGE | tr ',' ' '`; do
       i=`echo $i | tr '_' ':'`
       j=`echo $i | tr ':' '-'`
-      if [ $EXECUTOR == "nft" ]; then
+      if [ "$EXECUTOR" == "nft" ]; then
         $NFT add rule ip mangle $TYPE tcp dport $j counter ip dscp set $TOS_DEF
         $NFT add rule ip mangle $TYPE udp dport $j counter ip dscp set $TOS_DEF
       else
@@ -578,7 +586,7 @@ if [ ! "`cat $file | grep -v "#"`" == "" ]; then
                 if [ ! "$val" ]; then
                  if [ ! "$i" == "" ] && [ -f "$file" ]; then
                    eout "{trust} allow all to/from $i"
-                   if [ $EXECUTOR == "nft" ]; then
+                   if [ "$EXECUTOR" == "nft" ]; then
                            $NFT add rule ip filter $chain ip saddr $i counter accept
                            $NFT add rule ip filter $chain ip daddr $i counter accept
 	                else
@@ -620,7 +628,7 @@ if [ ! "`cat $file | grep -v "#"`" == "" ]; then
 
                   if [ ! "$IPFLOW" == "" ] && [ ! "$PIP" == "" ] && [ ! "$IPFLOW" == "" ] && [ ! "$PPORT" == "" ]; then
                     eout "{trust} allow $PIP $PFLOW_T port $PPORT"
-                    if [ $EXECUTOR == "nft" ]; then
+                    if [ "$EXECUTOR" == "nft" ]; then
                       $NFT add rule ip filter $chain ip protocol tcp ip $IPFLOW_NFT $PIP tcp $PFLOW $PPORT counter accept
                       $NFT add rule ip filter $chain ip protocol udp ip $IPFLOW_NFT $PIP udp $PFLOW $PPORT counter accept
                       if [ "$USE_IPV6" == "1" ]; then
@@ -703,7 +711,7 @@ if [ ! "`cat $file | grep -v "#"`" == "" ]; then
                                 eout "{trust} ignored local ip allow rule '$NFLOW_T $PIP $PFLOW_T port $PPORT'"
                          else
                                 eout "{trust} allow $NFLOW_T $PIP $PFLOW_T port $PPORT"
-                                if [ $EXECUTOR == "nft" ]; then
+                                if [ "$EXECUTOR" == "nft" ]; then
                                    $NFT add rule ip filter $chain ip protocol tcp ip $IPFLOW_NFT $PIP tcp $PFLOW $PPORT counter accept
                                    $NFT add rule ip filter $chain ip protocol udp ip $IPFLOW_NFT $PIP udp $PFLOW $PPORT counter accept
                                    if [ "$USE_IPV6" == "1" ]; then
@@ -795,7 +803,7 @@ if [ ! "`cat $file | grep -v "#"`" == "" ]; then
                          else
                                 if [ "$PTYPE" == "tcp" ]; then
                                   eout "{trust} allow $NFLOW_T $PTYPE $PIP $PFLOW_T port $PPORT"
-                                  if [ $EXECUTOR == "nft" ]; then
+                                  if [ "$EXECUTOR" == "nft" ]; then
                                       $NFT add rule ip filter $chain ip protocol tcp ip $IPFLOW_NFT $PIP $PTYPE $PFLOW $PPORT counter accept
                                       if [ "$USE_IPV6" == "1" ]; then
                                          if [[ $PIP =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
@@ -822,7 +830,7 @@ if [ ! "`cat $file | grep -v "#"`" == "" ]; then
                                   fi
                                 elif [ "$PTYPE" == "udp" ]; then
                                   eout "{trust} allow $NFLOW_T $PTYPE $PIP $PFLOW_T port $PPORT"
-                                  if [ $EXECUTOR == "nft" ]; then
+                                  if [ "$EXECUTOR" == "nft" ]; then
                                       $NFT add rule ip filter $chain ip protocol udp ip $IPFLOW $PIP $PTYPE $PFLOW $PPORT counter accept
                                       if [ "$USE_IPV6" == "1" ]; then
                                          if [[ $PIP =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
@@ -875,7 +883,7 @@ if [ ! "`cat $file | grep -v "#"`" == "" ]; then
            if [ ! "$val" ]; then
               if [ ! "$i" == "" ] && [ -f "$file" ]; then
                  eout "{trust} deny all to/from $i"
-                 if [ $EXECUTOR == "nft" ]; then
+                 if [ "$EXECUTOR" == "nft" ]; then
                     $NFT add rule ip filter $chain ip saddr $i counter $ALL_STOP
                     $NFT add rule ip filter $chain ip daddr $i counter $ALL_STOP
                     if [ "$USE_IPV6" == "1" ]; then
@@ -946,7 +954,7 @@ if [ ! "`cat $file | grep -v "#"`" == "" ]; then
 
                if [ ! "$IPFLOW" == "" ] && [ ! "$PIP" == "" ] && [ ! "$IPFLOW" == "" ] && [ ! "$PPORT" == "" ]; then
                   eout "{trust} deny $PIP $PFLOW_T port $PPORT"
-                  if [ $EXECUTOR == "nft" ]; then
+                  if [ "$EXECUTOR" == "nft" ]; then
                     $NFT add rule ip filter $chain ip protocol tcp ip $IPFLOW_NFT $PIP tcp $PFLOW $PPORT_NFT counter $TCP_STOP
                     $NFT add rule ip filter $chain ip protocol udp ip $IPFLOW_NFT $PIP udp $PFLOW $PPORT_NFT counter $UDP_STOP
                     if [ "$USE_IPV6" == "1" ]; then
@@ -1025,7 +1033,7 @@ if [ ! "`cat $file | grep -v "#"`" == "" ]; then
 
                if [ ! "$NFLOW" == "" ] && [ ! "$IPFLOW" == "" ] && [ ! "$PIP" == "" ] && [ ! "$IPFLOW" == "" ] && [ ! "$PPORT" == "" ]; then
                   eout "{trust} deny ($NFLOW_T) $PIP $PFLOW_T port $PPORT"
-                  if [ $EXECUTOR == "nft" ]; then
+                  if [ "$EXECUTOR" == "nft" ]; then
                      $NFT add rule ip filter $chain ip protocol tcp ip $IPFLOW_NFT $PIP tcp $PFLOW $PPORT_NFT counter $TCP_STOP
                      $NFT add rule ip filter $chain ip protocol udp ip $IPFLOW_NFT $PIP udp $PFLOW $PPORT_NFT counter $UDP_STOP
                      if [ "$USE_IPV6" == "1" ]; then
@@ -1113,7 +1121,7 @@ if [ ! "`cat $file | grep -v "#"`" == "" ]; then
                         if [ ! "$PTYPE" == "" ] && [ ! "$NFLOW" == "" ] && [ ! "$IPFLOW" == "" ] && [ ! "$PIP" == "" ] && [ ! "$IPFLOW" == "" ] && [ ! "$PPORT" == "" ]; then
                            if [ "$PTYPE" == "tcp" ]; then
                                eout "{trust} deny $NFLOW_T $PTYPE $PIP $PFLOW_T port $PPORT"
-                               if [ $EXECUTOR == "nft" ]; then
+                               if [ "$EXECUTOR" == "nft" ]; then
                                   $NFT add rule ip filter $chain ip protocol $PTYPE ip $IPFLOW_NFT $PIP $PTYPE $PFLOW $PPORT_NFT counter $TCP_STOP
                                   if [ "$USE_IPV6" == "1" ]; then
                                      if [[ $PIP =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
@@ -1144,7 +1152,7 @@ if [ ! "`cat $file | grep -v "#"`" == "" ]; then
                                fi
                            elif [ "$PTYPE" == "udp" ]; then
                                eout "{trust} deny $NFLOW_T $PTYPE $PIP $PFLOW_T port $PPORT"
-                               if [ $EXECUTOR == "nft" ]; then
+                               if [ "$EXECUTOR" == "nft" ]; then
                                   $NFT add rule ip filter $chain ip protocol $PTYPE ip $IPFLOW_NFT $PIP $PTYPE $PFLOW $PPORT_NFT counter $UDP_STOP
                                   if [ "$USE_IPV6" == "1" ]; then
                                      if [[ $PIP =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
@@ -1248,7 +1256,7 @@ fi
 dlist_php_hosts() {
 if [ ! "`cat $PHP_HOSTS | grep -v "#"`" == "" ]; then
    eout "{php} loading php_hosts.rules"
-   if [ $EXECUTOR == "nft" ]; then
+   if [ "$EXECUTOR" == "nft" ]; then
       $NFT add chain ip filter PHP
       for i in `cat $PHP_HOSTS | grep -v "#"`; do
          if [ ! "$i" == "" ] && [ -f "$PHP_HOSTS" ]; then
@@ -1310,7 +1318,7 @@ fi
 dlist_dshield_hosts() {
 if [ ! "`cat $DS_HOSTS | grep -v "#"`" == "" ]; then
    eout "{dshield} loading ds_hosts.rules"
-   if [ $EXECUTOR == "nft" ]; then
+   if [ "$EXECUTOR" == "nft" ]; then
       #$IPT $IPT_FLAGS -N DSHIELD
       $NFT add chain ip filter DSHIELD
       for i in `cat $DS_HOSTS | grep -v "#"`; do
@@ -1378,7 +1386,7 @@ fi
 dlist_spamhaus_hosts() {
 if [ ! "`cat $DROP_HOSTS | grep -v "#"`" == "" ]; then
    eout "{sdrop} loading sdrop_hosts.rules"
-   if [ $EXECUTOR == "nft" ]; then
+   if [ "$EXECUTOR" == "nft" ]; then
       $NFT add chain ip filter SDROP
       for i in `cat $DROP_HOSTS | grep -v "#"`; do
          if [ ! "$i" == "" ] && [ -f "$DROP_HOSTS" ]; then
@@ -1446,7 +1454,7 @@ if [ ! "`cat $ECNSHAME_HOSTS | grep -v "#"`" == "" ]; then
    eout "{ecnshame} loading ecnshame_hosts.rules"
    for i in `cat $ECNSHAME_HOSTS | grep -v "#"`; do
       if [ ! "$i" == "" ] && [ -f "$ECNSHAME_HOSTS" ]; then
-         if [ $EXECUTOR == "nft" ]; then
+         if [ "$EXECUTOR" == "nft" ]; then
             # TODO nft
             # dont work
             # https://www.linuxtopia.org/Linux_Firewall_iptables/x4212.html
@@ -1514,7 +1522,7 @@ if [ -f "$FILE" ]; then
   eout "{glob} loading $FNAME"
   for i in `cat $FILE | grep -v "#"`; do
     if [ ! "$i" == "" ]; then
-      if [ $EXECUTOR == "nft" ]; then
+      if [ "$EXECUTOR" == "nft" ]; then
         $NFT add rule ip filter INPUT ip saddr $i counter $ALL_STOP
         $NFT add rule ip filter OUTPUT ip daddr $i counter $ALL_STOP
       else
@@ -1539,7 +1547,7 @@ if [ ! "$BLK_PORTS" == "" ]; then
   for i in `echo $BLK_PORTS | tr ',' ' '`; do
     if [ "$(echo $i | grep "_")" == "" ]; then
       if [ ! "$i" == "" ]; then
-        if [ $EXECUTOR == "nft" ]; then
+        if [ "$EXECUTOR" == "nft" ]; then
           $NFT add rule ip filter INPUT tcp dport $i counter $TCP_STOP
           $NFT add rule ip filter INPUT udp dport $i counter $UDP_STOP
           $NFT add rule ip filter OUTPUT tcp dport $i counter $TCP_STOP
@@ -1556,7 +1564,7 @@ if [ ! "$BLK_PORTS" == "" ]; then
     else
       i=`echo $i | tr '_' ':'`
       if [ ! "$i" == "" ]; then
-        if [ $EXECUTOR == "nft" ]; then
+        if [ "$EXECUTOR" == "nft" ]; then
           j=`echo $i | tr ':' '-'`
           $NFT add rule ip filter INPUT tcp dport $j counter $TCP_STOP
           $NFT add rule ip filter INPUT udp dport $j counter $UDP_STOP
@@ -1577,7 +1585,7 @@ fi
 }
 
 lgate_mac() {
-if [ $EXECUTOR == "nft" ]; then
+if [ "$EXECUTOR" == "nft" ]; then
   $NFT add chain ip filter LMAC
   for mac in `echo $LGATE_MAC | tr ',' ' '`; do
     MAC=$mac
@@ -1653,7 +1661,7 @@ fi
 }
 
 refresh() {
-if [ $EXECUTOR == "nft" ]; then
+if [ "$EXECUTOR" == "nft" ]; then
   apf_loaded=`$NFT list table ip filter | grep PROHIBIT`
 else
   apf_loaded=`$IPT $IPT_FLAGS --list --numeric | grep PROHIBIT`
@@ -1694,7 +1702,7 @@ else
   glob_deny_download
 fi
 
-if [ $EXECUTOR == "nft" ]; then
+if [ "$EXECUTOR" == "nft" ]; then
   #$NFT list ruleset | grep -E "TALLOW|TGALLOW" | grep -E '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | awk '{print$4}' | sort -n | uniq > $tmpra
   ($NFT list chain ip filter TALLOW; $NFT list chain ip filter TGALLOW) | grep -E '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | awk '{print$3}' | sort -n | uniq > $tmpra
   $NFT flush chain ip filter REFRESH_TEMP
