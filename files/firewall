@@ -160,6 +160,8 @@ fi
 # Create (glob)trust system chains
 if [ $EXECUTOR == "nft" ]; then
   $NFT add table filter
+  $NFT add chain ip filter INPUT
+  $NFT add chain ip filter OUTPUT
   $NFT add chain ip filter TALLOW
   $NFT add chain ip filter TDENY
   $NFT add chain ip filter TGALLOW
@@ -178,6 +180,8 @@ if [ $EXECUTOR == "nft" ]; then
 
   if [ "$USE_IPV6" = "1" ]; then
     $NFT add table ip6 filter
+    $NFT add chain ip6 filter INPUT
+    $NFT add chain ip6 filter OUTPUT
     $NFT add chain ip6 filter TALLOW
     $NFT add chain ip6 filter TDENY
     $NFT add chain ip6 filter TGALLOW
