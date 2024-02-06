@@ -474,7 +474,7 @@ fi
 
 if [ "$EXECUTOR" == "nft" ]; then
    $NFT add table ip mangle
-   $NFT add chain ip mangle $TYPE
+   $NFT 'add chain ip mangle '$TYPE' { type route hook output priority -150; }'
 fi
 
 
