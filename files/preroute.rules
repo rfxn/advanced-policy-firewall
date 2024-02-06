@@ -1,3 +1,15 @@
 eout "{glob} loading preroute.rules"
 
+if [ $EXECUTOR == "nft" ]; then
+   $NFT add table ip nat
+   $NFT -- add chain nat PREROUTING { type nat hook prerouting priority -100 \; }
+   $NFT add chain nat POSTROUTING { type nat hook postrouting priority 100 \; }
+
+   if [ "$USE_IPV6" == "1" ]; then
+      $NFT add table ip6 nat
+      $NFT -- add chain ip6 nat PREROUTING { type nat hook prerouting priority -100 \; }
+      $NFT add chain ip6 nat POSTROUTING { type nat hook postrouting priority 100 \; }
+   fi
+fi
+
 # place your custom routing rules below
