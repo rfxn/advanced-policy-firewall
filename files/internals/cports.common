@@ -217,54 +217,54 @@ if [ ! "$IG_ICMP_TYPES" == "" ]; then
 fi
 
 if [ "$EGF" == "1" ]; then
-if [ ! "$EG_ICMP_TYPES" == "" ]; then
-PROTO="icmp"
-if [ "$ICMP_LIM" == "" ]; then
-        ICMP_LIM=0
-fi
-if [ $EXECUTOR == "nft" ]; then
-   if [ "$(echo $ICMP_LIM | tr '/' ' ' | awk '{print$1}')" -gt "0" ]; then
-        ICMP_EARGS="limit rate $ICMP_LIM burst 5 packets"
-   else
-        ICMP_EARGS=""
-   fi
-else
-   if [ "$(echo $ICMP_LIM | tr '/' ' ' | awk '{print$1}')" -gt "0" ]; then
-        ICMP_EARGS="-m limit --limit $ICMP_LIM"
-   else
-        ICMP_EARGS=""
-   fi
-fi
-EG_ICMP_TYPES=`echo $EG_ICMP_TYPES | tr ',' ' '`
-        for i in `echo $EG_ICMP_TYPES`; do
-         if [ ! "$i" == "" ]; then
-		i=`echo $i | tr '[:upper:]' '[:lower:]'`
-		if [ "$i" == "all" ]; then
-	          if [ $EXECUTOR == "nft" ]; then
-	             if [ "$USE_IPV6" == "1" ]; then
-                        $NFT add rule ip6 filter OUTPUT meta l4proto icmp ip6 saddr $VNET $ICMP_EARGS counter accept
-	             fi
-		     $NFT add rule ip filter OUTPUT ip protocol icmp ip saddr $VNET $ICMP_EARGS counter accept
-                  else
-                     $IPT $IPT_FLAGS -A OUTPUT -p icmp  -s $VNET -d 0/0 $ICMP_EARGS  -j ACCEPT
-		     # TODO ipv6?
-		  fi
-                  eout "{glob} opening outbound $PROTO all on $VNET"
-		else
-                  if [ $EXECUTOR == "nft" ]; then
-                     if [ "$USE_IPV6" == "1" ]; then
-                         $NFT add rule ip6 filter OUTPUT ip6 saddr $VNET icmp code $i $ICMP_EARGS counter accept
-                     fi
-		     $NFT add rule ip filter OUTPUT ip saddr $VNET icmp code $i $ICMP_EARGS counter accept
-                  else
-                     $IPT $IPT_FLAGS -A OUTPUT -p icmp --icmp-type $i  -s $VNET -d 0/0 $ICMP_EARGS -j ACCEPT
-		     # TODO ipv6?
-		  fi
-                  eout "{glob} opening outbound $PROTO type $i on $VNET"
-		fi
+   if [ ! "$EG_ICMP_TYPES" == "" ]; then
+      PROTO="icmp"
+      if [ "$ICMP_LIM" == "" ]; then
+         ICMP_LIM=0
+      fi
+      if [ $EXECUTOR == "nft" ]; then
+         if [ "$(echo $ICMP_LIM | tr '/' ' ' | awk '{print$1}')" -gt "0" ]; then
+            ICMP_EARGS="limit rate $ICMP_LIM burst 5 packets"
+         else
+            ICMP_EARGS=""
          fi
-        done
-fi
+      else
+         if [ "$(echo $ICMP_LIM | tr '/' ' ' | awk '{print$1}')" -gt "0" ]; then
+            ICMP_EARGS="-m limit --limit $ICMP_LIM"
+         else
+            ICMP_EARGS=""
+         fi
+      fi
+      EG_ICMP_TYPES=`echo $EG_ICMP_TYPES | tr ',' ' '`
+      for i in `echo $EG_ICMP_TYPES`; do
+         if [ ! "$i" == "" ]; then
+            i=`echo $i | tr '[:upper:]' '[:lower:]'`
+            if [ "$i" == "all" ]; then
+               if [ $EXECUTOR == "nft" ]; then
+                  if [ "$USE_IPV6" == "1" ]; then
+                     $NFT add rule ip6 filter OUTPUT meta l4proto icmp ip6 saddr $VNET $ICMP_EARGS counter accept
+                  fi
+                  $NFT add rule ip filter OUTPUT ip protocol icmp ip saddr $VNET $ICMP_EARGS counter accept
+               else
+                  $IPT $IPT_FLAGS -A OUTPUT -p icmp  -s $VNET -d 0/0 $ICMP_EARGS  -j ACCEPT
+                  # TODO ipv6?
+               fi
+               eout "{glob} opening outbound $PROTO all on $VNET"
+            else
+               if [ $EXECUTOR == "nft" ]; then
+                  if [ "$USE_IPV6" == "1" ]; then
+                     $NFT add rule ip6 filter OUTPUT ip6 saddr $VNET icmp code $i $ICMP_EARGS counter accept
+                  fi
+                  $NFT add rule ip filter OUTPUT ip saddr $VNET icmp code $i $ICMP_EARGS counter accept
+               else
+                  $IPT $IPT_FLAGS -A OUTPUT -p icmp --icmp-type $i  -s $VNET -d 0/0 $ICMP_EARGS -j ACCEPT
+                  # TODO ipv6?
+               fi
+               eout "{glob} opening outbound $PROTO type $i on $VNET"
+            fi
+         fi
+      done
+   fi
 fi
 
 if [ "$EGF" == "1" ]; then
