@@ -195,12 +195,12 @@ if [ ! "$IG_ICMP_TYPES" == "" ]; then
             eout "{glob} opening inbound $PROTO all on $VNET"
          else
             if [ $EXECUTOR == "nft" ]; then
-	       if [ "$USE_IPV6" == "1" ]; then
+               if [ "$USE_IPV6" == "1" ]; then
 	          $NFT add rule ip6 filter INPUT ip6 daddr $VNET icmp code $i $ICMP_EARGS counter accept
 	       fi
                #$IPT $IPT_FLAGS -A INPUT -p icmp --icmp-type $i -d $VNET  -s 0/0 $ICMP_EARGS -j ACCEPT
                $NFT add rule ip filter INPUT ip daddr $VNET icmp code $i $ICMP_EARGS counter accept
-	    else
+            else
                $IPT $IPT_FLAGS -A INPUT -p icmp --icmp-type $i -d $VNET  -s 0/0 $ICMP_EARGS -j ACCEPT
             fi
             eout "{glob} opening inbound $PROTO type $i on $VNET"
