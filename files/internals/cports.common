@@ -184,9 +184,7 @@ if [ ! "$IG_ICMP_TYPES" == "" ]; then
          i=`echo $i | tr '[:upper:]' '[:lower:]'`
          if [ "$i" == "all" ]; then
             if [ $EXECUTOR == "nft" ]; then
-               if [ "$USE_IPV6" == "1" ]; then
-                  $NFT add rule ip6 filter INPUT meta l4proto icmp ip6 daddr $VNET $ICMP_EARGS counter accept
-               fi
+               # for ipv6 and nft , see below block
                #$IPT $IPT_FLAGS -A INPUT -p icmp -d $VNET  -s 0/0 $ICMP_EARGS -j ACCEPT
                $NFT add rule ip filter INPUT ip protocol icmp ip daddr $VNET $ICMP_EARGS counter accept
             else
@@ -195,9 +193,7 @@ if [ ! "$IG_ICMP_TYPES" == "" ]; then
             eout "{glob} opening inbound $PROTO all on $VNET"
          else
             if [ $EXECUTOR == "nft" ]; then
-               if [ "$USE_IPV6" == "1" ]; then
-	          $NFT add rule ip6 filter INPUT ip6 daddr $VNET icmp code $i $ICMP_EARGS counter accept
-	       fi
+               # for ipv6 and nft , see below block
                #$IPT $IPT_FLAGS -A INPUT -p icmp --icmp-type $i -d $VNET  -s 0/0 $ICMP_EARGS -j ACCEPT
                $NFT add rule ip filter INPUT ip daddr $VNET icmp code $i $ICMP_EARGS counter accept
             else
@@ -214,6 +210,10 @@ if [ ! "$IG_ICMP_TYPES" == "" ]; then
 #        $IP6T -A INPUT -p ipv6-icmp -j ACCEPT
 #     fi
 #  fi
+fi
+
+if [ "$USE_IPV6" == "1" -a $EXECUTOR == "nft" ]; then
+   $NFT add rule ip6 filter INPUT ip6 daddr ::/0 icmpv6 type {$NFT_IP6_IG_ICMP_TYPES} counter accept
 fi
 
 if [ "$EGF" == "1" ]; then
