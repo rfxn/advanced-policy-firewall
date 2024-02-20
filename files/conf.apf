@@ -419,6 +419,9 @@ IG_UDP_CPORTS=""
 # for nft, see https://wiki.nftables.org/wiki-nftables/index.php/Quick_reference-nftables_in_10_minutes#Icmpv6
 IG_ICMP_TYPES="3,5,11,0,30,8"
 
+# when ipv6 and nft is enabled, set the correct ig icmp types
+NFT_IP6_IG_ICMP_TYPES="destination-unreachable,packet-too-big,time-exceeded,echo-request,echo-reply,mld-listener-query,mld-listener-report,mld-listener-reduction,nd-router-solicit,nd-router-advert,nd-neighbor-solicit,nd-neighbor-advert,parameter-problem,mld2-listener-report"
+
 # Configure outbound (egress) accepted services. This is an optional
 # feature; services and customized entries may be made directly to an ip's
 # virtual net file located in the vnet/ directory.
