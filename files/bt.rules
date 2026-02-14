@@ -228,6 +228,70 @@ if [ "$PKT_SANITY" == "1" ]; then
 	fi
 fi
 
+# IPv6 packet sanity checks (mirrors IPv4 IN_SANITY/OUT_SANITY without RAB integration)
+if [ "$PKT_SANITY" == "1" ] && [ "$USE_IPV6" == "1" ]; then
+	eout "{pkt_sanity} set active PKT_SANITY (IPv6)"
+	ipt6 -N IN_SANITY6
+	for flags in "ALL NONE" "SYN,FIN SYN,FIN" "SYN,RST SYN,RST" "FIN,RST FIN,RST" \
+		     "ACK,FIN FIN" "ACK,URG URG" "ACK,PSH PSH" "ALL FIN,URG,PSH" \
+		     "ALL SYN,RST,ACK,FIN,URG" "ALL ALL" "ALL FIN"; do
+		mask=$(echo $flags | awk '{print$1}')
+		comp=$(echo $flags | awk '{print$2}')
+		if [ "$LOG_DROP" == "1" ]; then
+			ipt6 -A IN_SANITY6 -p tcp --tcp-flags $mask $comp -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** SANITY6 ** "
+		fi
+		ipt6 -A IN_SANITY6 -p tcp --tcp-flags $mask $comp -j $TCP_STOP
+	done
+
+	ipt6 -N OUT_SANITY6
+	for flags in "ALL NONE" "SYN,FIN SYN,FIN" "SYN,RST SYN,RST" "FIN,RST FIN,RST" \
+		     "ACK,FIN FIN" "ACK,PSH PSH" "ACK,URG URG"; do
+		mask=$(echo $flags | awk '{print$1}')
+		comp=$(echo $flags | awk '{print$2}')
+		if [ "$LOG_DROP" == "1" ]; then
+			ipt6 -A OUT_SANITY6 -p tcp --tcp-flags $mask $comp -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** SANITY6 ** "
+		fi
+		ipt6 -A OUT_SANITY6 -p tcp --tcp-flags $mask $comp -j $TCP_STOP
+	done
+
+	if [ "$PKT_SANITY_INV" == "1" ]; then
+		if [ "$LOG_DROP" == "1" ]; then
+			ipt6 -A IN_SANITY6 -m state --state INVALID -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** SANITY6 ** "
+		fi
+		ipt6 -A IN_SANITY6 -m state --state INVALID -j $ALL_STOP
+		if [ "$LOG_DROP" == "1" ]; then
+			ipt6 -A OUT_SANITY6 -m state --state INVALID -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** SANITY6 ** "
+		fi
+		ipt6 -A OUT_SANITY6 -m state --state INVALID -j $ALL_STOP
+	fi
+
+	ipt6 -A INPUT -j IN_SANITY6
+	ipt6 -A OUTPUT -j OUT_SANITY6
+
+	if [ "$PKT_SANITY_PZERO" == "1" ]; then
+		eout "{pkt_sanity} deny IPv6 port zero traffic"
+		ipt6 -N PZERO6
+		if [ "$LOG_DROP" == "1" ]; then
+			ipt6 -A PZERO6 -p tcp --dport 0 -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** PortZero6 ** "
+		fi
+		ipt6 -A PZERO6 -p tcp --dport 0 -j $TCP_STOP
+		if [ "$LOG_DROP" == "1" ]; then
+			ipt6 -A PZERO6 -p udp --dport 0 -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** PortZero6 ** "
+		fi
+		ipt6 -A PZERO6 -p udp --dport 0 -j $UDP_STOP
+		if [ "$LOG_DROP" == "1" ]; then
+			ipt6 -A PZERO6 -p tcp --sport 0 -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** PortZero6 ** "
+		fi
+		ipt6 -A PZERO6 -p tcp --sport 0 -j $TCP_STOP
+		if [ "$LOG_DROP" == "1" ]; then
+			ipt6 -A PZERO6 -p udp --sport 0 -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** PortZero6 ** "
+		fi
+		ipt6 -A PZERO6 -p udp --sport 0 -j $UDP_STOP
+		ipt6 -A INPUT -j PZERO6
+		ipt6 -A OUTPUT -j PZERO6
+	fi
+fi
+
 if [ "$BLK_IDENT" = "1" ]; then
 	eout "{blk_ident} set active BLK_IDENT"
 	# Reject ident request if not defined in IG_TCP_CPORTS
@@ -271,6 +335,23 @@ if [ "$BLK_MCATNET" == "1" ]; then
 	ipt4 -A MCAST -d 224.0.0.0/8 -j $ALL_STOP
 	ipt4 -A INPUT -j MCAST
 	ipt4 -A OUTPUT -j MCAST
+
+	# IPv6 multicast blocking (ff00::/8)
+	if [ "$USE_IPV6" == "1" ]; then
+		eout "{blk_mcat} deny all from ff00::/8 (IPv6)"
+		eout "{blk_mcat} deny all to ff00::/8 (IPv6)"
+		ipt6 -N MCAST6
+		if [ "$LOG_DROP" == "1" ]; then
+			ipt6 -A MCAST6 -s ff00::/8 -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** MCAST6 ** "
+		fi
+		ipt6 -A MCAST6 -s ff00::/8 -j $ALL_STOP
+		if [ "$LOG_DROP" == "1" ]; then
+			ipt6 -A MCAST6 -d ff00::/8 -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** MCAST6 ** "
+		fi
+		ipt6 -A MCAST6 -d ff00::/8 -j $ALL_STOP
+		ipt6 -A INPUT -j MCAST6
+		ipt6 -A OUTPUT -j MCAST6
+	fi
 fi
 
 if [ ! "$BLK_P2P_PORTS" == "" ]; then

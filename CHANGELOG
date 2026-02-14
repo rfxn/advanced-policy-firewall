@@ -1,4 +1,8 @@
 - 2.0.1 | Feb 14 2026:
+[New] IPv6 PKT_SANITY: IN_SANITY6/OUT_SANITY6 chains with TCP flag checks,
+      INVALID state blocking, and PZERO6 port-zero filtering (bt.rules)
+[New] IPv6 multicast blocking; MCAST6 chain blocks ff00::/8 when
+      BLK_MCATNET=1 and USE_IPV6=1 (bt.rules)
 [New] $IP6TS/$IP6TR variables for ip6tables-save/ip6tables-restore discovery
       (internals.conf)
 [New] IPv6 fast load save/restore; ip6tables snapshot saved as .apf6.restore
