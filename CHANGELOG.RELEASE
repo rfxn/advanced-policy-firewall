@@ -1,21 +1,69 @@
-- 1.7.6-2 | Nov 18 2020:
-[New] add iptables locking support with iptables >= 1.4.20; pr #36
-      IPT_LOCK_SUPPORT
-      IPT_LOCK_TIMEOUT
-[Fix] typos
-
-- 1.7.6-1 | Jun 18 2019:
-[New] add mitigation options for TCP SACK Panic vulnerability
-      SYSCTL_TCP_NOSACK and BLK_TCP_SACK_PANIC added to conf.apf
-      https://access.redhat.com/security/vulnerabilities/tcpsack
-[Change] updated autoconf template
-[Change] ignore value of BLK_TCP_SACK_PANIC when SYSCTL_TCP_NOSACK is set
-[Change] make init script LSB compliant for use with systemd; pr #26
-[Fix] README typos; pr #28
-[Fix] flush ip6tables rules on stop/flush if USE_IPV6 enabled; pr #28
-[Fix] only the first nameserver in resolv.conf would be whitelisted when
-      RESV_DNS_DROP is set enabled; issue #25
-[Fix] change ipv4.ip_local_port_range to not emmit errors ref:
-      Marco Padovan <evcz at evcz.tk>
-      https://access.redhat.com/solutions/2887631
-      https://www.spinics.net/lists/netdev/msg330895.html
+- 2.0.1 | Feb 14 2026:
+[New] valid_host() and valid_ip_cidr() input validation functions for trust
+      system operations
+[New] ipt()/ipt4()/ipt6() dual-stack iptables helper functions; ipt() runs
+      both IPv4 and IPv6 when USE_IPV6=1, ipt4()/ipt6() for protocol-specific
+[New] IPv6 kernel module loading when USE_IPV6=1; ip6_tables, ip6table_filter,
+      nf_conntrack_ipv6
+[New] nft backend detection; iptables-save snapshot includes backend marker
+      (.apf.restore.backend) for safe restore across nft/legacy iptables
+[Fix] RAB_PSCAN_LEVEL always-true condition; || changed to && (firewall)
+[Fix] EG_DROP_CMD dead code; comparison to "1" changed to non-empty check
+      (cports.common)
+[Fix] missing $ prefix on LOG_DROP variable reference (cports.common)
+[Fix] RESV_DNS_DROP duplicate ACCEPT rules removed from DNS filtering loop
+      (firewall)
+[Fix] fastload message incorrectly stated "1h" when threshold is 12h (apf)
+[Fix] ovars() broken AWK expression rewritten with ${!var} indirect expansion
+      (functions.apf)
+[Fix] duplicate IPFLOW variable checks corrected to PFLOW in trust parsing
+      x6 (functions.apf)
+[Fix] cli_trust() now validates HOST input via valid_host() before trust
+      operations (functions.apf)
+[Fix] sed delimiter hardened to % in cli_trust_remove() and expirebans() to
+      prevent metacharacter injection (functions.apf)
+[Fix] blocklist integrity validation added via valid_ip_cidr() in all dlist_*
+      download functions (functions.apf)
+[Fix] unquoted variable expansion in file operations (install.sh, functions.apf)
+[Fix] hardcoded /sbin/ip replaced with $ip variable for cross-OS compatibility;
+      breaks on RHEL 8+/Ubuntu 20+ where ip is at /usr/sbin/ip (firewall,
+      vnetgen)
+[Fix] hardcoded /sbin/iptables-save replaced with $IPTS variable
+      (functions.apf)
+[Fix] 35+ hardcoded /etc/apf/ paths replaced with $INSTALL_PATH across
+      download functions, expirebans(), refresh(), cron, temp files, trust
+      md5 (functions.apf, apf)
+[Fix] all 8 $IP6T calls now include $IPT_FLAGS lock flag; previously skipped
+      -w timeout causing potential concurrent modification (functions.apf,
+      firewall, bt.rules)
+[Fix] IPv6 loopback rules corrected from 0/0 to ::/0 (firewall)
+[Fix] SYSCTL_TCP_NOSACK non-empty test corrected to == "1"; setting to "0"
+      previously still disabled SACK (sysctl.rules)
+[Fix] tcp_tw_recycle guarded behind /proc file existence; removed in kernel
+      4.12 (sysctl.rules)
+[Fix] 4 duplicate sysctl writes removed: log_martians x2, rp_filter x2,
+      accept_source_route x2 (sysctl.rules)
+[Fix] conf.apf date typo "2109" corrected to "2019"
+[Fix] cli_trust_remove() now validates input via valid_host() (functions.apf)
+[Fix] valid_host() IPv6 regex tightened to require colon-separated groups;
+      previously accepted invalid strings like "ff" or "::::" (functions.apf)
+[Fix] dead variables removed: LSTOP, LACCEPT, TOS_DEF_TOS, DSTOP
+      (internals.conf)
+[Fix] unused MOD assignment removed from ml() function (functions.apf)
+[Fix] duplicate cron.daily conditional collapsed in install.sh
+[Fix] $ip usage guarded behind -n check to prevent errors when ip binary
+      is absent (internals.conf)
+[Fix] vnetgen ifconfig fallback uses interface line detection instead of
+      grep Link which fails on modern net-tools (vnetgen)
+[Fix] deprecated $[...] arithmetic replaced with $((...)) across all files
+[Fix] ipchains check guarded behind kernel 2.4 detection (functions.apf)
+[Fix] --cmd-owner runtime detection with graceful skip for kernels that
+      removed xt_owner cmd support (cports.common)
+[Change] module loading rewritten with modprobe --dry-run for portable
+         detection across .ko, .ko.xz, .ko.zst extensions (functions.apf)
+[Change] ip route used as primary with route as fallback for interface
+         validation (firewall)
+[Change] ifconfig made optional; ip command used as primary in VNET
+         subsystem (vnetgen, main.vnet)
+[Change] which lsmod/rmmod no longer passes redundant absolute paths
+         (internals.conf)
