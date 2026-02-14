@@ -337,7 +337,7 @@ SYSCTL_TCP="$SYSCTL_TCP"
 #      CVE-2019-11477, CVE-2019-11478, CVE-2019-11479
 #
 # This can be safely ignored if you are running on a modern patched kernel newer
-# than June 16th 2109.
+# than June 16th 2019.
 SYSCTL_TCP_NOSACK="$SYSCTL_TCP_NOSACK"
 
 # These are system control (sysctl) option changes intended to help mitigate

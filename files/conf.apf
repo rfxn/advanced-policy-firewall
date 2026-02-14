@@ -260,7 +260,7 @@ RESV_DNS_DROP="1"
 # client agents for the purpose of distributing or downloading pirated media.
 # Format is comma separated for single ports and an underscore separator for
 # ranges (4660_4678).
-BLK_P2P_PORTS="1214,2323,4660_4678,6257,6699,6346,6347,6881_6889,6346,7778"
+BLK_P2P_PORTS="1214,2323,4660_4678,6257,6699,6346,6347,6881_6889,7778"
 
 # These are common Internet service ports that are understood in the wild 
 # services you would not want logged under normal circumstances. All ports
@@ -482,7 +482,7 @@ EG_UDP_UID=""
 # able to transmit data out of your server.
 
 # CMD-Match outbound (egress) denied applications
-EG_DROP_CMD="eggdrop psybnc bitchx BitchX init udp.pl"
+EG_DROP_CMD="eggdrop,psybnc,bitchx,BitchX,init,udp.pl"
 
 ##
 # [Remote Rule Imports]
@@ -556,6 +556,8 @@ LOG_TARGET="LOG"
 
 # Log interactive access over telnet & ssh; uses
 # custom log prefix of ** SSH ** & ** TELNET **
+# Note: requires LOG_DROP="1" to be enabled. Only logs NEW connections
+# that reach INPUT chain (i.e., not already accepted by port rules).
 LOG_IA="1"
 
 # Log all foreign gateway traffic

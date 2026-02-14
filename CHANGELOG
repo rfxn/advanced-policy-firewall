@@ -124,6 +124,25 @@
 [Change] DLIST download URLs updated from HTTP to HTTPS for all upstream
          sources: cdn.rfxn.com, spamhaus.org, feeds.dshield.org (conf.apf,
          .ca.def)
+[Fix] VER in apf CLI updated from "1.7.6-2" to "2.0.1" (apf)
+[Fix] ALL_STOP unconditional override removed from internals.conf; now only
+      defaults to DROP when unset by conf.apf (internals.conf)
+[Fix] tosroute() uses return instead of break for early exit (functions.apf)
+[Fix] EG_DROP_CMD default value changed from space-separated to comma-separated
+      to match the tr ',' parser in cports.common (conf.apf)
+[Fix] DEVEL_ON timing: fast load now checks DEVEL_MODE directly instead of
+      DEVEL_ON which is set after the check point (apf)
+[Fix] refresh() APF detection changed from PROHIBIT grep to TALLOW chain;
+      works with non-default UDP_STOP settings (functions.apf)
+[Fix] refresh() double REFRESH_TEMP flush removed; allow rules no longer
+      destroyed before deny rules are loaded (functions.apf)
+[Fix] DNS port range corrected from 1023:65535 to 1024:65535 in all DNS
+      rules (firewall)
+[Fix] BLK_P2P_PORTS duplicate port 6346 removed (conf.apf)
+[Fix] .ca.def date typo "2109" corrected to "2019"
+[Fix] $TIF undefined variable replaced with $IFACE_TRUSTED in vnetgen;
+      SET_ADDIFACE trusted interface exclusion now functional (vnetgen)
+[Change] LOG_IA dependency on LOG_DROP documented in conf.apf
 
 - 1.7.6-2 | Nov 18 2020:
 [New] add iptables locking support with iptables >= 1.4.20; pr #36

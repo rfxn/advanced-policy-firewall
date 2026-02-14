@@ -400,7 +400,7 @@ tosroute() {
 TYPE="$1"
 
 if [ -z "$TYPE" ]; then
-	break
+	return
 fi
 
 if [ ! "$TOS_0" == "" ]; then
@@ -1185,7 +1185,7 @@ fi
 }
 
 refresh() {
-	apf_loaded=`$IPT $IPT_FLAGS --list --numeric | grep PROHIBIT`
+	apf_loaded=`$IPT $IPT_FLAGS --list --numeric | grep TALLOW`
 	if [ -z "$apf_loaded" ]; then
 	        eout "{glob} apf does not appear to have rules loaded, doing nothing."
 	        mutex_unlock
@@ -1232,7 +1232,6 @@ refresh() {
         done
         tmprd="$INSTALL_PATH/internals/refresh.drop.temp.$$"
         $IPTS | grep -E "TDENY|TGDENY" | grep -E '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | awk '{print$4}' | sort -n | uniq > $tmprd
-        $IPT $IPT_FLAGS -F REFRESH_TEMP
         for i in `cat $tmprd | grep -v "#"`; do
                 if [ ! "$i" == "" ]; then
                  $IPT $IPT_FLAGS -A REFRESH_TEMP -s $i -d 0/0 -j $ALL_STOP
