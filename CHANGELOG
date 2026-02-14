@@ -1,4 +1,6 @@
 - 2.0.1 | Feb 14 2026:
+[Change] which replaced with command -v (POSIX builtin) for all 16 binary
+         discovery variables in internals.conf
 [Change] mutex_lock()/mutex_unlock() rewritten with flock for atomic kernel-level
          locking; eliminates TOCTOU race in polling lock (functions.apf)
 [New] -v|--version CLI option outputs version number (apf, functions.apf)
