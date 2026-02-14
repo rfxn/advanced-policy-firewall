@@ -32,33 +32,64 @@ devm() {
  fi
 }
 
+## Dual-stack iptables helpers
+# ipt()  — apply rule to both IPv4 and IPv6 (protocol-agnostic rules only)
+# ipt4() — IPv4 only (explicit)
+# ipt6() — IPv6 only when USE_IPV6=1 (explicit)
+ipt() {
+	$IPT $IPT_FLAGS "$@"
+	if [ "$USE_IPV6" == "1" ]; then
+		$IP6T $IPT_FLAGS "$@"
+	fi
+}
+ipt4() { $IPT $IPT_FLAGS "$@"; }
+ipt6() {
+	if [ "$USE_IPV6" == "1" ]; then
+		$IP6T $IPT_FLAGS "$@"
+	fi
+}
+
 ml() {
  MOD="$1"
  FATAL="$2"
- if [ "$KREL" == "2.4" ]; then
-        MEXT="o"
- else
-        MEXT="ko"
+ MEXT="ko"
+
+ # Primary: use modprobe --dry-run (handles .ko, .ko.xz, .ko.zst, all paths)
+ if $MPB --dry-run "$1" >> /dev/null 2>&1; then
+        $MPB $1 >> /dev/null 2>&1 &
+        return 0
  fi
 
- if [ "$FATAL" == "1" ] && [ ! -f "/lib/modules/$(uname -r)/kernel/net/ipv4/netfilter/$1.$MEXT" ] && [ ! -f "/lib/modules/$(uname -r)/kernel/net/ipv4/netfilter/$1.${MEXT}.xz" ]; then
+ # Fallback: manual path check for systems where --dry-run behaves oddly
+ KMOD="/lib/modules/$(uname -r)/kernel/net"
+ for ext in "$MEXT" "${MEXT}.xz" "${MEXT}.zst"; do
+        for subdir in "ipv4/netfilter" "netfilter"; do
+                if [ -f "$KMOD/$subdir/$1.$ext" ]; then
+                        $MPB $1 >> /dev/null 2>&1 &
+                        return 0
+                fi
+        done
+ done
+
+ # Module not found
+ if [ "$FATAL" == "1" ]; then
         if [ ! "$SET_VERBOSE" == "1" ]; then
                 echo "Unable to load iptables module ($1), aborting."
+                echo "  On RHEL/Alma/Rocky 10, try: dnf install kernel-modules-extra"
         fi
         eout "{glob} unable to load iptables module ($1), aborting."
         mutex_unlock
         exit 1
  fi
- if [ -f "/lib/modules/$(uname -r)/kernel/net/ipv4/netfilter/$1.$MEXT" ] || [ -f "/lib/modules/$(uname -r)/kernel/net/netfilter/$1.$MEXT" ] || [ -f "/lib/modules/$(uname -r)/kernel/net/ipv4/netfilter/$1.${MEXT}.xz" ] || [ -f "/lib/modules/$(uname -r)/kernel/net/netfilter/$1.${MEXT}.xz" ]; then
-        $MPB $1 >> /dev/null 2>&1 &
- fi
 }
 
 modinit() {
- # Remove ipchains module if loaded
- IPC_VAL=`$LSM | grep ipchains`
- if [ ! "$IPC_VAL" == "" ]; then
+ # Remove ipchains module if loaded (kernel 2.4 only)
+ if [ "$KREL" == "2.4" ]; then
+  IPC_VAL=`$LSM | grep ipchains`
+  if [ ! "$IPC_VAL" == "" ]; then
         $RMM ipchains
+  fi
  fi
  if [ ! "$SET_MONOKERN" == "1" ]; then
         # Loading Kernel Modules
@@ -69,14 +100,26 @@ modinit() {
 		ml $mod
 	done
 
+	# IPv6 modules (non-fatal; nft backend handles both protocols natively)
+	if [ "$USE_IPV6" == "1" ]; then
+		if [ ! -f "/proc/net/ip6_tables_names" ]; then
+			# Legacy backend: load IPv6 modules explicitly
+			ip6modlist="ip6_tables ip6table_filter ip6table_mangle nf_conntrack_ipv6"
+			for mod in $ip6modlist; do
+				ml $mod
+			done
+		fi
+	fi
 }
 
 check_rab() {
  ml xt_recent
  ml ipt_recent
- if [ ! -f "/lib/modules/$(uname -r)/kernel/net/ipv4/netfilter/ipt_recent.$MEXT" ] && [ ! -f "/lib/modules/$(uname -r)/kernel/net/ipv4/netfilter/ipt_recent.${MEXT}.xz" ] && [ ! -f "/lib/modules/$(uname -r)/kernel/net/ipv4/netfilter/xt_recent.$MEXT" ] && [ ! -f "/lib/modules/$(uname -r)/kernel/net/netfilter/xt_recent.$MEXT" ] && [ ! -f "/lib/modules/$(uname -r)/kernel/net/netfilter/xt_recent.${MEXT}.xz" ] && [ "$RAB" == "1" ]; then
-	RAB="0"
-	eout "{rab} force set RAB disabled, kernel module xt/ipt_recent not found."
+ if [ "$RAB" == "1" ]; then
+        if ! $MPB --dry-run xt_recent >> /dev/null 2>&1 && ! $MPB --dry-run ipt_recent >> /dev/null 2>&1; then
+                RAB="0"
+                eout "{rab} force set RAB disabled, kernel module xt/ipt_recent not found."
+        fi
  fi
 }
 
@@ -93,8 +136,8 @@ mutex_lock() {
       eout "{glob} pid in lock file is not apf, clearing lock."
       break
     fi
-    LOCKDIFF=$[`date +"%s"`-LOCKTIME]
-    LOCALDIFF=$[`date +"%s"`-STARTTIME]
+    LOCKDIFF=$(($(date +"%s")-$LOCKTIME))
+    LOCALDIFF=$(($(date +"%s")-$STARTTIME))
     if [ "$LOCKDIFF" -gt "$LOCK_TIMEOUT" ]; then
       eout "{glob} stale lock file found, clearing lock."
       break
@@ -132,15 +175,36 @@ trim() {
         if [ "$LINES" -gt "$MAXLINES" ]; then
                 eout "{glob} triming $FILE to $MAXLINES lines"
                 CHK_CMT=`tail -n $MAXLINES $FILE | grep -c "#"`
-                MAXLINES=$[CHK_CMT+MAXLINES]
+                MAXLINES=$(($CHK_CMT+$MAXLINES))
                 CHK_SCMT=`tail -n $MAXLINES $FILE | tac | tail -n 1 | grep "#"`
                 if [ "$CHK_SCMT" == "" ]; then
-                        MAXLINES=$[1+MAXLINES]
+                        MAXLINES=$((1+$MAXLINES))
                 fi
                 tail -n $MAXLINES $FILE > $FILE.new
                 mv -f $FILE.new $FILE
         fi
  fi
+}
+
+valid_ip_cidr() {
+	echo "$1" | grep -qE '^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}(/[0-9]{1,2})?$'
+}
+
+valid_host() {
+	local h="$1"
+	# IPv4 address or CIDR
+	if echo "$h" | grep -qE '^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}(/[0-9]{1,2})?$'; then
+		return 0
+	fi
+	# IPv6 address or CIDR
+	if echo "$h" | grep -qE '^[0-9a-fA-F:]+(/[0-9]{1,3})?$'; then
+		return 0
+	fi
+	# FQDN: alphanumeric, hyphens, dots; no leading/trailing hyphens per label
+	if echo "$h" | grep -qE '^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?)*$'; then
+		return 0
+	fi
+	return 1
 }
 
 cli_trust_remove() {
@@ -160,7 +224,7 @@ cli_trust_remove() {
         $IPT $IPT_FLAGS -D TGDENY -s $DIP -j $ALL_STOP
         $IPT $IPT_FLAGS -D TGDENY -d $DIP -j $ALL_STOP
 
-	sed -i "/$DIP/d" $ALLOW_HOSTS $DENY_HOSTS $GALLOW_HOSTS $GDENY_HOSTS
+	sed -i "\%$DIP%d" $ALLOW_HOSTS $DENY_HOSTS $GALLOW_HOSTS $GDENY_HOSTS
 	dil=`$IPT $IPT_FLAGS --numeric --list INPUT --line-numbers | grep -w $DIP | awk '{print$1}'`
 	dol=`$IPT $IPT_FLAGS --numeric --list OUTPUT --line-numbers | grep -w $DIP | awk '{print$1}'`
 	$IPT $IPT_FLAGS -D INPUT $dil >> /dev/null 2>&1
@@ -192,11 +256,15 @@ cli_trust() {
  HOST="$4"
  CMT="$5"
  if [ ! "$HOST" == "" ]; then
+	if ! valid_host "$HOST"; then
+		echo "Invalid host '$HOST': must be a valid IP address, CIDR block, or FQDN"
+		return 1
+	fi
         valtrust=`cat $DENY_HOSTS $ALLOW_HOSTS $GALLOW_HOSTS $GDENY_HOSTS | grep -F -w $HOST`
 	if [ "$valtrust" ]; then
 		tlist=`grep -l $HOST $DENY_HOSTS $ALLOW_HOSTS $GALLOW_HOSTS $GDENY_HOSTS | tr '\n' ' '`
 	fi
-        valip=`cat /etc/apf/internals/.localaddrs | grep -w $HOST`
+        valip=`cat $INSTALL_PATH/internals/.localaddrs | grep -w $HOST`
         if [ "$valtrust" ]; then
                 echo "$HOST already exists in $tlist"
         elif [ "$valip" ]; then
@@ -244,11 +312,11 @@ $IPT $IPT_FLAGS -P FORWARD ACCEPT
 
 if [ "$USE_IPV6" == "1" ]; then
 	chains6=`cat /proc/net/ip6_tables_names 2>/dev/null`
-	for i in $chains6; do $IP6T -t $i -F; done
-	for i in $chains6; do $IP6T -t $i -X; done
-	$IP6T -P INPUT ACCEPT
-	$IP6T -P OUTPUT ACCEPT
-	$IP6T -P FORWARD ACCEPT
+	for i in $chains6; do $IP6T $IPT_FLAGS -t $i -F; done
+	for i in $chains6; do $IP6T $IPT_FLAGS -t $i -X; done
+	$IP6T $IPT_FLAGS -P INPUT ACCEPT
+	$IP6T $IPT_FLAGS -P OUTPUT ACCEPT
+	$IP6T $IPT_FLAGS -P FORWARD ACCEPT
 fi
 
 if [ -f "/proc/net/ipt_recent/DEFAULT" ]; then
@@ -263,7 +331,7 @@ fi
 
 list() {
 echo "Loading iptables rules..."
-iptc=/etc/apf/.iptrules.$$
+iptc=$INSTALL_PATH/.iptrules.$$
 :> $iptc ; chmod 600 $iptc
 $IPT $IPT_FLAGS --verbose --numeric --line-numbers --list >> $iptc
 echo "Opening editor"
@@ -364,7 +432,9 @@ fi
 }
 
 ovars() {
-	nice -n 16 cat /etc/apf/conf.apf /etc/apf/internals/internals.conf | grep -v "#" | grep "=" | tr '=' ' ' | awk '{print""$"$1"}'
+	for var in $(nice -n 16 cat $INSTALL_PATH/conf.apf $INSTALL_PATH/internals/internals.conf | grep -v "^#" | grep "=" | awk -F'=' '{print $1}' | tr -d ' '); do
+		echo "$var=${!var}"
+	done
 }
 
 allow_hosts() {
@@ -382,7 +452,7 @@ if [ ! "`cat $file | grep -v "#"`" == "" ]; then
         #
         #
         for i in `cat $file | grep -v "#" | grep -v ":" | grep -v "="`; do
-                val=`cat /etc/apf/internals/.localaddrs | grep -w $i`
+                val=`cat $INSTALL_PATH/internals/.localaddrs | grep -w $i`
                 if [ ! "$val" ]; then
                  if [ ! "$i" == "" ] && [ -f "$file" ]; then
                         eout "{trust} allow all to/from $i"
@@ -419,7 +489,7 @@ if [ ! "`cat $file | grep -v "#"`" == "" ]; then
                         fi
                         PIP=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$4}'`
 
-                        if [ ! "$IPFLOW" == "" ] && [ ! "$PIP" == "" ] && [ ! "$IPFLOW" == "" ] && [ ! "$PPORT" == "" ]; then
+                        if [ ! "$IPFLOW" == "" ] && [ ! "$PIP" == "" ] && [ ! "$PFLOW" == "" ] && [ ! "$PPORT" == "" ]; then
                                 eout "{trust} allow $PIP $PFLOW_T port $PPORT"
                                 $IPT $IPT_FLAGS -A $chain -p tcp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j ACCEPT
                                 $IPT $IPT_FLAGS -A $chain -p udp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j ACCEPT
@@ -464,10 +534,10 @@ if [ ! "`cat $file | grep -v "#"`" == "" ]; then
                         fi
                         PIP=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$5}'`
 
-                        if [ ! "$NFLOW" == "" ] && [ ! "$IPFLOW" == "" ] && [ ! "$PIP" == "" ] && [ ! "$IPFLOW" == "" ] && [ ! "$PPORT" == "" ]; then
-                         if [ "$IPFLOW" == "s" ] && [ "$NFLOW" == "INPUT" ] && [ "$(cat /etc/apf/internals/.localaddrs | grep -w $PIP)" ]; then
+                        if [ ! "$NFLOW" == "" ] && [ ! "$IPFLOW" == "" ] && [ ! "$PIP" == "" ] && [ ! "$PFLOW" == "" ] && [ ! "$PPORT" == "" ]; then
+                         if [ "$IPFLOW" == "s" ] && [ "$NFLOW" == "INPUT" ] && [ "$(cat $INSTALL_PATH/internals/.localaddrs | grep -w $PIP)" ]; then
                                 eout "{trust} ignored local ip allow rule '$NFLOW_T $PIP $PFLOW_T port $PPORT'"
-                         elif [ "$IPFLOW" == "d" ] && [ "$NFLOW" == "OUTPUT" ] && [ "$(cat /etc/apf/internals/.localaddrs | grep -w $PIP)" ]; then
+                         elif [ "$IPFLOW" == "d" ] && [ "$NFLOW" == "OUTPUT" ] && [ "$(cat $INSTALL_PATH/internals/.localaddrs | grep -w $PIP)" ]; then
                                 eout "{trust} ignored local ip allow rule '$NFLOW_T $PIP $PFLOW_T port $PPORT'"
                          else
                                 eout "{trust} allow $NFLOW_T $PIP $PFLOW_T port $PPORT"
@@ -522,10 +592,10 @@ if [ ! "`cat $file | grep -v "#"`" == "" ]; then
                         fi
                         PIP=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$6}'`
 
-                        if [ ! "$PTYPE" == "" ] && [ ! "$NFLOW" == "" ] && [ ! "$IPFLOW" == "" ] && [ ! "$PIP" == "" ] && [ ! "$IPFLOW" == "" ] && [ ! "$PPORT" == "" ]; then
-                         if [ "$IPFLOW" == "s" ] && [ "$NFLOW" == "INPUT" ] && [ "$(cat /etc/apf/internals/.localaddrs | grep -w $PIP)" ]; then
+                        if [ ! "$PTYPE" == "" ] && [ ! "$NFLOW" == "" ] && [ ! "$IPFLOW" == "" ] && [ ! "$PIP" == "" ] && [ ! "$PFLOW" == "" ] && [ ! "$PPORT" == "" ]; then
+                         if [ "$IPFLOW" == "s" ] && [ "$NFLOW" == "INPUT" ] && [ "$(cat $INSTALL_PATH/internals/.localaddrs | grep -w $PIP)" ]; then
                                 eout "{trust} ignored local ip allow rule '$NFLOW_T $PIP $PFLOW_T port $PPORT'"
-                         elif [ "$IPFLOW" == "d" ] && [ "$NFLOW" == "OUTPUT" ] && [ "$(cat /etc/apf/internals/.localaddrs | grep -w $PIP)" ]; then
+                         elif [ "$IPFLOW" == "d" ] && [ "$NFLOW" == "OUTPUT" ] && [ "$(cat $INSTALL_PATH/internals/.localaddrs | grep -w $PIP)" ]; then
                                 eout "{trust} ignored local ip allow rule '$NFLOW_T $PIP $PFLOW_T port $PPORT'"
                          else
                                 if [ "$PTYPE" == "tcp" ]; then
@@ -558,7 +628,7 @@ if [ ! "`cat $file | grep -v "#"`" == "" ]; then
         #
         #
         for i in `cat $file | grep -v "#" | grep -v ":" | grep -v "="`; do
-                val="$(cat /etc/apf/internals/.localaddrs | grep -w $i)"
+                val="$(cat $INSTALL_PATH/internals/.localaddrs | grep -w $i)"
                 if [ ! "$val" ]; then
                  if [ ! "$i" == "" ] && [ -f "$file" ]; then
                         eout "{trust} deny all to/from $i"
@@ -595,7 +665,7 @@ if [ ! "`cat $file | grep -v "#"`" == "" ]; then
                         fi
                         PIP=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$4}'`
 
-                        if [ ! "$IPFLOW" == "" ] && [ ! "$PIP" == "" ] && [ ! "$IPFLOW" == "" ] && [ ! "$PPORT" == "" ]; then
+                        if [ ! "$IPFLOW" == "" ] && [ ! "$PIP" == "" ] && [ ! "$PFLOW" == "" ] && [ ! "$PPORT" == "" ]; then
                                 eout "{trust} deny $PIP $PFLOW_T port $PPORT"
                                 $IPT $IPT_FLAGS -A $chain -p tcp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j $TCP_STOP
 				$IPT $IPT_FLAGS -A $chain -p udp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j $UDP_STOP
@@ -640,7 +710,7 @@ if [ ! "`cat $file | grep -v "#"`" == "" ]; then
                         fi
                         PIP=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$5}'`
 
-                        if [ ! "$NFLOW" == "" ] && [ ! "$IPFLOW" == "" ] && [ ! "$PIP" == "" ] && [ ! "$IPFLOW" == "" ] && [ ! "$PPORT" == "" ]; then
+                        if [ ! "$NFLOW" == "" ] && [ ! "$IPFLOW" == "" ] && [ ! "$PIP" == "" ] && [ ! "$PFLOW" == "" ] && [ ! "$PPORT" == "" ]; then
                                 eout "{trust} deny ($NFLOW_T) $PIP $PFLOW_T port $PPORT"
                                 $IPT $IPT_FLAGS -A $chain -p tcp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j $TCP_STOP
 				$IPT $IPT_FLAGS -A $chain -p udp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j $UDP_STOP
@@ -692,7 +762,7 @@ if [ ! "`cat $file | grep -v "#"`" == "" ]; then
                         fi
                         PIP=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$6}'`
 
-                        if [ ! "$PTYPE" == "" ] && [ ! "$NFLOW" == "" ] && [ ! "$IPFLOW" == "" ] && [ ! "$PIP" == "" ] && [ ! "$IPFLOW" == "" ] && [ ! "$PPORT" == "" ]; then
+                        if [ ! "$PTYPE" == "" ] && [ ! "$NFLOW" == "" ] && [ ! "$IPFLOW" == "" ] && [ ! "$PIP" == "" ] && [ ! "$PFLOW" == "" ] && [ ! "$PPORT" == "" ]; then
 				if [ "$PTYPE" == "tcp" ]; then
         	                        eout "{trust} deny $NFLOW_T $PTYPE $PIP $PFLOW_T port $PPORT"
 	                                $IPT $IPT_FLAGS -A $chain -p $PTYPE -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j $TCP_STOP
@@ -709,65 +779,65 @@ fi
 
 dlist_resnet() {
  if [ -f "$RESNET" ]; then
-        cp $RESNET $RESNET.bk
-        chmod 600 $RESNET $RESNET.bk
+        cp "$RESNET" "$RESNET.bk"
+        chmod 600 "$RESNET" "$RESNET.bk"
  fi
 if [ -f "$WGET" ] && [ -f "$RESNET" ]; then
-   URL_TMP="/etc/apf/.apf-$$"
-   rm -rf $URL_TMP
+   URL_TMP="$INSTALL_PATH/.apf-$$"
+   rm -rf "$URL_TMP"
    URL_FILE=`echo $DLIST_RESERVED_URL | tr '/' '\n' | grep "." | tail -n 1`
-   mkdir $URL_TMP
-   cd $URL_TMP
+   mkdir "$URL_TMP"
+   cd "$URL_TMP"
    eout "{resnet} downloading $DLIST_RESERVED_URL"
-   $WGET -4 -t 1 -T 4 $DLIST_RESERVED_URL >> /dev/null 2>&1
+   $WGET -4 -t 1 -T 4 "$DLIST_RESERVED_URL" >> /dev/null 2>&1
    if [ -f "$URL_TMP/$URL_FILE" ]; then
         eout "{resnet} parsing $URL_FILE into $RESNET"
-        cat $URL_TMP/$URL_FILE > $RESNET
+        cat "$URL_TMP/$URL_FILE" > "$RESNET"
    else
         eout "{resnet} download of $DLIST_RESERVED_URL failed"
 	 if [ -f "$RESNET" ]; then
-	     cp $RESNET.bk $RESNET
-   	     chmod 600 $RESNET $RESNET.bk
+	     cp "$RESNET.bk" "$RESNET"
+   	     chmod 600 "$RESNET" "$RESNET.bk"
 	 fi
    fi
-   rm -rf $URL_TMP
-   cd /etc/apf
+   rm -rf "$URL_TMP"
+   cd $INSTALL_PATH
 else
  if [ -f "$RESNET" ]; then
-	cp $RESNET.bk $RESNET
-	chmod 600 $RESNET $RESNET.bk
+	cp "$RESNET.bk" "$RESNET"
+	chmod 600 "$RESNET" "$RESNET.bk"
  fi
 fi
 }
 
 dlist_php() {
 if [ ! "$DLIST_PHP_URL" == "" ] && [ "$DLIST_PHP" == "1" ] && [ -f "$WGET" ]; then
-   URL_TMP="/etc/apf/.apf-$$"
-   rm -rf $URL_TMP /etc/apf/.apf-*
+   URL_TMP="$INSTALL_PATH/.apf-$$"
+   rm -rf "$URL_TMP" $INSTALL_PATH/.apf-*
    URL_FILE=`echo $DLIST_PHP_URL | tr '/' '\n' | grep "." | tail -n 1`
-   mkdir $URL_TMP
-   cd $URL_TMP
+   mkdir "$URL_TMP"
+   cd "$URL_TMP"
    eout "{php} downloading $DLIST_PHP_URL"
-   $WGET -4 -t 1 -T 4 $DLIST_PHP_URL >> /dev/null 2>&1
+   $WGET -4 -t 1 -T 4 "$DLIST_PHP_URL" >> /dev/null 2>&1
    if [ -f "$URL_TMP/$URL_FILE" ]; then
         eout "{php} parsing $URL_FILE into $PHP_HOSTS"
         if [ -f "$PHP_HOSTS" ]; then
-                :> $PHP_HOSTS
+                :> "$PHP_HOSTS"
         fi
-        for str in `cat $URL_TMP/$URL_FILE | grep -v "#" | grep -e '[0-9]' | awk '{print$1}'`; do
+        for str in `cat "$URL_TMP/$URL_FILE" | grep -v "#" | grep -e '[0-9]' | awk '{print$1}'`; do
                 if [ ! "$str" == "" ]; then
-                    echo "$str" >> $PHP_HOSTS
+                    echo "$str" >> "$PHP_HOSTS"
                 fi
         done
    else
         eout "{php} download of $DLIST_PHP_URL failed"
    fi
-   rm -rf $URL_TMP
-   cd /etc/apf
+   rm -rf "$URL_TMP"
+   cd $INSTALL_PATH
 else
-   rm -f $PHP_HOSTS
-   touch $PHP_HOSTS
-   chmod 600 $PHP_HOSTS
+   rm -f "$PHP_HOSTS"
+   touch "$PHP_HOSTS"
+   chmod 600 "$PHP_HOSTS"
 fi
 }
 
@@ -777,6 +847,10 @@ if [ ! "`cat $PHP_HOSTS | grep -v "#"`" == "" ]; then
         $IPT $IPT_FLAGS -N PHP
         for i in `cat $PHP_HOSTS | grep -v "#"`; do
                 if [ ! "$i" == "" ] && [ -f "$PHP_HOSTS" ]; then
+			if ! valid_ip_cidr "$i"; then
+				eout "{php} skipping invalid entry: $i"
+				continue
+			fi
 		        if [ "$LOG_DROP" == "1" ]; then
                          $IPT $IPT_FLAGS -A PHP -s $i -d 0/0 -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** PHP ** "
 			fi
@@ -790,32 +864,32 @@ fi
 
 dlist_dshield() {
 if [ ! "$DLIST_DSHIELD_URL" == "" ] && [ "$DLIST_DSHIELD" == "1" ] && [ -f "$WGET" ]; then
-   URL_TMP="/etc/apf/.apf-$$"
-   rm -rf $URL_TMP /etc/apf/.apf-*
+   URL_TMP="$INSTALL_PATH/.apf-$$"
+   rm -rf "$URL_TMP" $INSTALL_PATH/.apf-*
    URL_FILE=`echo $DLIST_DSHIELD_URL | tr '/' '\n' | grep "." | tail -n 1`
-   mkdir $URL_TMP
-   cd $URL_TMP
+   mkdir "$URL_TMP"
+   cd "$URL_TMP"
    eout "{dshield} downloading $DLIST_DSHIELD_URL"
-   $WGET -4 -t 1 -T 4 $DLIST_DSHIELD_URL >> /dev/null 2>&1
+   $WGET -4 -t 1 -T 4 "$DLIST_DSHIELD_URL" >> /dev/null 2>&1
    if [ -f "$URL_TMP/$URL_FILE" ]; then
         eout "{dshield} parsing $URL_FILE into $DS_HOSTS"
         if [ -f "$DS_HOSTS" ]; then
-                :> $DS_HOSTS
+                :> "$DS_HOSTS"
         fi
-        for str in `cat $URL_TMP/$URL_FILE | grep -v "#" | grep -e '[0-9]' | awk '{print$1}'`; do
+        for str in `cat "$URL_TMP/$URL_FILE" | grep -v "#" | grep -e '[0-9]' | awk '{print$1}'`; do
                 if [ ! "$str" == "" ]; then
-                    echo "$str/24" >> $DS_HOSTS
+                    echo "$str/24" >> "$DS_HOSTS"
                 fi
         done
    else
         eout "{dshield} download of $DLIST_DSHIELD_URL failed"
    fi
-   rm -rf $URL_TMP
-   cd /etc/apf
+   rm -rf "$URL_TMP"
+   cd $INSTALL_PATH
 else
-   rm -f $DS_HOSTS
-   touch $DS_HOSTS
-   chmod 600 $DS_HOSTS
+   rm -f "$DS_HOSTS"
+   touch "$DS_HOSTS"
+   chmod 600 "$DS_HOSTS"
 fi
 }
 
@@ -825,6 +899,10 @@ if [ ! "`cat $DS_HOSTS | grep -v "#"`" == "" ]; then
         $IPT $IPT_FLAGS -N DSHIELD
         for i in `cat $DS_HOSTS | grep -v "#"`; do
                 if [ ! "$i" == "" ] && [ -f "$DS_HOSTS" ]; then
+			if ! valid_ip_cidr "$i"; then
+				eout "{dshield} skipping invalid entry: $i"
+				continue
+			fi
 		        if [ "$LOG_DROP" == "1" ]; then
                          $IPT $IPT_FLAGS -A DSHIELD -s $i -d 0/0 -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** DSHIELD ** "
 			fi
@@ -838,32 +916,32 @@ fi
 
 dlist_spamhaus() {
 if [ ! "$DLIST_SPAMHAUS_URL" == "" ] && [ "$DLIST_SPAMHAUS" == "1" ] && [ -f "$WGET" ]; then
-   URL_TMP="/etc/apf/.apf-$$"
-   rm -rf $URL_TMP /etc/apf/.apf-*
+   URL_TMP="$INSTALL_PATH/.apf-$$"
+   rm -rf "$URL_TMP" $INSTALL_PATH/.apf-*
    URL_FILE=`echo $DLIST_SPAMHAUS_URL | tr '/' '\n' | grep "." | tail -n 1`
-   mkdir $URL_TMP
-   cd $URL_TMP
+   mkdir "$URL_TMP"
+   cd "$URL_TMP"
    eout "{sdrop} downloading $DLIST_SPAMHAUS_URL"
-   $WGET -4 -t 1 -T 4 $DLIST_SPAMHAUS_URL >> /dev/null 2>&1
+   $WGET -4 -t 1 -T 4 "$DLIST_SPAMHAUS_URL" >> /dev/null 2>&1
    if [ -f "$URL_TMP/$URL_FILE" ]; then
         eout "{sdrop} parsing $URL_FILE into $DROP_HOSTS"
         if [ -f "$DROP_HOSTS" ]; then
-                :> $DROP_HOSTS
+                :> "$DROP_HOSTS"
         fi
-        for str in `cat $URL_TMP/$URL_FILE | grep -v "#" | grep "/" | awk '{print$1}' | tr -d ';'`; do
+        for str in `cat "$URL_TMP/$URL_FILE" | grep -v "#" | grep "/" | awk '{print$1}' | tr -d ';'`; do
                 if [ ! "$str" == "" ]; then
-                    echo "$str" >> $DROP_HOSTS
+                    echo "$str" >> "$DROP_HOSTS"
                 fi
         done
    else
         eout "{sdrop} download of $DLIST_SPAMHAUS_URL failed"
    fi
-   rm -rf $URL_TMP
-   cd /etc/apf
+   rm -rf "$URL_TMP"
+   cd $INSTALL_PATH
 else
-   rm -f $DROP_HOSTS
-   touch $DROP_HOSTS
-   chmod 600 $DROP_HOSTS
+   rm -f "$DROP_HOSTS"
+   touch "$DROP_HOSTS"
+   chmod 600 "$DROP_HOSTS"
 fi
 }
 
@@ -874,6 +952,10 @@ if [ ! "`cat $DROP_HOSTS | grep -v "#"`" == "" ]; then
         $IPT $IPT_FLAGS -N SDROP
         for i in `cat $DROP_HOSTS | grep -v "#"`; do
                 if [ ! "$i" == "" ] && [ -f "$DROP_HOSTS" ]; then
+			if ! valid_ip_cidr "$i"; then
+				eout "{sdrop} skipping invalid entry: $i"
+				continue
+			fi
 		        if [ "$LOG_DROP" == "1" ]; then
                          $IPT $IPT_FLAGS -A SDROP -s $i -d 0/0 -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** SDROP ** "
 		        fi
@@ -887,32 +969,32 @@ fi
 
 dlist_ecnshame() {
 if [ ! "$DLIST_ECNSHAME_URL" == "" ] && [ "$DLIST_ECNSHAME" == "1" ] && [ -f "$WGET" ]; then
-   URL_TMP="/etc/apf/.apf-$$"
-   rm -rf $URL_TMP /etc/apf/.apf-*
+   URL_TMP="$INSTALL_PATH/.apf-$$"
+   rm -rf "$URL_TMP" $INSTALL_PATH/.apf-*
    URL_FILE=`echo $DLIST_ECNSHAME_URL | tr '/' '\n' | grep "." | tail -n 1`
-   mkdir $URL_TMP
-   cd $URL_TMP
+   mkdir "$URL_TMP"
+   cd "$URL_TMP"
    eout "{ecnshame} downloading $DLIST_ECNSHAME_URL"
-   $WGET -4 -t 1 -T 4 $DLIST_ECNSHAME_URL >> /dev/null 2>&1
+   $WGET -4 -t 1 -T 4 "$DLIST_ECNSHAME_URL" >> /dev/null 2>&1
    if [ -f "$URL_TMP/$URL_FILE" ]; then
         eout "{ecnshame} parsing $URL_FILE into $ECNSHAME_HOSTS"
         if [ -f "$ECNSHAME_HOSTS" ]; then
-                :> $ECNSHAME_HOSTS
+                :> "$ECNSHAME_HOSTS"
         fi
-        for str in `cat $URL_TMP/$URL_FILE`; do
+        for str in `cat "$URL_TMP/$URL_FILE"`; do
                 if [ ! "$str" == "" ]; then
-                    echo "$str" >> $ECNSHAME_HOSTS
+                    echo "$str" >> "$ECNSHAME_HOSTS"
                 fi
         done
    else
         eout "{ecnshame} download of $DLIST_ECNSHAME_URL failed"
    fi
-   rm -rf $URL_TMP
-   cd /etc/apf
+   rm -rf "$URL_TMP"
+   cd $INSTALL_PATH
 else
-   rm -f $ECNSHAME_HOSTS
-   touch $ECNSHAME_HOSTS
-   chmod 600 $ECNSHAME_HOSTS
+   rm -f "$ECNSHAME_HOSTS"
+   touch "$ECNSHAME_HOSTS"
+   chmod 600 "$ECNSHAME_HOSTS"
 fi
 }
 
@@ -921,6 +1003,10 @@ if [ ! "`cat $ECNSHAME_HOSTS | grep -v "#"`" == "" ]; then
         eout "{ecnshame} loading ecnshame_hosts.rules"
         for i in `cat $ECNSHAME_HOSTS | grep -v "#"`; do
                 if [ ! "$i" == "" ] && [ -f "$ECNSHAME_HOSTS" ]; then
+			if ! valid_ip_cidr "$i"; then
+				eout "{ecnshame} skipping invalid entry: $i"
+				continue
+			fi
 			$IPT $IPT_FLAGS -t mangle -A POSTROUTING -p tcp -d $i -j ECN --ecn-tcp-remove
                 fi
         done
@@ -929,49 +1015,49 @@ fi
 
 glob_allow_download() {
 if [ ! "$GA_URL" == "" ] && [ "$USE_RGT" == "1" ] && [ -f "$WGET" ]; then
-   URL_TMP="/etc/apf/.apf-$$"
-   rm -rf $URL_TMP
+   URL_TMP="$INSTALL_PATH/.apf-$$"
+   rm -rf "$URL_TMP"
    URL_FILE=`echo $GA_URL | tr '/' '\n' | grep "." | tail -n 1`
-   mkdir $URL_TMP
-   cd $URL_TMP
+   mkdir "$URL_TMP"
+   cd "$URL_TMP"
    eout "{trust} downloading $GA_URL"
-   $WGET -4 -t 1 -T 4 $GA_URL >> /dev/null 2>&1
+   $WGET -4 -t 1 -T 4 "$GA_URL" >> /dev/null 2>&1
    if [ -f "$URL_TMP/$URL_FILE" ]; then
         eout "{trust} parsing $URL_FILE into $GALLOW_HOSTS"
-        cat $URL_TMP/$URL_FILE > $GALLOW_HOSTS
+        cat "$URL_TMP/$URL_FILE" > "$GALLOW_HOSTS"
    else
         eout "{trust} download of $GA_URL failed"
    fi
-   rm -rf $URL_TMP
-   cd /etc/apf
+   rm -rf "$URL_TMP"
+   cd $INSTALL_PATH
 else
-   rm -f $GALLOW_HOSTS
-   touch $GALLOW_HOSTS
-   chmod 600 $GALLOW_HOSTS
+   rm -f "$GALLOW_HOSTS"
+   touch "$GALLOW_HOSTS"
+   chmod 600 "$GALLOW_HOSTS"
 fi
 }
 
 glob_deny_download() {
 if [ ! "$GD_URL" == "" ] && [ "$USE_RGT" == "1" ] && [ -f "$WGET" ]; then
-   URL_TMP="/etc/apf/.apf-$$"
-   rm -rf $URL_TMP
+   URL_TMP="$INSTALL_PATH/.apf-$$"
+   rm -rf "$URL_TMP"
    URL_FILE=`echo $GD_URL | tr '/' '\n' | grep "." | tail -n 1`
-   mkdir $URL_TMP
-   cd $URL_TMP
+   mkdir "$URL_TMP"
+   cd "$URL_TMP"
    eout "{trust} downloading $GD_URL"
-   $WGET -4 -t 1 -T 4 $GD_URL >> /dev/null 2>&1
+   $WGET -4 -t 1 -T 4 "$GD_URL" >> /dev/null 2>&1
    if [ -f "$URL_TMP/$URL_FILE" ]; then
         eout "{trust} parsing $URL_FILE into $GDENY_HOSTS"
-	cat $URL_TMP/$URL_FILE > $GDENY_HOSTS
+	cat "$URL_TMP/$URL_FILE" > "$GDENY_HOSTS"
    else
         eout "{trust} download of $GD_URL failed"
    fi
-   rm -rf $URL_TMP
-   cd /etc/apf
+   rm -rf "$URL_TMP"
+   cd $INSTALL_PATH
 else
-   rm -f $GDENY_HOSTS
-   touch $GDENY_HOSTS
-   chmod 600 $GDENY_HOSTS
+   rm -f "$GDENY_HOSTS"
+   touch "$GDENY_HOSTS"
+   chmod 600 "$GDENY_HOSTS"
 fi
 }
 
@@ -1056,26 +1142,25 @@ if [ -z "$SET_EXPIRE" ]; then
         SET_EXPIRE=0
 fi
 if [ "$SET_EXPIRE" -ge "60" ]; then
- REFRESH_TIME=$[SET_REFRESH*60]
+ REFRESH_TIME=$(($SET_REFRESH*60))
  if [ "$SET_EXPIRE" -lt "$REFRESH_TIME" ]; then
         SET_EXPIRE="$REFRESH_TIME"
  fi
- if [ -f "/etc/apf/deny_hosts.rules" ]; then
+ if [ -f "$INSTALL_PATH/deny_hosts.rules" ]; then
          expire_time="$SET_EXPIRE"
          check_time=$(date +%s)
-         for i in `cat /etc/apf/deny_hosts.rules | grep -vE "static|noexpire" | grep -iE "# added.*on.*" | awk '{print$3"|"$5"|"$6}'`; do
+         for i in `cat $INSTALL_PATH/deny_hosts.rules | grep -vE "static|noexpire" | grep -iE "# added.*on.*" | awk '{print$3"|"$5"|"$6}'`; do
                 declare -a arr
                 arr=(`echo ${i//|/ }`)
                 ip=${arr[0]}
                 date_d=${arr[1]}
                 date_t=${arr[2]}
                 ban_time=$(date --date "$date_d $date_t" +%s)
-                time_diff=$[$check_time-$ban_time]
+                time_diff=$(($check_time-$ban_time))
                 if [ "$time_diff" -ge "$expire_time" ]; then
                         eout "{trust} removed expired ban for $ip (${time_diff}s/${expire_time}s)"
-                        sdel=`echo $ip | sed 's%/%\\\/%'`
-                        sed -i "/$sdel/d" /etc/apf/deny_hosts.rules
-                        /etc/apf/apf -u "$ip" >> /dev/null 2>&1
+                        sed -i "\%$ip%d" $INSTALL_PATH/deny_hosts.rules
+                        $INSTALL_PATH/apf -u "$ip" >> /dev/null 2>&1
                 fi
          done
  fi
@@ -1091,7 +1176,7 @@ refresh() {
 	fi
 
         eout "{glob} refreshing trust system rules"
-	tmpra="/etc/apf/internals/refresh.allow.temp.$$"
+	tmpra="$INSTALL_PATH/internals/refresh.allow.temp.$$"
 
         if [ "$SET_EXPIRE" -ge "60" ]; then
                 # expire deny_hosts bans
@@ -1102,25 +1187,25 @@ refresh() {
  	 glob_allow_download
 	 glob_deny_download
 	 trusts_md5=`$MD5 $DENY_HOSTS $GDENY_HOSTS $ALLOW_HOSTS $GALLOW_HOSTS | $MD5 | awk '{print$1}'`
-	 if [ -f "/etc/apf/internals/.trusts.md5" ]; then
-		last_trusts_md5=`cat /etc/apf/internals/.trusts.md5`
+	 if [ -f "$INSTALL_PATH/internals/.trusts.md5" ]; then
+		last_trusts_md5=`cat $INSTALL_PATH/internals/.trusts.md5`
 		if [ "$trusts_md5" == "$last_trusts_md5" ]; then
 		        eout "{glob} trust rules unchanged since last refresh, doing nothing."
-	                echo "$trusts_md5" > /etc/apf/internals/.trusts.md5
+	                echo "$trusts_md5" > $INSTALL_PATH/internals/.trusts.md5
 		        mutex_unlock
 			exit 1
 		else
-	                echo "$trusts_md5" > /etc/apf/internals/.trusts.md5
+	                echo "$trusts_md5" > $INSTALL_PATH/internals/.trusts.md5
 		fi
 	 else
-		echo "$trusts_md5" > /etc/apf/internals/.trusts.md5
+		echo "$trusts_md5" > $INSTALL_PATH/internals/.trusts.md5
 	 fi
 	else
 		glob_allow_download
 		glob_deny_download
 	fi
 
-        /sbin/iptables-save | grep -E "TALLOW|TGALLOW" | grep -E '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | awk '{print$4}' | sort -n | uniq > $tmpra
+        $IPTS | grep -E "TALLOW|TGALLOW" | grep -E '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | awk '{print$4}' | sort -n | uniq > $tmpra
         $IPT $IPT_FLAGS -F REFRESH_TEMP
         for i in `cat $tmpra | grep -v "#"`; do
                 if [ ! "$i" == "" ]; then
@@ -1128,8 +1213,8 @@ refresh() {
                  $IPT $IPT_FLAGS -A REFRESH_TEMP -d $i -s 0/0 -j ACCEPT
                 fi
         done
-        tmprd="/etc/apf/internals/refresh.drop.temp.$$"
-        /sbin/iptables-save | grep -E "TDENY|TGDENY" | grep -E '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | awk '{print$4}' | sort -n | uniq > $tmprd
+        tmprd="$INSTALL_PATH/internals/refresh.drop.temp.$$"
+        $IPTS | grep -E "TDENY|TGDENY" | grep -E '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | awk '{print$4}' | sort -n | uniq > $tmprd
         $IPT $IPT_FLAGS -F REFRESH_TEMP
         for i in `cat $tmprd | grep -v "#"`; do
                 if [ ! "$i" == "" ]; then
@@ -1154,7 +1239,7 @@ refresh() {
 cron_refresh() {
 if [ ! "$SET_REFRESH" == "0" ] && [ ! "$SET_REFRESH" == "" ]; then
 cat<<EOF > $INSTALL_PATH/internals/cron.refresh
-*/$SET_REFRESH * * * * root /etc/apf/apf --refresh >> /dev/null 2>&1 &
+*/$SET_REFRESH * * * * root $INSTALL_PATH/apf --refresh >> /dev/null 2>&1 &
 EOF
 	chmod 644 $INSTALL_PATH/internals/cron.refresh
 	ln -fs $INSTALL_PATH/internals/cron.refresh /etc/cron.d/refresh.apf

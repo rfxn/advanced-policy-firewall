@@ -179,15 +179,25 @@ fi
 fi
 
 if [ "$EGF" == "1" ]; then
- if [ "$EG_DROP_CMD" == "1" ]; then
+ if [ ! "$EG_DROP_CMD" == "" ]; then
+	# --cmd-owner was removed from iptables in kernel 3.x; detect support
+	if $IPT $IPT_FLAGS -N _DEG_TEST >> /dev/null 2>&1 && \
+	   $IPT $IPT_FLAGS -A _DEG_TEST -m owner --cmd-owner=_test -j DROP >> /dev/null 2>&1; then
+		$IPT $IPT_FLAGS -F _DEG_TEST >> /dev/null 2>&1
+		$IPT $IPT_FLAGS -X _DEG_TEST >> /dev/null 2>&1
 		$IPT $IPT_FLAGS -N DEG
-	for i in `echo $EG_DROP_CMD | tr ',' ' '`; do
-		si=`echo $i | cut -c 1-6`		
-		if [ "LOG_DROP" == "1" ]; then 
-		  $IPT $IPT_FLAGS -A DEG -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** DEG_$si ** "
-		fi
-		$IPT $IPT_FLAGS -A DEG -s 0/0 -d 0/0 -m owner --cmd-owner=$i -j $ALL_STOP
-	done
-		  $IPT $IPT_FLAGS -A OUTPUT -j DEG
+		for i in `echo $EG_DROP_CMD | tr ',' ' '`; do
+			si=`echo $i | cut -c 1-6`
+			if [ "$LOG_DROP" == "1" ]; then
+			  $IPT $IPT_FLAGS -A DEG -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** DEG_$si ** "
+			fi
+			$IPT $IPT_FLAGS -A DEG -s 0/0 -d 0/0 -m owner --cmd-owner=$i -j $ALL_STOP
+		done
+		$IPT $IPT_FLAGS -A OUTPUT -j DEG
+	else
+		$IPT $IPT_FLAGS -F _DEG_TEST >> /dev/null 2>&1
+		$IPT $IPT_FLAGS -X _DEG_TEST >> /dev/null 2>&1
+		eout "{glob} WARNING: EG_DROP_CMD set but --cmd-owner not supported by this kernel; skipping"
+	fi
  fi
 fi

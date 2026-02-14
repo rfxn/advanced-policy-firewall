@@ -29,7 +29,7 @@ if [ ! -f "$ip" ] && [ ! -f "$ifconfig" ]; then
 	echo "$ip and $ifconfig not found; aborting"
         exit 1
 elif [ -f "$ip" ]; then
- for addr in `/sbin/ip addr list | tr '/' ' ' | grep -w inet | grep -w $IF | grep -v 127.0.0.1 | grep -vw $NET | awk '{print$2}'`; do
+ for addr in `$ip addr list | tr '/' ' ' | grep -w inet | grep -w $IF | grep -v 127.0.0.1 | grep -vw $NET | awk '{print$2}'`; do
   if [ ! -f "$INSTALL_PATH/vnet/$addr.rules" ]; then
         touch $INSTALL_PATH/vnet/$addr.rules
         chmod 600 $INSTALL_PATH/vnet/$addr.rules
@@ -51,11 +51,11 @@ fi
 
 if [ "$SET_ADDIFACE" == "1" ]; then
  ## associate a vnet rule for ip's on additional interfaces other than the main
- for anet in `ifconfig | grep Link | grep -vwE "inet|inet6|lo|$IFACE_UNTRUSTED|$IFACE_UNTRUSTED" | awk '{print$1}'`; do
-  if [ -f "$ip" ]; then
-  valtif=`echo $TIF | grep $anet`
+ if [ -f "$ip" ]; then
+  for anet in $($ip -o link show 2>/dev/null | awk -F': ' '{print $2}' | grep -vwE "lo|$IFACE_UNTRUSTED"); do
+   valtif=$(echo $TIF | grep $anet)
    if [ "$valtif" == "" ]; then
-    for addr in `/sbin/ip addr list | tr '/' ' ' | grep -w inet | grep -w $anet | grep -v 127.0.0.1 | grep -vw $NET | awk '{print$2}'`; do
+    for addr in $($ip addr list $anet 2>/dev/null | tr '/' ' ' | grep -w inet | grep -v 127.0.0.1 | grep -vw $NET | awk '{print$2}'); do
      if [ ! -f "$INSTALL_PATH/vnet/$addr.rules" ]; then
         touch $INSTALL_PATH/vnet/$addr.rules
         chmod 600 $INSTALL_PATH/vnet/$addr.rules
@@ -63,11 +63,13 @@ if [ "$SET_ADDIFACE" == "1" ]; then
      fi
     done
    fi
-  elif [ -f "$ifconfig" ]; then
-   for iface in `ifconfig | grep -w $anet | awk '{print$1}'`; do
-    valtif=`echo $TIF | grep $anet`
-    if [ "$valtif" == "" ]; then 
-     for addr in `ifconfig $iface | grep -w inet | tr ':' ' ' | grep -vw $NET | awk '{print$3}'`; do
+  done
+ elif [ -f "$ifconfig" ]; then
+  for anet in $(ifconfig | grep Link | grep -vwE "inet|inet6|lo|$IFACE_UNTRUSTED|$IFACE_UNTRUSTED" | awk '{print$1}'); do
+   for iface in $(ifconfig | grep -w $anet | awk '{print$1}'); do
+    valtif=$(echo $TIF | grep $anet)
+    if [ "$valtif" == "" ]; then
+     for addr in $(ifconfig $iface | grep -w inet | tr ':' ' ' | grep -vw $NET | awk '{print$3}'); do
       if [ ! -f "$INSTALL_PATH/vnet/$addr.rules" ]; then
         touch $INSTALL_PATH/vnet/$addr.rules
         chmod 600 $INSTALL_PATH/vnet/$addr.rules
@@ -76,6 +78,6 @@ if [ "$SET_ADDIFACE" == "1" ]; then
      done
     fi
    done
-  fi
- done
+  done
+ fi
 fi

@@ -333,6 +333,6 @@ if [ "$BLK_TCP_SACK_PANIC" == "1" ] && [ ! "$SYSCTL_TCP_NOSACK" == "1" ]; then
 	eout "{blk_tcp_sack_panic} deny inbound tcp-flags SYN with MSS size 1 to 500 bytes "
 	$IPT $IPT_FLAGS -I INPUT -p tcp --tcp-flags SYN SYN -m tcpmss --mss 1:500 -j $TCP_STOP
 	if [ "$USE_IPV6" == "1" ]; then
-		$IP6T -I INPUT -p tcp --tcp-flags SYN SYN -m tcpmss --mss 1:500 -j $TCP_STOP
+		$IP6T $IPT_FLAGS -I INPUT -p tcp --tcp-flags SYN SYN -m tcpmss --mss 1:500 -j $TCP_STOP
 	fi
 fi

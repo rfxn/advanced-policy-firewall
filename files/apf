@@ -47,7 +47,7 @@ fi
 if [ -f "$INSTALL_PATH/internals/.last.full" ]; then
  LAST_FULL=`cat $INSTALL_PATH/internals/.last.full`
  CURRENT_LOAD=`date +"%s"`
- LOAD_DIFF=$[CURRENT_LOAD-LAST_FULL]
+ LOAD_DIFF=$(($CURRENT_LOAD-$LAST_FULL))
  if [ ! "$LOAD_DIFF" -lt "43200" ]; then
 	SKIP_FASTLOAD_EXPIRED=1
  fi
@@ -98,19 +98,33 @@ fi
 
 # check if we are flagged to skip fast load, otherwise off we go
 if [ "$SKIP_FASTLOAD_FIRSTRUN" == "" ] && [ "$SKIP_FASTLOAD_EXPIRED" == "" ] && [ "$SKIP_FASTLOAD_VARS" == "" ] && [ "$SET_FASTLOAD_UPSEC" == "" ]; then
-	devm
-	eout "{glob} activating firewall, fast load"
-	$IPTR $IPT_FLAGS $INSTALL_PATH/internals/.apf.restore
-	eout "{glob} firewall initialized"
-	if [ "$SET_VERBOSE" == "1" ] && [ "$DEVEL_ON" == "1" ]; then
-	        eout "{glob} !!DEVELOPMENT MODE ENABLED!! - firewall will flush every 5 minutes."
+	# Verify snapshot backend matches current iptables backend
+	IPT_BACKEND_CURRENT="legacy"
+	if $IPT --version 2>&1 | grep -q nf_tables; then
+		IPT_BACKEND_CURRENT="nft"
 	fi
-	mutex_unlock
-	exit 0
- elif [ "$SKIP_FASTLOAD_FIRSTRUN" == "1" ]; then 
+	if [ -f "$INSTALL_PATH/internals/.apf.restore.backend" ]; then
+		IPT_BACKEND_SAVED=$(cat "$INSTALL_PATH/internals/.apf.restore.backend")
+		if [ "$IPT_BACKEND_SAVED" != "$IPT_BACKEND_CURRENT" ]; then
+			SKIP_FASTLOAD_BACKEND=1
+		fi
+	fi
+	if [ ! "$SKIP_FASTLOAD_BACKEND" == "1" ]; then
+		devm
+		eout "{glob} activating firewall, fast load"
+		$IPTR $IPT_FLAGS $INSTALL_PATH/internals/.apf.restore
+		eout "{glob} firewall initialized"
+		if [ "$SET_VERBOSE" == "1" ] && [ "$DEVEL_ON" == "1" ]; then
+		        eout "{glob} !!DEVELOPMENT MODE ENABLED!! - firewall will flush every 5 minutes."
+		fi
+		mutex_unlock
+		exit 0
+	fi
+	eout "{glob} fast load snapshot backend mismatch ($IPT_BACKEND_SAVED vs $IPT_BACKEND_CURRENT), going full load"
+ elif [ "$SKIP_FASTLOAD_FIRSTRUN" == "1" ]; then
 	eout "{glob} first run? fast load skipped [internals/.last.full not present]"
  elif [ "$SKIP_FASTLOAD_EXPIRED" == "1" ]; then
-	eout "{glob} fast load snapshot more than 1h old, going full load"
+	eout "{glob} fast load snapshot more than 12h old, going full load"
  elif [ "$SKIP_FASTLOAD_VARS" == "1" ]; then
 	eout "{glob} config. or .rule file has changed since last full load, going full load"
  elif [ "$SET_FASTLOAD_UPSEC" == "1" ]; then
@@ -155,14 +169,20 @@ fi
 firewall_on=`$IPT $IPT_FLAGS -L --numeric | grep -vE "Chain|destination"`
 if [ ! "$DEVEL_ON" == "1" ] && [ ! "$firewall_on" == "" ]; then
 	$IPTS > $INSTALL_PATH/internals/.apf.restore
-	eout "{glob} fast load snapshot saved"
+	# Save backend marker for snapshot compatibility detection
+	IPT_BACKEND_CURRENT="legacy"
+	if $IPT --version 2>&1 | grep -q nf_tables; then
+		IPT_BACKEND_CURRENT="nft"
+	fi
+	echo "$IPT_BACKEND_CURRENT" > $INSTALL_PATH/internals/.apf.restore.backend
+	eout "{glob} fast load snapshot saved (backend: $IPT_BACKEND_CURRENT)"
 fi
 if [ "$SET_VERBOSE" == "1" ] && [ "$DEVEL_ON" == "1" ]; then
 	eout "{glob} !!DEVELOPMENT MODE ENABLED!! - firewall will flush every 5 minutes."
 fi
 
 if [ "$SET_REFRESH_MD5" == "1" ] && [ "$MD5" ]; then
-	$MD5 $DENY_HOSTS $GDENY_HOSTS $ALLOW_HOSTS $GALLOW_HOSTS | $MD5 | awk '{print$1}' > /etc/apf/internals/.trusts.md5
+	$MD5 $DENY_HOSTS $GDENY_HOSTS $ALLOW_HOSTS $GALLOW_HOSTS | $MD5 | awk '{print$1}' > $INSTALL_PATH/internals/.trusts.md5
 fi
 }
 

@@ -30,7 +30,14 @@ flush 1
 
 if [ ! "$IF" == "" ] && [ "$VF_ROUTE" == "1" ]; then
  for i in `echo $IF`; do
-  VAL_IF=`/sbin/route -n | grep -w $i`
+  if [ -n "$ip" ]; then
+	VAL_IF=$($ip route show dev $i 2>/dev/null)
+  elif [ -f "/sbin/route" ]; then
+	VAL_IF=$(/sbin/route -n | grep -w $i)
+  else
+	eout "{glob} neither ip nor route found; cannot verify interface $i"
+	exit 1
+  fi
 	if [ "$VAL_IF" == "" ]; then
 		eout "{glob} could not verify that interface $IF is routed to a network, aborting."
 	        if [ ! "$SET_VERBOSE" == "1" ]; then
@@ -42,7 +49,14 @@ if [ ! "$IF" == "" ] && [ "$VF_ROUTE" == "1" ]; then
 fi
 if [ ! "$IFACE_TRUSTED" == "" ] && [ "$VF_ROUTE" == "1" ]; then
  for i in `echo $IFACE_TRUSTED | tr ',' ' '`; do
-  VAL_IFACE_TRUSTED=`/sbin/route -n | grep -w $i`
+  if [ -n "$ip" ]; then
+	VAL_IFACE_TRUSTED=$($ip route show dev $i 2>/dev/null)
+  elif [ -f "/sbin/route" ]; then
+	VAL_IFACE_TRUSTED=$(/sbin/route -n | grep -w $i)
+  else
+	eout "{glob} neither ip nor route found; cannot verify interface $i"
+	exit 1
+  fi
         if [ "$VAL_IFACE_TRUSTED" == "" ]; then
                 eout "{glob} could not verify that interface $IFACE_TRUSTED is routed to a network, aborting."
 	        if [ ! "$SET_VERBOSE" == "1" ]; then
@@ -60,7 +74,7 @@ if [ "$DLIST_PHP" == "1" ] || [ "$DLIST_SPAMHAUS" == "1" ] || [ "$DLIST_DSHIELD"
 	fi
 fi
 
-/sbin/ip addr list $IFACE_UNTRUSTED | grep -w inet | grep -v inet6 | tr '/' ' ' | awk '{print$2}' > /etc/apf/internals/.localaddrs
+$ip addr list $IFACE_UNTRUSTED | grep -w inet | grep -v inet6 | tr '/' ' ' | awk '{print$2}' > $INSTALL_PATH/internals/.localaddrs
 
 if [ "$RAB" == "0" ]; then
 	RAB_LOG_HIT=0
@@ -76,15 +90,15 @@ tosroute PREROUTING
 $IPT $IPT_FLAGS -A INPUT -i lo -s 0/0 -d 0/0 -j ACCEPT
 $IPT $IPT_FLAGS -A OUTPUT -o lo -s 0/0 -d 0/0 -j ACCEPT
 if [ "$USE_IPV6" == "1" ]; then
-	$IP6T -A INPUT -i lo -s 0/0 -d 0/0 -j ACCEPT
-	$IP6T -A OUTPUT -o lo -s 0/0 -d 0/0 -j ACCEPT
+	$IP6T $IPT_FLAGS -A INPUT -i lo -s ::/0 -d ::/0 -j ACCEPT
+	$IP6T $IPT_FLAGS -A OUTPUT -o lo -s ::/0 -d ::/0 -j ACCEPT
 fi
 
 
 # Allow all traffic on trusted interfaces
 if [ ! "$IFACE_TRUSTED" == "" ]; then
  for i in `echo $IFACE_TRUSTED | tr ',' ' '`; do
- VAL_IF=`/sbin/ip addr list | grep -w $i`
+ VAL_IF=`$ip addr list | grep -w $i`
  if [ "$VAL_IF" == "" ]; then
         eout "{glob} unable to verify status of interface $i; assuming untrusted"
  else
@@ -169,7 +183,7 @@ if [ "$RAB" == "1" ]; then
  $IPT $IPT_FLAGS -A INPUT -p all -m recent $RAB_TRIP_FLAGS --hitcount $RAB_HITCOUNT --seconds $RAB_TIMER -j $ALL_STOP
 
  # RAB portscan rules
- if [ ! "$RAB_PSCAN_LEVEL" == "0" ] || [ ! "$RAB_PSCAN_LEVEL" == "" ]; then
+ if [ ! "$RAB_PSCAN_LEVEL" == "0" ] && [ ! "$RAB_PSCAN_LEVEL" == "" ]; then
   eout "{rab} set active RAB_PSCAN"
   case "$RAB_PSCAN_LEVEL" in
   1)
@@ -239,10 +253,6 @@ LDNS=`cat /etc/resolv.conf  | grep -v "#" | grep -w nameserver | awk '{print$2}'
         $IPT $IPT_FLAGS -A INPUT -p tcp -s $i --sport 53 --dport 1023:65535 -j ACCEPT
         $IPT $IPT_FLAGS -A OUTPUT -p udp -d $i --dport 53 --sport 1023:65535 -j ACCEPT
         $IPT $IPT_FLAGS -A OUTPUT -p tcp -d $i --dport 53 --sport 1023:65535 -j ACCEPT
-        if [ "$RESV_DNS_DROP" == "1" ]; then
-                $IPT $IPT_FLAGS -A OUTPUT -p udp -d $i --dport 53 --sport 1023:65535 -j ACCEPT
-                $IPT $IPT_FLAGS -A OUTPUT -p tcp -d $i --dport 53 --sport 1023:65535 -j ACCEPT
-        fi
         done
         if [ "$RESV_DNS_DROP" == "1" ]; then
                 $IPT $IPT_FLAGS -A INPUT  -p tcp -s 0/0 --sport 53 --dport 1023:65535 -j $ALL_STOP

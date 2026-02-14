@@ -12,21 +12,21 @@ BINPATH=${BINPATH:-"/usr/local/sbin/apf"}
 COMPAT_BINPATH=${COMPAT_BINPATH:-"/usr/local/sbin/fwmgr"}
 
 install() {
-        mkdir $INSTALL_PATH
-        find ./files -type f -exec sed -i s:/etc/apf:$INSTALL_PATH:g {} \;
-        cp -fR files/* $INSTALL_PATH
-        chmod -R 640 $INSTALL_PATH/*
-        chmod 750 $INSTALL_PATH/apf
-        chmod 750 $INSTALL_PATH/firewall
-        chmod 750 $INSTALL_PATH/vnet/vnetgen
-	chmod 750 $INSTALL_PATH/extras/get_ports
-	chmod 750 $INSTALL_PATH
-	cp -pf .ca.def importconf $INSTALL_PATH/extras/
-	mkdir $INSTALL_PATH/doc
-	cp README CHANGELOG COPYING.GPL $INSTALL_PATH/doc
-        ln -fs $INSTALL_PATH/apf $BINPATH
-        ln -fs $INSTALL_PATH/apf $COMPAT_BINPATH
-	rm -f /etc/cron.hourly/fw /etc/cron.daily/fw /etc/cron.d/fwdev $INSTALL_PATH/cron.fwdev
+        mkdir "$INSTALL_PATH"
+        find ./files -type f -exec sed -i "s:/etc/apf:$INSTALL_PATH:g" {} \;
+        cp -fR files/* "$INSTALL_PATH"
+        chmod -R 640 "$INSTALL_PATH"/*
+        chmod 750 "$INSTALL_PATH/apf"
+        chmod 750 "$INSTALL_PATH/firewall"
+        chmod 750 "$INSTALL_PATH/vnet/vnetgen"
+	chmod 750 "$INSTALL_PATH/extras/get_ports"
+	chmod 750 "$INSTALL_PATH"
+	cp -pf .ca.def importconf "$INSTALL_PATH/extras/"
+	mkdir "$INSTALL_PATH/doc"
+	cp README CHANGELOG COPYING.GPL "$INSTALL_PATH/doc"
+        ln -fs "$INSTALL_PATH/apf" "$BINPATH"
+        ln -fs "$INSTALL_PATH/apf" "$COMPAT_BINPATH"
+	rm -f /etc/cron.hourly/fw /etc/cron.daily/fw /etc/cron.d/fwdev "$INSTALL_PATH/cron.fwdev"
         if [ -f "/etc/cron.daily/apf" ]; then
                 rm -f /etc/cron.daily/apf
                 cp cron.daily /etc/cron.daily/apf
@@ -57,23 +57,23 @@ install() {
 	/sbin/chkconfig --add apf
 	/sbin/chkconfig --level 345 apf on
 	fi
-	$INSTALL_PATH/vnet/vnetgen
+	"$INSTALL_PATH/vnet/vnetgen"
 	if [ -f "/usr/bin/dialog" ] && [ -d "$INSTALL_PATH/extras/apf-m" ]; then
 		last=`pwd`
-		cd $INSTALL_PATH/extras/apf-m/
+		cd "$INSTALL_PATH/extras/apf-m/"
 		sh install -i
-		cd $last
+		cd "$last"
 	fi
-	chmod 750 $INSTALL_PATH
+	chmod 750 "$INSTALL_PATH"
 }
 
 VER=`cat files/VERSION | grep version | awk '{print$2}'`
 if [ -d "$INSTALL_PATH" ]; then
 	DVAL=`date +"%d%m%Y-%s"`
-	cp -R $INSTALL_PATH $INSTALL_PATH.bk$DVAL
-	rm -f $INSTALL_PATH.bk.last
-	ln -fs $INSTALL_PATH.bk$DVAL ${INSTALL_PATH}.bk.last
-	rm -rf $INSTALL_PATH
+	cp -R "$INSTALL_PATH" "$INSTALL_PATH.bk$DVAL"
+	rm -f "$INSTALL_PATH.bk.last"
+	ln -fs "$INSTALL_PATH.bk$DVAL" "${INSTALL_PATH}.bk.last"
+	rm -rf "$INSTALL_PATH"
 	echo -n "Installing APF $VER: "
 	install
 else
@@ -94,7 +94,7 @@ if [ -d "$INSTALL_PATH.bk.last" ]; then
 	./importconf
 	echo "  Note: Please review $INSTALL_PATH/conf.apf for consistency, install default backed up to $INSTALL_PATH/conf.apf.orig"
 else
-. $INSTALL_PATH/extras/get_ports
+. "$INSTALL_PATH/extras/get_ports"
 	echo "  Note: These ports are not auto-configured; they are simply presented for information purposes. You must manually configure all port options."
 fi
 
