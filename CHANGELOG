@@ -106,6 +106,24 @@
          USE_IPV6=1 (firewall)
 [Change] cl_cports() clears ICMPv6 variables between VNET iterations
          (functions.apf)
+[Fix] SYSCTL_ROUTE else branch removed; previously ENABLED ip_forward,
+      bootp_relay, and forwarding when routing protection was off, turning
+      server into a router (sysctl.rules)
+[Fix] allow_hosts() and deny_hosts() now validate plain IP entries via
+      valid_host() before passing to iptables; prevents injection from
+      malicious trust file entries (functions.apf)
+[Fix] cli_trust_remove() sed pattern anchored with ^ and \b to prevent
+      substring matching; 10.0.0.1 no longer removes 10.0.0.10
+      (functions.apf)
+[Fix] EG_DROP_CMD LOG rule now includes --cmd-owner filter; previously
+      logged ALL packets in DEG chain instead of only matched commands
+      (cports.common)
+[Change] temp directories in download functions use mktemp -d for atomic
+         creation; eliminates PID-based predictable paths and TOCTOU race
+         (functions.apf)
+[Change] DLIST download URLs updated from HTTP to HTTPS for all upstream
+         sources: cdn.rfxn.com, spamhaus.org, feeds.dshield.org (conf.apf,
+         .ca.def)
 
 - 1.7.6-2 | Nov 18 2020:
 [New] add iptables locking support with iptables >= 1.4.20; pr #36

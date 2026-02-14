@@ -97,12 +97,6 @@ if [ "$SYSCTL_ROUTE" == "1" ]; then
 	echo 0 > /proc/sys/net/ipv4/secure_redirects
 	echo 0 > /proc/sys/net/ipv4/send_redirects
 	echo 0 > /proc/sys/net/ipv4/proxy_arp
-else
-        echo 0 > /proc/sys/net/ipv4/conf/$IFACE_UNTRUSTED/rp_filter
-        echo 1 > /proc/sys/net/ipv4/conf/all/bootp_relay
-        echo 1 > /proc/sys/net/ipv4/ip_forward
-	echo 1 > /proc/sys/net/ipv4/conf/all/forwarding
-
 fi
 
 echo 1 > /proc/sys/net/ipv4/route/flush

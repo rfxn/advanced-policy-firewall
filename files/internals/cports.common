@@ -257,7 +257,7 @@ if [ "$EGF" == "1" ]; then
 		for i in `echo $EG_DROP_CMD | tr ',' ' '`; do
 			si=`echo $i | cut -c 1-6`
 			if [ "$LOG_DROP" == "1" ]; then
-			  ipt4 -A DEG -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** DEG_$si ** "
+			  ipt4 -A DEG -m owner --cmd-owner=$i -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** DEG_$si ** "
 			fi
 			ipt4 -A DEG -m owner --cmd-owner=$i -j $ALL_STOP
 		done

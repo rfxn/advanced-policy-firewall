@@ -248,7 +248,7 @@ cli_trust_remove() {
         $IPT $IPT_FLAGS -D TGDENY -s $DIP -j $ALL_STOP
         $IPT $IPT_FLAGS -D TGDENY -d $DIP -j $ALL_STOP
 
-	sed -i "\%$DIP%d" $ALLOW_HOSTS $DENY_HOSTS $GALLOW_HOSTS $GDENY_HOSTS
+	sed -i "\%^$DIP\b%d" $ALLOW_HOSTS $DENY_HOSTS $GALLOW_HOSTS $GDENY_HOSTS
 	dil=`$IPT $IPT_FLAGS --numeric --list INPUT --line-numbers | grep -w $DIP | awk '{print$1}'`
 	dol=`$IPT $IPT_FLAGS --numeric --list OUTPUT --line-numbers | grep -w $DIP | awk '{print$1}'`
 	$IPT $IPT_FLAGS -D INPUT $dil >> /dev/null 2>&1
@@ -473,6 +473,10 @@ if [ ! "`cat $file | grep -v "#"`" == "" ]; then
         #
         #
         for i in `cat $file | grep -v "#" | grep -v ":" | grep -v "="`; do
+                if [ ! "$i" == "" ] && ! valid_host "$i"; then
+                        eout "{trust} skipping invalid entry in $file: $i"
+                        continue
+                fi
                 val=`cat $INSTALL_PATH/internals/.localaddrs | grep -w $i`
                 if [ ! "$val" ]; then
                  if [ ! "$i" == "" ] && [ -f "$file" ]; then
@@ -649,6 +653,10 @@ if [ ! "`cat $file | grep -v "#"`" == "" ]; then
         #
         #
         for i in `cat $file | grep -v "#" | grep -v ":" | grep -v "="`; do
+                if [ ! "$i" == "" ] && ! valid_host "$i"; then
+                        eout "{trust} skipping invalid entry in $file: $i"
+                        continue
+                fi
                 val="$(cat $INSTALL_PATH/internals/.localaddrs | grep -w $i)"
                 if [ ! "$val" ]; then
                  if [ ! "$i" == "" ] && [ -f "$file" ]; then
@@ -804,10 +812,8 @@ dlist_resnet() {
         chmod 600 "$RESNET" "$RESNET.bk"
  fi
 if [ -f "$WGET" ] && [ -f "$RESNET" ]; then
-   URL_TMP="$INSTALL_PATH/.apf-$$"
-   rm -rf "$URL_TMP"
+   URL_TMP=$(mktemp -d "$INSTALL_PATH/.apf-XXXXXX")
    URL_FILE=`echo $DLIST_RESERVED_URL | tr '/' '\n' | grep "." | tail -n 1`
-   mkdir "$URL_TMP"
    cd "$URL_TMP"
    eout "{resnet} downloading $DLIST_RESERVED_URL"
    $WGET -4 -t 1 -T 4 "$DLIST_RESERVED_URL" >> /dev/null 2>&1
@@ -833,10 +839,8 @@ fi
 
 dlist_php() {
 if [ ! "$DLIST_PHP_URL" == "" ] && [ "$DLIST_PHP" == "1" ] && [ -f "$WGET" ]; then
-   URL_TMP="$INSTALL_PATH/.apf-$$"
-   rm -rf "$URL_TMP" $INSTALL_PATH/.apf-*
+   URL_TMP=$(mktemp -d "$INSTALL_PATH/.apf-XXXXXX")
    URL_FILE=`echo $DLIST_PHP_URL | tr '/' '\n' | grep "." | tail -n 1`
-   mkdir "$URL_TMP"
    cd "$URL_TMP"
    eout "{php} downloading $DLIST_PHP_URL"
    $WGET -4 -t 1 -T 4 "$DLIST_PHP_URL" >> /dev/null 2>&1
@@ -885,10 +889,8 @@ fi
 
 dlist_dshield() {
 if [ ! "$DLIST_DSHIELD_URL" == "" ] && [ "$DLIST_DSHIELD" == "1" ] && [ -f "$WGET" ]; then
-   URL_TMP="$INSTALL_PATH/.apf-$$"
-   rm -rf "$URL_TMP" $INSTALL_PATH/.apf-*
+   URL_TMP=$(mktemp -d "$INSTALL_PATH/.apf-XXXXXX")
    URL_FILE=`echo $DLIST_DSHIELD_URL | tr '/' '\n' | grep "." | tail -n 1`
-   mkdir "$URL_TMP"
    cd "$URL_TMP"
    eout "{dshield} downloading $DLIST_DSHIELD_URL"
    $WGET -4 -t 1 -T 4 "$DLIST_DSHIELD_URL" >> /dev/null 2>&1
@@ -937,10 +939,8 @@ fi
 
 dlist_spamhaus() {
 if [ ! "$DLIST_SPAMHAUS_URL" == "" ] && [ "$DLIST_SPAMHAUS" == "1" ] && [ -f "$WGET" ]; then
-   URL_TMP="$INSTALL_PATH/.apf-$$"
-   rm -rf "$URL_TMP" $INSTALL_PATH/.apf-*
+   URL_TMP=$(mktemp -d "$INSTALL_PATH/.apf-XXXXXX")
    URL_FILE=`echo $DLIST_SPAMHAUS_URL | tr '/' '\n' | grep "." | tail -n 1`
-   mkdir "$URL_TMP"
    cd "$URL_TMP"
    eout "{sdrop} downloading $DLIST_SPAMHAUS_URL"
    $WGET -4 -t 1 -T 4 "$DLIST_SPAMHAUS_URL" >> /dev/null 2>&1
@@ -990,10 +990,8 @@ fi
 
 dlist_ecnshame() {
 if [ ! "$DLIST_ECNSHAME_URL" == "" ] && [ "$DLIST_ECNSHAME" == "1" ] && [ -f "$WGET" ]; then
-   URL_TMP="$INSTALL_PATH/.apf-$$"
-   rm -rf "$URL_TMP" $INSTALL_PATH/.apf-*
+   URL_TMP=$(mktemp -d "$INSTALL_PATH/.apf-XXXXXX")
    URL_FILE=`echo $DLIST_ECNSHAME_URL | tr '/' '\n' | grep "." | tail -n 1`
-   mkdir "$URL_TMP"
    cd "$URL_TMP"
    eout "{ecnshame} downloading $DLIST_ECNSHAME_URL"
    $WGET -4 -t 1 -T 4 "$DLIST_ECNSHAME_URL" >> /dev/null 2>&1
@@ -1036,10 +1034,8 @@ fi
 
 glob_allow_download() {
 if [ ! "$GA_URL" == "" ] && [ "$USE_RGT" == "1" ] && [ -f "$WGET" ]; then
-   URL_TMP="$INSTALL_PATH/.apf-$$"
-   rm -rf "$URL_TMP"
+   URL_TMP=$(mktemp -d "$INSTALL_PATH/.apf-XXXXXX")
    URL_FILE=`echo $GA_URL | tr '/' '\n' | grep "." | tail -n 1`
-   mkdir "$URL_TMP"
    cd "$URL_TMP"
    eout "{trust} downloading $GA_URL"
    $WGET -4 -t 1 -T 4 "$GA_URL" >> /dev/null 2>&1
@@ -1060,10 +1056,8 @@ fi
 
 glob_deny_download() {
 if [ ! "$GD_URL" == "" ] && [ "$USE_RGT" == "1" ] && [ -f "$WGET" ]; then
-   URL_TMP="$INSTALL_PATH/.apf-$$"
-   rm -rf "$URL_TMP"
+   URL_TMP=$(mktemp -d "$INSTALL_PATH/.apf-XXXXXX")
    URL_FILE=`echo $GD_URL | tr '/' '\n' | grep "." | tail -n 1`
-   mkdir "$URL_TMP"
    cd "$URL_TMP"
    eout "{trust} downloading $GD_URL"
    $WGET -4 -t 1 -T 4 "$GD_URL" >> /dev/null 2>&1
