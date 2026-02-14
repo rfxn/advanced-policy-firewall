@@ -207,7 +207,11 @@ trim() {
 }
 
 valid_ip_cidr() {
-	echo "$1" | grep -qE '^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}(/[0-9]{1,2})?$'
+	echo "$1" | grep -qE '^([0-9]{1,3}\.){3}[0-9]{1,3}(/[0-9]{1,2})?$' || return 1
+	local IFS='./'; set -- $1
+	[ "$1" -le 255 ] && [ "$2" -le 255 ] && [ "$3" -le 255 ] && [ "$4" -le 255 ] || return 1
+	[ -n "$5" ] && { [ "$5" -le 32 ] || return 1; }
+	return 0
 }
 
 valid_host() {
@@ -220,8 +224,8 @@ valid_host() {
 	if echo "$h" | grep -qE '^[0-9a-fA-F]{1,4}(:[0-9a-fA-F]{0,4}){2,7}(/[0-9]{1,3})?$'; then
 		return 0
 	fi
-	# FQDN: alphanumeric, hyphens, dots; no leading/trailing hyphens per label
-	if echo "$h" | grep -qE '^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?)*$'; then
+	# FQDN: requires at least one dot, alphanumeric labels, TLD 2+ chars
+	if echo "$h" | grep -qE '^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?)+$'; then
 		return 0
 	fi
 	return 1
@@ -817,7 +821,7 @@ if [ -f "$WGET" ] && [ -f "$RESNET" ]; then
    cd "$URL_TMP"
    eout "{resnet} downloading $DLIST_RESERVED_URL"
    $WGET -4 -t 1 -T 4 "$DLIST_RESERVED_URL" >> /dev/null 2>&1
-   if [ -f "$URL_TMP/$URL_FILE" ]; then
+   if [ $? -eq 0 ] && [ -f "$URL_TMP/$URL_FILE" ]; then
         eout "{resnet} parsing $URL_FILE into $RESNET"
         cat "$URL_TMP/$URL_FILE" > "$RESNET"
    else
@@ -844,7 +848,7 @@ if [ ! "$DLIST_PHP_URL" == "" ] && [ "$DLIST_PHP" == "1" ] && [ -f "$WGET" ]; th
    cd "$URL_TMP"
    eout "{php} downloading $DLIST_PHP_URL"
    $WGET -4 -t 1 -T 4 "$DLIST_PHP_URL" >> /dev/null 2>&1
-   if [ -f "$URL_TMP/$URL_FILE" ]; then
+   if [ $? -eq 0 ] && [ -f "$URL_TMP/$URL_FILE" ]; then
         eout "{php} parsing $URL_FILE into $PHP_HOSTS"
         if [ -f "$PHP_HOSTS" ]; then
                 :> "$PHP_HOSTS"
@@ -894,7 +898,7 @@ if [ ! "$DLIST_DSHIELD_URL" == "" ] && [ "$DLIST_DSHIELD" == "1" ] && [ -f "$WGE
    cd "$URL_TMP"
    eout "{dshield} downloading $DLIST_DSHIELD_URL"
    $WGET -4 -t 1 -T 4 "$DLIST_DSHIELD_URL" >> /dev/null 2>&1
-   if [ -f "$URL_TMP/$URL_FILE" ]; then
+   if [ $? -eq 0 ] && [ -f "$URL_TMP/$URL_FILE" ]; then
         eout "{dshield} parsing $URL_FILE into $DS_HOSTS"
         if [ -f "$DS_HOSTS" ]; then
                 :> "$DS_HOSTS"
@@ -944,7 +948,7 @@ if [ ! "$DLIST_SPAMHAUS_URL" == "" ] && [ "$DLIST_SPAMHAUS" == "1" ] && [ -f "$W
    cd "$URL_TMP"
    eout "{sdrop} downloading $DLIST_SPAMHAUS_URL"
    $WGET -4 -t 1 -T 4 "$DLIST_SPAMHAUS_URL" >> /dev/null 2>&1
-   if [ -f "$URL_TMP/$URL_FILE" ]; then
+   if [ $? -eq 0 ] && [ -f "$URL_TMP/$URL_FILE" ]; then
         eout "{sdrop} parsing $URL_FILE into $DROP_HOSTS"
         if [ -f "$DROP_HOSTS" ]; then
                 :> "$DROP_HOSTS"
@@ -995,7 +999,7 @@ if [ ! "$DLIST_ECNSHAME_URL" == "" ] && [ "$DLIST_ECNSHAME" == "1" ] && [ -f "$W
    cd "$URL_TMP"
    eout "{ecnshame} downloading $DLIST_ECNSHAME_URL"
    $WGET -4 -t 1 -T 4 "$DLIST_ECNSHAME_URL" >> /dev/null 2>&1
-   if [ -f "$URL_TMP/$URL_FILE" ]; then
+   if [ $? -eq 0 ] && [ -f "$URL_TMP/$URL_FILE" ]; then
         eout "{ecnshame} parsing $URL_FILE into $ECNSHAME_HOSTS"
         if [ -f "$ECNSHAME_HOSTS" ]; then
                 :> "$ECNSHAME_HOSTS"
@@ -1039,7 +1043,7 @@ if [ ! "$GA_URL" == "" ] && [ "$USE_RGT" == "1" ] && [ -f "$WGET" ]; then
    cd "$URL_TMP"
    eout "{trust} downloading $GA_URL"
    $WGET -4 -t 1 -T 4 "$GA_URL" >> /dev/null 2>&1
-   if [ -f "$URL_TMP/$URL_FILE" ]; then
+   if [ $? -eq 0 ] && [ -f "$URL_TMP/$URL_FILE" ]; then
         eout "{trust} parsing $URL_FILE into $GALLOW_HOSTS"
         cat "$URL_TMP/$URL_FILE" > "$GALLOW_HOSTS"
    else
@@ -1061,7 +1065,7 @@ if [ ! "$GD_URL" == "" ] && [ "$USE_RGT" == "1" ] && [ -f "$WGET" ]; then
    cd "$URL_TMP"
    eout "{trust} downloading $GD_URL"
    $WGET -4 -t 1 -T 4 "$GD_URL" >> /dev/null 2>&1
-   if [ -f "$URL_TMP/$URL_FILE" ]; then
+   if [ $? -eq 0 ] && [ -f "$URL_TMP/$URL_FILE" ]; then
         eout "{trust} parsing $URL_FILE into $GDENY_HOSTS"
 	cat "$URL_TMP/$URL_FILE" > "$GDENY_HOSTS"
    else

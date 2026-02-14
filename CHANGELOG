@@ -157,6 +157,17 @@
 [Change] install.sh rotates apf_log instead of deleting on upgrade
 [Change] logrotate.d.apf given proper weekly rotation, compression, and
          postrotate directive
+[Fix] valid_ip_cidr() now validates octet ranges (0-255) and CIDR mask
+      limit (0-32); previously accepted 999.999.999.999 (functions.apf)
+[Fix] valid_host() FQDN regex requires at least one dot; single-label names
+      like "localhost" no longer accepted (functions.apf)
+[Fix] private.networks updated with RFC 6598 100.64.0.0/10 Carrier-Grade
+      NAT range (private.networks)
+[Fix] wget exit code checked in all 7 download functions; partial downloads
+      no longer processed (functions.apf)
+[New] IPv6 sysctl hardening when USE_IPV6=1: disables accept_source_route,
+      accept_redirects, accept_ra; disables forwarding when SYSCTL_ROUTE=1
+      (sysctl.rules)
 
 - 1.7.6-2 | Nov 18 2020:
 [New] add iptables locking support with iptables >= 1.4.20; pr #36

@@ -101,4 +101,15 @@ fi
 
 echo 1 > /proc/sys/net/ipv4/route/flush
 
+# IPv6 hardening
+if [ "$USE_IPV6" == "1" ]; then
+	echo 0 > /proc/sys/net/ipv6/conf/all/accept_source_route
+	echo 0 > /proc/sys/net/ipv6/conf/all/accept_redirects
+	if [ "$SYSCTL_ROUTE" == "1" ]; then
+		echo 0 > /proc/sys/net/ipv6/conf/all/forwarding
+	fi
+	echo 0 > /proc/sys/net/ipv6/conf/all/accept_ra
+	eout "{glob} setting ipv6 sysctl hardening enabled"
+fi
+
 # END SYSCTL config
