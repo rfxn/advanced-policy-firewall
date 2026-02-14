@@ -162,38 +162,21 @@ mutex_lock() {
   if [ "$APF_MUTEX_LOCKED" == "1" ]; then
     return
   fi
-  STARTTIME=`date +"%s"`
-
-  while [ -f "$LOCK_FILE" ]; do
-    read LOCKPID LOCKTIME <<<$(cat $LOCK_FILE)
-    PIDNAME=`ps -p $LOCKPID -o comm=`
-    if [ ! "$PIDNAME" == "apf" ]; then
-      eout "{glob} pid in lock file is not apf, clearing lock."
-      break
-    fi
-    LOCKDIFF=$(($(date +"%s")-$LOCKTIME))
-    LOCALDIFF=$(($(date +"%s")-$STARTTIME))
-    if [ "$LOCKDIFF" -gt "$LOCK_TIMEOUT" ]; then
-      eout "{glob} stale lock file found, clearing lock."
-      break
-    elif [ "$LOCALDIFF" -gt "$ENTER_LOCK_TIMEOUT" ]; then
-      eout "{glob} timed out while attempting to gain lock."
-      exit 1
-    else
-      eout "{glob} locked subsystem, already running? $LOCK_FILE is $LOCKDIFF seconds old, waiting..."
-      sleep 5
-    fi
-  done
-
-  touch $LOCK_FILE
-  chmod 600 $LOCK_FILE
-  echo "$$ $UTIME" > $LOCK_FILE
+  exec 9>"$LOCK_FILE"
+  chmod 600 "$LOCK_FILE"
+  if ! flock -w "$ENTER_LOCK_TIMEOUT" 9; then
+    eout "{glob} timed out while attempting to gain lock."
+    exit 1
+  fi
+  echo "$$ $(date +%s)" >&9
   APF_MUTEX_LOCKED="1"
 }
 
 mutex_unlock() {
   if [ "$APF_MUTEX_LOCKED" == "1" ]; then
-    rm -f $LOCK_FILE
+    flock -u 9
+    exec 9>&-
+    rm -f "$LOCK_FILE"
     APF_MUTEX_LOCKED="0"
   fi
 }
@@ -418,6 +401,7 @@ help() {
 	echo "-u|--remove HOST ................... remove host from [glob]*_hosts.rules"
 	echo "                                     and immediately remove rule from firewall"
 	echo "-o|--ovars ......................... output all configuration options"
+	echo "-v|--version ....................... output version number"
 }
 
 tosroute() {

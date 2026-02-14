@@ -1,4 +1,15 @@
 - 2.0.1 | Feb 14 2026:
+[Change] mutex_lock()/mutex_unlock() rewritten with flock for atomic kernel-level
+         locking; eliminates TOCTOU race in polling lock (functions.apf)
+[New] -v|--version CLI option outputs version number (apf, functions.apf)
+[New] systemd service unit (apf.service); install.sh prefers systemd over SysV
+      init when /run/systemd/system detected (install.sh)
+[Change] apf.init modernized: removed RHEL-specific /etc/rc.d/init.d/functions
+         dependency, uses $INSTALL_PATH, added status command (apf.init)
+[Change] install.sh now sed-replaces $INSTALL_PATH in init script and systemd
+         service when non-default path used (install.sh)
+[Change] get_ports uses ss as primary with netstat fallback; netstat removed
+         from modern distros (extras/get_ports)
 [New] IPv6 PKT_SANITY: IN_SANITY6/OUT_SANITY6 chains with TCP flag checks,
       INVALID state blocking, and PZERO6 port-zero filtering (bt.rules)
 [New] IPv6 multicast blocking; MCAST6 chain blocks ff00::/8 when

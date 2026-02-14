@@ -234,6 +234,9 @@ case "$1" in
 	head
 	ovars
 	;;
+-v|--version)
+	echo "$VER"
+	;;
 *)
 	head
 	help

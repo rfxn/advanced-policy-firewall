@@ -32,28 +32,42 @@ install() {
         rm -f /etc/cron.daily/apf
         cp cron.daily /etc/cron.daily/apf
         chmod 755 /etc/cron.daily/apf
-	if [ -d "/etc/rc.d/init.d" ]; then
-                cp -f apf.init /etc/rc.d/init.d/apf
+	# Service installation: prefer systemd, then SysV init, then rc.local
+	if [ -d "/run/systemd/system" ]; then
+		cp -f apf.service /etc/systemd/system/apf.service
+		if [ "$INSTALL_PATH" != "/etc/apf" ]; then
+			sed -i "s:/etc/apf:$INSTALL_PATH:g" /etc/systemd/system/apf.service
+		fi
+		systemctl daemon-reload
+		systemctl enable apf.service >> /dev/null 2>&1
+	elif [ -d "/etc/rc.d/init.d" ]; then
+		cp -f apf.init /etc/rc.d/init.d/apf
+		if [ "$INSTALL_PATH" != "/etc/apf" ]; then
+			sed -i "s:/etc/apf:$INSTALL_PATH:g" /etc/rc.d/init.d/apf
+		fi
+		if [ -f "/sbin/chkconfig" ]; then
+			/sbin/chkconfig --add apf
+			/sbin/chkconfig --level 345 apf on
+		fi
 	elif [ -d "/etc/init.d" ]; then
 		cp -f apf.init /etc/init.d/apf
-        else
+		if [ "$INSTALL_PATH" != "/etc/apf" ]; then
+			sed -i "s:/etc/apf:$INSTALL_PATH:g" /etc/init.d/apf
+		fi
+	else
 		if [ -f "/etc/rc.local" ]; then
 			val=`grep -i apf /etc/rc.local`
 			if [ "$val" == "" ]; then
 				echo "$INSTALL_PATH/apf -s >> /dev/null 2>&1" >> /etc/rc.local
 			fi
 		fi
-        fi
+	fi
 	if [ -f "/var/log/apf_log" ]; then
 		mv -f /var/log/apf_log /var/log/apf_log.prev
 	fi
 	rm -f /var/log/apfados_log
 	if [ -d "/etc/logrotate.d" ] && [ -f "logrotate.d.apf" ]; then
 		cp logrotate.d.apf /etc/logrotate.d/apf
-	fi
-	if [ -f "/sbin/chkconfig" ]; then
-	/sbin/chkconfig --add apf
-	/sbin/chkconfig --level 345 apf on
 	fi
 	"$INSTALL_PATH/vnet/vnetgen"
 	if [ -f "/usr/bin/dialog" ] && [ -d "$INSTALL_PATH/extras/apf-m" ]; then
