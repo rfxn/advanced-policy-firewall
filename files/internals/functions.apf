@@ -336,6 +336,10 @@ if [ ! "$1" = "1" ]; then
 	eout "{glob} flushing & zeroing chain policies"
 fi
 chains=`cat /proc/net/ip_tables_names 2>/dev/null`
+# Fallback for nft backend where /proc/net/ip_tables_names is absent
+if [ -z "$chains" ]; then
+	chains="filter nat mangle raw"
+fi
 for i in $chains; do ipt4 -t $i -F; done
 for i in $chains; do ipt4 -t $i -X; done
 ipt -P INPUT ACCEPT
@@ -344,6 +348,10 @@ ipt -P FORWARD ACCEPT
 
 if [ "$USE_IPV6" == "1" ]; then
 	chains6=`cat /proc/net/ip6_tables_names 2>/dev/null`
+	# Fallback for nft backend where /proc/net/ip6_tables_names is absent
+	if [ -z "$chains6" ]; then
+		chains6="filter nat mangle raw"
+	fi
 	for i in $chains6; do ipt6 -t $i -F; done
 	for i in $chains6; do ipt6 -t $i -X; done
 fi

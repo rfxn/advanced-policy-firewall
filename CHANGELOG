@@ -1,4 +1,13 @@
 - 2.0.1 | Feb 14 2026:
+[New] BATS smoke test suite with Docker and network namespace support;
+      9 test files covering install/CLI, chains, ports, trust, multi-interface,
+      IPv6, packet sanity, fast load, and flush (tests/)
+[New] Makefile with test/test-verbose targets (Makefile)
+[New] GitHub Actions CI workflow for smoke tests (.github/workflows/)
+[Fix] flush() inoperative on nft backend; /proc/net/ip_tables_names absent on
+      iptables-nft causes flush loops to skip entirely, leaving all rules in
+      place after apf -f; now falls back to hardcoded table list
+      (functions.apf)
 [Change] which replaced with command -v (POSIX builtin) for all 16 binary
          discovery variables in internals.conf
 [Change] mutex_lock()/mutex_unlock() rewritten with flock for atomic kernel-level

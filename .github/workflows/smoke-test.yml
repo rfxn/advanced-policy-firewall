@@ -1,0 +1,22 @@
+name: APF Smoke Tests
+
+on:
+  push:
+    branches: [master, '2.*']
+  pull_request:
+    branches: [master]
+
+jobs:
+  smoke-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build test image
+        run: docker build -f tests/Dockerfile -t apf-smoke-test .
+
+      - name: Run smoke tests
+        run: docker run --rm --privileged apf-smoke-test

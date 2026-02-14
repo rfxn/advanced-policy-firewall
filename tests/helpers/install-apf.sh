@@ -1,0 +1,50 @@
+#!/bin/bash
+#
+# Installs APF from source with Docker-appropriate patches.
+# Must be sourced or called after setup-netns.sh.
+
+APF_SRC="/opt/apf-src"
+APF_INSTALL="/opt/apf"
+
+install_apf() {
+    cd "$APF_SRC"
+    INSTALL_PATH="$APF_INSTALL" sh install.sh
+
+    # Patch conf.apf for Docker environment
+    local conf="$APF_INSTALL/conf.apf"
+
+    # Skip modprobe — Docker shares host kernel
+    sed -i 's/^SET_MONOKERN=.*/SET_MONOKERN="1"/' "$conf"
+
+    # No auto-flush cron
+    sed -i 's/^DEVEL_MODE=.*/DEVEL_MODE="0"/' "$conf"
+
+    # Skip route validation on synthetic interfaces
+    sed -i 's/^VF_ROUTE=.*/VF_ROUTE="0"/' "$conf"
+
+    # No internet downloads — deterministic tests
+    sed -i 's/^DLIST_PHP=.*/DLIST_PHP="0"/' "$conf"
+    sed -i 's/^DLIST_SPAMHAUS=.*/DLIST_SPAMHAUS="0"/' "$conf"
+    sed -i 's/^DLIST_DSHIELD=.*/DLIST_DSHIELD="0"/' "$conf"
+    sed -i 's/^DLIST_RESERVED=.*/DLIST_RESERVED="0"/' "$conf"
+    sed -i 's/^DLIST_ECNSHAME=.*/DLIST_ECNSHAME="0"/' "$conf"
+    sed -i 's/^USE_RGT=.*/USE_RGT="0"/' "$conf"
+
+    # Disable RAB (requires xt_recent kernel module)
+    sed -i 's/^RAB=.*/RAB="0"/' "$conf"
+
+    # Disable fast load for predictable test behavior
+    sed -i 's/^SET_FASTLOAD=.*/SET_FASTLOAD="0"/' "$conf"
+
+    # Disable refresh cron
+    sed -i 's/^SET_REFRESH=.*/SET_REFRESH="0"/' "$conf"
+
+    # Disable reserved network blocking (we use RFC 5737 test addresses)
+    sed -i 's/^BLK_RESNET=.*/BLK_RESNET="0"/' "$conf"
+
+    # Ensure log file exists
+    touch /var/log/apf_log
+    chmod 600 /var/log/apf_log
+}
+
+install_apf
