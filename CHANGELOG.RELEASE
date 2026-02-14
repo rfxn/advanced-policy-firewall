@@ -67,3 +67,23 @@
          subsystem (vnetgen, main.vnet)
 [Change] which lsmod/rmmod no longer passes redundant absolute paths
          (internals.conf)
+[New] ipt()/ipt4()/ipt6() helpers adopted across rule files; protocol-agnostic
+      rules now apply to both IPv4 and IPv6 when USE_IPV6=1 (firewall, bt.rules,
+      log.rules, functions.apf)
+[Change] chain creation, MSS clamping, connection state, default policies,
+         helpers (FTP/SSH/Traceroute), logging, P2P, and IDENT rules now use
+         ipt() for dual-stack support (firewall, bt.rules, log.rules)
+[Change] common drop ports (cdports) now use ipt() for dual-stack blocking
+         (functions.apf)
+[Change] flush() refactored: default policies use ipt(), table flush loops
+         use ipt4/ipt6 with separate proc chain lists (functions.apf)
+[Change] cports.common port rules converted to ipt4() with redundant -s 0/0
+         removed; true dual-stack port filtering deferred to Phase 10
+         (cports.common)
+[Change] packet sanity, fragment, multicast, lgate_mac rules converted to
+         explicit ipt4() to clarify IPv4-specific intent (bt.rules,
+         functions.apf)
+[Change] BLK_TCP_SACK_PANIC collapsed from separate $IPT/$IP6T blocks to
+         single ipt() call (bt.rules)
+[Change] EG_DROP_CMD section converted to ipt4(); redundant -s 0/0 -d 0/0
+         removed (cports.common)

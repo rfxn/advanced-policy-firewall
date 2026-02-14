@@ -110,16 +110,16 @@ if [ ! "$IFACE_TRUSTED" == "" ]; then
 fi
 
 # Create TCP RESET & UDP PROHIBIT chains
-$IPT $IPT_FLAGS -N RESET
-$IPT $IPT_FLAGS -A RESET -p tcp -j REJECT --reject-with tcp-reset
-$IPT $IPT_FLAGS -N PROHIBIT
-$IPT $IPT_FLAGS -A PROHIBIT -j REJECT --reject-with icmp-host-prohibited
+ipt -N RESET
+ipt -A RESET -p tcp -j REJECT --reject-with tcp-reset
+ipt -N PROHIBIT
+ipt4 -A PROHIBIT -j REJECT --reject-with icmp-host-prohibited
 
 # Load our SYSCTL rules
 . $INSTALL_PATH/sysctl.rules >> /dev/null 2>&1
 
 # Fix MTU/MSS Problems
-$IPT $IPT_FLAGS -A OUTPUT -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu
+ipt -A OUTPUT -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu
 
 # Block common nonroutable IP networks
 if [ "$BLK_MCATNET" = "1" ]; then
@@ -136,21 +136,21 @@ if [ "$BLK_RESNET" = "1" ]; then
 fi
 
 # Create (glob)trust system chains
-$IPT $IPT_FLAGS -N TALLOW
-$IPT $IPT_FLAGS -N TDENY
-$IPT $IPT_FLAGS -N TGALLOW
-$IPT $IPT_FLAGS -N TGDENY
-$IPT $IPT_FLAGS -N REFRESH_TEMP
-$IPT $IPT_FLAGS -A INPUT -j REFRESH_TEMP
-$IPT $IPT_FLAGS -A OUTPUT -j REFRESH_TEMP
-$IPT $IPT_FLAGS -A INPUT -j TALLOW
-$IPT $IPT_FLAGS -A OUTPUT -j TALLOW
-$IPT $IPT_FLAGS -A INPUT -j TGALLOW
-$IPT $IPT_FLAGS -A OUTPUT -j TGALLOW
-$IPT $IPT_FLAGS -A INPUT -j TDENY
-$IPT $IPT_FLAGS -A OUTPUT -j TDENY
-$IPT $IPT_FLAGS -A INPUT -j TGDENY
-$IPT $IPT_FLAGS -A OUTPUT -j TGDENY
+ipt -N TALLOW
+ipt -N TDENY
+ipt -N TGALLOW
+ipt -N TGDENY
+ipt -N REFRESH_TEMP
+ipt -A INPUT -j REFRESH_TEMP
+ipt -A OUTPUT -j REFRESH_TEMP
+ipt -A INPUT -j TALLOW
+ipt -A OUTPUT -j TALLOW
+ipt -A INPUT -j TGALLOW
+ipt -A OUTPUT -j TGALLOW
+ipt -A INPUT -j TDENY
+ipt -A OUTPUT -j TDENY
+ipt -A INPUT -j TGDENY
+ipt -A OUTPUT -j TGDENY
 
 # Load our Blocked Traffic rules
 . $INSTALL_PATH/bt.rules
@@ -237,11 +237,11 @@ fi
 . $INSTALL_PATH/main.rules
 
 # Drop NEW tcp connections after this point
-$IPT $IPT_FLAGS -A INPUT  -p tcp ! --syn -m state --state NEW -j $ALL_STOP
-$IPT $IPT_FLAGS -A INPUT  -p tcp -m state --state ESTABLISHED,RELATED -j ACCEPT
-$IPT $IPT_FLAGS -A INPUT  -p udp -m state --state ESTABLISHED,RELATED -j ACCEPT
-$IPT $IPT_FLAGS -A OUTPUT  -p tcp --dport 1024:65535 -m state --state ESTABLISHED,RELATED -j ACCEPT
-$IPT $IPT_FLAGS -A OUTPUT  -p udp --dport 1024:65535 -m state --state ESTABLISHED,RELATED -j ACCEPT
+ipt -A INPUT  -p tcp ! --syn -m state --state NEW -j $ALL_STOP
+ipt -A INPUT  -p tcp -m state --state ESTABLISHED,RELATED -j ACCEPT
+ipt -A INPUT  -p udp -m state --state ESTABLISHED,RELATED -j ACCEPT
+ipt -A OUTPUT  -p tcp --dport 1024:65535 -m state --state ESTABLISHED,RELATED -j ACCEPT
+ipt -A OUTPUT  -p udp --dport 1024:65535 -m state --state ESTABLISHED,RELATED -j ACCEPT
 
 # DNS
 if [ -f "/etc/resolv.conf" ] && [ "$RESV_DNS" == "1" ]; then
@@ -268,38 +268,38 @@ fi
 
 # FTP
 if [ "$HELPER_FTP" == "1" ]; then
-$IPT $IPT_FLAGS -A INPUT  -p tcp --sport 1023:65535 --dport $HELPER_FTP_PORT -m state --state RELATED,ESTABLISHED -j ACCEPT
-$IPT $IPT_FLAGS -A INPUT  -p tcp -m multiport --dport $HELPER_FTP_PORT,$HELPER_FTP_DATA -m state --state ESTABLISHED,RELATED -j ACCEPT
-$IPT $IPT_FLAGS -A INPUT  -p udp -m multiport --dport $HELPER_FTP_PORT,$HELPER_FTP_DATA -m state --state ESTABLISHED,RELATED -j ACCEPT
-$IPT $IPT_FLAGS -A OUTPUT  -p tcp --dport 1023:65535 --sport $HELPER_FTP_PORT -m state --state RELATED,ESTABLISHED -j ACCEPT
-$IPT $IPT_FLAGS -A OUTPUT  -p tcp -m multiport --dport $HELPER_FTP_PORT,$HELPER_FTP_DATA -m state --state ESTABLISHED,RELATED -j ACCEPT
-$IPT $IPT_FLAGS -A OUTPUT  -p udp -m multiport --dport $HELPER_FTP_PORT,$HELPER_FTP_DATA -m state --state ESTABLISHED,RELATED -j ACCEPT
+ipt -A INPUT  -p tcp --sport 1023:65535 --dport $HELPER_FTP_PORT -m state --state RELATED,ESTABLISHED -j ACCEPT
+ipt -A INPUT  -p tcp -m multiport --dport $HELPER_FTP_PORT,$HELPER_FTP_DATA -m state --state ESTABLISHED,RELATED -j ACCEPT
+ipt -A INPUT  -p udp -m multiport --dport $HELPER_FTP_PORT,$HELPER_FTP_DATA -m state --state ESTABLISHED,RELATED -j ACCEPT
+ipt -A OUTPUT  -p tcp --dport 1023:65535 --sport $HELPER_FTP_PORT -m state --state RELATED,ESTABLISHED -j ACCEPT
+ipt -A OUTPUT  -p tcp -m multiport --dport $HELPER_FTP_PORT,$HELPER_FTP_DATA -m state --state ESTABLISHED,RELATED -j ACCEPT
+ipt -A OUTPUT  -p udp -m multiport --dport $HELPER_FTP_PORT,$HELPER_FTP_DATA -m state --state ESTABLISHED,RELATED -j ACCEPT
 fi
 
 # SSH
 if [ "$HELPER_SSH" == "1" ]; then
-	$IPT $IPT_FLAGS -A INPUT  -p tcp --sport $HELPER_SSH_PORT --dport 513:65535 -m state --state ESTABLISHED,RELATED -j ACCEPT
-	$IPT $IPT_FLAGS -A INPUT  -p tcp --sport 1024:65535 --dport $HELPER_SSH_PORT --syn -m state --state ESTABLISHED,RELATED -j ACCEPT
-	$IPT $IPT_FLAGS -A INPUT  -p udp --dport $HELPER_SSH_PORT -m state --state ESTABLISHED -j ACCEPT
+	ipt -A INPUT  -p tcp --sport $HELPER_SSH_PORT --dport 513:65535 -m state --state ESTABLISHED,RELATED -j ACCEPT
+	ipt -A INPUT  -p tcp --sport 1024:65535 --dport $HELPER_SSH_PORT --syn -m state --state ESTABLISHED,RELATED -j ACCEPT
+	ipt -A INPUT  -p udp --dport $HELPER_SSH_PORT -m state --state ESTABLISHED -j ACCEPT
 fi
 
 # Traceroute
 if [ "$TCR_PASS" == "1" ]; then
-	$IPT $IPT_FLAGS -A INPUT  -p udp -m state --state NEW --dport $TCR_PORTS -j ACCEPT
-        $IPT $IPT_FLAGS -A OUTPUT  -p udp -m state --state NEW --dport $TCR_PORTS -j ACCEPT
+	ipt -A INPUT  -p udp -m state --state NEW --dport $TCR_PORTS -j ACCEPT
+        ipt -A OUTPUT  -p udp -m state --state NEW --dport $TCR_PORTS -j ACCEPT
 fi
 
 
 if [ "$LOG_DROP" == "1" ]; then
 # Default TCP/UDP INPUT log chain
-         $IPT $IPT_FLAGS -A INPUT -p tcp -m limit --limit $LOG_RATE/minute  -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** IN_TCP DROP ** "
-         $IPT $IPT_FLAGS -A INPUT -p udp -m limit --limit $LOG_RATE/minute  -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** IN_UDP DROP ** "
+         ipt -A INPUT -p tcp -m limit --limit $LOG_RATE/minute  -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** IN_TCP DROP ** "
+         ipt -A INPUT -p udp -m limit --limit $LOG_RATE/minute  -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** IN_UDP DROP ** "
 fi
 
 if [ "$LOG_DROP" == "1" ] && [ "$EGF" == "1" ]; then
 # Default TCP/UDP OUTPUT log chain
-         $IPT $IPT_FLAGS -A OUTPUT -p tcp -m limit --limit $LOG_RATE/minute  -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** OUT_TCP DROP ** "
-         $IPT $IPT_FLAGS -A OUTPUT -p udp -m limit --limit $LOG_RATE/minute  -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** OUT_UDP DROP ** "
+         ipt -A OUTPUT -p tcp -m limit --limit $LOG_RATE/minute  -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** OUT_TCP DROP ** "
+         ipt -A OUTPUT -p udp -m limit --limit $LOG_RATE/minute  -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** OUT_UDP DROP ** "
 fi
 
 
@@ -315,17 +315,17 @@ tosroute POSTROUTING
 
 # Default Output Policies
 if [ ! "$EGF" == "1" ] || [ "$EGF" == "" ]; then
-        $IPT $IPT_FLAGS -A OUTPUT -j ACCEPT
+        ipt -A OUTPUT -j ACCEPT
         eout "{glob} default (egress) output accept"
 elif [ "$EGF" == "1" ]; then
-	$IPT $IPT_FLAGS -A OUTPUT -p tcp -j $TCP_STOP
-	$IPT $IPT_FLAGS -A OUTPUT -p udp -j $UDP_STOP
-        $IPT $IPT_FLAGS -A OUTPUT -p all -j $ALL_STOP
+	ipt -A OUTPUT -p tcp -j $TCP_STOP
+	ipt -A OUTPUT -p udp -j $UDP_STOP
+        ipt -A OUTPUT -p all -j $ALL_STOP
         eout "{glob} default (egress) output drop"
 fi
 
 # Default Input Policies
 eout "{glob} default (ingress) input drop"
-$IPT $IPT_FLAGS -A INPUT -p tcp -j $TCP_STOP
-$IPT $IPT_FLAGS -A INPUT -p udp -j $UDP_STOP
-$IPT $IPT_FLAGS -A INPUT -p all -j $ALL_STOP
+ipt -A INPUT -p tcp -j $TCP_STOP
+ipt -A INPUT -p udp -j $UDP_STOP
+ipt -A INPUT -p all -j $ALL_STOP

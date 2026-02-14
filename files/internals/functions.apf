@@ -307,19 +307,16 @@ if [ ! "$1" = "1" ]; then
 	eout "{glob} flushing & zeroing chain policies"
 fi
 chains=`cat /proc/net/ip_tables_names 2>/dev/null`
-for i in $chains; do $IPT $IPT_FLAGS -t $i -F; done
-for i in $chains; do $IPT $IPT_FLAGS -t $i -X; done
-$IPT $IPT_FLAGS -P INPUT ACCEPT
-$IPT $IPT_FLAGS -P OUTPUT ACCEPT
-$IPT $IPT_FLAGS -P FORWARD ACCEPT
+for i in $chains; do ipt4 -t $i -F; done
+for i in $chains; do ipt4 -t $i -X; done
+ipt -P INPUT ACCEPT
+ipt -P OUTPUT ACCEPT
+ipt -P FORWARD ACCEPT
 
 if [ "$USE_IPV6" == "1" ]; then
 	chains6=`cat /proc/net/ip6_tables_names 2>/dev/null`
-	for i in $chains6; do $IP6T $IPT_FLAGS -t $i -F; done
-	for i in $chains6; do $IP6T $IPT_FLAGS -t $i -X; done
-	$IP6T $IPT_FLAGS -P INPUT ACCEPT
-	$IP6T $IPT_FLAGS -P OUTPUT ACCEPT
-	$IP6T $IPT_FLAGS -P FORWARD ACCEPT
+	for i in $chains6; do ipt6 -t $i -F; done
+	for i in $chains6; do ipt6 -t $i -X; done
 fi
 
 if [ -f "/proc/net/ipt_recent/DEFAULT" ]; then
@@ -1071,8 +1068,8 @@ FNAME=`echo $FILE | tr '/' '\n' | tail -n 1`
 eout "{glob} loading $FNAME"
  for i in `cat $FILE | grep -v "#"`; do
   if [ ! "$i" == "" ]; then
-        $IPT $IPT_FLAGS -A INPUT -s $i -j $ALL_STOP
-	$IPT $IPT_FLAGS -A OUTPUT -d $i -j $ALL_STOP
+        ipt4 -A INPUT -s $i -j $ALL_STOP
+	ipt4 -A OUTPUT -d $i -j $ALL_STOP
   fi
  done
 fi
@@ -1091,20 +1088,20 @@ if [ ! "$BLK_PORTS" == "" ]; then
 for i in `echo $BLK_PORTS | tr ',' ' '`; do
 	if [ "$(echo $i | grep "_")" == "" ]; then
          if [ ! "$i" == "" ]; then
-		$IPT $IPT_FLAGS -A INPUT  -p tcp --dport $i -j $TCP_STOP
-		$IPT $IPT_FLAGS -A INPUT  -p udp --dport $i -j $UDP_STOP
-		$IPT $IPT_FLAGS -A OUTPUT  -p tcp --dport $i -j $TCP_STOP
-		$IPT $IPT_FLAGS -A OUTPUT  -p udp --dport $i -j $UDP_STOP
+		ipt -A INPUT  -p tcp --dport $i -j $TCP_STOP
+		ipt -A INPUT  -p udp --dport $i -j $UDP_STOP
+		ipt -A OUTPUT  -p tcp --dport $i -j $TCP_STOP
+		ipt -A OUTPUT  -p udp --dport $i -j $UDP_STOP
 		eout "{blk_ports} deny all to/from tcp port $i"
                 eout "{blk_ports} deny all to/from udp port $i"
          fi
         else
                 i=`echo $i | tr '_' ':'`
                 if [ ! "$i" == "" ]; then
-			$IPT $IPT_FLAGS -A INPUT  -p tcp --dport $i -j $TCP_STOP
-			$IPT $IPT_FLAGS -A INPUT  -p udp --dport $i -j $UDP_STOP
-			$IPT $IPT_FLAGS -A OUTPUT  -p tcp --dport $i -j $TCP_STOP
-			$IPT $IPT_FLAGS -A OUTPUT  -p udp --dport $i -j $UDP_STOP
+			ipt -A INPUT  -p tcp --dport $i -j $TCP_STOP
+			ipt -A INPUT  -p udp --dport $i -j $UDP_STOP
+			ipt -A OUTPUT  -p tcp --dport $i -j $TCP_STOP
+			ipt -A OUTPUT  -p udp --dport $i -j $UDP_STOP
         	        eout "{blk_ports} deny all to/from tcp port $i"
 	                eout "{blk_ports} deny all to/from udp port $i"
                 fi
@@ -1114,19 +1111,19 @@ fi
 }
 
 lgate_mac() {
-$IPT $IPT_FLAGS -N LMAC
+ipt4 -N LMAC
 for mac in `echo $LGATE_MAC | tr ',' ' '`; do
 MAC=$mac
 if [ ! "$MAC" == "" ]; then
-  $IPT $IPT_FLAGS -A INPUT  -m mac ! --mac-source "$MAC" -j LMAC
+  ipt4 -A INPUT  -m mac ! --mac-source "$MAC" -j LMAC
   eout "{glob} gateway ($MAC) route verification enabled"
 fi
 done
 
 if [ "$LOG_LGATE" == "1" ]; then
- $IPT $IPT_FLAGS -A LMAC -m limit --limit $LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix=" ** DROP FORIGN MAC ** "
+ ipt4 -A LMAC -m limit --limit $LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix=" ** DROP FORIGN MAC ** "
 fi
-$IPT $IPT_FLAGS -A LMAC  -j REJECT --reject-with icmp-net-prohibited
+ipt4 -A LMAC  -j REJECT --reject-with icmp-net-prohibited
 }
 
 cl_cports() {
