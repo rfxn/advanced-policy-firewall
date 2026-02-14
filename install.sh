@@ -12,9 +12,11 @@ BINPATH=${BINPATH:-"/usr/local/sbin/apf"}
 COMPAT_BINPATH=${COMPAT_BINPATH:-"/usr/local/sbin/fwmgr"}
 
 install() {
-        mkdir "$INSTALL_PATH"
-        find ./files -type f -exec sed -i "s:/etc/apf:$INSTALL_PATH:g" {} \;
+        mkdir -p "$INSTALL_PATH"
         cp -fR files/* "$INSTALL_PATH"
+        if [ "$INSTALL_PATH" != "/etc/apf" ]; then
+                find "$INSTALL_PATH" -type f -exec sed -i "s:/etc/apf:$INSTALL_PATH:g" {} \;
+        fi
         chmod -R 640 "$INSTALL_PATH"/*
         chmod 750 "$INSTALL_PATH/apf"
         chmod 750 "$INSTALL_PATH/firewall"
@@ -22,7 +24,7 @@ install() {
 	chmod 750 "$INSTALL_PATH/extras/get_ports"
 	chmod 750 "$INSTALL_PATH"
 	cp -pf .ca.def importconf "$INSTALL_PATH/extras/"
-	mkdir "$INSTALL_PATH/doc"
+	mkdir -p "$INSTALL_PATH/doc"
 	cp README CHANGELOG COPYING.GPL "$INSTALL_PATH/doc"
         ln -fs "$INSTALL_PATH/apf" "$BINPATH"
         ln -fs "$INSTALL_PATH/apf" "$COMPAT_BINPATH"
@@ -42,9 +44,10 @@ install() {
 			fi
 		fi
         fi
-	if [ -f "/var/log/apf_log" ] || [ -f "/var/log/apfados_log" ]; then
-	rm -f /var/log/apf_log /var/log/apfados_log
+	if [ -f "/var/log/apf_log" ]; then
+		mv -f /var/log/apf_log /var/log/apf_log.prev
 	fi
+	rm -f /var/log/apfados_log
 	if [ -d "/etc/logrotate.d" ] && [ -f "logrotate.d.apf" ]; then
 		cp logrotate.d.apf /etc/logrotate.d/apf
 	fi
@@ -65,7 +68,7 @@ install() {
 VER=`cat files/VERSION | grep version | awk '{print$2}'`
 if [ -d "$INSTALL_PATH" ]; then
 	DVAL=`date +"%d%m%Y-%s"`
-	cp -R "$INSTALL_PATH" "$INSTALL_PATH.bk$DVAL"
+	cp -R "$INSTALL_PATH" "$INSTALL_PATH.bk$DVAL" || { echo "Backup failed, aborting."; exit 1; }
 	rm -f "$INSTALL_PATH.bk.last"
 	ln -fs "$INSTALL_PATH.bk$DVAL" "${INSTALL_PATH}.bk.last"
 	rm -rf "$INSTALL_PATH"

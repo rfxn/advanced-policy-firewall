@@ -1,6 +1,10 @@
-/var/log/apfados_log /var/log/apf_log {
+/var/log/apf_log {
+    weekly
+    rotate 4
+    compress
     missingok
+    notifempty
     postrotate
+        /usr/bin/killall -HUP rsyslogd 2>/dev/null || true
     endscript
 }
-

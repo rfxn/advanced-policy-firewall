@@ -143,6 +143,20 @@
 [Fix] $TIF undefined variable replaced with $IFACE_TRUSTED in vnetgen;
       SET_ADDIFACE trusted interface exclusion now functional (vnetgen)
 [Change] LOG_IA dependency on LOG_DROP documented in conf.apf
+[Fix] /etc/init.d/apf hardcoded paths replaced with $INSTALL_PATH/apf -f
+      in devm() cron, allow_hosts(), deny_hosts() (functions.apf)
+[Fix] importconf copy destinations changed from /etc/apf/ to $INSTALL_PATH/
+      (importconf)
+[Fix] install.sh copies files before sed to prevent source tree corruption
+      on repeated installs; sed only runs when INSTALL_PATH != /etc/apf
+[Fix] install.sh uses mkdir -p and validates backup before rm -rf
+[Fix] .ca.def hardcoded values (SET_TRIM, TOS_DEF_RANGE, TCR_PORTS,
+      SYSCTL_ROUTE, DLIST_RESERVED) converted to $variable imports
+[New] .ca.def: SYSCTL_CONNTRACK_ADAPTIVE, SYSCTL_CONNTRACK_INCREMENT,
+      SYSCTL_CONNTRACK_HIGH, SYSCTL_CONNTRACK_BUCKETS variable imports added
+[Change] install.sh rotates apf_log instead of deleting on upgrade
+[Change] logrotate.d.apf given proper weekly rotation, compression, and
+         postrotate directive
 
 - 1.7.6-2 | Nov 18 2020:
 [New] add iptables locking support with iptables >= 1.4.20; pr #36

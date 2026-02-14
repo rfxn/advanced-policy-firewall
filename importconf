@@ -21,8 +21,8 @@ if [ -d "$INSTALL_PATH.bk.last" ]; then
 
 cp -f $INSTALL_PATH/conf.apf $INSTALL_PATH/conf.apf.orig
 cp -f $DOUT $INSTALL_PATH/conf.apf
-cp -f $INSTALL_PATH.bk.last/*_hosts.rules /etc/apf/
-cp -f $INSTALL_PATH.bk.last/vnet/*.rules /etc/apf/vnet/
+cp -f $INSTALL_PATH.bk.last/*_hosts.rules "$INSTALL_PATH/"
+cp -f $INSTALL_PATH.bk.last/vnet/*.rules "$INSTALL_PATH/vnet/"
 
 OV=`cat $INSTALL_PATH.bk.last/VERSION | awk '{print$2}'`
 NV=`cat $INSTALL_PATH/VERSION | awk '{print$2}'`

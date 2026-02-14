@@ -98,7 +98,7 @@ SET_REFRESH_MD5="$SET_REFRESH_MD5"
 # This is the total amount of rules allowed inside of the deny trust system.
 # When this limit is reached, the deny rule files will begin to purge older
 # entries to maintain the set limit. [value is max lines, 0 for unlimited]
-SET_TRIM="250"
+SET_TRIM="$SET_TRIM"
 
 # Verifies that the IFACE_* and IFACE_TRUSTED interfaces are actually routed
 # to something. If configured interfaces are found with no routes setup then
@@ -221,7 +221,7 @@ PKT_SANITY_PZERO="$PKT_SANITY_PZERO"
 TOS_DEF="$TOS_DEF"
 
 # Set the default TOS port range
-TOS_DEF_RANGE="512:65535"
+TOS_DEF_RANGE="$TOS_DEF_RANGE"
 
 # 0: Ports for Normal-Service
 TOS_0="$TOS_0"
@@ -241,7 +241,7 @@ TOS_16="$TOS_16"
 # Allow traceroute requests on the defined range of ports. This feature
 # is not required for normal operations and some even prefer it disabled.
 # Enable Traceroute 	# Traceroute ports
-TCR_PASS="$TCR_PASS"		TCR_PORTS="33434:33534"
+TCR_PASS="$TCR_PASS"		TCR_PORTS="$TCR_PORTS"
 
 # Set a reasonable packet/time ratio for ICMP packets, exceeding this flow
 # will result in dropped ICMP packets. Supported values are in the form of: 
@@ -323,6 +323,10 @@ BLK_TCP_SACK_PANIC="$BLK_TCP_SACK_PANIC"
 # in some or all connections being refused, in particular during denial of
 # service attacks.
 SYSCTL_CONNTRACK="$SYSCTL_CONNTRACK"
+SYSCTL_CONNTRACK_ADAPTIVE="$SYSCTL_CONNTRACK_ADAPTIVE"
+SYSCTL_CONNTRACK_INCREMENT="$SYSCTL_CONNTRACK_INCREMENT"
+SYSCTL_CONNTRACK_HIGH="$SYSCTL_CONNTRACK_HIGH"
+SYSCTL_CONNTRACK_BUCKETS="$SYSCTL_CONNTRACK_BUCKETS"
 
 # These are system control (sysctl) option changes to disable TCP features
 # that can be abused in addition to tweaking other TCP features for increased
@@ -347,7 +351,7 @@ SYSCTL_SYN="$SYSCTL_SYN"
 # These are system control (sysctl) option changes to provide protection from
 # spoofed packets and ip/arp/route redirection. If you are performing advanced
 # routing policies on this host such as NAT/MASQ you should disable this.
-SYSCTL_ROUTE="0"
+SYSCTL_ROUTE="$SYSCTL_ROUTE"
 
 # This system control (sysctl) option will log all network traffic that is
 # from impossible source addresses. This option can discover attacks or issues
@@ -512,7 +516,7 @@ DLIST_DSHIELD_URL="https://feeds.dshield.org/top10-2.txt"
 # will update the reserved networks list in order to prevent new ip assignments
 # on the internet from getting blocked; this option is only important when
 # BLK_RESNET is set to enabled.
-DLIST_RESERVED="1"
+DLIST_RESERVED="$DLIST_RESERVED"
 DLIST_RESERVED_URL="https://cdn.rfxn.com/downloads/reserved.networks"
 
 # ECN is an extension which helps reduce congestion. Unfortunately some
