@@ -344,6 +344,9 @@ flush() {
 firewall_on=`$IPT $IPT_FLAGS -L --numeric | grep -vE "Chain|destination"`
 if [ "$SET_FASTLOAD" == "1" ] && [ ! "$1" == "1" ] && [ ! "$DEVEL_ON" == "1" ] && [ ! "$firewall_on" == "" ]; then
 	$IPTS > $INSTALL_PATH/internals/.apf.restore
+	if [ "$USE_IPV6" == "1" ] && [ -n "$IP6TS" ]; then
+		$IP6TS > $INSTALL_PATH/internals/.apf6.restore
+	fi
 	eout "{glob} fast load snapshot saved"
 fi
 if [ ! "$1" = "1" ]; then
@@ -377,6 +380,12 @@ echo "Loading iptables rules..."
 iptc=$INSTALL_PATH/.iptrules.$$
 :> $iptc ; chmod 600 $iptc
 $IPT $IPT_FLAGS --verbose --numeric --line-numbers --list >> $iptc
+if [ "$USE_IPV6" == "1" ] && [ -n "$IP6T" ]; then
+	echo "" >> $iptc
+	echo "=== IPv6 (ip6tables) ===" >> $iptc
+	echo "" >> $iptc
+	$IP6T $IPT_FLAGS --verbose --numeric --line-numbers --list >> $iptc
+fi
 echo "Opening editor"
 if [ -f "/usr/bin/pico" ]; then
 	/usr/bin/pico -w $iptc
@@ -1256,33 +1265,41 @@ refresh() {
 		glob_deny_download
 	fi
 
+	# Extract currently-trusted IPv4 addresses from iptables-save
         $IPTS | grep -E "TALLOW|TGALLOW" | grep -E '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | awk '{print$4}' | sort -n | uniq > $tmpra
-        $IPT $IPT_FLAGS -F REFRESH_TEMP
+	# Also extract IPv6 addresses from ip6tables-save
+	if [ "$USE_IPV6" == "1" ] && [ -n "$IP6TS" ]; then
+		$IP6TS | grep -E "TALLOW|TGALLOW" | grep -E '[0-9a-fA-F]*:[0-9a-fA-F:]+' | awk '{print$4}' | sort | uniq >> $tmpra
+	fi
+        ipt -F REFRESH_TEMP
         for i in `cat $tmpra | grep -v "#"`; do
-                if [ ! "$i" == "" ]; then
-                 $IPT $IPT_FLAGS -A REFRESH_TEMP -s $i -d 0/0 -j ACCEPT
-                 $IPT $IPT_FLAGS -A REFRESH_TEMP -d $i -s 0/0 -j ACCEPT
+                if [ ! "$i" == "" ] && ipt_for_host "$i"; then
+                 $IPT_H $IPT_FLAGS -A REFRESH_TEMP -s $i -d $ANY_ADDR -j ACCEPT
+                 $IPT_H $IPT_FLAGS -A REFRESH_TEMP -d $i -s $ANY_ADDR -j ACCEPT
                 fi
         done
         tmprd="$INSTALL_PATH/internals/refresh.drop.temp.$$"
         $IPTS | grep -E "TDENY|TGDENY" | grep -E '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | awk '{print$4}' | sort -n | uniq > $tmprd
+	if [ "$USE_IPV6" == "1" ] && [ -n "$IP6TS" ]; then
+		$IP6TS | grep -E "TDENY|TGDENY" | grep -E '[0-9a-fA-F]*:[0-9a-fA-F:]+' | awk '{print$4}' | sort | uniq >> $tmprd
+	fi
         for i in `cat $tmprd | grep -v "#"`; do
-                if [ ! "$i" == "" ]; then
-                 $IPT $IPT_FLAGS -A REFRESH_TEMP -s $i -d 0/0 -j $ALL_STOP
-                 $IPT $IPT_FLAGS -A REFRESH_TEMP -d $i -s 0/0 -j $ALL_STOP
+                if [ ! "$i" == "" ] && ipt_for_host "$i"; then
+                 $IPT_H $IPT_FLAGS -A REFRESH_TEMP -s $i -d $ANY_ADDR -j $ALL_STOP
+                 $IPT_H $IPT_FLAGS -A REFRESH_TEMP -d $i -s $ANY_ADDR -j $ALL_STOP
                 fi
         done
         trim $DENY_HOSTS $SET_TRIM
         trim $GDENY_HOSTS $SET_TRIM
-        $IPT $IPT_FLAGS -F TDENY
-        $IPT $IPT_FLAGS -F TGDENY
-        $IPT $IPT_FLAGS -F TALLOW
-        $IPT $IPT_FLAGS -F TGALLOW
+        ipt -F TDENY
+        ipt -F TGDENY
+        ipt -F TALLOW
+        ipt -F TGALLOW
 	allow_hosts $GALLOW_HOSTS TGALLOW
 	allow_hosts $ALLOW_HOSTS TALLOW
 	deny_hosts $GDENY_HOSTS TGDENY
 	deny_hosts $DENY_HOSTS TDENY
-        $IPT $IPT_FLAGS -F REFRESH_TEMP
+        ipt -F REFRESH_TEMP
         rm -f $tmpra $tmprd
 }
 

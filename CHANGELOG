@@ -1,4 +1,15 @@
 - 2.0.1 | Feb 14 2026:
+[New] $IP6TS/$IP6TR variables for ip6tables-save/ip6tables-restore discovery
+      (internals.conf)
+[New] IPv6 fast load save/restore; ip6tables snapshot saved as .apf6.restore
+      alongside IPv4 snapshot, restored on fast load when USE_IPV6=1 (apf)
+[Change] list() now shows both IPv4 and IPv6 rules when USE_IPV6=1
+      (functions.apf)
+[Change] flush() fast save now includes ip6tables snapshot when USE_IPV6=1
+      (functions.apf)
+[Change] refresh() now extracts and preserves IPv6 trust addresses from
+      ip6tables-save during trust chain refresh; uses ipt() for chain flushes
+      (functions.apf)
 [New] ipt_for_host() helper routes iptables commands to correct table based on
       host address family; detects IPv6 by ':' presence, sets $IPT_H/$ANY_ADDR
 [Fix] trust system IPv6 support; cli_trust(), cli_trust_remove(), allow_hosts(),
