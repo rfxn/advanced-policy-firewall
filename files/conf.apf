@@ -413,6 +413,13 @@ IG_UDP_CPORTS=""
 # 'internals/icmp.types' for type definition; 'all' is wildcard for any
 IG_ICMP_TYPES="3,5,11,0,30,8"
 
+# Common ICMPv6 inbound (ingress) types (requires USE_IPV6="1")
+# Types 133-136 (Neighbor Discovery Protocol) are always permitted regardless
+# of this setting as they are required for IPv6 connectivity.
+# Default includes: 1=dest-unreach, 2=packet-too-big, 3=time-exceeded,
+# 4=parameter-problem, 128=echo-request, 129=echo-reply
+IG_ICMPV6_TYPES="1,2,3,4,128,129"
+
 # Configure outbound (egress) accepted services. This is an optional
 # feature; services and customized entries may be made directly to an ip's
 # virtual net file located in the vnet/ directory.
@@ -439,6 +446,11 @@ EG_UDP_CPORTS="20,21,53"
 # Common ICMP outbound (egress) types
 # 'internals/icmp.types' for type definition; 'all' is wildcard for any
 EG_ICMP_TYPES="all"
+
+# Common ICMPv6 outbound (egress) types (requires USE_IPV6="1")
+# Types 133-136 (Neighbor Discovery Protocol) are always permitted regardless
+# of this setting as they are required for IPv6 connectivity.
+EG_ICMPV6_TYPES="all"
 
 # Configure user-id specific outbound (egress) port access. This is a more
 # granular feature to limit the scope of outbound packet flows with user-id

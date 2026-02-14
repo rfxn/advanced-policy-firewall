@@ -49,6 +49,27 @@ ipt6() {
 	fi
 }
 
+# VNET-aware dual-stack helpers for port filtering.
+# When VNET is a specific IP (SET_VNET=1), IPv4 gets -d/-s $VNET and IPv6
+# applies without address restriction. When VNET is "0/0" (SET_VNET=0),
+# both stacks apply without address restriction (0/0 is the default).
+ipt_dst() {
+	if [ -n "$VNET" ] && [ "$VNET" != "0/0" ]; then
+		ipt4 -d $VNET "$@"
+		ipt6 "$@"
+	else
+		ipt "$@"
+	fi
+}
+ipt_src() {
+	if [ -n "$VNET" ] && [ "$VNET" != "0/0" ]; then
+		ipt4 -s $VNET "$@"
+		ipt6 "$@"
+	else
+		ipt "$@"
+	fi
+}
+
 ml() {
  FATAL="$2"
  MEXT="ko"
@@ -1130,9 +1151,11 @@ cl_cports() {
 	IG_TCP_CPORTS=""
 	IG_UDP_CPORTS=""
 	IG_ICMP_TYPES=""
+	IG_ICMPV6_TYPES=""
 	EG_TCP_CPORTS=""
 	EG_UDP_CPORTS=""
 	EG_ICMP_TYPES=""
+	EG_ICMPV6_TYPES=""
 	EG_TCP_UID=""
 	EG_UDP_UID=""
 }

@@ -87,6 +87,25 @@
          single ipt() call (bt.rules)
 [Change] EG_DROP_CMD section converted to ipt4(); redundant -s 0/0 -d 0/0
          removed (cports.common)
+[New] IPv6 local address detection; .localaddrs6 generated alongside
+      .localaddrs when USE_IPV6=1 (firewall)
+[New] IPv6 PROHIBIT chain with icmp6-adm-prohibited reject target (firewall)
+[New] ipt_dst()/ipt_src() VNET-aware dual-stack helpers for port filtering;
+      IPv4 gets -d/-s $VNET, IPv6 applies without address restriction
+      (functions.apf)
+[New] ICMPv6 filtering support with IG_ICMPV6_TYPES and EG_ICMPV6_TYPES
+      config variables; NDP types 133-136 always permitted (cports.common,
+      conf.apf)
+[New] IPv6 DNS filtering; nameservers from resolv.conf routed to ipt4/ipt6
+      based on address type (firewall)
+[Change] trusted interface rules converted to ipt() dual-stack; redundant
+         -s 0/0 -d 0/0 removed (firewall)
+[Change] TCP/UDP port filtering converted from ipt4 to ipt_dst/ipt_src for
+         dual-stack support; IPv6 gets port rules when USE_IPV6=1 (cports.common)
+[Change] RESV_DNS_DROP rules converted to ipt4/ipt6 with IPv6 coverage when
+         USE_IPV6=1 (firewall)
+[Change] cl_cports() clears ICMPv6 variables between VNET iterations
+         (functions.apf)
 
 - 1.7.6-2 | Nov 18 2020:
 [New] add iptables locking support with iptables >= 1.4.20; pr #36

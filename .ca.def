@@ -415,6 +415,10 @@ IG_UDP_CPORTS="$IG_UDP_CPORTS"
 # 'internals/icmp.types' for type definition; 'all' is wildcard for any
 IG_ICMP_TYPES="$IG_ICMP_TYPES"
 
+# Common ICMPv6 inbound (ingress) types
+# NDP types 133-136 are always permitted regardless of this setting
+IG_ICMPV6_TYPES="$IG_ICMPV6_TYPES"
+
 # Configure outbound (egress) accepted services. This is an optional
 # feature; services and customized entries may be made directly to an ip's
 # virtual net file located in the vnet/ directory.
@@ -441,6 +445,10 @@ EG_UDP_CPORTS="$EG_UDP_CPORTS"
 # Common ICMP outbound (egress) types
 # 'internals/icmp.types' for type definition; 'all' is wildcard for any
 EG_ICMP_TYPES="$EG_ICMP_TYPES"
+
+# Common ICMPv6 outbound (egress) types
+# NDP types 133-136 are always permitted regardless of this setting
+EG_ICMPV6_TYPES="$EG_ICMPV6_TYPES"
 
 # Configure user-id specific outbound (egress) port access. This is a more
 # granular feature to limit the scope of outbound packet flows with user-id
