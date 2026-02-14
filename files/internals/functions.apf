@@ -50,7 +50,6 @@ ipt6() {
 }
 
 ml() {
- MOD="$1"
  FATAL="$2"
  MEXT="ko"
 
@@ -197,7 +196,7 @@ valid_host() {
 		return 0
 	fi
 	# IPv6 address or CIDR
-	if echo "$h" | grep -qE '^[0-9a-fA-F:]+(/[0-9]{1,3})?$'; then
+	if echo "$h" | grep -qE '^[0-9a-fA-F]{1,4}(:[0-9a-fA-F]{0,4}){2,7}(/[0-9]{1,3})?$'; then
 		return 0
 	fi
 	# FQDN: alphanumeric, hyphens, dots; no leading/trailing hyphens per label
@@ -209,6 +208,10 @@ valid_host() {
 
 cli_trust_remove() {
 	DIP="$1"
+	if ! valid_host "$DIP"; then
+		echo "Invalid host '$DIP': must be a valid IP address, CIDR block, or FQDN"
+		return 1
+	fi
 	$IPT $IPT_FLAGS -D INPUT -s $DIP -j ACCEPT
 	$IPT $IPT_FLAGS -D OUTPUT -d $DIP -j ACCEPT
         $IPT $IPT_FLAGS -D INPUT -s $DIP -j $ALL_STOP

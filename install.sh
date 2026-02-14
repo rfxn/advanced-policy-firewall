@@ -27,14 +27,9 @@ install() {
         ln -fs "$INSTALL_PATH/apf" "$BINPATH"
         ln -fs "$INSTALL_PATH/apf" "$COMPAT_BINPATH"
 	rm -f /etc/cron.hourly/fw /etc/cron.daily/fw /etc/cron.d/fwdev "$INSTALL_PATH/cron.fwdev"
-        if [ -f "/etc/cron.daily/apf" ]; then
-                rm -f /etc/cron.daily/apf
-                cp cron.daily /etc/cron.daily/apf
-                chmod 755 /etc/cron.daily/apf
-        else
-                cp cron.daily /etc/cron.daily/apf
-                chmod 755 /etc/cron.daily/apf
-        fi
+        rm -f /etc/cron.daily/apf
+        cp cron.daily /etc/cron.daily/apf
+        chmod 755 /etc/cron.daily/apf
 	if [ -d "/etc/rc.d/init.d" ]; then
                 cp -f apf.init /etc/rc.d/init.d/apf
 	elif [ -d "/etc/init.d" ]; then

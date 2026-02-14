@@ -27,10 +27,8 @@ echo 1 > /proc/sys/net/ipv4/icmp_echo_ignore_broadcasts
 if [ "$SYSCTL_LOGMARTIANS" == "1" ]; then
 	eout "{glob} setting sysctl_logmartians enabled"
 	echo 1 > /proc/sys/net/ipv4/conf/$IFACE_UNTRUSTED/log_martians
-	echo 1 > /proc/sys/net/ipv4/conf/$IFACE_UNTRUSTED/log_martians
 else
         eout "{glob} setting sysctl_logmartians disabled"
-        echo 0 > /proc/sys/net/ipv4/conf/$IFACE_UNTRUSTED/log_martians
         echo 0 > /proc/sys/net/ipv4/conf/$IFACE_UNTRUSTED/log_martians
 fi
 
@@ -61,11 +59,13 @@ fi
 # TCP Parameters
 if [ "$SYSCTL_TCP" == "1" ]; then
 	eout "{glob} setting sysctl_tcp enabled"
-	echo 0 > /proc/sys/net/ipv4/tcp_tw_recycle
+	if [ -f "/proc/sys/net/ipv4/tcp_tw_recycle" ]; then
+		echo 0 > /proc/sys/net/ipv4/tcp_tw_recycle
+	fi
 	echo 1 > /proc/sys/net/ipv4/tcp_tw_reuse
 	echo 1 > /proc/sys/net/ipv4/tcp_window_scaling
 	echo 0 > /proc/sys/net/ipv4/tcp_timestamps
-	if [ "$SYSCTL_TCP_NOSACK" ]; then
+	if [ "$SYSCTL_TCP_NOSACK" == "1" ]; then
 		echo 0 > /proc/sys/net/ipv4/tcp_sack
 	else
 		echo 1 > /proc/sys/net/ipv4/tcp_sack
@@ -89,8 +89,6 @@ fi
 if [ "$SYSCTL_ROUTE" == "1" ]; then
 	eout "{glob} setting sysctl_routing enabled"
 	echo 1 > /proc/sys/net/ipv4/conf/$IFACE_UNTRUSTED/rp_filter
-	echo 1 > /proc/sys/net/ipv4/conf/$IFACE_UNTRUSTED/rp_filter
-	echo 0 > /proc/sys/net/ipv4/conf/$IFACE_UNTRUSTED/accept_source_route
 	echo 0 > /proc/sys/net/ipv4/conf/$IFACE_UNTRUSTED/accept_source_route
 	echo 0 > /proc/sys/net/ipv4/conf/all/bootp_relay
 	echo 0 > /proc/sys/net/ipv4/ip_forward
@@ -100,7 +98,6 @@ if [ "$SYSCTL_ROUTE" == "1" ]; then
 	echo 0 > /proc/sys/net/ipv4/send_redirects
 	echo 0 > /proc/sys/net/ipv4/proxy_arp
 else
-        echo 0 > /proc/sys/net/ipv4/conf/$IFACE_UNTRUSTED/rp_filter
         echo 0 > /proc/sys/net/ipv4/conf/$IFACE_UNTRUSTED/rp_filter
         echo 1 > /proc/sys/net/ipv4/conf/all/bootp_relay
         echo 1 > /proc/sys/net/ipv4/ip_forward

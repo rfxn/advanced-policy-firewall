@@ -65,7 +65,7 @@ if [ "$SET_ADDIFACE" == "1" ]; then
    fi
   done
  elif [ -f "$ifconfig" ]; then
-  for anet in $(ifconfig | grep Link | grep -vwE "inet|inet6|lo|$IFACE_UNTRUSTED|$IFACE_UNTRUSTED" | awk '{print$1}'); do
+  for anet in $(ifconfig | grep -E '^[a-zA-Z0-9]' | awk '{print$1}' | tr -d ':' | grep -vwE "lo|$IFACE_UNTRUSTED"); do
    for iface in $(ifconfig | grep -w $anet | awk '{print$1}'); do
     valtif=$(echo $TIF | grep $anet)
     if [ "$valtif" == "" ]; then
