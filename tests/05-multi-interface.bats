@@ -8,6 +8,7 @@
 load '/usr/local/lib/bats/bats-support/load'
 load '/usr/local/lib/bats/bats-assert/load'
 source /opt/tests/helpers/assert-iptables.bash
+source /opt/tests/helpers/detect-nc.sh
 
 APF="/opt/apf/apf"
 
@@ -59,12 +60,11 @@ teardown_file() {
     if [ "$NETNS_AVAILABLE" != "true" ]; then
         skip "network namespaces not available (need --privileged)"
     fi
-    # Start a listener on port 80 (netcat-openbsd: nc -l PORT)
-    nc -l 80 </dev/null &
+    nc_listen 80
     local pid=$!
     sleep 1
 
-    run ip netns exec client_ns nc -z -w 2 203.0.113.1 80
+    run ip netns exec client_ns $NC_BIN -z -w 2 203.0.113.1 80
     assert_success
 
     kill $pid 2>/dev/null || true
@@ -76,7 +76,7 @@ teardown_file() {
         skip "network namespaces not available (need --privileged)"
     fi
     # Port 3306 is not in IG_TCP_CPORTS — should be filtered
-    run ip netns exec client_ns nc -z -w 1 203.0.113.1 3306
+    run ip netns exec client_ns $NC_BIN -z -w 1 203.0.113.1 3306
     assert_failure
 }
 
@@ -85,11 +85,11 @@ teardown_file() {
         skip "network namespaces not available (need --privileged)"
     fi
     # Trusted interface bypasses all rules — even non-configured ports
-    nc -l 9999 </dev/null &
+    nc_listen 9999
     local pid=$!
     sleep 1
 
-    run ip netns exec client_ns nc -z -w 2 10.0.0.1 9999
+    run ip netns exec client_ns $NC_BIN -z -w 2 10.0.0.1 9999
     assert_success
 
     kill $pid 2>/dev/null || true

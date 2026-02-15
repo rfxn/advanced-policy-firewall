@@ -114,3 +114,64 @@ assert_rule_not_exists() {
         return 1
     fi
 }
+
+# Assert a rule matching PATTERN exists using iptables -S (more consistent across backends)
+# iptables -S output is the same format on both nft and legacy backends.
+# Usage: assert_rule_exists_ips CHAIN PATTERN [TABLE]
+assert_rule_exists_ips() {
+    local chain="$1"
+    local pattern="$2"
+    local table="${3:-filter}"
+    local rules
+    rules=$(iptables -t "$table" -S "$chain" 2>/dev/null)
+    if ! echo "$rules" | grep -qE -- "$pattern"; then
+        echo "Expected rule matching '$pattern' in chain '$chain' table '$table' (iptables -S)" >&2
+        echo "Actual rules:" >&2
+        echo "$rules" >&2
+        return 1
+    fi
+}
+
+# Assert a rule matching PATTERN exists using ip6tables -S
+# Usage: assert_rule_exists_ip6s CHAIN PATTERN [TABLE]
+assert_rule_exists_ip6s() {
+    local chain="$1"
+    local pattern="$2"
+    local table="${3:-filter}"
+    local rules
+    rules=$(ip6tables -t "$table" -S "$chain" 2>/dev/null)
+    if ! echo "$rules" | grep -qE -- "$pattern"; then
+        echo "Expected rule matching '$pattern' in chain '$chain' table '$table' (ip6tables -S)" >&2
+        echo "Actual rules:" >&2
+        echo "$rules" >&2
+        return 1
+    fi
+}
+
+# Assert the exact number of -A (append) rules in a chain
+# Usage: assert_rule_count CHAIN EXPECTED_COUNT [TABLE]
+assert_rule_count() {
+    local chain="$1"
+    local expected="$2"
+    local table="${3:-filter}"
+    local actual
+    actual=$(iptables -t "$table" -S "$chain" 2>/dev/null | grep -c '^-A' || true)
+    if [ "$actual" -ne "$expected" ]; then
+        echo "Expected $expected rules in chain '$chain' table '$table', got $actual" >&2
+        return 1
+    fi
+}
+
+# Assert the exact number of -A (append) rules in an ip6tables chain
+# Usage: assert_rule_count_ip6 CHAIN EXPECTED_COUNT [TABLE]
+assert_rule_count_ip6() {
+    local chain="$1"
+    local expected="$2"
+    local table="${3:-filter}"
+    local actual
+    actual=$(ip6tables -t "$table" -S "$chain" 2>/dev/null | grep -c '^-A' || true)
+    if [ "$actual" -ne "$expected" ]; then
+        echo "Expected $expected ip6tables rules in chain '$chain' table '$table', got $actual" >&2
+        return 1
+    fi
+}

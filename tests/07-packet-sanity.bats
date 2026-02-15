@@ -35,27 +35,24 @@ teardown_file() {
     assert_chain_exists OUT_SANITY
 }
 
-# TCP flag tests: nft backend shows flags as hex (0xNN/0xNN)
-# FIN=0x01 SYN=0x02 RST=0x04 PSH=0x08 ACK=0x10 URG=0x20
-# SYN,FIN=0x03  SYN,RST=0x06  ALL=0x3F  NONE=0x00
+# TCP flag tests: nft backend shows hex (flags:0xNN/0xNN),
+# legacy backend shows symbolic (SYN,FIN SYN,FIN).
+# Use alternation pattern for cross-backend portability.
 
 @test "IN_SANITY blocks SYN,FIN pair" {
-    # SYN,FIN SYN,FIN → mask 0x03 match 0x03
-    assert_rule_exists IN_SANITY "flags:0x03/0x03"
+    assert_rule_exists IN_SANITY "(SYN,FIN.*SYN,FIN|flags:0x03/0x03)"
 }
 
 @test "IN_SANITY blocks ALL NONE (null scan)" {
-    # ALL NONE → mask 0x3F match 0x00
-    assert_rule_exists IN_SANITY "flags:0x3F/0x00"
+    assert_rule_exists IN_SANITY "(FIN,SYN,RST,PSH,ACK,URG.*NONE|flags:0x3F/0x00)"
 }
 
 @test "IN_SANITY blocks SYN,RST pair" {
-    # SYN,RST SYN,RST → mask 0x06 match 0x06
-    assert_rule_exists IN_SANITY "flags:0x06/0x06"
+    assert_rule_exists IN_SANITY "(SYN,RST.*SYN,RST|flags:0x06/0x06)"
 }
 
 @test "OUT_SANITY blocks SYN,FIN pair" {
-    assert_rule_exists OUT_SANITY "flags:0x03/0x03"
+    assert_rule_exists OUT_SANITY "(SYN,FIN.*SYN,FIN|flags:0x03/0x03)"
 }
 
 @test "INPUT references IN_SANITY" {
