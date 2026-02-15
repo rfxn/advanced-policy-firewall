@@ -26,9 +26,9 @@ else
    exit 1
 fi
 
-if [ ! -f $LOG_APF ]; then
-        touch $LOG_APF
-        chmod 600 $LOG_APF
+if [ ! -f "$LOG_APF" ]; then
+        touch "$LOG_APF"
+        chmod 600 "$LOG_APF"
         eout "{glob} status log not found, created"
 fi
 
@@ -140,18 +140,18 @@ fi
 ##
 eout "{glob} activating firewall"
 # record our last full load
-date +"%s" > $INSTALL_PATH/internals/.last.full
+date +"%s" > "$INSTALL_PATH/internals/.last.full"
 if [ ! -f "$DS_HOSTS" ]; then
-	touch $DS_HOSTS
-	chmod 600 $DS_HOSTS
+	touch "$DS_HOSTS"
+	chmod 600 "$DS_HOSTS"
 fi
 if [ ! -f "$DENY_HOSTS" ]; then
-        touch $DENY_HOSTS
-        chmod 600 $DENY_HOSTS
+        touch "$DENY_HOSTS"
+        chmod 600 "$DENY_HOSTS"
 fi
 if [ ! -f "$ALLOW_HOSTS" ]; then
-        touch $ALLOW_HOSTS
-        chmod 600 $ALLOW_HOSTS
+        touch "$ALLOW_HOSTS"
+        chmod 600 "$ALLOW_HOSTS"
 fi
 # check dev mode
 devm

@@ -8,8 +8,8 @@
 ##
 #
 CNF="/etc/apf/conf.apf"
-if [ -f $CNF ]; then
-   source $CNF
+if [ -f "$CNF" ]; then
+   source "$CNF"
 else
    echo "$CNF not found, aborting."
    exit 1
@@ -24,25 +24,25 @@ if [ ! -f "$INSTALL_PATH/vnet/vnetgen.def" ]; then
         exit 1
 fi
 
-if [ ! -f "$ip" ] && [ ! -f "$ifconfig" ]; then
-        eout "{glob} $ip and $ifconfig not found; aborting"
-	echo "$ip and $ifconfig not found; aborting"
+if [ -z "$ip" ] && [ -z "$ifconfig" ]; then
+        eout "{glob} ip and ifconfig not found; aborting"
+	echo "ip and ifconfig not found; aborting"
         exit 1
-elif [ -f "$ip" ]; then
- for addr in `$ip addr list | tr '/' ' ' | grep -w inet | grep -w $IF | grep -v 127.0.0.1 | grep -vw $NET | awk '{print$2}'`; do
+elif [ -n "$ip" ]; then
+ for addr in `$ip addr list | tr '/' ' ' | grep -w inet | grep -w "$IF" | grep -v 127.0.0.1 | grep -vw "$NET" | awk '{print$2}'`; do
   if [ ! -f "$INSTALL_PATH/vnet/$addr.rules" ]; then
-        touch $INSTALL_PATH/vnet/$addr.rules
-        chmod 600 $INSTALL_PATH/vnet/$addr.rules
-        . $INSTALL_PATH/vnet/vnetgen.def
+        touch "$INSTALL_PATH/vnet/$addr.rules"
+        chmod 600 "$INSTALL_PATH/vnet/$addr.rules"
+        . "$INSTALL_PATH/vnet/vnetgen.def"
   fi
  done
-elif [ -f "$ifconfig" ]; then
-for iface in `ifconfig | grep -w $IF | awk '{print$1}'`; do
-  for addr in `ifconfig $iface | grep -w inet | tr ':' ' ' | grep -vw $NET | awk '{print$3}'`; do
+elif [ -n "$ifconfig" ]; then
+for iface in `$ifconfig | grep -w "$IF" | awk '{print$1}'`; do
+  for addr in `$ifconfig $iface | grep -w inet | tr ':' ' ' | grep -vw "$NET" | awk '{print$3}'`; do
     if [ ! -f "$INSTALL_PATH/vnet/$addr.rules" ]; then
-        touch $INSTALL_PATH/vnet/$addr.rules
-        chmod 600 $INSTALL_PATH/vnet/$addr.rules
-        . $INSTALL_PATH/vnet/vnetgen.def
+        touch "$INSTALL_PATH/vnet/$addr.rules"
+        chmod 600 "$INSTALL_PATH/vnet/$addr.rules"
+        . "$INSTALL_PATH/vnet/vnetgen.def"
     fi
   done
 done
@@ -51,29 +51,29 @@ fi
 
 if [ "$SET_ADDIFACE" == "1" ]; then
  ## associate a vnet rule for ip's on additional interfaces other than the main
- if [ -f "$ip" ]; then
+ if [ -n "$ip" ]; then
   for anet in $($ip -o link show 2>/dev/null | awk -F': ' '{print $2}' | grep -vwE "lo|$IFACE_UNTRUSTED"); do
-   valtif=$(echo $IFACE_TRUSTED | tr ',' ' ' | grep -w $anet)
+   valtif=$(echo "$IFACE_TRUSTED" | tr ',' ' ' | grep -w "$anet")
    if [ "$valtif" == "" ]; then
-    for addr in $($ip addr list $anet 2>/dev/null | tr '/' ' ' | grep -w inet | grep -v 127.0.0.1 | grep -vw $NET | awk '{print$2}'); do
+    for addr in $($ip addr list "$anet" 2>/dev/null | tr '/' ' ' | grep -w inet | grep -v 127.0.0.1 | grep -vw "$NET" | awk '{print$2}'); do
      if [ ! -f "$INSTALL_PATH/vnet/$addr.rules" ]; then
-        touch $INSTALL_PATH/vnet/$addr.rules
-        chmod 600 $INSTALL_PATH/vnet/$addr.rules
-        . $INSTALL_PATH/vnet/vnetgen.def
+        touch "$INSTALL_PATH/vnet/$addr.rules"
+        chmod 600 "$INSTALL_PATH/vnet/$addr.rules"
+        . "$INSTALL_PATH/vnet/vnetgen.def"
      fi
     done
    fi
   done
- elif [ -f "$ifconfig" ]; then
-  for anet in $(ifconfig | grep -E '^[a-zA-Z0-9]' | awk '{print$1}' | tr -d ':' | grep -vwE "lo|$IFACE_UNTRUSTED"); do
-   for iface in $(ifconfig | grep -w $anet | awk '{print$1}'); do
-    valtif=$(echo $IFACE_TRUSTED | tr ',' ' ' | grep -w $anet)
+ elif [ -n "$ifconfig" ]; then
+  for anet in $($ifconfig | grep -E '^[a-zA-Z0-9]' | awk '{print$1}' | tr -d ':' | grep -vwE "lo|$IFACE_UNTRUSTED"); do
+   for iface in $($ifconfig | grep -w "$anet" | awk '{print$1}'); do
+    valtif=$(echo "$IFACE_TRUSTED" | tr ',' ' ' | grep -w "$anet")
     if [ "$valtif" == "" ]; then
-     for addr in $(ifconfig $iface | grep -w inet | tr ':' ' ' | grep -vw $NET | awk '{print$3}'); do
+     for addr in $($ifconfig "$iface" | grep -w inet | tr ':' ' ' | grep -vw "$NET" | awk '{print$3}'); do
       if [ ! -f "$INSTALL_PATH/vnet/$addr.rules" ]; then
-        touch $INSTALL_PATH/vnet/$addr.rules
-        chmod 600 $INSTALL_PATH/vnet/$addr.rules
-        . $INSTALL_PATH/vnet/vnetgen.def
+        touch "$INSTALL_PATH/vnet/$addr.rules"
+        chmod 600 "$INSTALL_PATH/vnet/$addr.rules"
+        . "$INSTALL_PATH/vnet/vnetgen.def"
       fi
      done
     fi

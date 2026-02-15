@@ -313,7 +313,7 @@ fi
 if [ "$BLK_IDENT" = "1" ]; then
 	eout "{blk_ident} set active BLK_IDENT"
 	# Reject ident request if not defined in IG_TCP_CPORTS
-	if [ "$(echo $IG_TCP_CPORTS | tr ',' '\n' | grep -w 113)" == "" ]; then
+	if [ "$(echo "$IG_TCP_CPORTS" | tr ',' '\n' | grep -w 113)" == "" ]; then
 		eout "{blk_ident} reject all to/from tcp port 113"
 		ipt -N IDENT
                 if [ "$LOG_DROP" == "1" ]; then

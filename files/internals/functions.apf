@@ -11,7 +11,7 @@
 eout() {
 arg=$1
         if [ ! "$arg" == "" ]; then
-                echo "$(date +"%b %d %H:%M:%S") $(hostname -s) $APPN($$): $arg" >> $LOG_APF
+                echo "$(date +"%b %d %H:%M:%S") $(hostname -s) $APPN($$): $arg" >> "$LOG_APF"
                 if [ "$SET_VERBOSE" == "1" ] || [ "$2" == "1" ]; then
                         echo "$APPN($$): $arg"
                 fi
@@ -25,10 +25,10 @@ devm() {
         if [ ! "$SET_VERBOSE" == "1" ]; then
                 eout "{glob} !!DEVELOPMENT MODE ENABLED!! - firewall will flush every 5 minutes." 1
         fi
-        echo "*/5 * * * * root $INSTALL_PATH/apf -f >> /dev/null 2>&1" > $cron_file
-        chmod 644 $cron_file
+        echo "*/5 * * * * root $INSTALL_PATH/apf -f >> /dev/null 2>&1" > "$cron_file"
+        chmod 644 "$cron_file"
  elif [ "$DEVEL_MODE" == "0" ]; then
-        rm -f $cron_file
+        rm -f "$cron_file"
  fi
 }
 
@@ -211,17 +211,17 @@ trim() {
 	MAXLINES=0
  fi
  if [ ! "$MAXLINES" == "0" ] && [ -f "$FILE" ]; then
-	LINES=`cat $FILE | grep -v "#" | grep -c ""`
+	LINES=`cat "$FILE" | grep -v "#" | grep -c ""`
         if [ "$LINES" -gt "$MAXLINES" ]; then
                 eout "{glob} trimming $FILE to $MAXLINES lines"
-                CHK_CMT=`tail -n $MAXLINES $FILE | grep -c "#"`
+                CHK_CMT=`tail -n "$MAXLINES" "$FILE" | grep -c "#"`
                 MAXLINES=$(($CHK_CMT+$MAXLINES))
-                CHK_SCMT=`tail -n $MAXLINES $FILE | tac | tail -n 1 | grep "#"`
+                CHK_SCMT=`tail -n "$MAXLINES" "$FILE" | tac | tail -n 1 | grep "#"`
                 if [ "$CHK_SCMT" == "" ]; then
                         MAXLINES=$((1+$MAXLINES))
                 fi
-                tail -n $MAXLINES $FILE > $FILE.new
-                mv -f $FILE.new $FILE
+                tail -n "$MAXLINES" "$FILE" > "$FILE.new"
+                mv -f "$FILE.new" "$FILE"
         fi
  fi
 }
@@ -276,7 +276,7 @@ cli_trust_remove() {
         $IPT_H $IPT_FLAGS -D TGDENY -s $DIP -j $ALL_STOP
         $IPT_H $IPT_FLAGS -D TGDENY -d $DIP -j $ALL_STOP
 
-	sed -i "\%^$DIP\b%d" $ALLOW_HOSTS $DENY_HOSTS $GALLOW_HOSTS $GDENY_HOSTS
+	sed -i "\%^$DIP\b%d" "$ALLOW_HOSTS" "$DENY_HOSTS" "$GALLOW_HOSTS" "$GDENY_HOSTS"
 
 	# Clean remaining rules from INPUT/OUTPUT (reverse order to preserve line numbers)
 	dil=$($IPT_H $IPT_FLAGS --numeric --list INPUT --line-numbers | grep -w "$DIP" | tac | awk '{print$1}')
@@ -325,7 +325,7 @@ cli_trust() {
             fi
         done
 	valtrust="$tlist"
-        valip=`cat $INSTALL_PATH/internals/.localaddrs $INSTALL_PATH/internals/.localaddrs6 2>/dev/null | grep -w $HOST`
+        valip=`cat "$INSTALL_PATH/internals/.localaddrs" "$INSTALL_PATH/internals/.localaddrs6" 2>/dev/null | grep -w "$HOST"`
         if [ "$valtrust" ]; then
                 echo "$HOST already exists in $tlist"
         elif [ "$valip" ]; then
@@ -428,7 +428,7 @@ rm -f $iptc
 
 status() {
 echo "$NAME Status Log:"
-tac $LOG_APF | more
+tac "$LOG_APF" | more
 }
 
 help() {
@@ -537,7 +537,7 @@ if [ ! "`cat $file | grep -v "#"`" == "" ]; then
                         eout "{trust} skipping invalid entry in $file: $i"
                         continue
                 fi
-                val=`cat $INSTALL_PATH/internals/.localaddrs $INSTALL_PATH/internals/.localaddrs6 2>/dev/null | grep -w $i`
+                val=`cat "$INSTALL_PATH/internals/.localaddrs" "$INSTALL_PATH/internals/.localaddrs6" 2>/dev/null | grep -w "$i"`
                 if [ ! "$val" ]; then
                  if [ ! "$i" == "" ] && [ -f "$file" ]; then
                   if ipt_for_host "$i"; then
@@ -626,9 +626,9 @@ if [ ! "`cat $file | grep -v "#"`" == "" ]; then
                         PIP=$(trust_restore_ipv6 "`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$5}'`")
 
                         if [ ! "$NFLOW" == "" ] && [ ! "$IPFLOW" == "" ] && [ ! "$PIP" == "" ] && [ ! "$PFLOW" == "" ] && [ ! "$PPORT" == "" ]; then
-                         if [ "$IPFLOW" == "s" ] && [ "$NFLOW" == "INPUT" ] && [ "$(cat $INSTALL_PATH/internals/.localaddrs $INSTALL_PATH/internals/.localaddrs6 2>/dev/null | grep -w $PIP)" ]; then
+                         if [ "$IPFLOW" == "s" ] && [ "$NFLOW" == "INPUT" ] && [ "$(cat "$INSTALL_PATH/internals/.localaddrs" "$INSTALL_PATH/internals/.localaddrs6" 2>/dev/null | grep -w "$PIP")" ]; then
                                 eout "{trust} ignored local ip allow rule '$NFLOW_T $PIP $PFLOW_T port $PPORT'"
-                         elif [ "$IPFLOW" == "d" ] && [ "$NFLOW" == "OUTPUT" ] && [ "$(cat $INSTALL_PATH/internals/.localaddrs $INSTALL_PATH/internals/.localaddrs6 2>/dev/null | grep -w $PIP)" ]; then
+                         elif [ "$IPFLOW" == "d" ] && [ "$NFLOW" == "OUTPUT" ] && [ "$(cat "$INSTALL_PATH/internals/.localaddrs" "$INSTALL_PATH/internals/.localaddrs6" 2>/dev/null | grep -w "$PIP")" ]; then
                                 eout "{trust} ignored local ip allow rule '$NFLOW_T $PIP $PFLOW_T port $PPORT'"
                          elif ipt_for_host "$PIP"; then
                                 eout "{trust} allow $NFLOW_T $PIP $PFLOW_T port $PPORT"
@@ -685,9 +685,9 @@ if [ ! "`cat $file | grep -v "#"`" == "" ]; then
                         PIP=$(trust_restore_ipv6 "`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$6}'`")
 
                         if [ ! "$PTYPE" == "" ] && [ ! "$NFLOW" == "" ] && [ ! "$IPFLOW" == "" ] && [ ! "$PIP" == "" ] && [ ! "$PFLOW" == "" ] && [ ! "$PPORT" == "" ]; then
-                         if [ "$IPFLOW" == "s" ] && [ "$NFLOW" == "INPUT" ] && [ "$(cat $INSTALL_PATH/internals/.localaddrs $INSTALL_PATH/internals/.localaddrs6 2>/dev/null | grep -w $PIP)" ]; then
+                         if [ "$IPFLOW" == "s" ] && [ "$NFLOW" == "INPUT" ] && [ "$(cat "$INSTALL_PATH/internals/.localaddrs" "$INSTALL_PATH/internals/.localaddrs6" 2>/dev/null | grep -w "$PIP")" ]; then
                                 eout "{trust} ignored local ip allow rule '$NFLOW_T $PIP $PFLOW_T port $PPORT'"
-                         elif [ "$IPFLOW" == "d" ] && [ "$NFLOW" == "OUTPUT" ] && [ "$(cat $INSTALL_PATH/internals/.localaddrs $INSTALL_PATH/internals/.localaddrs6 2>/dev/null | grep -w $PIP)" ]; then
+                         elif [ "$IPFLOW" == "d" ] && [ "$NFLOW" == "OUTPUT" ] && [ "$(cat "$INSTALL_PATH/internals/.localaddrs" "$INSTALL_PATH/internals/.localaddrs6" 2>/dev/null | grep -w "$PIP")" ]; then
                                 eout "{trust} ignored local ip allow rule '$NFLOW_T $PIP $PFLOW_T port $PPORT'"
                          elif ipt_for_host "$PIP"; then
                                 if [ "$PTYPE" == "tcp" ]; then
@@ -724,7 +724,7 @@ if [ ! "`cat $file | grep -v "#"`" == "" ]; then
                         eout "{trust} skipping invalid entry in $file: $i"
                         continue
                 fi
-                val="$(cat $INSTALL_PATH/internals/.localaddrs $INSTALL_PATH/internals/.localaddrs6 2>/dev/null | grep -w $i)"
+                val="$(cat "$INSTALL_PATH/internals/.localaddrs" "$INSTALL_PATH/internals/.localaddrs6" 2>/dev/null | grep -w "$i")"
                 if [ ! "$val" ]; then
                  if [ ! "$i" == "" ] && [ -f "$file" ]; then
                   if ipt_for_host "$i"; then

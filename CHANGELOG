@@ -1,4 +1,17 @@
 - 2.0.1 | Feb 14 2026:
+[Change] Variable quoting hardened across critical paths: eout(), trim(),
+      cli_trust(), cli_trust_remove(), status(), devm() file operations
+      (functions.apf)
+[Change] Trust file local-address checks quote $HOST, $i, $PIP and file
+      path arguments (functions.apf)
+[Change] apf entry point: quoted $LOG_APF, $DS_HOSTS, $DENY_HOSTS,
+      $ALLOW_HOSTS in touch/chmod/test operations (apf)
+[Fix] vnetgen: [ -f "$ip" ] semantic error changed to [ -n "$ip" ] and
+      [ -z "$ip" ] for correct command-availability detection (vnetgen)
+[Change] vnetgen: quoted $IF, $NET, $anet, $iface, $IFACE_TRUSTED and
+      all touch/chmod/source paths (vnetgen)
+[Change] firewall: quoted $i in trusted interface grep (firewall)
+[Change] bt.rules: quoted $IG_TCP_CPORTS in IDENT port check (bt.rules)
 [Fix] cli_trust() duplicate check matched comment lines, causing false
       "already exists" after apf -u/-a cycle; now filters comments and
       restores whole-word matching (functions.apf)
