@@ -213,7 +213,7 @@ trim() {
  if [ ! "$MAXLINES" == "0" ] && [ -f "$FILE" ]; then
 	LINES=`cat $FILE | grep -v "#" | grep -c ""`
         if [ "$LINES" -gt "$MAXLINES" ]; then
-                eout "{glob} triming $FILE to $MAXLINES lines"
+                eout "{glob} trimming $FILE to $MAXLINES lines"
                 CHK_CMT=`tail -n $MAXLINES $FILE | grep -c "#"`
                 MAXLINES=$(($CHK_CMT+$MAXLINES))
                 CHK_SCMT=`tail -n $MAXLINES $FILE | tac | tail -n 1 | grep "#"`
@@ -318,10 +318,8 @@ cli_trust() {
 		echo "Invalid host '$HOST': must be a valid IP address, CIDR block, or FQDN"
 		return 1
 	fi
-        valtrust=`cat $DENY_HOSTS $ALLOW_HOSTS $GALLOW_HOSTS $GDENY_HOSTS | grep -F -w $HOST`
-	if [ "$valtrust" ]; then
-		tlist=`grep -l $HOST $DENY_HOSTS $ALLOW_HOSTS $GALLOW_HOSTS $GDENY_HOSTS | tr '\n' ' '`
-	fi
+        tlist=$(grep -Fl "$HOST" $DENY_HOSTS $ALLOW_HOSTS $GALLOW_HOSTS $GDENY_HOSTS 2>/dev/null | tr '\n' ' ')
+	valtrust="$tlist"
         valip=`cat $INSTALL_PATH/internals/.localaddrs $INSTALL_PATH/internals/.localaddrs6 2>/dev/null | grep -w $HOST`
         if [ "$valtrust" ]; then
                 echo "$HOST already exists in $tlist"
@@ -903,7 +901,7 @@ if [ -f "$WGET" ] && [ -f "$RESNET" ]; then
 	 fi
    fi
    rm -rf "$URL_TMP"
-   cd $INSTALL_PATH
+   cd "$INSTALL_PATH"
 else
  if [ -f "$RESNET" ]; then
 	cp "$RESNET.bk" "$RESNET"
@@ -915,7 +913,7 @@ fi
 dlist_php() {
 if [ ! "$DLIST_PHP_URL" == "" ] && [ "$DLIST_PHP" == "1" ] && [ -f "$WGET" ]; then
    URL_TMP=$(mktemp -d "$INSTALL_PATH/.apf-XXXXXX")
-   URL_FILE=`echo $DLIST_PHP_URL | tr '/' '\n' | grep "." | tail -n 1`
+   URL_FILE="${DLIST_PHP_URL##*/}"
    cd "$URL_TMP"
    eout "{php} downloading $DLIST_PHP_URL"
    $WGET -4 -t 1 -T 4 "$DLIST_PHP_URL" >> /dev/null 2>&1
@@ -933,7 +931,7 @@ if [ ! "$DLIST_PHP_URL" == "" ] && [ "$DLIST_PHP" == "1" ] && [ -f "$WGET" ]; th
         eout "{php} download of $DLIST_PHP_URL failed"
    fi
    rm -rf "$URL_TMP"
-   cd $INSTALL_PATH
+   cd "$INSTALL_PATH"
 else
    rm -f "$PHP_HOSTS"
    touch "$PHP_HOSTS"
@@ -967,7 +965,7 @@ fi
 dlist_dshield() {
 if [ ! "$DLIST_DSHIELD_URL" == "" ] && [ "$DLIST_DSHIELD" == "1" ] && [ -f "$WGET" ]; then
    URL_TMP=$(mktemp -d "$INSTALL_PATH/.apf-XXXXXX")
-   URL_FILE=`echo $DLIST_DSHIELD_URL | tr '/' '\n' | grep "." | tail -n 1`
+   URL_FILE="${DLIST_DSHIELD_URL##*/}"
    cd "$URL_TMP"
    eout "{dshield} downloading $DLIST_DSHIELD_URL"
    $WGET -4 -t 1 -T 4 "$DLIST_DSHIELD_URL" >> /dev/null 2>&1
@@ -985,7 +983,7 @@ if [ ! "$DLIST_DSHIELD_URL" == "" ] && [ "$DLIST_DSHIELD" == "1" ] && [ -f "$WGE
         eout "{dshield} download of $DLIST_DSHIELD_URL failed"
    fi
    rm -rf "$URL_TMP"
-   cd $INSTALL_PATH
+   cd "$INSTALL_PATH"
 else
    rm -f "$DS_HOSTS"
    touch "$DS_HOSTS"
@@ -1019,7 +1017,7 @@ fi
 dlist_spamhaus() {
 if [ ! "$DLIST_SPAMHAUS_URL" == "" ] && [ "$DLIST_SPAMHAUS" == "1" ] && [ -f "$WGET" ]; then
    URL_TMP=$(mktemp -d "$INSTALL_PATH/.apf-XXXXXX")
-   URL_FILE=`echo $DLIST_SPAMHAUS_URL | tr '/' '\n' | grep "." | tail -n 1`
+   URL_FILE="${DLIST_SPAMHAUS_URL##*/}"
    cd "$URL_TMP"
    eout "{sdrop} downloading $DLIST_SPAMHAUS_URL"
    $WGET -4 -t 1 -T 4 "$DLIST_SPAMHAUS_URL" >> /dev/null 2>&1
@@ -1037,7 +1035,7 @@ if [ ! "$DLIST_SPAMHAUS_URL" == "" ] && [ "$DLIST_SPAMHAUS" == "1" ] && [ -f "$W
         eout "{sdrop} download of $DLIST_SPAMHAUS_URL failed"
    fi
    rm -rf "$URL_TMP"
-   cd $INSTALL_PATH
+   cd "$INSTALL_PATH"
 else
    rm -f "$DROP_HOSTS"
    touch "$DROP_HOSTS"
@@ -1072,7 +1070,7 @@ fi
 dlist_ecnshame() {
 if [ ! "$DLIST_ECNSHAME_URL" == "" ] && [ "$DLIST_ECNSHAME" == "1" ] && [ -f "$WGET" ]; then
    URL_TMP=$(mktemp -d "$INSTALL_PATH/.apf-XXXXXX")
-   URL_FILE=`echo $DLIST_ECNSHAME_URL | tr '/' '\n' | grep "." | tail -n 1`
+   URL_FILE="${DLIST_ECNSHAME_URL##*/}"
    cd "$URL_TMP"
    eout "{ecnshame} downloading $DLIST_ECNSHAME_URL"
    $WGET -4 -t 1 -T 4 "$DLIST_ECNSHAME_URL" >> /dev/null 2>&1
@@ -1090,7 +1088,7 @@ if [ ! "$DLIST_ECNSHAME_URL" == "" ] && [ "$DLIST_ECNSHAME" == "1" ] && [ -f "$W
         eout "{ecnshame} download of $DLIST_ECNSHAME_URL failed"
    fi
    rm -rf "$URL_TMP"
-   cd $INSTALL_PATH
+   cd "$INSTALL_PATH"
 else
    rm -f "$ECNSHAME_HOSTS"
    touch "$ECNSHAME_HOSTS"
@@ -1118,7 +1116,7 @@ fi
 glob_allow_download() {
 if [ ! "$GA_URL" == "" ] && [ "$USE_RGT" == "1" ] && [ -f "$WGET" ]; then
    URL_TMP=$(mktemp -d "$INSTALL_PATH/.apf-XXXXXX")
-   URL_FILE=`echo $GA_URL | tr '/' '\n' | grep "." | tail -n 1`
+   URL_FILE="${GA_URL##*/}"
    cd "$URL_TMP"
    eout "{trust} downloading $GA_URL"
    $WGET -4 -t 1 -T 4 "$GA_URL" >> /dev/null 2>&1
@@ -1129,7 +1127,7 @@ if [ ! "$GA_URL" == "" ] && [ "$USE_RGT" == "1" ] && [ -f "$WGET" ]; then
         eout "{trust} download of $GA_URL failed"
    fi
    rm -rf "$URL_TMP"
-   cd $INSTALL_PATH
+   cd "$INSTALL_PATH"
 else
    rm -f "$GALLOW_HOSTS"
    touch "$GALLOW_HOSTS"
@@ -1140,7 +1138,7 @@ fi
 glob_deny_download() {
 if [ ! "$GD_URL" == "" ] && [ "$USE_RGT" == "1" ] && [ -f "$WGET" ]; then
    URL_TMP=$(mktemp -d "$INSTALL_PATH/.apf-XXXXXX")
-   URL_FILE=`echo $GD_URL | tr '/' '\n' | grep "." | tail -n 1`
+   URL_FILE="${GD_URL##*/}"
    cd "$URL_TMP"
    eout "{trust} downloading $GD_URL"
    $WGET -4 -t 1 -T 4 "$GD_URL" >> /dev/null 2>&1
@@ -1151,7 +1149,7 @@ if [ ! "$GD_URL" == "" ] && [ "$USE_RGT" == "1" ] && [ -f "$WGET" ]; then
         eout "{trust} download of $GD_URL failed"
    fi
    rm -rf "$URL_TMP"
-   cd $INSTALL_PATH
+   cd "$INSTALL_PATH"
 else
    rm -f "$GDENY_HOSTS"
    touch "$GDENY_HOSTS"
@@ -1162,7 +1160,7 @@ fi
 dnet() {
 FILE="$1"
 if [ -f "$FILE" ]; then
-FNAME=`echo $FILE | tr '/' '\n' | tail -n 1`
+FNAME="${FILE##*/}"
 eout "{glob} loading $FNAME"
  for i in `cat $FILE | grep -v "#"`; do
   if [ ! "$i" == "" ] && ipt_for_host "$i"; then

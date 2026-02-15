@@ -1,4 +1,19 @@
 - 2.0.1 | Feb 14 2026:
+[Change] URL filename extraction in 7 download functions replaced backtick
+         tr/grep/tail pipeline with ${URL##*/} parameter expansion
+         (functions.apf)
+[Fix] unquoted cd $INSTALL_PATH in 7 download function cleanup paths; now
+      quoted as cd "$INSTALL_PATH" (functions.apf)
+[Change] conf.apf GA_URL/GD_URL example URLs updated from http:// to
+         https:// matching all other DLIST URLs (conf.apf)
+[Fix] trim() log message typo "triming" corrected to "trimming"
+      (functions.apf)
+[Change] internals.conf 6 backtick command substitutions modernized to $()
+         syntax (internals.conf)
+[Change] cli_trust() two-pass grep consolidated to single grep -Fl call
+         (functions.apf)
+[Change] dnet() filename extraction replaced backtick tr/tail pipeline with
+         ${FILE##*/} parameter expansion (functions.apf)
 [New] IPv6 fragmented UDP blocking; FRAG_UDP6 chain uses -m frag --fragmore
       to match IPv6 fragment extension headers; includes RAB logging and
       sanity flags matching IPv4 FRAG_UDP behavior (bt.rules)

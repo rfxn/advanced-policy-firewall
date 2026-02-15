@@ -544,8 +544,8 @@ DLIST_ECNSHAME_URL="https://cdn.rfxn.com/downloads/ecnshame.lst"
 # a daily basis. The files can be maintained in a static fashion by
 # leaving USE_RGT=0, ideal for a host serving the files.
 USE_RGT="0"
-GA_URL="http://yourhost.com/glob_allow.rules"
-GD_URL="http://yourhost.com/glob_deny.rules"
+GA_URL="https://yourhost.com/glob_allow.rules"
+GD_URL="https://yourhost.com/glob_deny.rules"
 
 ##
 # [Logging and control settings]
