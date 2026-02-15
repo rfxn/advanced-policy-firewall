@@ -10,7 +10,7 @@ APF_DIR="/opt/apf"
 
 setup_file() {
     source /opt/tests/helpers/setup-netns.sh
-    source /opt/tests/helpers/install-apf.sh
+    source /opt/tests/helpers/reset-apf.sh
     source /opt/tests/helpers/apf-config.sh
     apf_set_interface "veth-pub" ""
     apf_set_config "SET_FASTLOAD" "0"
@@ -61,35 +61,23 @@ teardown_file() {
     assert_success
 }
 
-@test "USE_IPV6=1 full load creates .apf6.restore snapshot" {
+@test "USE_IPV6=1 full load creates valid .apf6.restore with expected chains" {
     source /opt/tests/helpers/apf-config.sh
     apf_set_config "USE_IPV6" "1"
     "$APF" -f 2>/dev/null || true
     "$APF" -s
-    [ -f "$APF_DIR/internals/.apf6.restore" ]
-    apf_set_config "USE_IPV6" "0"
-    "$APF" -f 2>/dev/null || true
-}
 
-@test "IPv6 snapshot is valid ip6tables-restore format" {
-    source /opt/tests/helpers/apf-config.sh
-    apf_set_config "USE_IPV6" "1"
-    "$APF" -f 2>/dev/null || true
-    "$APF" -s
-    # Should contain a table marker
+    # Snapshot file exists
+    [ -f "$APF_DIR/internals/.apf6.restore" ]
+
+    # Valid ip6tables-restore format (contains table marker)
     run grep '^\*' "$APF_DIR/internals/.apf6.restore"
     assert_success
-    apf_set_config "USE_IPV6" "0"
-    "$APF" -f 2>/dev/null || true
-}
 
-@test "IPv6 snapshot contains TALLOW chain" {
-    source /opt/tests/helpers/apf-config.sh
-    apf_set_config "USE_IPV6" "1"
-    "$APF" -f 2>/dev/null || true
-    "$APF" -s
+    # Contains expected chains
     run grep "TALLOW" "$APF_DIR/internals/.apf6.restore"
     assert_success
+
     apf_set_config "USE_IPV6" "0"
     "$APF" -f 2>/dev/null || true
 }

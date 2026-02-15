@@ -1,4 +1,18 @@
-- 2.0.1 | Feb 14 2026:
+- 2.0.1 | Feb 15 2026:
+[Change] Test suite performance: consolidated redundant flush+start cycles in
+      08-fastload.bats (3 IPv6 tests merged into 1), 09-flush-cleanup.bats
+      (5 flush tests merged into 1), and 11-advanced-trust.bats (17 per-test
+      flush+start cycles replaced with single setup_file() load)
+[Change] APF pre-installed during Docker build; test files use fast reset-apf.sh
+      helper instead of re-running install.sh (~2.5s saved per test file)
+[New] Parallel test targets: make -C tests test-all-parallel runs all OS targets
+      concurrently using half available cores
+[Change] Makefile moved from project root to tests/ directory; use
+      make -C tests test (tests/Makefile)
+[Change] GHA workflow uses docker/build-push-action with buildx layer caching
+      for faster CI builds (.github/workflows/smoke-test.yml)
+[Change] Deleted stale GHA failure files from pre-Phase 35 test run
+      (tests/centos7.github.failure, tests/ubuntu2204.github.failure)
 [Change] wget download functions no longer force IPv4-only transport; removed
       -4 flag from all 7 $WGET calls to allow dual-stack connectivity via
       happy eyeballs; IPv6-only hosts can now download blocklists

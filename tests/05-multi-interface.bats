@@ -16,7 +16,7 @@ setup_file() {
     source /opt/tests/helpers/setup-netns.sh
     # Export for individual tests to check
     export NETNS_AVAILABLE
-    source /opt/tests/helpers/install-apf.sh
+    source /opt/tests/helpers/reset-apf.sh
     source /opt/tests/helpers/apf-config.sh
     # veth-pub = untrusted (internet-facing), veth-priv = trusted (LAN)
     apf_set_interface "veth-pub" "veth-priv"

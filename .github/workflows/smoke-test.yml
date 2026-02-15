@@ -20,5 +20,18 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build test image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.os == 'debian12' && 'tests/Dockerfile' || format('tests/Dockerfile.{0}', matrix.os) }}
+          tags: apf-test-${{ matrix.os }}
+          load: true
+          cache-from: type=gha,scope=${{ matrix.os }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.os }}
+
       - name: Run smoke tests (${{ matrix.os }})
-        run: ./tests/run-tests.sh --os ${{ matrix.os }}
+        run: docker run --rm --privileged apf-test-${{ matrix.os }}

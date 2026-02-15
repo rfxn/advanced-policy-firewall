@@ -10,7 +10,7 @@ APF="/opt/apf/apf"
 
 setup_file() {
     source /opt/tests/helpers/setup-netns.sh
-    source /opt/tests/helpers/install-apf.sh
+    source /opt/tests/helpers/reset-apf.sh
     source /opt/tests/helpers/apf-config.sh
     apf_set_interface "veth-pub" ""
     apf_set_config "PKT_SANITY" "1"
@@ -37,37 +37,21 @@ teardown_file() {
     [ "$after" -eq 0 ]
 }
 
-@test "flush resets INPUT policy to ACCEPT" {
+@test "flush after start resets all state" {
     "$APF" -s
     "$APF" -f
+
+    # All built-in chain policies reset to ACCEPT
     assert_chain_policy INPUT ACCEPT
-}
-
-@test "flush resets OUTPUT policy to ACCEPT" {
-    "$APF" -s
-    "$APF" -f
     assert_chain_policy OUTPUT ACCEPT
-}
-
-@test "flush resets FORWARD policy to ACCEPT" {
-    "$APF" -s
-    "$APF" -f
     assert_chain_policy FORWARD ACCEPT
-}
 
-@test "flush removes all filter rules" {
-    "$APF" -s
-    "$APF" -f
-    # Count all -A (append) rules across all chains in filter table
+    # No filter rules remain
     local rule_count
     rule_count=$(iptables -S | grep -c '^-A' || true)
     [ "$rule_count" -eq 0 ]
-}
 
-@test "flush clears mangle table" {
-    "$APF" -s
-    "$APF" -f
-    local rule_count
+    # Mangle table cleared
     rule_count=$(iptables -t mangle -S | grep -c '^-A' || true)
     [ "$rule_count" -eq 0 ]
 }

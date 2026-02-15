@@ -54,6 +54,12 @@ install_apf() {
     # Ensure log file exists
     touch /var/log/apf_log
     chmod 600 /var/log/apf_log
+
+    # Save clean state for reset-apf.sh (used by subsequent test files)
+    for rf in "$APF_INSTALL/allow_hosts.rules" "$APF_INSTALL/deny_hosts.rules"; do
+        sed '/^[^#]/d' "$rf" > "$rf.clean"
+    done
+    cp "$APF_INSTALL/conf.apf" "$APF_INSTALL/conf.apf.clean"
 }
 
 install_apf

@@ -10,7 +10,7 @@ APF="/opt/apf/apf"
 
 setup_file() {
     source /opt/tests/helpers/setup-netns.sh
-    source /opt/tests/helpers/install-apf.sh
+    source /opt/tests/helpers/reset-apf.sh
     source /opt/tests/helpers/apf-config.sh
     apf_set_interface "veth-pub" ""
     apf_set_config "PKT_SANITY" "1"
