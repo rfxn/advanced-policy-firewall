@@ -1,4 +1,13 @@
 - 2.0.1 | Feb 14 2026:
+[Fix] hardcoded /sbin/route replaced with command -v route for portable
+      detection; route binary at /usr/sbin/route on RHEL 8+/Debian 12+
+      (firewall)
+[Fix] get_ports IPv6 parsing; rev|cut -d: split on IPv6 colons producing
+      wrong ports; replaced with sed 's/.*://'; ::1 loopback now filtered
+      alongside 127.* (get_ports)
+[Change] list() editor discovery uses command -v loop instead of hardcoded
+         paths /usr/bin/pico, /usr/bin/nano, /bin/vi (functions.apf)
+[Fix] firewall dead head command removed from CNF error path (firewall)
 [Fix] expirebans() flock deadlock; spawned $INSTALL_PATH/apf -u as child process
       which attempted to acquire the same flock held by parent, causing 60s hang
       then silent failure; changed to direct cli_trust_remove() call

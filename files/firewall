@@ -12,7 +12,6 @@ CNF="/etc/apf/conf.apf"
 if [ -f "$CNF" ] && [ ! "$CNF" == "" ]; then
    source $CNF
 else
-   head
    echo "\$CNF not found; aborting"
    exit 1
 fi
@@ -32,8 +31,8 @@ if [ ! "$IF" == "" ] && [ "$VF_ROUTE" == "1" ]; then
  for i in `echo $IF`; do
   if [ -n "$ip" ]; then
 	VAL_IF=$($ip route show dev $i 2>/dev/null)
-  elif [ -f "/sbin/route" ]; then
-	VAL_IF=$(/sbin/route -n | grep -w $i)
+  elif command -v route > /dev/null 2>&1; then
+	VAL_IF=$(route -n | grep -w "$i")
   else
 	eout "{glob} neither ip nor route found; cannot verify interface $i"
 	exit 1
@@ -51,8 +50,8 @@ if [ ! "$IFACE_TRUSTED" == "" ] && [ "$VF_ROUTE" == "1" ]; then
  for i in `echo $IFACE_TRUSTED | tr ',' ' '`; do
   if [ -n "$ip" ]; then
 	VAL_IFACE_TRUSTED=$($ip route show dev $i 2>/dev/null)
-  elif [ -f "/sbin/route" ]; then
-	VAL_IFACE_TRUSTED=$(/sbin/route -n | grep -w $i)
+  elif command -v route > /dev/null 2>&1; then
+	VAL_IFACE_TRUSTED=$(route -n | grep -w "$i")
   else
 	eout "{glob} neither ip nor route found; cannot verify interface $i"
 	exit 1

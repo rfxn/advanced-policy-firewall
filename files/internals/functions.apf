@@ -409,12 +409,15 @@ if [ "$USE_IPV6" == "1" ] && [ -n "$IP6T" ]; then
 	$IP6T $IPT_FLAGS --verbose --numeric --line-numbers --list >> $iptc
 fi
 echo "Opening editor"
-if [ -f "/usr/bin/pico" ]; then
-	/usr/bin/pico -w $iptc
-elif [ -f "/usr/bin/nano" ]; then
-	/usr/bin/nano -w $iptc
-elif [ -f "/bin/vi" ]; then
-	/bin/vi $iptc
+EDITOR_CMD=""
+for ed in pico nano vi vim; do
+	if command -v $ed > /dev/null 2>&1; then
+		EDITOR_CMD=$(command -v $ed)
+		break
+	fi
+done
+if [ -n "$EDITOR_CMD" ]; then
+	$EDITOR_CMD $iptc
 fi
 clear
 rm -f $iptc

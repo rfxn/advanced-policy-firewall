@@ -11,14 +11,14 @@ tcp_ports=""
 udp_ports=""
 
 if command -v ss > /dev/null 2>&1; then
-	for ptcp in $(ss -tlnp 2>/dev/null | tail -n +2 | awk '{print $4}' | grep -v '^127\.' | rev | cut -d: -f1 | rev | sort -nu); do
+	for ptcp in $(ss -tlnp 2>/dev/null | tail -n +2 | awk '{print $4}' | grep -vE '^127\.|^\[::1\]' | sed 's/.*://' | sort -nu); do
 		if [ "$tcp_ports" == "" ]; then
 			tcp_ports="$ptcp"
 		else
 			tcp_ports="$tcp_ports,$ptcp"
 		fi
 	done
-	for pudp in $(ss -ulnp 2>/dev/null | tail -n +2 | awk '{print $4}' | grep -v '^127\.' | rev | cut -d: -f1 | rev | sort -nu); do
+	for pudp in $(ss -ulnp 2>/dev/null | tail -n +2 | awk '{print $4}' | grep -vE '^127\.|^\[::1\]' | sed 's/.*://' | sort -nu); do
 		if [ "$udp_ports" == "" ]; then
 			udp_ports="$pudp"
 		else
@@ -26,14 +26,14 @@ if command -v ss > /dev/null 2>&1; then
 		fi
 	done
 elif command -v netstat > /dev/null 2>&1; then
-	for ptcp in $(netstat -tlnp 2>/dev/null | awk '/^tcp/ && !/127\.0\.0\.1/' | awk '{print $4}' | rev | cut -d: -f1 | rev | sort -nu); do
+	for ptcp in $(netstat -tlnp 2>/dev/null | awk '/^tcp/ && !/127\.0\.0\.1/ && !/::1/' | awk '{print $4}' | sed 's/.*://' | sort -nu); do
 		if [ "$tcp_ports" == "" ]; then
 			tcp_ports="$ptcp"
 		else
 			tcp_ports="$tcp_ports,$ptcp"
 		fi
 	done
-	for pudp in $(netstat -ulnp 2>/dev/null | awk '/^udp/ && !/127\.0\.0\.1/' | awk '{print $4}' | rev | cut -d: -f1 | rev | sort -nu); do
+	for pudp in $(netstat -ulnp 2>/dev/null | awk '/^udp/ && !/127\.0\.0\.1/ && !/::1/' | awk '{print $4}' | sed 's/.*://' | sort -nu); do
 		if [ "$udp_ports" == "" ]; then
 			udp_ports="$pudp"
 		else
