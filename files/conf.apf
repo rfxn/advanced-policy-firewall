@@ -319,6 +319,12 @@ BLK_IDENT="0"
 # during denial of service attacks.
 SYSCTL_CONNTRACK="131072"
 
+# When enabled, automatically scales conntrack_max up when usage exceeds 80%
+# of the current limit. Scaling occurs on each firewall start/restart.
+# INCREMENT: amount to add per scaling event
+# HIGH: absolute ceiling (will not scale above this value)
+# BUCKETS: hash table size (nf_conntrack hashsize); higher values reduce
+# lookup latency at the cost of kernel memory
 SYSCTL_CONNTRACK_ADAPTIVE="0"
 SYSCTL_CONNTRACK_INCREMENT="65536"
 SYSCTL_CONNTRACK_HIGH="1048576"

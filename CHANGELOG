@@ -23,6 +23,19 @@
 [Change] dnet() deny network loader converted from ipt4() to ipt_for_host()
          routing; IPv6 deny networks now blocked when USE_IPV6=1
          (functions.apf)
+[New] Conntrack hash table sizing via SYSCTL_CONNTRACK_BUCKETS; writes to
+      /sys/module/nf_conntrack/parameters/hashsize when set (sysctl.rules)
+[New] Adaptive conntrack scaling; SYSCTL_CONNTRACK_ADAPTIVE auto-scales
+      conntrack_max when usage exceeds 80% threshold, capped at
+      SYSCTL_CONNTRACK_HIGH ceiling (sysctl.rules, conf.apf)
+[New] nf_conntrack_helper disabled by default to reduce ALG attack surface
+      (CVE-2013-6390, CVE-2019-8956) (sysctl.rules)
+[Fix] IPv6 sysctl per-interface scope; accept_source_route and
+      accept_redirects now set on both /conf/all/ and /conf/$IFACE_UNTRUSTED/
+      matching IPv4 hardening pattern; previously only set on /conf/all/
+      (sysctl.rules)
+[Fix] IPv6 route flush added; /proc/sys/net/ipv6/route/flush now triggered
+      alongside IPv4 flush when USE_IPV6=1 (sysctl.rules)
 [Fix] IPv6 plain trust addresses silently dropped; allow_hosts()/deny_hosts()
       used grep -v ":" which excluded all IPv6 entries from Loop 1 plain IP
       processing; changed to grep -v "=" to filter only advanced syntax
