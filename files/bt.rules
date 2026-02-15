@@ -189,7 +189,7 @@ if [ "$PKT_SANITY" == "1" ]; then
         ipt4 -A INPUT -j IN_SANITY
 
 	if [ "$PKT_SANITY_FUDP" == "1" ]; then
-		# Block fragmented UDP
+		# Block fragmented UDP (IPv4)
 	        eout "{pkt_sanity} deny all fragmented udp"
 		ipt4 -N FRAG_UDP
                 if [ "$LOG_DROP" == "1" ]; then
@@ -201,6 +201,21 @@ if [ "$PKT_SANITY" == "1" ]; then
 		ipt4 -A FRAG_UDP -p udp -f $RAB_SANITY_FLAGS -j $UDP_STOP
 		ipt4 -A INPUT -j FRAG_UDP
 		ipt4 -A OUTPUT -j FRAG_UDP
+
+		# Block fragmented UDP (IPv6 — uses fragment extension header)
+		if [ "$USE_IPV6" == "1" ]; then
+		 eout "{pkt_sanity} deny all fragmented ipv6 udp"
+		 ipt6 -N FRAG_UDP6
+		 if [ "$LOG_DROP" == "1" ]; then
+		  ipt6 -A FRAG_UDP6 -p udp -m frag --fragmore -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** UDP6 Frag ** "
+		 fi
+		 if [ "$RAB_LOG_HIT" == "1" ]; then
+		  ipt6 -A FRAG_UDP6 -p udp -m frag --fragmore -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** RABHIT6 ** "
+		 fi
+		 ipt6 -A FRAG_UDP6 -p udp -m frag --fragmore $RAB_SANITY_FLAGS -j $UDP_STOP
+		 ipt6 -A INPUT -j FRAG_UDP6
+		 ipt6 -A OUTPUT -j FRAG_UDP6
+		fi
 	fi
 	if [ "$PKT_SANITY_PZERO" == "1" ]; then
 		# Block port zero traffic

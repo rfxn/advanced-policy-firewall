@@ -1268,7 +1268,10 @@ fi
 }
 
 refresh() {
-	apf_loaded=`$IPT $IPT_FLAGS --list --numeric | grep TALLOW`
+	apf_loaded=$($IPT $IPT_FLAGS --list --numeric 2>/dev/null | grep TALLOW)
+	if [ -z "$apf_loaded" ] && [ "$USE_IPV6" == "1" ]; then
+		apf_loaded=$($IP6T $IPT_FLAGS --list --numeric 2>/dev/null | grep TALLOW)
+	fi
 	if [ -z "$apf_loaded" ]; then
 	        eout "{glob} apf does not appear to have rules loaded, doing nothing."
 	        mutex_unlock

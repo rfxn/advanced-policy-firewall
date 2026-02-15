@@ -1,4 +1,12 @@
 - 2.0.1 | Feb 14 2026:
+[New] IPv6 fragmented UDP blocking; FRAG_UDP6 chain uses -m frag --fragmore
+      to match IPv6 fragment extension headers; includes RAB logging and
+      sanity flags matching IPv4 FRAG_UDP behavior (bt.rules)
+[Fix] refresh() IPv4-only load check; only checked $IPT for TALLOW chain;
+      now falls back to $IP6T when USE_IPV6=1 so IPv6-only rule sets are
+      correctly detected (functions.apf)
+[New] IPv6 trust syntax documentation added to glob_allow.rules and
+      glob_deny.rules matching allow_hosts.rules format (glob rules)
 [Fix] hardcoded /sbin/route replaced with command -v route for portable
       detection; route binary at /usr/sbin/route on RHEL 8+/Debian 12+
       (firewall)
