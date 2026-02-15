@@ -119,7 +119,7 @@ a point form summary of most APF features for reference and review:
 - configurable type of service options to dictate the priority of different types
   of network traffic
 - intelligent default settings to meet every day server setups
-- dynamic configuration of your servers local DNS revolvers into the firewall
+- dynamic configuration of your servers local DNS resolvers into the firewall
 - optional filtering of common p2p applications
 - optional filtering of private & reserved IP address space
 - optional implicit blocks of the ident service 
@@ -140,7 +140,13 @@ a point form summary of most APF features for reference and review:
 - if you are familiar with netfilter you can create your own rules in any of
   the policy files
 - pluggable and ready advanced use of QoS algorithms provided by the Linux
-- 3rd party add-on projects that compliment APF features
+  kernel
+- IPv6 dual-stack support: automatic ip6tables rules alongside iptables when
+  USE_IPV6 is enabled, including ICMPv6 filtering and NDP
+- input validation on all trust system entries (IPv4, IPv6, CIDR, FQDN)
+- nft backend detection with safe fast load across iptables backend changes
+- systemd service unit for modern init management
+- 3rd party add-on projects that complement APF features
 
 1.1) Introduction: Supported Systems & Requirements
 The APF package is designed to run on Linux based operating systems that have
@@ -148,7 +154,7 @@ an operational version of the iptables (netfilter) package installed. Both the
 traditional iptables-legacy and the newer iptables-nft backends are supported.
 You can find out more details on the netfilter project at:
 
-http://www.netfilter.org/
+https://www.netfilter.org/
 
 Most modern Linux distributions include all required iptables/netfilter modules
 by default. If you are building a custom kernel, ensure the following modules
@@ -328,13 +334,25 @@ user in better understanding what the firewall is doing rule-by-rule. Although
 the SET_VERBOSE option is new to APF, this level of logging has long been
 provided in the /var/log/apf_log file and still remains as such.
 
+Option: USE_IPV6
+Description: This option enables IPv6 dual-stack support for APF. When enabled,
+APF will load IPv6 kernel modules and apply ip6tables rules alongside all
+iptables rules. This includes IPv6 chain creation, port filtering, trust system
+support, packet sanity checks, and ICMPv6 filtering. NDP (Neighbor Discovery
+Protocol) types 133-136 are always permitted for IPv6 connectivity. The VNET
+subsystem does not currently support IPv6. IPv6 support requires that your
+system has IPv6 enabled in its networking configuration and that the ip6tables
+binary is available.
+
 Option: SET_FASTLOAD
 Description:  This tells APF to use a special feature to take saved snap shots
 of the running firewall. Instead of regenerating every single firewall rule
 when we stop/start the firewall, APF will use these snap shots to "fast load"
 the rules in bulk. There are internal features in APF that will detect when 
 configuration has changed and then expire the snap shot forcing a full reload
-of the firewall.
+of the firewall. APF also detects changes between iptables backends (legacy vs
+nft) and will force a full reload if the backend has changed since the snapshot
+was taken, preventing restore errors from incompatible formats.
 
 Option: SET_VNET
 Description: The ever curious option called SET_VNET, to put it brief this
@@ -427,7 +445,7 @@ increase i/o wait loads to the disk from the heavy logging.
 The advanced options, although not required, are those which afford the firewall
 the ability to be a more robust and encompassing solution in protecting a host.
 These options should be reviewed on a case-by-case basis and enabled only as
-you determine there merit to meet a particular need on a host or network.
+you determine their merit to meet a particular need on a host or network.
 
 
 Option: SET_MONOKERN
@@ -464,7 +482,7 @@ temporarily banned for the duration of RAB_TIMER value in seconds.
 Option: RAB_PSCAN_LEVEL
 Description: This enables RAB for port scan violations, which is when an
 address attempts to connect to a port that has been classified as malicious.
-These types of are those which are not commonly used in today's Internet but are
+These are ports which are not commonly used in today's Internet but are
 the subject of scrutiny by attackers, such as ports 1,7,9,11. The values for
 this option are broken into 4 integers and they are 0 for disabled, 1 for
 low security, 2 for medium security and 3 for high security.
@@ -496,7 +514,7 @@ force logging.
 Option: RAB_LOG_TRIP
 Description: This controls if the firewall should log all subsequent traffic
 from an address that is already blocked for a violation hit, this can generate
-allot of logs. However, the use of this option despite the depth of log data it
+a lot of logs. However, the use of this option despite the depth of log data it
 may generate could provide valuable information as to the intents of an attacker.
 The use of LOG_DROP variable set to 1 will override this to force logging.
 
@@ -514,10 +532,10 @@ review these options below in short and provide the pro/con's of their uses.
    local router replies with an "icmp-port/host-unreachable" message. So when an
    attacker probing your IP address receives no reply from the server or local
    router to the scans, they will instantly know you are running a firewall, 
-   possibly peaking curiosity more.
+   possibly piquing curiosity more.
 
  - Then we have RESET which allows the firewall to reply to discarded packets
-   in such a way that it trys to make the remote host "reset/terminate" the
+   in such a way that it tries to make the remote host "reset/terminate" the
    connection attempts to you. This option is more in-line with TCP/IP 
    standards however in most situations will provide no real benefits or
    drawbacks. In some really isolated situations you may find that using RESET
@@ -577,8 +595,8 @@ Following the TOS settings we find the traceroute settings TCR_ which tell the
 firewall if and how we should handle traceroute traffic. This is by default
 enabled in APF, mostly cause of popular demand but really there is no reason
 to have it enabled or disabled other than personal preference. The TCR_PASS
-option tells the firewall if we want to accept traceroutes and on the TCR_PORTS
-
+option tells the firewall if we want to accept traceroutes and the TCR_PORTS
+option defines the UDP port range used for traceroute detection.
 
 3.3) Configuration: Reactive Address Blocking
 The Reactive Address Blocking (RAB) system provides in-line intrusion
@@ -611,11 +629,11 @@ The /usr/local/sbin/apf command has a number of options that will ease the
 day-to-day use of your firewall. Here is a quick snap-shot of the options:
 
 usage /usr/local/sbin/apf [OPTION]
--s|--start ......................... load the firewall rules
+-s|--start ......................... load all firewall rules
 -r|--restart ....................... stop (flush) & reload firewall rules
 -f|--stop .......................... stop (flush) all firewall rules
--l|--list .......................... list chain rules
--t|--status ........................ firewall status
+-l|--list .......................... list all firewall rules
+-t|--status ........................ output firewall status log
 -e|--refresh ....................... refresh & resolve dns names in trust rules
 -a HOST CMT|--allow HOST COMMENT ... add host (IP/IPv6/CIDR/FQDN) to
                                      allow_hosts.rules and immediately
@@ -623,16 +641,17 @@ usage /usr/local/sbin/apf [OPTION]
 -d HOST CMT|--deny HOST COMMENT .... add host (IP/IPv6/CIDR/FQDN) to
                                      deny_hosts.rules and immediately
                                      load new rule into firewall
--u|--remove HOST ................... remove host from [glob_]deny_hosts.rules
+-u|--remove HOST ................... remove host from [glob]*_hosts.rules
                                      and immediately remove rule from firewall
 -o|--ovars ......................... output all configuration options
+-v|--version ....................... output version number
 
 These options explain themselves very clearly such as the start/stop/restart
 operations. 
 
 The -l|--list option will list all the firewall rules you currently have loaded,
 this is more of a feature intended for experienced users but nevertheless can be
-insightful for any administrator to peak at. 
+insightful for any administrator to peek at. 
 
 As for the -t|--status option, this will simply show you page-by-page the APF
 status log that tracks any operations you perform with APF - if something is
@@ -647,12 +666,12 @@ If you need to quickly allow or deny someone access on the system then the
 -a|--allow and -d|--deny options are your champions. If you need to quickly
 remove an allow or deny entry from the firewall then the -u|--remove option
 is there for it. These options are immediate in action and do NOT require
-the firewall to be restarted. Please the below sections of this file for
+the firewall to be restarted. Please see the below sections of this file for
 more information on the trust system.
 
-Finally the -o|--ovars options is a debug feature, if something is not working
-the way it was intended and you need help them please send me an email to
-apf@r-fx.org and be sure to include the output of this option with your email.
+Finally the -o|--ovars options is a debug feature, if something is not working as intended and you need help, please send an
+email to apf@r-fx.org and be sure to include the output of this option with
+your email.
 
 4.1) General Usage: Trust System:
 The trust system in APF is a very traditional setup with two basic trust levels;
@@ -668,12 +687,14 @@ The two basic trust level files are located at:
 
 These files by nature are static, meaning that once you add an entry to them,
 they will remain in the files till you remove them yourself. The trust files
-accept both FQDN (fully qualified domain names) and IP addresses with optional
-bit masking. Examples of these formats are:
+accept FQDN (fully qualified domain names), IPv4 addresses, and IPv6 addresses
+with optional bit masking. Examples of these formats are:
 
 yourhost.you.com (FQDN)
 192.168.2.102 (IP Address)
 192.168.1.0/24 (IP Address with 24 bit mask)
+2001:db8::1 (IPv6 Address)
+2001:db8::/32 (IPv6 Address with prefix length)
 
 The definition of IP bit masking is slightly out of the scope of this document
 but some common bit masks that are used would be:

@@ -68,7 +68,7 @@ SET_VNET="0"
 # defined by IFACE_* variables. This feature is ideal for systems running
 # private interfaces where not all hosts on the private network are trusted or
 # are otherwise exposed to "open" networks through this private interface
-# (i.e: the Internet, network accessible storage LAN, corporate WAN, etc..)
+# (i.e: the Internet, network accessible storage LAN, corporate WAN, etc.)
 SET_ADDIFACE="0"
 
 # This allows the firewall to work around modular kernel issues by assuming
@@ -159,7 +159,7 @@ RAB_TRIP="1"
 RAB_LOG_HIT="1"
 
 # This controls if the firewall should log all subsequent traffic from an address
-# that is already blocked for a violation hit, this can generate allot of logs.
+# that is already blocked for a violation hit, this can generate a lot of logs.
 # The use of LOG_DROP variable set to 1 will override this to force logging.
 RAB_LOG_TRIP="0"
 
@@ -372,7 +372,7 @@ SYSCTL_ECN="0"
 # socket becomes overflowed. The cookie is used to interrupt the flow of syn
 # transmissions with a hashed sequence number that must be correlated with the
 # sending host. The hash is made up of the sending host address, packet flags
-# etc..; if the sending host does not validate against the hash then the tcp
+# etc.; if the sending host does not validate against the hash then the tcp
 # hand-shake is terminated. In short, this helps to mitigate syn-flood attacks.
 # Note: syncookies seriously violates TCP protocol and can result in serious
 #       degradation of some services (i.e. SMTP); visible not by you, but your
@@ -498,14 +498,14 @@ EG_DROP_CMD="eggdrop,psybnc,bitchx,BitchX,init,udp.pl"
 # Project Honey Pot is the first and only distributed system for identifying 
 # spammers and the spambots they use to scrape addresses from your website.
 # This aggregate list combines Harvesters, Spammers and SMTP Dictionary attacks
-# from the PHP IP Data at:  http://www.projecthoneypot.org/list_of_ips.php
+# from the PHP IP Data at:  https://www.projecthoneypot.org/list_of_ips.php
 DLIST_PHP="0"
 DLIST_PHP_URL="https://cdn.rfxn.com/downloads/php_list"
 
 # The Spamhaus Don't Route Or Peer List (DROP) is an advisory "drop all
 # traffic" list, consisting of stolen 'zombie' netblocks and netblocks
 # controlled entirely by professional spammers. For more information please
-# see http://www.spamhaus.org/drop/.
+# see https://www.spamhaus.org/drop/.
 DLIST_SPAMHAUS="0"
 DLIST_SPAMHAUS_URL="https://www.spamhaus.org/drop/drop.lasso"
 

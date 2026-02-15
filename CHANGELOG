@@ -1,4 +1,22 @@
 - 2.0.1 | Feb 15 2026:
+[Fix] README typos: revolvers→resolvers, compliment→complement, peak→peek,
+      there→their, trys→tries, peaking→piquing, allot→a lot, incomplete
+      sentences fixed, broken RAB_PSCAN_LEVEL sentence repaired, truncated
+      TCR_ section completed
+[Change] README feature list expanded with IPv6 dual-stack, input validation,
+      nft backend detection, and systemd support
+[Change] README section 3.1: USE_IPV6 option documented
+[Change] README section 3.1: SET_FASTLOAD description enhanced with nft
+      backend detection note
+[Change] README section 4 help listing synced with help() output;
+      -v/--version added
+[Change] README section 4.1 trust examples expanded with IPv6 address formats
+[Change] README netfilter.org URL updated to HTTPS
+[Fix] head() email domain standardized from @rfxn.org to @rfxn.com (apf)
+[Fix] conf.apf comment typos: allot→a lot, etc..→etc., HTTP→HTTPS in
+      comment URLs (conf.apf)
+[Fix] .ca.def template synced with all conf.apf comment fixes from
+      Phases 38-39 (subsiquent, inital, your, allot, etc.., HTTP URLs)
 [Fix] README typos corrected: FTA→FTP, there→their, Unbuntu→Ubuntu,
       not recommends→not recommended, captain→caption, hte→the
 [Change] README modernized: removed stale todo list and 2000s-era hardware
