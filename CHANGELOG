@@ -1,4 +1,21 @@
 - 2.0.1 | Feb 14 2026:
+[Fix] importconf cross-test contamination; trust file entries from prior test
+      runs no longer persist across reinstalls in test suite
+      (tests/helpers/install-apf.sh)
+[Fix] sysctl log_martians test false positive; previously accepted both 0 and 1
+      (always passing); now verifies write actually takes effect or skips when
+      Docker kernel ignores sysctl writes (tests/12-sysctl.bats)
+[Fix] OUTPUT policy test false positive; replaced fragile tail/grep with
+      assert_chain_policy helper (tests/02-chain-verification.bats)
+[Change] Per-test teardown() added to test files 06, 11, 13 to prevent dirty
+      state from leaking between tests on mid-test failure
+      (tests/06-ipv6.bats, tests/11-advanced-trust.bats,
+      tests/13-refresh-expiry.bats)
+[New] Fast load restore path test; verifies iptables-restore from snapshot
+      actually restores chains on second start (tests/08-fastload.bats)
+[New] RAB test file (15-rab.bats) with 7 tests covering chain structure,
+      portscan rules, and logging; gracefully skips when xt_recent kernel
+      module unavailable in Docker (tests/15-rab.bats)
 [Change] Backtick command substitutions modernized to $() across all files:
       functions.apf (97), cports.common (36), apf (8), firewall (9),
       bt.rules (4), vnetgen (3), main.vnet (2), importconf (2),

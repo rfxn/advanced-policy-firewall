@@ -94,10 +94,8 @@ teardown_file() {
 }
 
 @test "default OUTPUT has ACCEPT when EGF=0" {
-    # With EGF=0, OUTPUT should end with an ACCEPT-all rule
-    local rules
-    rules=$(iptables -L OUTPUT -n | tail -2)
-    echo "$rules" | grep -q "ACCEPT"
+    # With EGF=0, OUTPUT policy is ACCEPT and an explicit ACCEPT-all rule exists
+    assert_chain_policy OUTPUT ACCEPT
 }
 
 @test "MSS clamping rule in OUTPUT" {

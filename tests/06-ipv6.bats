@@ -30,6 +30,16 @@ teardown_file() {
     source /opt/tests/helpers/teardown-netns.sh
 }
 
+teardown() {
+    # Clean IPv6 test entries from trust files on failure
+    for pattern in "2001:db8"; do
+        sed -i "/${pattern}/d" "$APF_DIR/allow_hosts.rules" 2>/dev/null || true
+        sed -i "/${pattern}/d" "$APF_DIR/deny_hosts.rules" 2>/dev/null || true
+    done
+    ip6tables -F TALLOW 2>/dev/null || true
+    ip6tables -F TDENY 2>/dev/null || true
+}
+
 @test "IPv6 loopback uses ::/0 not 0/0" {
     local rules
     rules=$(ip6tables -L INPUT -nv)

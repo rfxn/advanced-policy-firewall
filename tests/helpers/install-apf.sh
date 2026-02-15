@@ -10,6 +10,15 @@ install_apf() {
     cd "$APF_SRC"
     INSTALL_PATH="$APF_INSTALL" sh install.sh
 
+    # Prevent cross-test contamination: importconf copies old *_hosts.rules
+    # from backup, which may contain entries from previous test runs.
+    # Strip all non-comment, non-blank lines from trust files.
+    for rf in "$APF_INSTALL/allow_hosts.rules" "$APF_INSTALL/deny_hosts.rules"; do
+        if [ -f "$rf" ]; then
+            sed -i '/^[^#]/d' "$rf"
+        fi
+    done
+
     # Patch conf.apf for Docker environment
     local conf="$APF_INSTALL/conf.apf"
 

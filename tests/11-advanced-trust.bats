@@ -37,6 +37,14 @@ setup() {
     done
 }
 
+teardown() {
+    # Same cleanup on exit — prevents dirty state if test fails mid-execution
+    for pattern in "192.0.2" "198.51.100" "2001:db8"; do
+        sed -i "/${pattern}/d" "$APF_DIR/allow_hosts.rules" 2>/dev/null || true
+        sed -i "/${pattern}/d" "$APF_DIR/deny_hosts.rules" 2>/dev/null || true
+    done
+}
+
 @test "simple trust: d=PORT:s=IP creates port ACCEPT rules" {
     echo "d=8080:s=192.0.2.50" >> "$APF_DIR/allow_hosts.rules"
     "$APF" -f 2>/dev/null || true

@@ -94,6 +94,35 @@ teardown_file() {
     "$APF" -f 2>/dev/null || true
 }
 
+@test "fast load restores rules from snapshot" {
+    source /opt/tests/helpers/apf-config.sh
+    apf_set_config "SET_FASTLOAD" "1"
+    # First: do a full load to create the snapshot
+    "$APF" -f 2>/dev/null
+    "$APF" -s
+    # Verify chains exist after full load
+    run iptables -L TALLOW -n
+    assert_success
+    # Flush all rules
+    "$APF" -f 2>/dev/null
+    # Verify chains are gone after flush
+    run iptables -L TALLOW -n 2>/dev/null
+    assert_failure
+    # Restart — should take fast load path (snapshot exists, no config change)
+    "$APF" -s
+    # Verify chains are restored from snapshot
+    run iptables -L TALLOW -n
+    assert_success
+    run iptables -L TDENY -n
+    assert_success
+    # Verify the log confirms fast load was used
+    run grep "fast load" /var/log/apf_log
+    assert_success
+    # Cleanup
+    apf_set_config "SET_FASTLOAD" "0"
+    "$APF" -f 2>/dev/null
+}
+
 @test "config change forces full load when fastload enabled" {
     source /opt/tests/helpers/apf-config.sh
     apf_set_config "SET_FASTLOAD" "1"

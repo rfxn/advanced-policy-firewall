@@ -31,6 +31,14 @@ setup() {
     done
 }
 
+teardown() {
+    # Same cleanup on exit — prevents dirty state if test fails mid-execution
+    for pattern in "192.0.2" "198.51.100"; do
+        sed -i "/${pattern}/d" "$APF_DIR/allow_hosts.rules" 2>/dev/null || true
+        sed -i "/${pattern}/d" "$APF_DIR/deny_hosts.rules" 2>/dev/null || true
+    done
+}
+
 @test "apf -e with loaded rules succeeds" {
     "$APF" -f 2>/dev/null || true
     "$APF" -s
@@ -93,9 +101,6 @@ setup() {
     # Entry should still exist (not expired)
     run grep "^192.0.2.52" "$APF_DIR/deny_hosts.rules"
     assert_success
-
-    # Clean up
-    sed -i "/192.0.2.52/d" "$APF_DIR/deny_hosts.rules"
 }
 
 @test "expirebans preserves static entries" {
@@ -110,9 +115,6 @@ setup() {
     # Static entries should never be removed
     run grep "^192.0.2.53" "$APF_DIR/deny_hosts.rules"
     assert_success
-
-    # Clean up
-    sed -i "/192.0.2.53/d" "$APF_DIR/deny_hosts.rules"
 }
 
 @test "expirebans preserves noexpire entries" {
@@ -125,7 +127,4 @@ setup() {
 
     run grep "^192.0.2.54" "$APF_DIR/deny_hosts.rules"
     assert_success
-
-    # Clean up
-    sed -i "/192.0.2.54/d" "$APF_DIR/deny_hosts.rules"
 }
