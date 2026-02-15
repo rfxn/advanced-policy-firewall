@@ -14,6 +14,7 @@ setup_file() {
     source /opt/tests/helpers/install-apf.sh
     source /opt/tests/helpers/apf-config.sh
     apf_set_interface "veth-pub" ""
+    apf_set_config "USE_IPV6" "1"
     "$APF" -f 2>/dev/null || true
     "$APF" -s
 }

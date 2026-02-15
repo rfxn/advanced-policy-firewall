@@ -17,6 +17,7 @@ setup_file() {
     source /opt/tests/helpers/install-apf.sh
     source /opt/tests/helpers/apf-config.sh
     apf_set_interface "veth-pub" ""
+    apf_set_config "USE_IPV6" "1"
     apf_set_config "EGF" "1"
     apf_set_config "EG_TCP_CPORTS" "80,443"
     apf_set_config "EG_UDP_CPORTS" "53"

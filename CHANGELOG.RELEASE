@@ -1,4 +1,9 @@
 - 2.0.1 | Feb 14 2026:
+[Fix] cli_trust() duplicate check matched comment lines, causing false
+      "already exists" after apf -u/-a cycle; now filters comments and
+      restores whole-word matching (functions.apf)
+[Fix] IPv6 trust tests missing USE_IPV6=1 in test setup; added to
+      04-trust-system.bats and 11-advanced-trust.bats
 [Change] URL filename extraction in 7 download functions replaced backtick
          tr/grep/tail pipeline with ${URL##*/} parameter expansion
          (functions.apf)

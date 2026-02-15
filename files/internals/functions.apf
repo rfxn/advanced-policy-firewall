@@ -318,7 +318,12 @@ cli_trust() {
 		echo "Invalid host '$HOST': must be a valid IP address, CIDR block, or FQDN"
 		return 1
 	fi
-        tlist=$(grep -Fl "$HOST" $DENY_HOSTS $ALLOW_HOSTS $GALLOW_HOSTS $GDENY_HOSTS 2>/dev/null | tr '\n' ' ')
+        tlist=""
+        for f in $DENY_HOSTS $ALLOW_HOSTS $GALLOW_HOSTS $GDENY_HOSTS; do
+            if [ -f "$f" ] && grep -v '^#' "$f" | grep -Fwq "$HOST"; then
+                tlist="$tlist$f "
+            fi
+        done
 	valtrust="$tlist"
         valip=`cat $INSTALL_PATH/internals/.localaddrs $INSTALL_PATH/internals/.localaddrs6 2>/dev/null | grep -w $HOST`
         if [ "$valtrust" ]; then
