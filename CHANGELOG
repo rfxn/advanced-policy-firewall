@@ -1,8 +1,18 @@
 - 2.0.1 | Feb 15 2026:
-[Change] Removed Dockerfiles for CentOS 6, Ubuntu 16.04, and Ubuntu 18.04;
-         repos are no longer accessible. Test matrix aligned to CI targets:
-         Debian 12, CentOS 7, Rocky 8/9, Ubuntu 20.04/22.04/24.04. Rocky 10
-         retained for manual testing (tests/Makefile, tests/run-tests.sh)
+[New] Deep legacy test targets: CentOS 6 (vault.centos.org) and Ubuntu 12.04
+      (old-releases.ubuntu.com) reintroduced as manual test targets with
+      Dockerfiles, run-tests.sh, and Makefile deep-legacy group
+      (tests/Dockerfile.centos6, tests/Dockerfile.ubuntu1204)
+[Fix] CentOS 6 Dockerfile: added iptables-ipv6 package for ip6tables support
+[Fix] Packet sanity test patterns widened to handle third iptables output
+      format (tcpflags: 0xNN/0xNN) found on very old legacy systems
+      (tests/07-packet-sanity.bats)
+[Fix] apf -l dependency check test uses timeout to prevent hang when editor
+      (vi) is present in container (tests/16-dependency-check.bats)
+[Change] Removed Dockerfiles for Ubuntu 16.04 and Ubuntu 18.04; repos are
+         no longer accessible. Test matrix aligned to CI targets: Debian 12,
+         CentOS 7, Rocky 8/9, Ubuntu 20.04/22.04/24.04. Rocky 10 retained
+         for manual testing (tests/Makefile, tests/run-tests.sh)
 [Fix] list() predictable temp file replaced with mktemp; PID-based
       $INSTALL_PATH/.iptrules.$$ changed to mktemp with XXXXXX suffix;
       all file references now quoted (functions.apf)

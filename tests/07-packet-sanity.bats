@@ -35,24 +35,26 @@ teardown_file() {
     assert_chain_exists OUT_SANITY
 }
 
-# TCP flag tests: nft backend shows hex (flags:0xNN/0xNN),
-# legacy backend shows symbolic (SYN,FIN SYN,FIN).
+# TCP flag tests: three iptables output formats exist:
+#   nft backend:        flags:0xNN/0xNN
+#   legacy backend:     SYN,FIN SYN,FIN (symbolic)
+#   very old legacy:    tcpflags: 0xNN/0xNN (CentOS 6, Ubuntu 12.04)
 # Use alternation pattern for cross-backend portability.
 
 @test "IN_SANITY blocks SYN,FIN pair" {
-    assert_rule_exists IN_SANITY "(SYN,FIN.*SYN,FIN|flags:0x03/0x03)"
+    assert_rule_exists IN_SANITY "(SYN,FIN.*SYN,FIN|flags:.*0x03/0x03)"
 }
 
 @test "IN_SANITY blocks ALL NONE (null scan)" {
-    assert_rule_exists IN_SANITY "(FIN,SYN,RST,PSH,ACK,URG.*NONE|flags:0x3F/0x00)"
+    assert_rule_exists IN_SANITY "(FIN,SYN,RST,PSH,ACK,URG.*NONE|flags:.*0x3F/0x00)"
 }
 
 @test "IN_SANITY blocks SYN,RST pair" {
-    assert_rule_exists IN_SANITY "(SYN,RST.*SYN,RST|flags:0x06/0x06)"
+    assert_rule_exists IN_SANITY "(SYN,RST.*SYN,RST|flags:.*0x06/0x06)"
 }
 
 @test "OUT_SANITY blocks SYN,FIN pair" {
-    assert_rule_exists OUT_SANITY "(SYN,FIN.*SYN,FIN|flags:0x03/0x03)"
+    assert_rule_exists OUT_SANITY "(SYN,FIN.*SYN,FIN|flags:.*0x03/0x03)"
 }
 
 @test "INPUT references IN_SANITY" {

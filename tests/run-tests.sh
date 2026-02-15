@@ -10,14 +10,16 @@
 #   ./tests/run-tests.sh /opt/tests/04-trust-system.bats # Specific file
 #
 # Supported OS values (CI matrix marked with *):
-#   debian12   * Debian 12 slim (default, nft backend)
-#   centos7    * CentOS 7 (EOL, legacy backend)
-#   rocky8     * Rocky Linux 8 (nft backend)
-#   rocky9     * Rocky Linux 9 (nft backend)
-#   rocky10      Rocky Linux 10 (nft backend, pending stable)
-#   ubuntu2004 * Ubuntu 20.04 LTS (nft backend)
-#   ubuntu2204 * Ubuntu 22.04 LTS (nft backend)
-#   ubuntu2404 * Ubuntu 24.04 LTS (nft backend)
+#   debian12     * Debian 12 slim (default, nft backend)
+#   centos6        CentOS 6 (EOL, legacy backend, vault repos)
+#   centos7      * CentOS 7 (EOL, legacy backend)
+#   rocky8       * Rocky Linux 8 (nft backend)
+#   rocky9       * Rocky Linux 9 (nft backend)
+#   rocky10        Rocky Linux 10 (nft backend, pending stable)
+#   ubuntu1204     Ubuntu 12.04 (EOL, legacy backend, old-releases repos)
+#   ubuntu2004   * Ubuntu 20.04 LTS (nft backend)
+#   ubuntu2204   * Ubuntu 22.04 LTS (nft backend)
+#   ubuntu2404   * Ubuntu 24.04 LTS (nft backend)
 #
 set -e
 
@@ -36,6 +38,9 @@ case "$OS" in
     debian12)
         DOCKERFILE="$SCRIPT_DIR/Dockerfile"
         ;;
+    centos6)
+        DOCKERFILE="$SCRIPT_DIR/Dockerfile.centos6"
+        ;;
     centos7)
         DOCKERFILE="$SCRIPT_DIR/Dockerfile.centos7"
         ;;
@@ -48,6 +53,9 @@ case "$OS" in
     rocky10)
         DOCKERFILE="$SCRIPT_DIR/Dockerfile.rocky10"
         ;;
+    ubuntu1204)
+        DOCKERFILE="$SCRIPT_DIR/Dockerfile.ubuntu1204"
+        ;;
     ubuntu2004)
         DOCKERFILE="$SCRIPT_DIR/Dockerfile.ubuntu2004"
         ;;
@@ -59,7 +67,7 @@ case "$OS" in
         ;;
     *)
         echo "Unknown OS: $OS"
-        echo "Supported: debian12, centos7, rocky8, rocky9, rocky10, ubuntu2004, ubuntu2204, ubuntu2404"
+        echo "Supported: debian12, centos6, centos7, rocky8, rocky9, rocky10, ubuntu1204, ubuntu2004, ubuntu2204, ubuntu2404"
         exit 1
         ;;
 esac

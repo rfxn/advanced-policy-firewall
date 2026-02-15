@@ -1,8 +1,8 @@
 .PHONY: test test-verbose \
-       test-centos7 test-rocky8 test-rocky9 test-rocky10 \
-       test-ubuntu2004 test-ubuntu2204 test-ubuntu2404 \
-       test-all test-modern test-legacy \
-       test-modern-parallel test-legacy-parallel test-all-parallel
+       test-centos6 test-centos7 test-rocky8 test-rocky9 test-rocky10 \
+       test-ubuntu1204 test-ubuntu2004 test-ubuntu2204 test-ubuntu2404 \
+       test-all test-modern test-legacy test-deep-legacy \
+       test-modern-parallel test-legacy-parallel test-deep-legacy-parallel test-all-parallel
 
 HALF_CORES := $(shell echo $$(( $$(nproc) / 2 )) | awk '{ print ($$1 < 1) ? 1 : $$1 }')
 
@@ -36,6 +36,13 @@ test-ubuntu2204:
 test-ubuntu2404:
 	./run-tests.sh --os ubuntu2404
 
+# Deep legacy OS targets (EOL, not in CI) — manual only
+test-centos6:
+	./run-tests.sh --os centos6
+
+test-ubuntu1204:
+	./run-tests.sh --os ubuntu1204
+
 # Modern OS targets (active support) — sequential
 test-modern:
 	./run-tests.sh --os debian12
@@ -48,6 +55,11 @@ test-legacy:
 	./run-tests.sh --os centos7
 	./run-tests.sh --os rocky8
 	./run-tests.sh --os ubuntu2004
+
+# Deep legacy OS targets (very old EOL, vault/old-releases repos) — sequential
+test-deep-legacy:
+	./run-tests.sh --os centos6
+	./run-tests.sh --os ubuntu1204
 
 # Full matrix (all CI targets) — sequential
 test-all:
@@ -66,6 +78,10 @@ test-modern-parallel:
 
 test-legacy-parallel:
 	printf '%s\n' centos7 rocky8 ubuntu2004 | \
+	  xargs -P $(HALF_CORES) -I{} ./run-tests.sh --os {}
+
+test-deep-legacy-parallel:
+	printf '%s\n' centos6 ubuntu1204 | \
 	  xargs -P $(HALF_CORES) -I{} ./run-tests.sh --os {}
 
 test-all-parallel:

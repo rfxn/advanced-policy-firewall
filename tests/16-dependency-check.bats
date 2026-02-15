@@ -139,6 +139,7 @@ teardown() {
 }
 
 @test "apf -l works without dependency check" {
-    run "$APF" -l
+    # timeout prevents hang if an editor (vi) is found on the system
+    run timeout 10 "$APF" -l
     refute_output --partial "missing critical dependencies"
 }
