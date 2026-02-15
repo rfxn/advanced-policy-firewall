@@ -21,7 +21,9 @@ setup_file() {
     source /opt/tests/helpers/reset-apf.sh
     source /opt/tests/helpers/apf-config.sh
     apf_set_interface "veth-pub" ""
-    apf_set_config "USE_IPV6" "1"
+    if ip6tables_available; then
+        apf_set_config "USE_IPV6" "1"
+    fi
     apf_set_config "EGF" "1"
     apf_set_config "EG_TCP_CPORTS" "80,443"
     apf_set_config "EG_UDP_CPORTS" "53"
@@ -101,35 +103,44 @@ teardown_file() {
 }
 
 @test "IPv6 plain address in allow_hosts creates ip6tables rules" {
+    if ! ip6tables_available; then skip "ip6tables not available"; fi
     assert_rule_exists_ip6s TALLOW "-s 2001:db8::50.*ACCEPT"
     assert_rule_exists_ip6s TALLOW "-d 2001:db8::50.*ACCEPT"
 }
 
 @test "IPv6 plain address in deny_hosts creates ip6tables rules" {
+    if ! ip6tables_available; then skip "ip6tables not available"; fi
     assert_rule_exists_ip6s TDENY "2001:db8::51"
 }
 
 @test "IPv6 bracket syntax: d=PORT:s=[IPv6] creates ip6tables rules" {
+    if ! ip6tables_available; then skip "ip6tables not available"; fi
     assert_rule_exists_ip6s TALLOW "2001:db8::55.*--dports 8080"
 }
 
 @test "IPv6 bracket direction: in:d=PORT:s=[IPv6] creates ip6tables rules" {
+    if ! ip6tables_available; then skip "ip6tables not available"; fi
     assert_rule_exists_ip6s TALLOW "2001:db8::60.*--dports 443"
 }
 
 @test "IPv6 bracket full syntax: tcp:in:d=PORT:s=[IPv6] creates ip6tables TCP rule" {
+    if ! ip6tables_available; then skip "ip6tables not available"; fi
     assert_rule_exists_ip6s TALLOW "2001:db8::70.*-p tcp.*--dports 22"
 }
 
 @test "IPv6 bracket deny: d=PORT:s=[IPv6] in deny_hosts creates ip6tables rules" {
+    if ! ip6tables_available; then skip "ip6tables not available"; fi
     assert_rule_exists_ip6s TDENY "2001:db8::52.*--dports 22"
 }
 
 @test "IPv6 bracket with CIDR: d=PORT:s=[IPv6/mask] creates ip6tables rules" {
+    if ! ip6tables_available; then skip "ip6tables not available"; fi
     assert_rule_exists_ip6s TALLOW "2001:db8::/32.*--dports 80"
 }
 
 @test "IPv4 advanced trust still works alongside IPv6 entries" {
     assert_rule_exists_ips TALLOW "192.0.2.55.*--dports 8080"
-    assert_rule_exists_ip6s TALLOW "2001:db8::80.*--dports 8080"
+    if ip6tables_available; then
+        assert_rule_exists_ip6s TALLOW "2001:db8::80.*--dports 8080"
+    fi
 }

@@ -4,6 +4,7 @@
 
 load '/usr/local/lib/bats/bats-support/load'
 load '/usr/local/lib/bats/bats-assert/load'
+source /opt/tests/helpers/assert-iptables.bash
 
 APF="/opt/apf/apf"
 APF_DIR="/opt/apf"
@@ -62,6 +63,7 @@ teardown_file() {
 }
 
 @test "USE_IPV6=1 full load creates valid .apf6.restore with expected chains" {
+    if ! ip6tables_available; then skip "ip6tables not available"; fi
     source /opt/tests/helpers/apf-config.sh
     apf_set_config "USE_IPV6" "1"
     "$APF" -f 2>/dev/null || true

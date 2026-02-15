@@ -14,7 +14,9 @@ setup_file() {
     source /opt/tests/helpers/reset-apf.sh
     source /opt/tests/helpers/apf-config.sh
     apf_set_interface "veth-pub" ""
-    apf_set_config "USE_IPV6" "1"
+    if ip6tables_available; then
+        apf_set_config "USE_IPV6" "1"
+    fi
     "$APF" -f 2>/dev/null || true
     "$APF" -s
 }
@@ -173,17 +175,20 @@ setup() {
 }
 
 @test "apf -a adds IPv6 to ip6tables TALLOW chain" {
+    if ! ip6tables_available; then skip "ip6tables not available"; fi
     "$APF" -a 2001:db8::50 "ipv6 allow"
     assert_rule_exists_ip6s TALLOW "-s 2001:db8::50"
     assert_rule_exists_ip6s TALLOW "-d 2001:db8::50"
 }
 
 @test "apf -d adds IPv6 to ip6tables TDENY chain" {
+    if ! ip6tables_available; then skip "ip6tables not available"; fi
     "$APF" -d 2001:db8::51 "ipv6 deny"
     assert_rule_exists_ip6s TDENY "2001:db8::51"
 }
 
 @test "plain IPv6 in allow_hosts.rules creates ip6tables rules" {
+    if ! ip6tables_available; then skip "ip6tables not available"; fi
     echo "2001:db8::50" >> "$APF_DIR/allow_hosts.rules"
     "$APF" -f 2>/dev/null || true
     "$APF" -s
@@ -192,6 +197,7 @@ setup() {
 }
 
 @test "plain IPv6 in deny_hosts.rules creates ip6tables rules" {
+    if ! ip6tables_available; then skip "ip6tables not available"; fi
     echo "2001:db8::51" >> "$APF_DIR/deny_hosts.rules"
     "$APF" -f 2>/dev/null || true
     "$APF" -s
@@ -199,6 +205,7 @@ setup() {
 }
 
 @test "apf -u removes IPv6 from file and chain" {
+    if ! ip6tables_available; then skip "ip6tables not available"; fi
     "$APF" -a 2001:db8::50 "ipv6 remove test"
     assert_rule_exists_ip6s TALLOW "2001:db8::50"
 

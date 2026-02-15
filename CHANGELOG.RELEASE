@@ -1,4 +1,10 @@
 - 2.0.1 | Feb 15 2026:
+[Fix] IPv6 tests skip gracefully when ip6tables kernel module is unavailable;
+      adds ip6tables_available() helper and skip guards across 6 test files
+      for GH Actions CentOS 7 compatibility (tests/helpers/assert-iptables.bash,
+      tests/04-trust-system.bats, tests/06-ipv6.bats, tests/08-fastload.bats,
+      tests/09-flush-cleanup.bats, tests/11-advanced-trust.bats,
+      tests/16-dependency-check.bats)
 [New] Deep legacy test targets: CentOS 6 (vault.centos.org) and Ubuntu 12.04
       (old-releases.ubuntu.com) reintroduced as manual test targets with
       Dockerfiles, run-tests.sh, and Makefile deep-legacy group

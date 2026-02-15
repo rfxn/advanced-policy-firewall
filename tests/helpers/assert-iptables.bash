@@ -3,6 +3,13 @@
 # Custom BATS assertions for iptables rule verification.
 # Uses -L -nv for rule matching (shows interface names, protocol names).
 
+# Check if ip6tables is functional (kernel module loaded).
+# CentOS 7 legacy iptables needs ip6_tables module; GH Actions runners may lack it.
+# Usage: if ! ip6tables_available; then skip "ip6tables not available"; fi
+ip6tables_available() {
+    ip6tables -L INPUT -n >/dev/null 2>&1
+}
+
 # Assert a chain exists in iptables (IPv4)
 # Usage: assert_chain_exists CHAIN [TABLE]
 assert_chain_exists() {

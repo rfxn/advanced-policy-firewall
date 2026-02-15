@@ -71,6 +71,7 @@ teardown_file() {
 }
 
 @test "USE_IPV6=1 flush also clears ip6tables" {
+    if ! ip6tables_available; then skip "ip6tables not available"; fi
     source /opt/tests/helpers/apf-config.sh
     apf_set_config "USE_IPV6" "1"
     "$APF" -s
