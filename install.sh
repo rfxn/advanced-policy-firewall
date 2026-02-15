@@ -56,7 +56,7 @@ install() {
 		fi
 	else
 		if [ -f "/etc/rc.local" ]; then
-			val=`grep -i apf /etc/rc.local`
+			val=$(grep -i apf /etc/rc.local)
 			if [ "$val" == "" ]; then
 				echo "$INSTALL_PATH/apf -s >> /dev/null 2>&1" >> /etc/rc.local
 			fi
@@ -71,7 +71,7 @@ install() {
 	fi
 	"$INSTALL_PATH/vnet/vnetgen"
 	if [ -f "/usr/bin/dialog" ] && [ -d "$INSTALL_PATH/extras/apf-m" ]; then
-		last=`pwd`
+		last=$(pwd)
 		cd "$INSTALL_PATH/extras/apf-m/"
 		sh install -i
 		cd "$last"
@@ -79,9 +79,9 @@ install() {
 	chmod 750 "$INSTALL_PATH"
 }
 
-VER=`cat files/VERSION | grep version | awk '{print$2}'`
+VER=$(cat files/VERSION | grep version | awk '{print$2}')
 if [ -d "$INSTALL_PATH" ]; then
-	DVAL=`date +"%d%m%Y-%s"`
+	DVAL=$(date +"%d%m%Y-%s")
 	cp -R "$INSTALL_PATH" "$INSTALL_PATH.bk$DVAL" || { echo "Backup failed, aborting."; exit 1; }
 	rm -f "$INSTALL_PATH.bk.last"
 	ln -fs "$INSTALL_PATH.bk$DVAL" "${INSTALL_PATH}.bk.last"

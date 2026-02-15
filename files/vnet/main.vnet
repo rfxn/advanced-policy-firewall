@@ -9,8 +9,8 @@
 INSTALL_PATH="/etc/apf"
 if [ "$SET_VNET" == "1" ]; then
         eout "{glob} virtual network enabled, loading vnet rules."
-for i in `ls $INSTALL_PATH/vnet/ | grep .rules`; do
-        VALIP=`echo $i | sed 's/.rules//'`
+for i in $(ls $INSTALL_PATH/vnet/ | grep .rules); do
+        VALIP=$(echo $i | sed 's/.rules//')
         if [ -n "$ip" ]; then
                 IFVALIP=$($ip addr show 2>/dev/null | grep -w "$VALIP")
         elif [ -n "$ifconfig" ] && [ -f "$ifconfig" ]; then

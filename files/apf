@@ -45,8 +45,8 @@ fi
 # Is our last full load more than 12h ago?
 # if so we are going to full load
 if [ -f "$INSTALL_PATH/internals/.last.full" ]; then
- LAST_FULL=`cat $INSTALL_PATH/internals/.last.full`
- CURRENT_LOAD=`date +"%s"`
+ LAST_FULL=$(cat $INSTALL_PATH/internals/.last.full)
+ CURRENT_LOAD=$(date +"%s")
  LOAD_DIFF=$(($CURRENT_LOAD-$LAST_FULL))
  if [ ! "$LOAD_DIFF" -lt "43200" ]; then
 	SKIP_FASTLOAD_EXPIRED=1
@@ -60,12 +60,12 @@ if [ ! -f "$INSTALL_PATH/internals/.md5.cores" ]; then
         SKIP_FASTLOAD_VARS=1
 	MD5_FIRSTRUN=1
 else
-        EMPTY_MD5=`cat $INSTALL_PATH/internals/.md5.cores`
+        EMPTY_MD5=$(cat $INSTALL_PATH/internals/.md5.cores)
         if [ "$EMPTY_MD5" == "" ]; then
                 $MD5 $MD5_FILES > $INSTALL_PATH/internals/.md5.cores 2> /dev/null
         fi
 	$MD5 $MD5_FILES > $INSTALL_PATH/internals/.md5.cores.new 2> /dev/null 
-        VARS_DIFF=`$DIFF $INSTALL_PATH/internals/.md5.cores.new $INSTALL_PATH/internals/.md5.cores`
+        VARS_DIFF=$($DIFF $INSTALL_PATH/internals/.md5.cores.new $INSTALL_PATH/internals/.md5.cores)
         if [ ! "$VARS_DIFF" == "" ]; then
 		$MD5 $MD5_FILES > $INSTALL_PATH/internals/.md5.cores 2> /dev/null
                 SKIP_FASTLOAD_VARS=1
@@ -83,7 +83,7 @@ if [ ! -f "$INSTALL_PATH/internals/.last.vars" ]; then
 	SKIP_FASTLOAD_VARS=1
 else
 	$INSTALL_PATH/apf -o > $INSTALL_PATH/internals/.last.vars.new
-	VARS_DIFF=`$DIFF $INSTALL_PATH/internals/.last.vars.new $INSTALL_PATH/internals/.last.vars`
+	VARS_DIFF=$($DIFF $INSTALL_PATH/internals/.last.vars.new $INSTALL_PATH/internals/.last.vars)
 	if [ ! "$VARS_DIFF" == "" ]; then
 	        $INSTALL_PATH/apf -o > $INSTALL_PATH/internals/.last.vars
 		SKIP_FASTLOAD_VARS=1
@@ -91,7 +91,7 @@ else
 fi
 
 # check uptime is greater than 5 minutes (300s)
- UPSEC=`cat /proc/uptime  | tr '.' ' ' | awk '{print$1}'`
+ UPSEC=$(cat /proc/uptime  | tr '.' ' ' | awk '{print$1}')
  if [ "$UPSEC" -lt "300" ]; then
 	SET_FASTLOAD_UPSEC=1
  fi
@@ -160,7 +160,7 @@ $INSTALL_PATH/vnet/vnetgen
 # start main firewall script
 $INSTALL_PATH/firewall
 # check for/load bandmin
-LOAD=`cat /proc/loadavg | tr '.' ' ' | awk '{print$1}'`
+LOAD=$(cat /proc/loadavg | tr '.' ' ' | awk '{print$1}')
  if [ ! "$LOAD" -gt "10" ]; then
 	bandmin
  fi
@@ -169,7 +169,7 @@ if [ "$MD5_FIRSTRUN" == "1" ]; then
         $MD5 $MD5_FILES > $INSTALL_PATH/internals/.md5.cores 2> /dev/null
 fi
 
-firewall_on=`$IPT $IPT_FLAGS -L --numeric | grep -vE "Chain|destination"`
+firewall_on=$($IPT $IPT_FLAGS -L --numeric | grep -vE "Chain|destination")
 if [ ! "$DEVEL_ON" == "1" ] && [ ! "$firewall_on" == "" ]; then
 	$IPTS > $INSTALL_PATH/internals/.apf.restore
 	if [ "$USE_IPV6" == "1" ] && [ -n "$IP6TS" ]; then

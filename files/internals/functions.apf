@@ -143,7 +143,7 @@ ml() {
 modinit() {
  # Remove ipchains module if loaded (kernel 2.4 only)
  if [ "$KREL" == "2.4" ]; then
-  IPC_VAL=`$LSM | grep ipchains`
+  IPC_VAL=$($LSM | grep ipchains)
   if [ ! "$IPC_VAL" == "" ]; then
         $RMM ipchains
   fi
@@ -211,12 +211,12 @@ trim() {
 	MAXLINES=0
  fi
  if [ ! "$MAXLINES" == "0" ] && [ -f "$FILE" ]; then
-	LINES=`cat "$FILE" | grep -v "#" | grep -c ""`
+	LINES=$(cat "$FILE" | grep -v "#" | grep -c "")
         if [ "$LINES" -gt "$MAXLINES" ]; then
                 eout "{glob} trimming $FILE to $MAXLINES lines"
-                CHK_CMT=`tail -n "$MAXLINES" "$FILE" | grep -c "#"`
+                CHK_CMT=$(tail -n "$MAXLINES" "$FILE" | grep -c "#")
                 MAXLINES=$(($CHK_CMT+$MAXLINES))
-                CHK_SCMT=`tail -n "$MAXLINES" "$FILE" | tac | tail -n 1 | grep "#"`
+                CHK_SCMT=$(tail -n "$MAXLINES" "$FILE" | tac | tail -n 1 | grep "#")
                 if [ "$CHK_SCMT" == "" ]; then
                         MAXLINES=$((1+$MAXLINES))
                 fi
@@ -325,7 +325,7 @@ cli_trust() {
             fi
         done
 	valtrust="$tlist"
-        valip=`cat "$INSTALL_PATH/internals/.localaddrs" "$INSTALL_PATH/internals/.localaddrs6" 2>/dev/null | grep -w "$HOST"`
+        valip=$(cat "$INSTALL_PATH/internals/.localaddrs" "$INSTALL_PATH/internals/.localaddrs6" 2>/dev/null | grep -w "$HOST")
         if [ "$valtrust" ]; then
                 echo "$HOST already exists in $tlist"
         elif [ "$valip" ]; then
@@ -333,7 +333,7 @@ cli_trust() {
         elif ! ipt_for_host "$HOST"; then
                 echo "$HOST appears to be IPv6 but USE_IPV6 is not enabled"
         else
-	        TIME=`date +"%D %H:%M:%S"`
+	        TIME=$(date +"%D %H:%M:%S")
 		if [ "$CMT" ]; then
 			echo "# added $HOST on $TIME with comment: $CMT" >> $FILE
 		else
@@ -358,7 +358,7 @@ cli_trust() {
 }
 
 flush() {
-firewall_on=`$IPT $IPT_FLAGS -L --numeric | grep -vE "Chain|destination"`
+firewall_on=$($IPT $IPT_FLAGS -L --numeric | grep -vE "Chain|destination")
 if [ "$SET_FASTLOAD" == "1" ] && [ ! "$1" == "1" ] && [ ! "$DEVEL_ON" == "1" ] && [ ! "$firewall_on" == "" ]; then
 	$IPTS > $INSTALL_PATH/internals/.apf.restore
 	if [ "$USE_IPV6" == "1" ] && [ -n "$IP6TS" ]; then
@@ -369,7 +369,7 @@ fi
 if [ ! "$1" = "1" ]; then
 	eout "{glob} flushing & zeroing chain policies"
 fi
-chains=`cat /proc/net/ip_tables_names 2>/dev/null`
+chains=$(cat /proc/net/ip_tables_names 2>/dev/null)
 # Fallback for nft backend where /proc/net/ip_tables_names is absent
 if [ -z "$chains" ]; then
 	chains="filter nat mangle raw"
@@ -381,7 +381,7 @@ ipt -P OUTPUT ACCEPT
 ipt -P FORWARD ACCEPT
 
 if [ "$USE_IPV6" == "1" ]; then
-	chains6=`cat /proc/net/ip6_tables_names 2>/dev/null`
+	chains6=$(cat /proc/net/ip6_tables_names 2>/dev/null)
 	# Fallback for nft backend where /proc/net/ip6_tables_names is absent
 	if [ -z "$chains6" ]; then
 		chains6="filter nat mangle raw"
@@ -464,48 +464,48 @@ if [ -z "$TYPE" ]; then
 fi
 
 if [ ! "$TOS_0" == "" ]; then
-        for i in `echo $TOS_0 | tr ',' ' '`; do
-                i=`echo $i | tr '_' ':'`
+        for i in $(echo $TOS_0 | tr ',' ' '); do
+                i=$(echo $i | tr '_' ':')
                 $IPT $IPT_FLAGS -t mangle -A $TYPE -p tcp --dport $i -j TOS --set-tos 0
                 $IPT $IPT_FLAGS -t mangle -A $TYPE -p udp --dport $i -j TOS --set-tos 0
         done
 fi
 
 if [ ! "$TOS_2" == "" ]; then
-        for i in `echo $TOS_2 | tr ',' ' '`; do
-                i=`echo $i | tr '_' ':'`
+        for i in $(echo $TOS_2 | tr ',' ' '); do
+                i=$(echo $i | tr '_' ':')
                 $IPT $IPT_FLAGS -t mangle -A $TYPE -p tcp --dport $i -j TOS --set-tos 2
                 $IPT $IPT_FLAGS -t mangle -A $TYPE -p udp --dport $i -j TOS --set-tos 2
         done
 fi
 
 if [ ! "$TOS_4" == "" ]; then
-        for i in `echo $TOS_4 | tr ',' ' '`; do
-                i=`echo $i | tr '_' ':'`
+        for i in $(echo $TOS_4 | tr ',' ' '); do
+                i=$(echo $i | tr '_' ':')
                 $IPT $IPT_FLAGS -t mangle -A $TYPE -p tcp --dport $i -j TOS --set-tos 4
                 $IPT $IPT_FLAGS -t mangle -A $TYPE -p udp --dport $i -j TOS --set-tos 4
         done
 fi
 
 if [ ! "$TOS_8" == "" ]; then
-        for i in `echo $TOS_8 | tr ',' ' '`; do
-                i=`echo $i | tr '_' ':'`
+        for i in $(echo $TOS_8 | tr ',' ' '); do
+                i=$(echo $i | tr '_' ':')
                 $IPT $IPT_FLAGS -t mangle -A $TYPE -p tcp --dport $i -j TOS --set-tos 8
                 $IPT $IPT_FLAGS -t mangle -A $TYPE -p udp --dport $i -j TOS --set-tos 8
         done
 fi
 
 if [ ! "$TOS_16" == "" ]; then
-        for i in `echo $TOS_16 | tr ',' ' '`; do
-                i=`echo $i | tr '_' ':'`
+        for i in $(echo $TOS_16 | tr ',' ' '); do
+                i=$(echo $i | tr '_' ':')
                 $IPT $IPT_FLAGS -t mangle -A $TYPE -p tcp --dport $i -j TOS --set-tos 16
                 $IPT $IPT_FLAGS -t mangle -A $TYPE -p udp --dport $i -j TOS --set-tos 16
         done
 fi
 
 if [ ! "$TOS_DEF_RANGE" == "" ]; then
-        for i in `echo $TOS_DEF_RANGE | tr ',' ' '`; do
-                i=`echo $i | tr '_' ':'`
+        for i in $(echo $TOS_DEF_RANGE | tr ',' ' '); do
+                i=$(echo $i | tr '_' ':')
                 $IPT $IPT_FLAGS -t mangle -A $TYPE -p tcp --dport $i -j TOS --set-tos $TOS_DEF
                 $IPT $IPT_FLAGS -t mangle -A $TYPE -p udp --dport $i -j TOS --set-tos $TOS_DEF
         done
@@ -528,16 +528,16 @@ if [ -z "$file" ] || [ -z "$chain" ]; then
         exit 1
 fi
 
-if [ ! "`cat $file | grep -v "#"`" == "" ]; then
+if [ ! "$(cat $file | grep -v "#")" == "" ]; then
         eout "{glob} loading $file"
         #
         #
-        for i in `cat $file | grep -v "#" | grep -v "="`; do
+        for i in $(cat $file | grep -v "#" | grep -v "="); do
                 if [ ! "$i" == "" ] && ! valid_host "$i"; then
                         eout "{trust} skipping invalid entry in $file: $i"
                         continue
                 fi
-                val=`cat "$INSTALL_PATH/internals/.localaddrs" "$INSTALL_PATH/internals/.localaddrs6" 2>/dev/null | grep -w "$i"`
+                val=$(cat "$INSTALL_PATH/internals/.localaddrs" "$INSTALL_PATH/internals/.localaddrs6" 2>/dev/null | grep -w "$i")
                 if [ ! "$val" ]; then
                  if [ ! "$i" == "" ] && [ -f "$file" ]; then
                   if ipt_for_host "$i"; then
@@ -550,11 +550,11 @@ if [ ! "`cat $file | grep -v "#"`" == "" ]; then
         done
         #
         #
-        for i in `cat $file | grep -v "#" | grep "=" | grep -vw in | grep -vw out | grep -v tcp | grep -v udp`; do
+        for i in $(cat $file | grep -v "#" | grep "=" | grep -vw in | grep -vw out | grep -v tcp | grep -v udp); do
                 if [ ! "$i" == "" ] && [ -f "$file" ]; then
                         i=$(trust_protect_ipv6 "$i")
 
-                        PFLOW=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$1}'`
+                        PFLOW=$(echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$1}')
                 if [ "$PFLOW" == "s" ]; then
                                 PFLOW="sport"
                                 PFLOW_T="from"
@@ -562,20 +562,20 @@ if [ ! "`cat $file | grep -v "#"`" == "" ]; then
                                 PFLOW="dport"
                                 PFLOW_T="to"
                         fi
-                        PPORT=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$2}'`
+                        PPORT=$(echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$2}')
                         if [ ! "$(echo $PPORT | grep _)" == "" ]; then
-                                PPORT_BEG=`echo $PPORT | tr '_' ' ' | awk '{print$1}'`
-                                PPORT_END=`echo $PPORT | tr '_' ' ' | awk '{print$2}'`
+                                PPORT_BEG=$(echo $PPORT | tr '_' ' ' | awk '{print$1}')
+                                PPORT_END=$(echo $PPORT | tr '_' ' ' | awk '{print$2}')
                                 PPORT="$PPORT_BEG:$PPORT_END"
                         fi
 
-                        IPFLOW=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$3}'`
+                        IPFLOW=$(echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$3}')
                         if [ "$IPFLOW" == "s" ]; then
                                 IPFLOW="s"
                         elif [ "$IPFLOW" == "d" ]; then
                                 IPFLOW="d"
                         fi
-                        PIP=$(trust_restore_ipv6 "`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$4}'`")
+                        PIP=$(trust_restore_ipv6 "$(echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$4}')")
 
                         if [ ! "$IPFLOW" == "" ] && [ ! "$PIP" == "" ] && [ ! "$PFLOW" == "" ] && [ ! "$PPORT" == "" ]; then
                          if ipt_for_host "$PIP"; then
@@ -588,11 +588,11 @@ if [ ! "`cat $file | grep -v "#"`" == "" ]; then
         done
         #
         #
-        for i in `cat $file | grep -v "#" | grep "=" | grep -v "tcp" | grep -v "udp"`; do
+        for i in $(cat $file | grep -v "#" | grep "=" | grep -v "tcp" | grep -v "udp"); do
                 if [ ! "$i" == "" ] && [ -f "$file" ]; then
                         i=$(trust_protect_ipv6 "$i")
 
-                        NFLOW=`echo $i | tr ':' ' ' | tr '=' ' '| awk '{print$1}'`
+                        NFLOW=$(echo $i | tr ':' ' ' | tr '=' ' '| awk '{print$1}')
                         if [ "$NFLOW" == "in" ]; then
                                 NFLOW="INPUT"
                                 NFLOW_T="inbound"
@@ -601,7 +601,7 @@ if [ ! "`cat $file | grep -v "#"`" == "" ]; then
                                 NFLOW_T="outbound"
                         fi
 
-                        PFLOW=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$2}'`
+                        PFLOW=$(echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$2}')
                         if [ "$PFLOW" == "s" ]; then
                                 PFLOW="sport"
                                 PFLOW_T="from"
@@ -610,20 +610,20 @@ if [ ! "`cat $file | grep -v "#"`" == "" ]; then
                                 PFLOW_T="to"
                         fi
 
-                        PPORT=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$3}'`
+                        PPORT=$(echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$3}')
                         if [ ! "$(echo $PPORT | grep _)" == "" ]; then
-                                PPORT_BEG=`echo $PPORT | tr '_' ' ' | awk '{print$1}'`
-                                PPORT_END=`echo $PPORT | tr '_' ' ' | awk '{print$2}'`
+                                PPORT_BEG=$(echo $PPORT | tr '_' ' ' | awk '{print$1}')
+                                PPORT_END=$(echo $PPORT | tr '_' ' ' | awk '{print$2}')
                                 PPORT="$PPORT_BEG:$PPORT_END"
                         fi
 
-                        IPFLOW=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$4}'`
+                        IPFLOW=$(echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$4}')
                         if [ "$IPFLOW" == "s" ]; then
                                 IPFLOW="s"
                         elif [ "$IPFLOW" == "d" ]; then
                                 IPFLOW="d"
                         fi
-                        PIP=$(trust_restore_ipv6 "`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$5}'`")
+                        PIP=$(trust_restore_ipv6 "$(echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$5}')")
 
                         if [ ! "$NFLOW" == "" ] && [ ! "$IPFLOW" == "" ] && [ ! "$PIP" == "" ] && [ ! "$PFLOW" == "" ] && [ ! "$PPORT" == "" ]; then
                          if [ "$IPFLOW" == "s" ] && [ "$NFLOW" == "INPUT" ] && [ "$(cat "$INSTALL_PATH/internals/.localaddrs" "$INSTALL_PATH/internals/.localaddrs6" 2>/dev/null | grep -w "$PIP")" ]; then
@@ -640,18 +640,18 @@ if [ ! "`cat $file | grep -v "#"`" == "" ]; then
         done
         #
         #
-        for i in `cat $file | grep -v "#" | grep "="`; do
+        for i in $(cat $file | grep -v "#" | grep "="); do
                 if [ ! "$i" == "" ] && [ -f "$file" ]; then
                         i=$(trust_protect_ipv6 "$i")
 
-                        PTYPE=`echo $i | tr ':' ' ' | tr '=' ' '| awk '{print$1}'`
+                        PTYPE=$(echo $i | tr ':' ' ' | tr '=' ' '| awk '{print$1}')
                         if [ "$PTYPE" == "tcp" ]; then
                                 PTYPE="tcp"
                         elif [ "$PTYPE" == "udp" ]; then
                                 PTYPE="udp"
                         fi
 
-                        NFLOW=`echo $i | tr ':' ' ' | tr '=' ' '| awk '{print$2}'`
+                        NFLOW=$(echo $i | tr ':' ' ' | tr '=' ' '| awk '{print$2}')
                         if [ "$NFLOW" == "in" ]; then
                                 NFLOW="INPUT"
                                 NFLOW_T="inbound"
@@ -660,7 +660,7 @@ if [ ! "`cat $file | grep -v "#"`" == "" ]; then
                                 NFLOW_T="outbound"
                         fi
 
-                        PFLOW=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$3}'`
+                        PFLOW=$(echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$3}')
                         if [ "$PFLOW" == "s" ]; then
                                 PFLOW="sport"
                                 PFLOW_T="from"
@@ -669,20 +669,20 @@ if [ ! "`cat $file | grep -v "#"`" == "" ]; then
                                 PFLOW_T="to"
                         fi
 
-                        PPORT=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$4}'`
+                        PPORT=$(echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$4}')
                         if [ ! "$(echo $PPORT | grep _)" == "" ]; then
-                                PPORT_BEG=`echo $PPORT | tr '_' ' ' | awk '{print$1}'`
-                                PPORT_END=`echo $PPORT | tr '_' ' ' | awk '{print$2}'`
+                                PPORT_BEG=$(echo $PPORT | tr '_' ' ' | awk '{print$1}')
+                                PPORT_END=$(echo $PPORT | tr '_' ' ' | awk '{print$2}')
                                 PPORT="$PPORT_BEG:$PPORT_END"
                         fi
 
-                        IPFLOW=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$5}'`
+                        IPFLOW=$(echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$5}')
                         if [ "$IPFLOW" == "s" ]; then
                                 IPFLOW="s"
                         elif [ "$IPFLOW" == "d" ]; then
                                 IPFLOW="d"
                         fi
-                        PIP=$(trust_restore_ipv6 "`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$6}'`")
+                        PIP=$(trust_restore_ipv6 "$(echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$6}')")
 
                         if [ ! "$PTYPE" == "" ] && [ ! "$NFLOW" == "" ] && [ ! "$IPFLOW" == "" ] && [ ! "$PIP" == "" ] && [ ! "$PFLOW" == "" ] && [ ! "$PPORT" == "" ]; then
                          if [ "$IPFLOW" == "s" ] && [ "$NFLOW" == "INPUT" ] && [ "$(cat "$INSTALL_PATH/internals/.localaddrs" "$INSTALL_PATH/internals/.localaddrs6" 2>/dev/null | grep -w "$PIP")" ]; then
@@ -715,11 +715,11 @@ if [ -z "$file" ] || [ -z "$chain" ]; then
 	exit 1
 fi
 
-if [ ! "`cat $file | grep -v "#"`" == "" ]; then
+if [ ! "$(cat $file | grep -v "#")" == "" ]; then
         eout "{glob} loading $file"
         #
         #
-        for i in `cat $file | grep -v "#" | grep -v "="`; do
+        for i in $(cat $file | grep -v "#" | grep -v "="); do
                 if [ ! "$i" == "" ] && ! valid_host "$i"; then
                         eout "{trust} skipping invalid entry in $file: $i"
                         continue
@@ -737,11 +737,11 @@ if [ ! "`cat $file | grep -v "#"`" == "" ]; then
         done
         #
         #
-	for i in `cat $file | grep -v "#" | grep "=" | grep -vw in | grep -vw out | grep -v tcp | grep -v udp`; do
+	for i in $(cat $file | grep -v "#" | grep "=" | grep -vw in | grep -vw out | grep -v tcp | grep -v udp); do
                 if [ ! "$i" == "" ] && [ -f "$file" ]; then
                         i=$(trust_protect_ipv6 "$i")
 
-                        PFLOW=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$1}'`
+                        PFLOW=$(echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$1}')
                         if [ "$PFLOW" == "s" ]; then
                                 PFLOW="sport"
                                 PFLOW_T="from"
@@ -749,20 +749,20 @@ if [ ! "`cat $file | grep -v "#"`" == "" ]; then
                                 PFLOW="dport"
                                 PFLOW_T="to"
                         fi
-                        PPORT=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$2}'`
+                        PPORT=$(echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$2}')
                         if [ ! "$(echo $PPORT | grep _)" == "" ]; then
-                                PPORT_BEG=`echo $PPORT | tr '_' ' ' | awk '{print$1}'`
-                                PPORT_END=`echo $PPORT | tr '_' ' ' | awk '{print$2}'`
+                                PPORT_BEG=$(echo $PPORT | tr '_' ' ' | awk '{print$1}')
+                                PPORT_END=$(echo $PPORT | tr '_' ' ' | awk '{print$2}')
                                 PPORT="$PPORT_BEG:$PPORT_END"
                         fi
 
-                        IPFLOW=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$3}'`
+                        IPFLOW=$(echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$3}')
                         if [ "$IPFLOW" == "s" ]; then
                                 IPFLOW="s"
                         elif [ "$IPFLOW" == "d" ]; then
                                 IPFLOW="d"
                         fi
-                        PIP=$(trust_restore_ipv6 "`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$4}'`")
+                        PIP=$(trust_restore_ipv6 "$(echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$4}')")
 
                         if [ ! "$IPFLOW" == "" ] && [ ! "$PIP" == "" ] && [ ! "$PFLOW" == "" ] && [ ! "$PPORT" == "" ]; then
                          if ipt_for_host "$PIP"; then
@@ -775,11 +775,11 @@ if [ ! "`cat $file | grep -v "#"`" == "" ]; then
         done
         #
         #
-        for i in `cat $file | grep -v "#" | grep "=" | grep -v "tcp" | grep -v "udp"`; do
+        for i in $(cat $file | grep -v "#" | grep "=" | grep -v "tcp" | grep -v "udp"); do
                 if [ ! "$i" == "" ] && [ -f "$file" ]; then
                         i=$(trust_protect_ipv6 "$i")
 
-                        NFLOW=`echo $i | tr ':' ' ' | tr '=' ' '| awk '{print$1}'`
+                        NFLOW=$(echo $i | tr ':' ' ' | tr '=' ' '| awk '{print$1}')
                         if [ "$NFLOW" == "in" ]; then
                                 NFLOW="INPUT"
                                 NFLOW_T="inbound"
@@ -788,7 +788,7 @@ if [ ! "`cat $file | grep -v "#"`" == "" ]; then
                                 NFLOW_T="outbound"
                         fi
 
-                        PFLOW=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$2}'`
+                        PFLOW=$(echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$2}')
                         if [ "$PFLOW" == "s" ]; then
                                 PFLOW="sport"
                                 PFLOW_T="from"
@@ -797,20 +797,20 @@ if [ ! "`cat $file | grep -v "#"`" == "" ]; then
                                 PFLOW_T="to"
                         fi
 
-                        PPORT=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$3}'`
+                        PPORT=$(echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$3}')
                         if [ ! "$(echo $PPORT | grep _)" == "" ]; then
-                                PPORT_BEG=`echo $PPORT | tr '_' ' ' | awk '{print$1}'`
-                                PPORT_END=`echo $PPORT | tr '_' ' ' | awk '{print$2}'`
+                                PPORT_BEG=$(echo $PPORT | tr '_' ' ' | awk '{print$1}')
+                                PPORT_END=$(echo $PPORT | tr '_' ' ' | awk '{print$2}')
                                 PPORT="$PPORT_BEG:$PPORT_END"
                         fi
 
-                        IPFLOW=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$4}'`
+                        IPFLOW=$(echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$4}')
                         if [ "$IPFLOW" == "s" ]; then
                                 IPFLOW="s"
                         elif [ "$IPFLOW" == "d" ]; then
                                 IPFLOW="d"
                         fi
-                        PIP=$(trust_restore_ipv6 "`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$5}'`")
+                        PIP=$(trust_restore_ipv6 "$(echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$5}')")
 
                         if [ ! "$NFLOW" == "" ] && [ ! "$IPFLOW" == "" ] && [ ! "$PIP" == "" ] && [ ! "$PFLOW" == "" ] && [ ! "$PPORT" == "" ]; then
                          if ipt_for_host "$PIP"; then
@@ -823,18 +823,18 @@ if [ ! "`cat $file | grep -v "#"`" == "" ]; then
         done
         #
         #
-        for i in `cat $file | grep -v "#" | grep "="`; do
+        for i in $(cat $file | grep -v "#" | grep "="); do
                 if [ ! "$i" == "" ] && [ -f "$file" ]; then
                         i=$(trust_protect_ipv6 "$i")
 
-                        PTYPE=`echo $i | tr ':' ' ' | tr '=' ' '| awk '{print$1}'`
+                        PTYPE=$(echo $i | tr ':' ' ' | tr '=' ' '| awk '{print$1}')
                         if [ "$PTYPE" == "tcp" ]; then
                                 PTYPE="tcp"
                         elif [ "$PTYPE" == "udp" ]; then
                                 PTYPE="udp"
                         fi
 
-                        NFLOW=`echo $i | tr ':' ' ' | tr '=' ' '| awk '{print$2}'`
+                        NFLOW=$(echo $i | tr ':' ' ' | tr '=' ' '| awk '{print$2}')
                         if [ "$NFLOW" == "in" ]; then
                                 NFLOW="INPUT"
                                 NFLOW_T="inbound"
@@ -843,7 +843,7 @@ if [ ! "`cat $file | grep -v "#"`" == "" ]; then
                                 NFLOW_T="outbound"
                         fi
 
-                        PFLOW=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$3}'`
+                        PFLOW=$(echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$3}')
                         if [ "$PFLOW" == "s" ]; then
                                 PFLOW="sport"
                                 PFLOW_T="from"
@@ -852,20 +852,20 @@ if [ ! "`cat $file | grep -v "#"`" == "" ]; then
                                 PFLOW_T="to"
                         fi
 
-                        PPORT=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$4}'`
+                        PPORT=$(echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$4}')
                         if [ ! "$(echo $PPORT | grep _)" == "" ]; then
-                                PPORT_BEG=`echo $PPORT | tr '_' ' ' | awk '{print$1}'`
-                                PPORT_END=`echo $PPORT | tr '_' ' ' | awk '{print$2}'`
+                                PPORT_BEG=$(echo $PPORT | tr '_' ' ' | awk '{print$1}')
+                                PPORT_END=$(echo $PPORT | tr '_' ' ' | awk '{print$2}')
                                 PPORT="$PPORT_BEG:$PPORT_END"
                         fi
 
-                        IPFLOW=`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$5}'`
+                        IPFLOW=$(echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$5}')
                         if [ "$IPFLOW" == "s" ]; then
                                 IPFLOW="s"
                         elif [ "$IPFLOW" == "d" ]; then
                                 IPFLOW="d"
                         fi
-                        PIP=$(trust_restore_ipv6 "`echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$6}'`")
+                        PIP=$(trust_restore_ipv6 "$(echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$6}')")
 
                         if [ ! "$PTYPE" == "" ] && [ ! "$NFLOW" == "" ] && [ ! "$IPFLOW" == "" ] && [ ! "$PIP" == "" ] && [ ! "$PFLOW" == "" ] && [ ! "$PPORT" == "" ]; then
                          if ipt_for_host "$PIP"; then
@@ -891,7 +891,7 @@ dlist_resnet() {
  fi
 if [ -f "$WGET" ] && [ -f "$RESNET" ]; then
    URL_TMP=$(mktemp -d "$INSTALL_PATH/.apf-XXXXXX")
-   URL_FILE=`echo $DLIST_RESERVED_URL | tr '/' '\n' | grep "." | tail -n 1`
+   URL_FILE=$(echo $DLIST_RESERVED_URL | tr '/' '\n' | grep "." | tail -n 1)
    cd "$URL_TMP"
    eout "{resnet} downloading $DLIST_RESERVED_URL"
    $WGET -4 -t 1 -T 4 "$DLIST_RESERVED_URL" >> /dev/null 2>&1
@@ -927,7 +927,7 @@ if [ ! "$DLIST_PHP_URL" == "" ] && [ "$DLIST_PHP" == "1" ] && [ -f "$WGET" ]; th
         if [ -f "$PHP_HOSTS" ]; then
                 :> "$PHP_HOSTS"
         fi
-        for str in `cat "$URL_TMP/$URL_FILE" | grep -v "#" | grep -e '[0-9]' | awk '{print$1}'`; do
+        for str in $(cat "$URL_TMP/$URL_FILE" | grep -v "#" | grep -e '[0-9]' | awk '{print$1}'); do
                 if [ ! "$str" == "" ]; then
                     echo "$str" >> "$PHP_HOSTS"
                 fi
@@ -945,10 +945,10 @@ fi
 }
 
 dlist_php_hosts() {
-if [ ! "`cat $PHP_HOSTS | grep -v "#"`" == "" ]; then
+if [ ! "$(cat $PHP_HOSTS | grep -v "#")" == "" ]; then
         eout "{php} loading php_hosts.rules"
         ipt -N PHP
-        for i in `cat $PHP_HOSTS | grep -v "#"`; do
+        for i in $(cat $PHP_HOSTS | grep -v "#"); do
                 if [ ! "$i" == "" ] && [ -f "$PHP_HOSTS" ]; then
 			if ! valid_ip_cidr "$i"; then
 				eout "{php} skipping invalid entry: $i"
@@ -979,7 +979,7 @@ if [ ! "$DLIST_DSHIELD_URL" == "" ] && [ "$DLIST_DSHIELD" == "1" ] && [ -f "$WGE
         if [ -f "$DS_HOSTS" ]; then
                 :> "$DS_HOSTS"
         fi
-        for str in `cat "$URL_TMP/$URL_FILE" | grep -v "#" | grep -e '[0-9]' | awk '{print$1}'`; do
+        for str in $(cat "$URL_TMP/$URL_FILE" | grep -v "#" | grep -e '[0-9]' | awk '{print$1}'); do
                 if [ ! "$str" == "" ]; then
                     echo "$str/24" >> "$DS_HOSTS"
                 fi
@@ -997,10 +997,10 @@ fi
 }
 
 dlist_dshield_hosts() {
-if [ ! "`cat $DS_HOSTS | grep -v "#"`" == "" ]; then
+if [ ! "$(cat $DS_HOSTS | grep -v "#")" == "" ]; then
         eout "{dshield} loading ds_hosts.rules"
         ipt -N DSHIELD
-        for i in `cat $DS_HOSTS | grep -v "#"`; do
+        for i in $(cat $DS_HOSTS | grep -v "#"); do
                 if [ ! "$i" == "" ] && [ -f "$DS_HOSTS" ]; then
 			if ! valid_ip_cidr "$i"; then
 				eout "{dshield} skipping invalid entry: $i"
@@ -1031,7 +1031,7 @@ if [ ! "$DLIST_SPAMHAUS_URL" == "" ] && [ "$DLIST_SPAMHAUS" == "1" ] && [ -f "$W
         if [ -f "$DROP_HOSTS" ]; then
                 :> "$DROP_HOSTS"
         fi
-        for str in `cat "$URL_TMP/$URL_FILE" | grep -v "#" | grep "/" | awk '{print$1}' | tr -d ';'`; do
+        for str in $(cat "$URL_TMP/$URL_FILE" | grep -v "#" | grep "/" | awk '{print$1}' | tr -d ';'); do
                 if [ ! "$str" == "" ]; then
                     echo "$str" >> "$DROP_HOSTS"
                 fi
@@ -1050,10 +1050,10 @@ fi
 
 
 dlist_spamhaus_hosts() {
-if [ ! "`cat $DROP_HOSTS | grep -v "#"`" == "" ]; then
+if [ ! "$(cat $DROP_HOSTS | grep -v "#")" == "" ]; then
         eout "{sdrop} loading sdrop_hosts.rules"
         ipt -N SDROP
-        for i in `cat $DROP_HOSTS | grep -v "#"`; do
+        for i in $(cat $DROP_HOSTS | grep -v "#"); do
                 if [ ! "$i" == "" ] && [ -f "$DROP_HOSTS" ]; then
 			if ! valid_ip_cidr "$i"; then
 				eout "{sdrop} skipping invalid entry: $i"
@@ -1084,7 +1084,7 @@ if [ ! "$DLIST_ECNSHAME_URL" == "" ] && [ "$DLIST_ECNSHAME" == "1" ] && [ -f "$W
         if [ -f "$ECNSHAME_HOSTS" ]; then
                 :> "$ECNSHAME_HOSTS"
         fi
-        for str in `cat "$URL_TMP/$URL_FILE"`; do
+        for str in $(cat "$URL_TMP/$URL_FILE"); do
                 if [ ! "$str" == "" ]; then
                     echo "$str" >> "$ECNSHAME_HOSTS"
                 fi
@@ -1102,9 +1102,9 @@ fi
 }
 
 dlist_ecnshame_hosts() {
-if [ ! "`cat $ECNSHAME_HOSTS | grep -v "#"`" == "" ]; then
+if [ ! "$(cat $ECNSHAME_HOSTS | grep -v "#")" == "" ]; then
         eout "{ecnshame} loading ecnshame_hosts.rules"
-        for i in `cat $ECNSHAME_HOSTS | grep -v "#"`; do
+        for i in $(cat $ECNSHAME_HOSTS | grep -v "#"); do
                 if [ ! "$i" == "" ] && [ -f "$ECNSHAME_HOSTS" ]; then
 			if ! valid_ip_cidr "$i"; then
 				eout "{ecnshame} skipping invalid entry: $i"
@@ -1167,7 +1167,7 @@ FILE="$1"
 if [ -f "$FILE" ]; then
 FNAME="${FILE##*/}"
 eout "{glob} loading $FNAME"
- for i in `cat $FILE | grep -v "#"`; do
+ for i in $(cat $FILE | grep -v "#"); do
   if [ ! "$i" == "" ] && ipt_for_host "$i"; then
         $IPT_H $IPT_FLAGS -A INPUT -s $i -j $ALL_STOP
 	$IPT_H $IPT_FLAGS -A OUTPUT -d $i -j $ALL_STOP
@@ -1186,7 +1186,7 @@ fi
 cdports() {
 if [ ! "$BLK_PORTS" == "" ]; then
 	eout "{glob} loading common drop ports"
-for i in `echo $BLK_PORTS | tr ',' ' '`; do
+for i in $(echo $BLK_PORTS | tr ',' ' '); do
 	if [ "$(echo $i | grep "_")" == "" ]; then
          if [ ! "$i" == "" ]; then
 		ipt -A INPUT  -p tcp --dport $i -j $TCP_STOP
@@ -1197,7 +1197,7 @@ for i in `echo $BLK_PORTS | tr ',' ' '`; do
                 eout "{blk_ports} deny all to/from udp port $i"
          fi
         else
-                i=`echo $i | tr '_' ':'`
+                i=$(echo $i | tr '_' ':')
                 if [ ! "$i" == "" ]; then
 			ipt -A INPUT  -p tcp --dport $i -j $TCP_STOP
 			ipt -A INPUT  -p udp --dport $i -j $UDP_STOP
@@ -1213,7 +1213,7 @@ fi
 
 lgate_mac() {
 ipt4 -N LMAC
-for mac in `echo $LGATE_MAC | tr ',' ' '`; do
+for mac in $(echo $LGATE_MAC | tr ',' ' '); do
 MAC=$mac
 if [ ! "$MAC" == "" ]; then
   ipt4 -A INPUT  -m mac ! --mac-source "$MAC" -j LMAC
@@ -1222,7 +1222,7 @@ fi
 done
 
 if [ "$LOG_LGATE" == "1" ]; then
- ipt4 -A LMAC -m limit --limit $LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix=" ** DROP FORIGN MAC ** "
+ ipt4 -A LMAC -m limit --limit $LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix=" ** DROP FOREIGN MAC ** "
 fi
 ipt4 -A LMAC  -j REJECT --reject-with icmp-net-prohibited
 }
@@ -1252,9 +1252,9 @@ if [ "$SET_EXPIRE" -ge "60" ]; then
  if [ -f "$INSTALL_PATH/deny_hosts.rules" ]; then
          expire_time="$SET_EXPIRE"
          check_time=$(date +%s)
-         for i in `cat $INSTALL_PATH/deny_hosts.rules | grep -vE "static|noexpire" | grep -iE "# added.*on.*" | awk '{print$3"|"$5"|"$6}'`; do
+         for i in $(cat $INSTALL_PATH/deny_hosts.rules | grep -vE "static|noexpire" | grep -iE "# added.*on.*" | awk '{print$3"|"$5"|"$6}'); do
                 declare -a arr
-                arr=(`echo ${i//|/ }`)
+                arr=($(echo ${i//|/ }))
                 ip=${arr[0]}
                 date_d=${arr[1]}
                 date_t=${arr[2]}
@@ -1292,9 +1292,9 @@ refresh() {
 	if [ "$SET_REFRESH_MD5" == "1" ] && [ "$MD5" ]; then
  	 glob_allow_download
 	 glob_deny_download
-	 trusts_md5=`$MD5 $DENY_HOSTS $GDENY_HOSTS $ALLOW_HOSTS $GALLOW_HOSTS | $MD5 | awk '{print$1}'`
+	 trusts_md5=$($MD5 $DENY_HOSTS $GDENY_HOSTS $ALLOW_HOSTS $GALLOW_HOSTS | $MD5 | awk '{print$1}')
 	 if [ -f "$INSTALL_PATH/internals/.trusts.md5" ]; then
-		last_trusts_md5=`cat $INSTALL_PATH/internals/.trusts.md5`
+		last_trusts_md5=$(cat $INSTALL_PATH/internals/.trusts.md5)
 		if [ "$trusts_md5" == "$last_trusts_md5" ]; then
 		        eout "{glob} trust rules unchanged since last refresh, doing nothing."
 	                echo "$trusts_md5" > $INSTALL_PATH/internals/.trusts.md5
@@ -1318,7 +1318,7 @@ refresh() {
 		$IP6TS | grep -E "TALLOW|TGALLOW" | grep -E '[0-9a-fA-F]*:[0-9a-fA-F:]+' | awk '{print$4}' | sort | uniq >> $tmpra
 	fi
         ipt -F REFRESH_TEMP
-        for i in `cat $tmpra | grep -v "#"`; do
+        for i in $(cat $tmpra | grep -v "#"); do
                 if [ ! "$i" == "" ] && ipt_for_host "$i"; then
                  $IPT_H $IPT_FLAGS -A REFRESH_TEMP -s $i -d $ANY_ADDR -j ACCEPT
                  $IPT_H $IPT_FLAGS -A REFRESH_TEMP -d $i -s $ANY_ADDR -j ACCEPT
@@ -1329,7 +1329,7 @@ refresh() {
 	if [ "$USE_IPV6" == "1" ] && [ -n "$IP6TS" ]; then
 		$IP6TS | grep -E "TDENY|TGDENY" | grep -E '[0-9a-fA-F]*:[0-9a-fA-F:]+' | awk '{print$4}' | sort | uniq >> $tmprd
 	fi
-        for i in `cat $tmprd | grep -v "#"`; do
+        for i in $(cat $tmprd | grep -v "#"); do
                 if [ ! "$i" == "" ] && ipt_for_host "$i"; then
                  $IPT_H $IPT_FLAGS -A REFRESH_TEMP -s $i -d $ANY_ADDR -j $ALL_STOP
                  $IPT_H $IPT_FLAGS -A REFRESH_TEMP -d $i -s $ANY_ADDR -j $ALL_STOP

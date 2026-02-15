@@ -377,8 +377,8 @@ if [ ! "$BLK_P2P_PORTS" == "" ]; then
         # Drop traffic to/from common p2p networks
         # winmx,napster,bittorrent,gnutella,edonkey,kazaa,morpheus
         ipt -N P2P
-        for i in `echo $BLK_P2P_PORTS | tr ',' ' '`; do
-                MVAL=`echo $i | grep "_"`
+        for i in $(echo $BLK_P2P_PORTS | tr ',' ' '); do
+                MVAL=$(echo $i | grep "_")
                 PORT=$i
                 if [ "$MVAL" == "" ]; then
                         eout "{blk_p2p} deny all to/from tcp port $i"
@@ -400,8 +400,8 @@ if [ ! "$BLK_P2P_PORTS" == "" ]; then
                         fi
                         ipt -A P2P -p udp --dport 1024:65534 --sport $PORT -j REJECT
                 else
-                        PORT_BEG=`echo $i | tr '_' ' ' | awk '{print$1}'`
-                        PORT_END=`echo $i | tr '_' ' ' | awk '{print$2}'`
+                        PORT_BEG=$(echo $i | tr '_' ' ' | awk '{print$1}')
+                        PORT_END=$(echo $i | tr '_' ' ' | awk '{print$2}')
                         PORTST="$PORT_BEG:$PORT_END"
                         eout "{blk_p2p} deny all to/from tcp port $PORTST"
                         eout "{blk_p2p} deny all to/from udp port $PORTST"
