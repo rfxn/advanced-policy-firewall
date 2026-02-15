@@ -1,4 +1,8 @@
 - 2.0.1 | Feb 14 2026:
+[Change] wget download functions no longer force IPv4-only transport; removed
+      -4 flag from all 7 $WGET calls to allow dual-stack connectivity via
+      happy eyeballs; IPv6-only hosts can now download blocklists
+      (functions.apf)
 [Fix] importconf cross-test contamination; trust file entries from prior test
       runs no longer persist across reinstalls in test suite
       (tests/helpers/install-apf.sh)
