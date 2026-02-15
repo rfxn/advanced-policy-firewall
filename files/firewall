@@ -182,9 +182,9 @@ if [ "$RAB" == "1" ]; then
  fi
 
  if [ "$LOG_DROP" == "1" ] || [ "$RAB_LOG_TRIP" == "1" ]; then
-	$IPT $IPT_FLAGS -A INPUT -p all -m recent --rcheck --hitcount $RAB_HITCOUNT --seconds $RAB_TIMER -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** RABTRIP ** "
+	ipt -A INPUT -p all -m recent --rcheck --hitcount $RAB_HITCOUNT --seconds $RAB_TIMER -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** RABTRIP ** "
  fi
- $IPT $IPT_FLAGS -A INPUT -p all -m recent $RAB_TRIP_FLAGS --hitcount $RAB_HITCOUNT --seconds $RAB_TIMER -j $ALL_STOP
+ ipt -A INPUT -p all -m recent $RAB_TRIP_FLAGS --hitcount $RAB_HITCOUNT --seconds $RAB_TIMER -j $ALL_STOP
 
  # RAB portscan rules
  if [ ! "$RAB_PSCAN_LEVEL" == "0" ] && [ ! "$RAB_PSCAN_LEVEL" == "" ]; then
@@ -200,22 +200,24 @@ if [ "$RAB" == "1" ]; then
   RAB_PSCAN_PORTS="$RAB_PSCAN_LEVEL_3"
   esac
   eout "{rab} RAB_PSCAN monitored ports $RAB_PSCAN_PORTS"
-  $IPT $IPT_FLAGS -N RABPSCAN
+  ipt -N RABPSCAN
   LDNS=`cat /etc/resolv.conf  | grep -v "#" | grep -w nameserver | awk '{print$2}' | grep -v 127.0.0.1`
   if [ "$LDNS" ]; then
 	for i in `echo $LDNS`; do
-		$IPT $IPT_FLAGS -I RABPSCAN -s $i -j RETURN
+		if ipt_for_host "$i"; then
+			$IPT_H $IPT_FLAGS -I RABPSCAN -s $i -j RETURN
+		fi
 	done
   fi
   for i in `echo $RAB_PSCAN_PORTS | tr ',' ' '`; do
    if [ "$LOG_DROP" == "1" ] || [ "$RAB_LOG_HIT" == "1" ]; then
-	   $IPT $IPT_FLAGS -A RABPSCAN -p tcp --dport $i -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** RABHIT ** "
-	   $IPT $IPT_FLAGS -A RABPSCAN -p udp --dport $i -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** RABHIT ** "
+	   ipt -A RABPSCAN -p tcp --dport $i -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** RABHIT ** "
+	   ipt -A RABPSCAN -p udp --dport $i -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** RABHIT ** "
    fi
-   $IPT $IPT_FLAGS -A RABPSCAN -p tcp --dport $i -m recent --set -j $TCP_STOP
-   $IPT $IPT_FLAGS -A RABPSCAN -p udp --dport $i -m recent --set -j $UDP_STOP
+   ipt -A RABPSCAN -p tcp --dport $i -m recent --set -j $TCP_STOP
+   ipt -A RABPSCAN -p udp --dport $i -m recent --set -j $UDP_STOP
   done
-  $IPT $IPT_FLAGS -A INPUT -j RABPSCAN
+  ipt -A INPUT -j RABPSCAN
  fi
 fi
 

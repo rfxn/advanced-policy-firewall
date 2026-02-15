@@ -59,6 +59,8 @@ SET_FASTLOAD="0"
 # each IP on a system to /etc/apf/vnet/IP.rules. These rule files can be
 # configured with conf.apf variables for unique but convenient firewall
 # policies or custom iptables entries for even greater flexibility.
+# Note: VNET is IPv4-only. IPv6 addresses cannot be used as filenames and
+# IPv6 does not use the interface aliasing model that VNET relies on.
 SET_VNET="0"
 
 # This feature firewalls any additional interfaces on the server as untrusted

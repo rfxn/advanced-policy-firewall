@@ -228,7 +228,7 @@ if [ "$PKT_SANITY" == "1" ]; then
 	fi
 fi
 
-# IPv6 packet sanity checks (mirrors IPv4 IN_SANITY/OUT_SANITY without RAB integration)
+# IPv6 packet sanity checks (mirrors IPv4 IN_SANITY/OUT_SANITY with RAB integration)
 if [ "$PKT_SANITY" == "1" ] && [ "$USE_IPV6" == "1" ]; then
 	eout "{pkt_sanity} set active PKT_SANITY (IPv6)"
 	ipt6 -N IN_SANITY6
@@ -240,7 +240,10 @@ if [ "$PKT_SANITY" == "1" ] && [ "$USE_IPV6" == "1" ]; then
 		if [ "$LOG_DROP" == "1" ]; then
 			ipt6 -A IN_SANITY6 -p tcp --tcp-flags $mask $comp -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** SANITY6 ** "
 		fi
-		ipt6 -A IN_SANITY6 -p tcp --tcp-flags $mask $comp -j $TCP_STOP
+		if [ "$RAB_LOG_HIT" == "1" ]; then
+			ipt6 -A IN_SANITY6 -p tcp --tcp-flags $mask $comp -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** RABHIT6 ** "
+		fi
+		ipt6 -A IN_SANITY6 -p tcp --tcp-flags $mask $comp $RAB_SANITY_FLAGS -j $TCP_STOP
 	done
 
 	ipt6 -N OUT_SANITY6
@@ -258,7 +261,7 @@ if [ "$PKT_SANITY" == "1" ] && [ "$USE_IPV6" == "1" ]; then
 		if [ "$LOG_DROP" == "1" ]; then
 			ipt6 -A IN_SANITY6 -m state --state INVALID -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** SANITY6 ** "
 		fi
-		ipt6 -A IN_SANITY6 -m state --state INVALID -j $ALL_STOP
+		ipt6 -A IN_SANITY6 -m state --state INVALID $RAB_SANITY_FLAGS -j $ALL_STOP
 		if [ "$LOG_DROP" == "1" ]; then
 			ipt6 -A OUT_SANITY6 -m state --state INVALID -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** SANITY6 ** "
 		fi
@@ -274,19 +277,19 @@ if [ "$PKT_SANITY" == "1" ] && [ "$USE_IPV6" == "1" ]; then
 		if [ "$LOG_DROP" == "1" ]; then
 			ipt6 -A PZERO6 -p tcp --dport 0 -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** PortZero6 ** "
 		fi
-		ipt6 -A PZERO6 -p tcp --dport 0 -j $TCP_STOP
+		ipt6 -A PZERO6 -p tcp --dport 0 $RAB_SANITY_FLAGS -j $TCP_STOP
 		if [ "$LOG_DROP" == "1" ]; then
 			ipt6 -A PZERO6 -p udp --dport 0 -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** PortZero6 ** "
 		fi
-		ipt6 -A PZERO6 -p udp --dport 0 -j $UDP_STOP
+		ipt6 -A PZERO6 -p udp --dport 0 $RAB_SANITY_FLAGS -j $UDP_STOP
 		if [ "$LOG_DROP" == "1" ]; then
 			ipt6 -A PZERO6 -p tcp --sport 0 -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** PortZero6 ** "
 		fi
-		ipt6 -A PZERO6 -p tcp --sport 0 -j $TCP_STOP
+		ipt6 -A PZERO6 -p tcp --sport 0 $RAB_SANITY_FLAGS -j $TCP_STOP
 		if [ "$LOG_DROP" == "1" ]; then
 			ipt6 -A PZERO6 -p udp --sport 0 -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** PortZero6 ** "
 		fi
-		ipt6 -A PZERO6 -p udp --sport 0 -j $UDP_STOP
+		ipt6 -A PZERO6 -p udp --sport 0 $RAB_SANITY_FLAGS -j $UDP_STOP
 		ipt6 -A INPUT -j PZERO6
 		ipt6 -A OUTPUT -j PZERO6
 	fi
