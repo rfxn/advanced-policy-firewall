@@ -1,4 +1,8 @@
 - 2.0.1 | Feb 15 2026:
+[Change] Removed Dockerfiles for CentOS 6, Ubuntu 16.04, and Ubuntu 18.04;
+         repos are no longer accessible. Test matrix aligned to CI targets:
+         Debian 12, CentOS 7, Rocky 8/9, Ubuntu 20.04/22.04/24.04. Rocky 10
+         retained for manual testing (tests/Makefile, tests/run-tests.sh)
 [Fix] list() predictable temp file replaced with mktemp; PID-based
       $INSTALL_PATH/.iptrules.$$ changed to mktemp with XXXXXX suffix;
       all file references now quoted (functions.apf)

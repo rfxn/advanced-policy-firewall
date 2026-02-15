@@ -1,6 +1,6 @@
 .PHONY: test test-verbose \
-       test-centos6 test-centos7 test-rocky8 test-rocky9 test-rocky10 \
-       test-ubuntu1604 test-ubuntu1804 test-ubuntu2004 test-ubuntu2204 test-ubuntu2404 \
+       test-centos7 test-rocky8 test-rocky9 test-rocky10 \
+       test-ubuntu2004 test-ubuntu2204 test-ubuntu2404 \
        test-all test-modern test-legacy \
        test-modern-parallel test-legacy-parallel test-all-parallel
 
@@ -13,10 +13,7 @@ test:
 test-verbose:
 	./run-tests.sh --formatter pretty
 
-# Individual OS targets
-test-centos6:
-	./run-tests.sh --os centos6
-
+# Individual OS targets (matches CI matrix)
 test-centos7:
 	./run-tests.sh --os centos7
 
@@ -26,14 +23,9 @@ test-rocky8:
 test-rocky9:
 	./run-tests.sh --os rocky9
 
+# Rocky 10 — not in CI matrix (pending stable image), manual only
 test-rocky10:
 	./run-tests.sh --os rocky10
-
-test-ubuntu1604:
-	./run-tests.sh --os ubuntu1604
-
-test-ubuntu1804:
-	./run-tests.sh --os ubuntu1804
 
 test-ubuntu2004:
 	./run-tests.sh --os ubuntu2004
@@ -55,16 +47,14 @@ test-modern:
 test-legacy:
 	./run-tests.sh --os centos7
 	./run-tests.sh --os rocky8
-	./run-tests.sh --os ubuntu1804
 	./run-tests.sh --os ubuntu2004
 
-# Full matrix (all supported OS targets) — sequential
+# Full matrix (all CI targets) — sequential
 test-all:
 	./run-tests.sh --os debian12
 	./run-tests.sh --os centos7
 	./run-tests.sh --os rocky8
 	./run-tests.sh --os rocky9
-	./run-tests.sh --os ubuntu1804
 	./run-tests.sh --os ubuntu2004
 	./run-tests.sh --os ubuntu2204
 	./run-tests.sh --os ubuntu2404
@@ -75,9 +65,9 @@ test-modern-parallel:
 	  xargs -P $(HALF_CORES) -I{} ./run-tests.sh --os {}
 
 test-legacy-parallel:
-	printf '%s\n' centos7 rocky8 ubuntu1804 ubuntu2004 | \
+	printf '%s\n' centos7 rocky8 ubuntu2004 | \
 	  xargs -P $(HALF_CORES) -I{} ./run-tests.sh --os {}
 
 test-all-parallel:
-	printf '%s\n' debian12 centos7 rocky8 rocky9 ubuntu1804 ubuntu2004 ubuntu2204 ubuntu2404 | \
+	printf '%s\n' debian12 centos7 rocky8 rocky9 ubuntu2004 ubuntu2204 ubuntu2404 | \
 	  xargs -P $(HALF_CORES) -I{} ./run-tests.sh --os {}
