@@ -1,44 +1,28 @@
 - 2.0.1 | Feb 15 2026:
-[Fix] README typos: revolvers→resolvers, compliment→complement, peak→peek,
-      there→their, trys→tries, peaking→piquing, allot→a lot, incomplete
-      sentences fixed, broken RAB_PSCAN_LEVEL sentence repaired, truncated
-      TCR_ section completed
-[Change] README feature list expanded with IPv6 dual-stack, input validation,
-      nft backend detection, and systemd support
-[Change] README section 3.1: USE_IPV6 option documented
-[Change] README section 3.1: SET_FASTLOAD description enhanced with nft
-      backend detection note
-[Change] README section 4 help listing synced with help() output;
-      -v/--version added
-[Change] README section 4.1 trust examples expanded with IPv6 address formats
-[Change] README netfilter.org URL updated to HTTPS
+[Fix] Fast load error handling: iptables-restore and ip6tables-restore exit
+      codes now checked; corrupted or incompatible snapshots fall through to
+      full load instead of reporting success with no rules applied (apf)
+[Fix] Fast load IPv6 snapshot gap: when USE_IPV6=1 but no IPv6 snapshot
+      exists (first boot after enabling IPv6), partial IPv4-only fast load
+      is now detected, flushed, and falls through to full load (apf)
+[Fix] .ca.def SET_REFRESH_MD5 description corrected from "value in minutes"
+      to "value 1 to enable, 0 to disable" matching conf.apf (.ca.def)
+[New] IPv6 trust syntax documentation added to deny_hosts.rules with
+      bracket notation examples matching allow_hosts.rules (deny_hosts.rules)
+[Change] README overhauled: modernized platform/module lists, documented
+      USE_IPV6 and nft backend detection, filled all stub sections (3.3-3.5,
+      4.2, 4.4), added IPv6 trust examples, synced help listing with help()
+      output, added -v/--version, updated URLs to HTTPS, ~20 typo fixes
 [Fix] head() email domain standardized from @rfxn.org to @rfxn.com (apf)
-[Fix] conf.apf comment typos: allot→a lot, etc..→etc., HTTP→HTTPS in
-      comment URLs (conf.apf)
-[Fix] .ca.def template synced with all conf.apf comment fixes from
-      Phases 38-39 (subsiquent, inital, your, allot, etc.., HTTP URLs)
-[Fix] README typos corrected: FTA→FTP, there→their, Unbuntu→Ubuntu,
-      not recommends→not recommended, captain→caption, hte→the
-[Change] README modernized: removed stale todo list and 2000s-era hardware
-      specs; updated platform list to current supported OS matrix; replaced
-      legacy ipt_* module names with modern nf_conntrack/xt_* naming; added
-      systemd boot loading documentation alongside SysV init
-[Change] README sections 3.3-3.5 filled: RAB configuration, VNET per-IP
-      policies, global variables and custom rules
-[Change] README sections 4.2, 4.4 filled: global trust system with
-      glob_allow/glob_deny, dynamic trust file behavior
-[Change] README section 4.3 expanded with IPv6 bracket notation examples
-      for advanced trust syntax (README)
-[Change] README support URLs updated from http:// to https://
 [Change] help() output updated: -a/-d options now show IP/IPv6/CIDR/FQDN
       instead of IP/FQDN (functions.apf)
-[Change] README section 4 usage summary updated to match help() output
 [Change] Error messages in cli_trust() and cli_trust_remove() now mention
       IPv6 addresses explicitly (functions.apf)
 [Change] Fast load eout message now includes iptables backend type
       (legacy/nf_tables) for easier troubleshooting (apf)
-[Fix] conf.apf comment typos: subsiquent→subsequent, inital→initial,
-      subsiqent→subsequent, your→you're, start use→use (conf.apf)
+[Fix] conf.apf and .ca.def comment typos: subsiquent→subsequent,
+      inital→initial, allot→a lot, etc..→etc., your→you're,
+      HTTP→HTTPS in comment URLs (conf.apf, .ca.def)
 [Change] Test suite performance: consolidated redundant flush+start cycles in
       08-fastload.bats (3 IPv6 tests merged into 1), 09-flush-cleanup.bats
       (5 flush tests merged into 1), and 11-advanced-trust.bats (17 per-test
