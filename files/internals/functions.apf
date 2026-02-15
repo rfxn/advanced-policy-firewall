@@ -941,21 +941,23 @@ fi
 dlist_php_hosts() {
 if [ ! "`cat $PHP_HOSTS | grep -v "#"`" == "" ]; then
         eout "{php} loading php_hosts.rules"
-        $IPT $IPT_FLAGS -N PHP
+        ipt -N PHP
         for i in `cat $PHP_HOSTS | grep -v "#"`; do
                 if [ ! "$i" == "" ] && [ -f "$PHP_HOSTS" ]; then
 			if ! valid_ip_cidr "$i"; then
 				eout "{php} skipping invalid entry: $i"
 				continue
 			fi
-		        if [ "$LOG_DROP" == "1" ]; then
-                         $IPT $IPT_FLAGS -A PHP -s $i -d 0/0 -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** PHP ** "
+			if ipt_for_host "$i"; then
+			  if [ "$LOG_DROP" == "1" ]; then
+                           $IPT_H $IPT_FLAGS -A PHP -s $i -d $ANY_ADDR -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** PHP ** "
+			  fi
+                          $IPT_H $IPT_FLAGS -A PHP -s $i -d $ANY_ADDR -j $ALL_STOP
 			fi
-                        $IPT $IPT_FLAGS -A PHP -s $i -d 0/0 -j $ALL_STOP
                 fi
         done
-        $IPT $IPT_FLAGS -A INPUT -j PHP
-        $IPT $IPT_FLAGS -A OUTPUT -j PHP
+        ipt -A INPUT -j PHP
+        ipt -A OUTPUT -j PHP
 fi
 }
 
@@ -991,21 +993,23 @@ fi
 dlist_dshield_hosts() {
 if [ ! "`cat $DS_HOSTS | grep -v "#"`" == "" ]; then
         eout "{dshield} loading ds_hosts.rules"
-        $IPT $IPT_FLAGS -N DSHIELD
+        ipt -N DSHIELD
         for i in `cat $DS_HOSTS | grep -v "#"`; do
                 if [ ! "$i" == "" ] && [ -f "$DS_HOSTS" ]; then
 			if ! valid_ip_cidr "$i"; then
 				eout "{dshield} skipping invalid entry: $i"
 				continue
 			fi
-		        if [ "$LOG_DROP" == "1" ]; then
-                         $IPT $IPT_FLAGS -A DSHIELD -s $i -d 0/0 -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** DSHIELD ** "
+			if ipt_for_host "$i"; then
+			  if [ "$LOG_DROP" == "1" ]; then
+                           $IPT_H $IPT_FLAGS -A DSHIELD -s $i -d $ANY_ADDR -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** DSHIELD ** "
+			  fi
+                          $IPT_H $IPT_FLAGS -A DSHIELD -s $i -d $ANY_ADDR -j $ALL_STOP
 			fi
-                        $IPT $IPT_FLAGS -A DSHIELD -s $i -d 0/0 -j $ALL_STOP
                 fi
         done
-        $IPT $IPT_FLAGS -A INPUT -j DSHIELD
-        $IPT $IPT_FLAGS -A OUTPUT -j DSHIELD
+        ipt -A INPUT -j DSHIELD
+        ipt -A OUTPUT -j DSHIELD
 fi
 }
 
@@ -1042,21 +1046,23 @@ fi
 dlist_spamhaus_hosts() {
 if [ ! "`cat $DROP_HOSTS | grep -v "#"`" == "" ]; then
         eout "{sdrop} loading sdrop_hosts.rules"
-        $IPT $IPT_FLAGS -N SDROP
+        ipt -N SDROP
         for i in `cat $DROP_HOSTS | grep -v "#"`; do
                 if [ ! "$i" == "" ] && [ -f "$DROP_HOSTS" ]; then
 			if ! valid_ip_cidr "$i"; then
 				eout "{sdrop} skipping invalid entry: $i"
 				continue
 			fi
-		        if [ "$LOG_DROP" == "1" ]; then
-                         $IPT $IPT_FLAGS -A SDROP -s $i -d 0/0 -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** SDROP ** "
-		        fi
-                        $IPT $IPT_FLAGS -A SDROP -s $i -d 0/0 -j $ALL_STOP
+			if ipt_for_host "$i"; then
+			  if [ "$LOG_DROP" == "1" ]; then
+                           $IPT_H $IPT_FLAGS -A SDROP -s $i -d $ANY_ADDR -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** SDROP ** "
+			  fi
+                          $IPT_H $IPT_FLAGS -A SDROP -s $i -d $ANY_ADDR -j $ALL_STOP
+			fi
                 fi
         done
-        $IPT $IPT_FLAGS -A INPUT -j SDROP
-        $IPT $IPT_FLAGS -A OUTPUT -j SDROP
+        ipt -A INPUT -j SDROP
+        ipt -A OUTPUT -j SDROP
 fi
 }
 
@@ -1098,7 +1104,9 @@ if [ ! "`cat $ECNSHAME_HOSTS | grep -v "#"`" == "" ]; then
 				eout "{ecnshame} skipping invalid entry: $i"
 				continue
 			fi
-			$IPT $IPT_FLAGS -t mangle -A POSTROUTING -p tcp -d $i -j ECN --ecn-tcp-remove
+			if ipt_for_host "$i"; then
+				$IPT_H $IPT_FLAGS -t mangle -A POSTROUTING -p tcp -d $i -j ECN --ecn-tcp-remove
+			fi
                 fi
         done
 fi
@@ -1154,9 +1162,9 @@ if [ -f "$FILE" ]; then
 FNAME=`echo $FILE | tr '/' '\n' | tail -n 1`
 eout "{glob} loading $FNAME"
  for i in `cat $FILE | grep -v "#"`; do
-  if [ ! "$i" == "" ]; then
-        ipt4 -A INPUT -s $i -j $ALL_STOP
-	ipt4 -A OUTPUT -d $i -j $ALL_STOP
+  if [ ! "$i" == "" ] && ipt_for_host "$i"; then
+        $IPT_H $IPT_FLAGS -A INPUT -s $i -j $ALL_STOP
+	$IPT_H $IPT_FLAGS -A OUTPUT -d $i -j $ALL_STOP
   fi
  done
 fi

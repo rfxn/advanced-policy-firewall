@@ -15,6 +15,14 @@
       (functions.apf)
 [Change] cli_trust_remove() modernized backtick subshells to $() syntax
          (functions.apf)
+[Change] Blocklist chains (PHP, DSHIELD, SDROP) converted from $IPT to ipt()
+         for dual-stack chain creation/attachment; per-entry rules use
+         ipt_for_host() routing with $IPT_H/$ANY_ADDR (functions.apf)
+[Change] ECN shame list converted from $IPT to ipt_for_host() routing for
+         IPv6-capable mangle rules (functions.apf)
+[Change] dnet() deny network loader converted from ipt4() to ipt_for_host()
+         routing; IPv6 deny networks now blocked when USE_IPV6=1
+         (functions.apf)
 [Fix] IPv6 plain trust addresses silently dropped; allow_hosts()/deny_hosts()
       used grep -v ":" which excluded all IPv6 entries from Loop 1 plain IP
       processing; changed to grep -v "=" to filter only advanced syntax
