@@ -61,6 +61,39 @@ teardown_file() {
     assert_success
 }
 
+@test "USE_IPV6=1 full load creates .apf6.restore snapshot" {
+    source /opt/tests/helpers/apf-config.sh
+    apf_set_config "USE_IPV6" "1"
+    "$APF" -f 2>/dev/null || true
+    "$APF" -s
+    [ -f "$APF_DIR/internals/.apf6.restore" ]
+    apf_set_config "USE_IPV6" "0"
+    "$APF" -f 2>/dev/null || true
+}
+
+@test "IPv6 snapshot is valid ip6tables-restore format" {
+    source /opt/tests/helpers/apf-config.sh
+    apf_set_config "USE_IPV6" "1"
+    "$APF" -f 2>/dev/null || true
+    "$APF" -s
+    # Should contain a table marker
+    run grep '^\*' "$APF_DIR/internals/.apf6.restore"
+    assert_success
+    apf_set_config "USE_IPV6" "0"
+    "$APF" -f 2>/dev/null || true
+}
+
+@test "IPv6 snapshot contains TALLOW chain" {
+    source /opt/tests/helpers/apf-config.sh
+    apf_set_config "USE_IPV6" "1"
+    "$APF" -f 2>/dev/null || true
+    "$APF" -s
+    run grep "TALLOW" "$APF_DIR/internals/.apf6.restore"
+    assert_success
+    apf_set_config "USE_IPV6" "0"
+    "$APF" -f 2>/dev/null || true
+}
+
 @test "config change forces full load when fastload enabled" {
     source /opt/tests/helpers/apf-config.sh
     apf_set_config "SET_FASTLOAD" "1"

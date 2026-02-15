@@ -1,13 +1,23 @@
 - 2.0.1 | Feb 14 2026:
 [New] BATS smoke test suite with Docker and network namespace support;
-      9 test files covering install/CLI, chains, ports, trust, multi-interface,
-      IPv6, packet sanity, fast load, and flush (tests/)
-[New] Makefile with test/test-verbose targets (Makefile)
+      14 test files (180 tests) covering install/CLI, chains, ports, trust,
+      multi-interface, IPv6, packet sanity, fast load, flush, validation,
+      advanced trust syntax, sysctl, refresh/expiry, and install paths (tests/)
+[New] Multi-OS Docker test matrix: Debian 12, CentOS 7, Rocky 8/9,
+      Ubuntu 20.04/22.04/24.04; with Dockerfiles for CentOS 6, Rocky 10,
+      Ubuntu 16.04/18.04 (tests/Dockerfile.*)
+[New] Cross-distro netcat portability helper for nc/ncat differences
+      (tests/helpers/detect-nc.sh)
+[New] Backend-portable iptables assertions using iptables -S; supports both
+      nft and legacy backends (tests/helpers/assert-iptables.bash)
+[New] Makefile with per-OS test targets, test-modern/test-legacy/test-all
+      groups (Makefile)
+[New] GitHub Actions CI matrix across 7 OS targets (.github/workflows/)
+[Change] run-tests.sh supports --os flag for distro selection (tests/)
 [Fix] flush() inoperative on nft backend; /proc/net/ip_tables_names absent on
       iptables-nft causes flush loops to skip entirely, leaving all rules in
       place after apf -f; now falls back to hardcoded table list
       (functions.apf)
-[New] GitHub Actions CI workflow for smoke tests (.github/workflows/)
 [Change] which replaced with command -v (POSIX builtin) for all 16 binary
          discovery variables in internals.conf
 [Change] mutex_lock()/mutex_unlock() rewritten with flock for atomic kernel-level

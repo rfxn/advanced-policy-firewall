@@ -26,7 +26,7 @@ teardown_file() {
 setup() {
     # Direct cleanup — more reliable than apf -u in container
     # Remove all lines mentioning test IPs (entries + comments)
-    for host in 192.0.2.50 192.0.2.51 "198.51.100.0/24"; do
+    for host in 192.0.2.50 192.0.2.51 192.0.2.55 "198.51.100.0/24" "198.51.100.1/32"; do
         local escaped
         escaped=$(echo "$host" | sed 's/[.\/]/\\&/g')
         sed -i "/${escaped}/d" "$APF_DIR/allow_hosts.rules" 2>/dev/null || true
@@ -131,4 +131,31 @@ setup() {
 @test "apf -a with no host shows error" {
     run "$APF" -a
     assert_output --partial "FQDN or IP address is required"
+}
+
+@test "apf -a accepts /32 single-host CIDR" {
+    run "$APF" -a 198.51.100.1/32 "single host cidr"
+    assert_success
+    # iptables normalizes /32 to bare IP in display
+    assert_rule_exists TALLOW "198.51.100.1"
+}
+
+@test "apf -u removes CIDR without breaking sed" {
+    # Verifies sed delimiter hardening: / in CIDR doesn't break removal
+    "$APF" -a 198.51.100.0/24 "cidr remove test"
+    assert_rule_exists TALLOW "198.51.100.0/24"
+
+    run "$APF" -u 198.51.100.0/24
+    assert_success
+
+    run grep "^198.51.100.0/24" "$APF_DIR/allow_hosts.rules"
+    assert_failure
+}
+
+@test "apf -a with special characters in comment" {
+    "$APF" -a 192.0.2.55 "test's comment with spaces & special"
+    run grep "192.0.2.55" "$APF_DIR/allow_hosts.rules"
+    assert_success
+    run grep "test's comment" "$APF_DIR/allow_hosts.rules"
+    assert_success
 }
