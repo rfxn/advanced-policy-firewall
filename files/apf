@@ -33,6 +33,7 @@ if [ ! -f "$LOG_APF" ]; then
 fi
 
 start() {
+check_deps
 ##
 # Fast Load
 ##

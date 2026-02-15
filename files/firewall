@@ -16,11 +16,6 @@ else
    exit 1
 fi
 
-if [ ! -f "$ip" ] && [ ! -f "$ifconfig" ]; then
-	eout "{glob} $ip and $ifconfig not found; aborting"
-	exit 1
-fi
-
 # load our iptables modules
 modinit
 
@@ -64,13 +59,6 @@ if [ ! "$IFACE_TRUSTED" == "" ] && [ "$VF_ROUTE" == "1" ]; then
                 exit 1
         fi
  done
-fi
-
-if [ "$DLIST_PHP" == "1" ] || [ "$DLIST_SPAMHAUS" == "1" ] || [ "$DLIST_DSHIELD" == "1" ] || [ "$DLIST_RESERVED" == "1" ] || [ "$DLIST_ECNSHAME" == "1" ] || [ "$USE_RGT" == "1" ]; then
-	if [ ! -f "$WGET" ]; then
-		echo "DLIST_* or RGT enabled but wget binary not found, aborting"
-		exit 1
-	fi
 fi
 
 $ip addr list $IFACE_UNTRUSTED | grep -w inet | grep -v inet6 | tr '/' ' ' | awk '{print$2}' > $INSTALL_PATH/internals/.localaddrs

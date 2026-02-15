@@ -1,4 +1,17 @@
 - 2.0.1 | Feb 15 2026:
+[New] Centralized dependency checking via check_deps(); validates iptables,
+      ip, modprobe, ip6tables (critical) and wget, iptables-save/restore,
+      diff (warning) before firewall start with OS-aware install hints
+      (functions.apf, apf)
+[Change] Ad-hoc ip/ifconfig existence check removed from firewall; superseded
+         by check_deps() with correct -z test instead of buggy -f test
+         (firewall)
+[Change] Ad-hoc wget/DLIST hard abort removed from firewall; downgraded to
+         warning in check_deps() since dlist_* functions handle missing wget
+         gracefully (firewall)
+[New] Dependency check test file (16-dependency-check.bats) with 8 tests
+      covering critical/optional detection, install hints, and non-start
+      commands bypassing checks (tests/)
 [Fix] Fast load error handling: iptables-restore and ip6tables-restore exit
       codes now checked; corrupted or incompatible snapshots fall through to
       full load instead of reporting success with no rules applied (apf)

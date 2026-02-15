@@ -180,6 +180,90 @@ check_rab() {
  fi
 }
 
+check_deps() {
+ local crit=""
+ local warn=""
+ local pkg_apt=""
+ local pkg_rpm=""
+
+ # Critical: iptables
+ if [ -z "$IPT" ]; then
+  crit="$crit iptables"
+  pkg_apt="$pkg_apt iptables"
+  pkg_rpm="$pkg_rpm iptables"
+ fi
+
+ # Critical: ip
+ if [ -z "$ip" ]; then
+  crit="$crit ip(iproute2)"
+  pkg_apt="$pkg_apt iproute2"
+  pkg_rpm="$pkg_rpm iproute"
+ fi
+
+ # Critical: modprobe (unless monolithic kernel)
+ if [ "$SET_MONOKERN" != "1" ] && [ -z "$MPB" ]; then
+  crit="$crit modprobe(kmod)"
+  pkg_apt="$pkg_apt kmod"
+  pkg_rpm="$pkg_rpm kmod"
+ fi
+
+ # Critical: ip6tables (when IPv6 enabled)
+ if [ "$USE_IPV6" == "1" ] && [ -z "$IP6T" ]; then
+  # Only add iptables package hint if not already listed
+  crit="$crit ip6tables"
+  if [ -n "$IPT" ]; then
+   pkg_apt="$pkg_apt iptables"
+   pkg_rpm="$pkg_rpm iptables"
+  fi
+ fi
+
+ # Warn: wget (when remote lists or RGT enabled)
+ if [ "$DLIST_PHP" == "1" ] || [ "$DLIST_SPAMHAUS" == "1" ] || [ "$DLIST_DSHIELD" == "1" ] || [ "$DLIST_RESERVED" == "1" ] || [ "$DLIST_ECNSHAME" == "1" ] || [ "$USE_RGT" == "1" ]; then
+  if [ -z "$WGET" ]; then
+   warn="$warn wget(remote-lists)"
+  fi
+ fi
+
+ # Warn: iptables-save/restore and diff (when fast load enabled)
+ if [ "$SET_FASTLOAD" == "1" ]; then
+  if [ -z "$IPTS" ]; then
+   warn="$warn iptables-save(fastload)"
+  fi
+  if [ -z "$IPTR" ]; then
+   warn="$warn iptables-restore(fastload)"
+  fi
+  if [ -z "$DIFF" ]; then
+   warn="$warn diff(fastload)"
+  fi
+ fi
+
+ # Emit warnings (non-fatal)
+ if [ -n "$warn" ]; then
+  eout "{glob} missing optional dependencies:$warn"
+ fi
+
+ # Emit critical failures and abort
+ if [ -n "$crit" ]; then
+  # Detect package manager for install hint
+  local hint=""
+  if command -v apt-get > /dev/null 2>&1; then
+   hint="apt-get install$pkg_apt"
+  elif command -v dnf > /dev/null 2>&1; then
+   hint="dnf install$pkg_rpm"
+  elif command -v yum > /dev/null 2>&1; then
+   hint="yum install$pkg_rpm"
+  elif command -v microdnf > /dev/null 2>&1; then
+   hint="microdnf install$pkg_rpm"
+  fi
+  eout "{glob} missing critical dependencies:$crit" 1
+  if [ -n "$hint" ]; then
+   eout "{glob}   Try: $hint" 1
+  fi
+  mutex_unlock
+  exit 1
+ fi
+}
+
 mutex_lock() {
   if [ "$APF_MUTEX_LOCKED" == "1" ]; then
     return
