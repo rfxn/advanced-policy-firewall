@@ -1,4 +1,7 @@
 - 2.0.1 | Feb 15 2026:
+[Fix] list() predictable temp file replaced with mktemp; PID-based
+      $INSTALL_PATH/.iptrules.$$ changed to mktemp with XXXXXX suffix;
+      all file references now quoted (functions.apf)
 [New] Centralized dependency checking via check_deps(); validates iptables,
       ip, modprobe, ip6tables (critical) and wget, iptables-save/restore,
       diff (warning) before firewall start with OS-aware install hints

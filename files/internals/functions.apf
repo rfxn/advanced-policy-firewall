@@ -486,28 +486,28 @@ fi
 
 list() {
 echo "Loading iptables rules..."
-iptc=$INSTALL_PATH/.iptrules.$$
-:> $iptc ; chmod 600 $iptc
-$IPT $IPT_FLAGS --verbose --numeric --line-numbers --list >> $iptc
+iptc=$(mktemp "$INSTALL_PATH/.iptrules.XXXXXX")
+chmod 600 "$iptc"
+$IPT $IPT_FLAGS --verbose --numeric --line-numbers --list >> "$iptc"
 if [ "$USE_IPV6" == "1" ] && [ -n "$IP6T" ]; then
-	echo "" >> $iptc
-	echo "=== IPv6 (ip6tables) ===" >> $iptc
-	echo "" >> $iptc
-	$IP6T $IPT_FLAGS --verbose --numeric --line-numbers --list >> $iptc
+	echo "" >> "$iptc"
+	echo "=== IPv6 (ip6tables) ===" >> "$iptc"
+	echo "" >> "$iptc"
+	$IP6T $IPT_FLAGS --verbose --numeric --line-numbers --list >> "$iptc"
 fi
 echo "Opening editor"
 EDITOR_CMD=""
 for ed in pico nano vi vim; do
-	if command -v $ed > /dev/null 2>&1; then
-		EDITOR_CMD=$(command -v $ed)
+	if command -v "$ed" > /dev/null 2>&1; then
+		EDITOR_CMD=$(command -v "$ed")
 		break
 	fi
 done
 if [ -n "$EDITOR_CMD" ]; then
-	$EDITOR_CMD $iptc
+	$EDITOR_CMD "$iptc"
 fi
 clear
-rm -f $iptc
+rm -f "$iptc"
 }
 
 status() {
