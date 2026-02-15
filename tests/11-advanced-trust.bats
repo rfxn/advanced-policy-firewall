@@ -106,10 +106,61 @@ setup() {
     assert_rule_exists_ips TALLOW "-d 198.51.100.0/24.*ACCEPT"
 }
 
-@test "IPv6 in allow_hosts.rules: deferred (Phase 16)" {
-    # allow_hosts() uses `grep -v ":"` to separate plain IPs from advanced
-    # trust syntax, which excludes all IPv6 addresses. IPv6 trust via
-    # allow_hosts.rules/deny_hosts.rules is deferred to Phase 16.
-    # CLI trust (apf -a IPv6) works because it calls cli_trust() directly.
-    skip "IPv6 in trust files not yet supported (Phase 16)"
+@test "IPv6 plain address in allow_hosts creates ip6tables rules" {
+    echo "2001:db8::50" >> "$APF_DIR/allow_hosts.rules"
+    "$APF" -f 2>/dev/null || true
+    "$APF" -s
+    assert_rule_exists_ip6s TALLOW "-s 2001:db8::50.*ACCEPT"
+    assert_rule_exists_ip6s TALLOW "-d 2001:db8::50.*ACCEPT"
+}
+
+@test "IPv6 plain address in deny_hosts creates ip6tables rules" {
+    echo "2001:db8::51" >> "$APF_DIR/deny_hosts.rules"
+    "$APF" -f 2>/dev/null || true
+    "$APF" -s
+    assert_rule_exists_ip6s TDENY "2001:db8::51"
+}
+
+@test "IPv6 bracket syntax: d=PORT:s=[IPv6] creates ip6tables rules" {
+    echo "d=8080:s=[2001:db8::50]" >> "$APF_DIR/allow_hosts.rules"
+    "$APF" -f 2>/dev/null || true
+    "$APF" -s
+    assert_rule_exists_ip6s TALLOW "2001:db8::50.*--dports 8080"
+}
+
+@test "IPv6 bracket direction: in:d=PORT:s=[IPv6] creates ip6tables rules" {
+    echo "in:d=443:s=[2001:db8::50]" >> "$APF_DIR/allow_hosts.rules"
+    "$APF" -f 2>/dev/null || true
+    "$APF" -s
+    assert_rule_exists_ip6s TALLOW "2001:db8::50.*--dports 443"
+}
+
+@test "IPv6 bracket full syntax: tcp:in:d=PORT:s=[IPv6] creates ip6tables TCP rule" {
+    echo "tcp:in:d=22:s=[2001:db8::50]" >> "$APF_DIR/allow_hosts.rules"
+    "$APF" -f 2>/dev/null || true
+    "$APF" -s
+    assert_rule_exists_ip6s TALLOW "2001:db8::50.*-p tcp.*--dports 22"
+}
+
+@test "IPv6 bracket deny: d=PORT:s=[IPv6] in deny_hosts creates ip6tables rules" {
+    echo "d=22:s=[2001:db8::51]" >> "$APF_DIR/deny_hosts.rules"
+    "$APF" -f 2>/dev/null || true
+    "$APF" -s
+    assert_rule_exists_ip6s TDENY "2001:db8::51.*--dports 22"
+}
+
+@test "IPv6 bracket with CIDR: d=PORT:s=[IPv6/mask] creates ip6tables rules" {
+    echo "d=80:s=[2001:db8::/32]" >> "$APF_DIR/allow_hosts.rules"
+    "$APF" -f 2>/dev/null || true
+    "$APF" -s
+    assert_rule_exists_ip6s TALLOW "2001:db8::/32.*--dports 80"
+}
+
+@test "IPv4 advanced trust still works alongside IPv6 entries" {
+    echo "d=8080:s=192.0.2.50" >> "$APF_DIR/allow_hosts.rules"
+    echo "d=8080:s=[2001:db8::50]" >> "$APF_DIR/allow_hosts.rules"
+    "$APF" -f 2>/dev/null || true
+    "$APF" -s
+    assert_rule_exists_ips TALLOW "192.0.2.50.*--dports 8080"
+    assert_rule_exists_ip6s TALLOW "2001:db8::50.*--dports 8080"
 }

@@ -26,15 +26,17 @@ teardown_file() {
 setup() {
     # Direct cleanup — more reliable than apf -u in container
     # Remove all lines mentioning test IPs (entries + comments)
-    for host in 192.0.2.50 192.0.2.51 192.0.2.55 "198.51.100.0/24" "198.51.100.1/32"; do
+    for host in 192.0.2.50 192.0.2.51 192.0.2.55 "198.51.100.0/24" "198.51.100.1/32" "2001:db8::50" "2001:db8::51"; do
         local escaped
-        escaped=$(echo "$host" | sed 's/[.\/]/\\&/g')
+        escaped=$(echo "$host" | sed 's/[.\/\:]/\\&/g')
         sed -i "/${escaped}/d" "$APF_DIR/allow_hosts.rules" 2>/dev/null || true
         sed -i "/${escaped}/d" "$APF_DIR/deny_hosts.rules" 2>/dev/null || true
     done
     # Flush trust chains so stale iptables rules don't interfere
     iptables -F TALLOW 2>/dev/null || true
     iptables -F TDENY 2>/dev/null || true
+    ip6tables -F TALLOW 2>/dev/null || true
+    ip6tables -F TDENY 2>/dev/null || true
 }
 
 @test "apf -a adds host to allow_hosts.rules file" {
@@ -158,4 +160,57 @@ setup() {
     assert_success
     run grep "test's comment" "$APF_DIR/allow_hosts.rules"
     assert_success
+}
+
+# --- IPv6 trust tests ---
+
+@test "apf -a accepts IPv6 address" {
+    run "$APF" -a 2001:db8::50 "ipv6 allow"
+    assert_success
+    run grep "2001:db8::50" "$APF_DIR/allow_hosts.rules"
+    assert_success
+}
+
+@test "apf -a adds IPv6 to ip6tables TALLOW chain" {
+    "$APF" -a 2001:db8::50 "ipv6 allow"
+    assert_rule_exists_ip6s TALLOW "-s 2001:db8::50"
+    assert_rule_exists_ip6s TALLOW "-d 2001:db8::50"
+}
+
+@test "apf -d adds IPv6 to ip6tables TDENY chain" {
+    "$APF" -d 2001:db8::51 "ipv6 deny"
+    assert_rule_exists_ip6s TDENY "2001:db8::51"
+}
+
+@test "plain IPv6 in allow_hosts.rules creates ip6tables rules" {
+    echo "2001:db8::50" >> "$APF_DIR/allow_hosts.rules"
+    "$APF" -f 2>/dev/null || true
+    "$APF" -s
+    assert_rule_exists_ip6s TALLOW "-s 2001:db8::50"
+    assert_rule_exists_ip6s TALLOW "-d 2001:db8::50"
+}
+
+@test "plain IPv6 in deny_hosts.rules creates ip6tables rules" {
+    echo "2001:db8::51" >> "$APF_DIR/deny_hosts.rules"
+    "$APF" -f 2>/dev/null || true
+    "$APF" -s
+    assert_rule_exists_ip6s TDENY "2001:db8::51"
+}
+
+@test "apf -u removes IPv6 from file and chain" {
+    "$APF" -a 2001:db8::50 "ipv6 remove test"
+    assert_rule_exists_ip6s TALLOW "2001:db8::50"
+
+    run "$APF" -u 2001:db8::50
+    assert_success
+
+    run grep "^2001:db8::50" "$APF_DIR/allow_hosts.rules"
+    assert_failure
+
+    local rules
+    rules=$(ip6tables -S TALLOW 2>/dev/null || true)
+    if echo "$rules" | grep -q "2001:db8::50"; then
+        echo "Host 2001:db8::50 still in TALLOW chain after -u" >&2
+        return 1
+    fi
 }
