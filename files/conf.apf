@@ -7,7 +7,7 @@
 # This program may be freely redistributed under the terms of the GNU GPL v2
 ##
 # NOTE: This file should be edited with word/line wrapping off,
-#       if your using pico/nano please start use the -w switch
+#       if you're using pico/nano please use the -w switch
 #       (e.g: nano -w filename)
 
 ##
@@ -151,14 +151,14 @@ RAB_HITCOUNT="1"
 RAB_TIMER="300"
 
 # This allows RAB to 'trip' the block timer back to 0 seconds if an address
-# attempts ANY subsiquent communication while still on the inital block period.
+# attempts ANY subsequent communication while still on the initial block period.
 RAB_TRIP="1"
 
 # This controls if the firewall should log all violation hits from an address.
 # The use of LOG_DROP variable set to 1 will override this to force logging.
 RAB_LOG_HIT="1"
 
-# This controls if the firewall should log all subsiqent traffic from an address
+# This controls if the firewall should log all subsequent traffic from an address
 # that is already blocked for a violation hit, this can generate allot of logs.
 # The use of LOG_DROP variable set to 1 will override this to force logging.
 RAB_LOG_TRIP="0"

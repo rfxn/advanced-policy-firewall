@@ -111,7 +111,7 @@ if [ "$SKIP_FASTLOAD_FIRSTRUN" == "" ] && [ "$SKIP_FASTLOAD_EXPIRED" == "" ] && 
 	fi
 	if [ ! "$SKIP_FASTLOAD_BACKEND" == "1" ]; then
 		devm
-		eout "{glob} activating firewall, fast load"
+		eout "{glob} activating firewall, fast load ($IPT_BACKEND_CURRENT)"
 		$IPTR $IPT_FLAGS $INSTALL_PATH/internals/.apf.restore
 		if [ "$USE_IPV6" == "1" ] && [ -n "$IP6TR" ] && [ -f "$INSTALL_PATH/internals/.apf6.restore" ]; then
 			$IP6TR $IPT_FLAGS $INSTALL_PATH/internals/.apf6.restore

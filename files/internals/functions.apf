@@ -254,7 +254,7 @@ valid_host() {
 cli_trust_remove() {
 	DIP="$1"
 	if ! valid_host "$DIP"; then
-		echo "Invalid host '$DIP': must be a valid IP address, CIDR block, or FQDN"
+		echo "Invalid host '$DIP': must be a valid IP/IPv6 address, CIDR block, or FQDN"
 		return 1
 	fi
 	if ! ipt_for_host "$DIP"; then
@@ -315,7 +315,7 @@ cli_trust() {
  CMT="$5"
  if [ ! "$HOST" == "" ]; then
 	if ! valid_host "$HOST"; then
-		echo "Invalid host '$HOST': must be a valid IP address, CIDR block, or FQDN"
+		echo "Invalid host '$HOST': must be a valid IP/IPv6 address, CIDR block, or FQDN"
 		return 1
 	fi
         tlist=""
@@ -439,10 +439,12 @@ help() {
         echo "-l|--list .......................... list all firewall rules"
         echo "-t|--status ........................ output firewall status log"
 	echo "-e|--refresh ....................... refresh & resolve dns names in trust rules"
-        echo "-a HOST CMT|--allow HOST COMMENT ... add host (IP/FQDN) to allow_hosts.rules and"
-        echo "                                     immediately load new rule into firewall"
-        echo "-d HOST CMT|--deny HOST COMMENT .... add host (IP/FQDN) to deny_hosts.rules and"
-        echo "                                     immediately load new rule into firewall"
+        echo "-a HOST CMT|--allow HOST COMMENT ... add host (IP/IPv6/CIDR/FQDN) to"
+        echo "                                     allow_hosts.rules and immediately"
+        echo "                                     load new rule into firewall"
+        echo "-d HOST CMT|--deny HOST COMMENT .... add host (IP/IPv6/CIDR/FQDN) to"
+        echo "                                     deny_hosts.rules and immediately"
+        echo "                                     load new rule into firewall"
 	echo "-u|--remove HOST ................... remove host from [glob]*_hosts.rules"
 	echo "                                     and immediately remove rule from firewall"
 	echo "-o|--ovars ......................... output all configuration options"

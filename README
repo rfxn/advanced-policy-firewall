@@ -63,7 +63,7 @@ The second, connection based stateful policies, is a means to distinguish
 legitimate packets for different types of connections. Only packets matching a
 known connection will be allowed by the firewall; others will be rejected. An
 example of this would be FTP data transfers, in an older era of firewalling
-you would have to define a complex set of static policies to allow FTA data
+you would have to define a complex set of static policies to allow FTP data
 transfers to flow without a problem. That is not so with stateful policies,
 the firewall can see that an address has established a connection to port 21
 then "relate" that address to the data transfer portion of the connection and
@@ -109,7 +109,7 @@ a point form summary of most APF features for reference and review:
   blocks
 - any number of additional interfaces may be configured as firewalled
   (untrusted) or trusted (not firewalled)
-- additional firewalled interfaces can have there own unique firewall policies
+- additional firewalled interfaces can have their own unique firewall policies
   applied
 - intelligent route verification to prevent embarrassing configuration errors
 - advanced packet sanity checks to make sure traffic coming and going meets
@@ -142,77 +142,56 @@ a point form summary of most APF features for reference and review:
 - pluggable and ready advanced use of QoS algorithms provided by the Linux
 - 3rd party add-on projects that compliment APF features
 
-Still on the feature todo list is:
-- full support for NAT/MASQ including port forwarding
-- cluster oriented round-robin packet or port forwarding
-- in-line firewall reactive address blocking of connection floods
-- and much more...
-
 1.1) Introduction: Supported Systems & Requirements
 The APF package is designed to run on Linux based operating systems that have
-an operational version of the iptables (netfilter) package installed. The 
-iptables (netfilter) package is supported on Linux kernels 2.4 and above,
-you can find out more details on the netfilter project at:
+an operational version of the iptables (netfilter) package installed. Both the
+traditional iptables-legacy and the newer iptables-nft backends are supported.
+You can find out more details on the netfilter project at:
 
 http://www.netfilter.org/
 
-If the version of Linux you are using already has an included copy of
-iptables then chances are very high it has all the iptables modules that APF
-will need. If you are configuring iptables in your own custom kernel then you
-should be sure that the following modules are compiled with the kernel for
-modular support: 
+Most modern Linux distributions include all required iptables/netfilter modules
+by default. If you are building a custom kernel, ensure the following modules
+are available (built-in or modular):
 
-ip_tables
 iptable_filter
 iptable_mangle
-ip_conntrack
-ip_conntrack_irc
-ip_conntrack_ftp
-ipt_state 
-ipt_multiport
-ipt_limit
-ipt_recent
-ipt_LOG
-ipt_REJECT
-ipt_ecn
-ipt_length
-ipt_mac
-ipt_multiport
-ipt_owner
-ipt_state
-ipt_ttl
-ipt_TOS
-ipt_TCPMSS
-ipt_ULOG
+nf_conntrack
+nf_conntrack_ftp
+nf_conntrack_irc
+xt_state (or nf_conntrack with CT target)
+xt_multiport
+xt_limit
+xt_recent
+xt_LOG (or nf_log_syslog)
+xt_REJECT (ipt_REJECT / ip6t_REJECT)
+xt_ecn
+xt_length
+xt_mac
+xt_owner
+xt_TCPMSS
 
-If you would like to make sure you support these modules then you can take a
-look inside of /lib/modules/kernelver/kernel/net/ipv4/netfilter/ directory.
+For IPv6 support (USE_IPV6=1), also ensure:
+ip6table_filter
+ip6table_mangle
+nf_conntrack_ipv6 (on kernels < 4.19; merged into nf_conntrack on 4.19+)
 
-# ls /lib/modules/$(uname -r)/kernel/net/ipv4/netfilter/
+APF will attempt to load each module at startup and report any that are
+missing. You can check available modules with:
 
-The known Linux platforms that APF will run on are very diverse and it is hard
-to keep track but here is a short summary:
+# ls /lib/modules/$(uname -r)/kernel/net/netfilter/
 
-Redhat Enterprise AS/ES 2+
-CentOS Any
-Fedora Core Any
-Slackware 8.0+
-Debian GNU/Linux 3.0+
-Suse Linux 8.1+
-Unbuntu Any
-TurboLinux Server 9+
-TurboLinux Fuji (Desktop)
-RedHat Linux 7.3,8,9
+APF is tested and supported on the following platforms:
 
-The base system specs for APF operating as intended are not set in stone and
-you can easily scale the package into almost any situation that has a Linux
-2.4+ kernel, iptables and bash shell with standard set of gnu-utils (grep,
-awk, sed and the like). Below is a short table of what is recommended:
-DEVICE      MIN       RECOMMENDED
-CPU:        300Mhz    600Mhz
-MEM:        64MB      96MB
-DISK:       OS        OS
-NETWORK:    Any       Any
+RHEL / Rocky Linux / AlmaLinux 8, 9
+CentOS 7 (legacy support)
+Debian 10, 11, 12
+Ubuntu 20.04, 22.04, 24.04
+Fedora (current releases)
+
+APF will generally run on any Linux distribution that provides iptables
+(legacy or nft backend) and a bash shell with standard GNU utilities
+(grep, awk, sed, etc.).
 
 2) Installation
 The installation setup of APF is very straight forward, there is an included
@@ -226,7 +205,7 @@ or
 
 If one so desires they may customize the setup of APF by editing the variables
 inside the install.sh script followed by also editing the path variables in
-the conf.apf and internals.conf files. This is however not recommends and the 
+the conf.apf and internals.conf files. This is however not recommended and the
 default paths should meet all user needs, they are:
 
 Install Path: /etc/apf
@@ -246,26 +225,31 @@ After installation is completed the documentation and convenience scripts are
 copied to /etc/apf/docs and /etc/apf/extras respective.
 
 2.1) Installation: Boot Loading
-On installation APF will install an init script to /etc/init.d/apf
+On installation APF will install a systemd service unit (apf.service) on
+systems with systemd, or an init script to /etc/init.d/apf on older systems,
 and configure it to load on boot. If you are setting up APF in a more
 custom situation then you may follow the below instructions.
 
 There is really 3 modes of operation for having APF firewall our system
 and each has no real benefit except tailoring itself to your needs.
 
-The first is to setup APF in the init system with chkconfig (done by
-default during install), as detailed below:
+The first and recommended approach on modern systems is systemd:
+
+systemctl enable apf
+systemctl start apf
+
+On older systems without systemd, use chkconfig (done by default during
+install on SysV-init systems):
 
 chkconfig --add apf
 chkconfig --level 345 apf on
 
-Secondly, you can add the following string too the bottom of the
+Secondly, you can add the following string to the bottom of the
 /etc/rc.local file:
 
 sh -c "/etc/apf/apf -s" &
 
-It is NOT recommended that you use both of these startup methods together,
-for most systems the init script via chkconfig should be fine.
+It is NOT recommended that you use multiple startup methods together.
 
 The third and final approach is to simply run APF in an on-demand fashion. That
 is, enable it with the 'apf -s' command when desired and disable it with the
@@ -567,7 +551,7 @@ for attackers to inject raw/custom packets into this host.
 Now onto the sanity filters, these are options that allow APF to scrutinize
 traffic coming into and out of the server so it conforms to TCP/IP standards
 and also filters common attack characteristics. There are a number of sanity
-options and each one has a well detailed captain in hte configuration file. In
+options and each one has a well detailed caption in the configuration file. In
 addition, these options comes preconfigured to suite most situation needs and
 provide the best protection possible. With that, I will defer the PKT_SANITY
 details to the conf.apf file where you can find ample information on each
@@ -597,8 +581,30 @@ option tells the firewall if we want to accept traceroutes and on the TCR_PORTS
 
 
 3.3) Configuration: Reactive Address Blocking
+The Reactive Address Blocking (RAB) system provides in-line intrusion
+prevention by automatically blocking addresses that trigger sanity violations
+or port scan detection. RAB is configured through the RAB_* variables in
+conf.apf. Key settings include RAB_SANITY for sanity violation blocking,
+RAB_PSCAN_LEVEL for port scan sensitivity (0-3), RAB_TIMER for block duration
+(up to 43200 seconds), and RAB_TRIP to reset the timer on repeat offenses.
+See section 3.2 above and conf.apf for detailed descriptions of each option.
+
 3.4) Configuration: Virtual Network Files
+When SET_VNET=1, APF generates per-IP policy files under the vnet/ directory
+for each aliased address on the IFACE_UNTRUSTED interface. Each file
+(e.g., vnet/192.168.1.100.rules) can override the global port filtering
+variables (IG_TCP_CPORTS, EG_TCP_CPORTS, etc.) for that specific IP address.
+This allows fine-grained control over which ports are open on each address.
+Run 'apf -s' after editing VNET files to apply changes. Note that the VNET
+subsystem operates on IPv4 addresses only.
+
 3.5) Configuration: Global Variables & Custom Rules
+All variables defined in conf.apf are available for use in VNET per-IP rule
+files, allowing you to import global settings and selectively override them.
+For custom iptables rules beyond what conf.apf provides, you can add rules
+directly to the preroute.rules file which is loaded early in the firewall
+chain. Any valid iptables syntax can be used in these files, as they are
+sourced directly into the firewall's bash execution environment.
 
 4) General Usage:
 The /usr/local/sbin/apf command has a number of options that will ease the
@@ -611,10 +617,12 @@ usage /usr/local/sbin/apf [OPTION]
 -l|--list .......................... list chain rules
 -t|--status ........................ firewall status
 -e|--refresh ....................... refresh & resolve dns names in trust rules
--a HOST CMT|--allow HOST COMMENT ... add host (IP/FQDN) to allow_hosts.rules and
-                                     immediately load new rule into firewall
--d HOST CMT|--deny HOST COMMENT .... add host (IP/FQDN) to deny_hosts.rules and
-                                     immediately load new rule into firewall
+-a HOST CMT|--allow HOST COMMENT ... add host (IP/IPv6/CIDR/FQDN) to
+                                     allow_hosts.rules and immediately
+                                     load new rule into firewall
+-d HOST CMT|--deny HOST COMMENT .... add host (IP/IPv6/CIDR/FQDN) to
+                                     deny_hosts.rules and immediately
+                                     load new rule into firewall
 -u|--remove HOST ................... remove host from [glob_]deny_hosts.rules
                                      and immediately remove rule from firewall
 -o|--ovars ......................... output all configuration options
@@ -700,6 +708,14 @@ for obvious reason and that it will remove entries that match from
 allow_hosts.rules, deny_hosts.rules and the global extensions of these files.
 
 4.2) General Usage: Global Trust System
+The global trust system extends the local trust files with centrally managed
+allow and deny lists that can be downloaded from a remote server. The files
+glob_allow.rules and glob_deny.rules are populated by setting the GA_URL and
+GD_URL variables in conf.apf to the URLs of your remote trust lists. APF will
+periodically download these lists and load them into the TGALLOW and TGDENY
+chains. This is useful for organizations managing multiple servers that need
+to share a common set of trusted or blocked addresses. The --remove (-u)
+option will also remove entries from the global trust files.
 
 4.3) General Usage: Advanced Trust Syntax
 Advanced trust usage; The trust rules can be made in advanced format with 4
@@ -726,9 +742,24 @@ Examples:
  inbound to destination port 3306 from 24.202.11.0/24
  d=3306:s=24.202.11.0/24
 
+IPv6 addresses use bracket notation to protect colons from the field
+delimiter parser:
+
+ inbound to destination port 22 from IPv6 address 2001:db8::1
+ d=22:s=[2001:db8::1]
+
+ inbound to destination port 443 from IPv6 network 2001:db8::/32
+ tcp:in:d=443:s=[2001:db8::/32]
+
+Plain (non-advanced) IPv6 addresses can be added directly without brackets:
+ 2001:db8::1
+
 4.4) General Usage: Dynamic Trust Files
-dyn_allow_hosts.rules
-dyn_deny_hosts.rules
+The dynamic trust files dyn_allow_hosts.rules and dyn_deny_hosts.rules are
+automatically managed by APF subsystems such as Reactive Address Blocking
+(RAB) and are not intended for manual editing. Entries in these files are
+transient and are cleared when the firewall is restarted. They use the same
+format as the static trust files (one IP or CIDR per line).
 
 5) License:
 APF is developed and supported on a volunteer basis by Ryan MacDonald
@@ -742,11 +773,11 @@ required under GNU GPL.
 
 6) Support Information:
 If you require any assistance with APF you may refer to the R-fx Networks
-community forums located at http://forums.rfxnetworks.com. You may also send
+community forums located at https://forums.rfxnetworks.com. You may also send
 an e-mail to support@r-fx.org.
 
 The official home page for APF is located at:
-http://www.rfxnetworks.com/apf.php
+https://www.rfxnetworks.com/apf.php
 
 All bugs or feature requests should be sent to apf@r-fx.org and please be sure
 to include as much information as possible or conceptual ideas of how you think

@@ -1,4 +1,26 @@
 - 2.0.1 | Feb 15 2026:
+[Fix] README typos corrected: FTA→FTP, there→their, Unbuntu→Ubuntu,
+      not recommends→not recommended, captain→caption, hte→the
+[Change] README modernized: removed stale todo list and 2000s-era hardware
+      specs; updated platform list to current supported OS matrix; replaced
+      legacy ipt_* module names with modern nf_conntrack/xt_* naming; added
+      systemd boot loading documentation alongside SysV init
+[Change] README sections 3.3-3.5 filled: RAB configuration, VNET per-IP
+      policies, global variables and custom rules
+[Change] README sections 4.2, 4.4 filled: global trust system with
+      glob_allow/glob_deny, dynamic trust file behavior
+[Change] README section 4.3 expanded with IPv6 bracket notation examples
+      for advanced trust syntax (README)
+[Change] README support URLs updated from http:// to https://
+[Change] help() output updated: -a/-d options now show IP/IPv6/CIDR/FQDN
+      instead of IP/FQDN (functions.apf)
+[Change] README section 4 usage summary updated to match help() output
+[Change] Error messages in cli_trust() and cli_trust_remove() now mention
+      IPv6 addresses explicitly (functions.apf)
+[Change] Fast load eout message now includes iptables backend type
+      (legacy/nf_tables) for easier troubleshooting (apf)
+[Fix] conf.apf comment typos: subsiquent→subsequent, inital→initial,
+      subsiqent→subsequent, your→you're, start use→use (conf.apf)
 [Change] Test suite performance: consolidated redundant flush+start cycles in
       08-fastload.bats (3 IPv6 tests merged into 1), 09-flush-cleanup.bats
       (5 flush tests merged into 1), and 11-advanced-trust.bats (17 per-test
