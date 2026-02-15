@@ -257,7 +257,10 @@ cli_trust_remove() {
 		echo "Invalid host '$DIP': must be a valid IP address, CIDR block, or FQDN"
 		return 1
 	fi
-	ipt_for_host "$DIP" || true
+	if ! ipt_for_host "$DIP"; then
+		echo "Cannot remove '$DIP': IPv6 address but USE_IPV6 is not enabled"
+		return 1
+	fi
 	$IPT_H $IPT_FLAGS -D INPUT -s $DIP -j ACCEPT
 	$IPT_H $IPT_FLAGS -D OUTPUT -d $DIP -j ACCEPT
         $IPT_H $IPT_FLAGS -D INPUT -s $DIP -j $ALL_STOP
@@ -274,26 +277,32 @@ cli_trust_remove() {
         $IPT_H $IPT_FLAGS -D TGDENY -d $DIP -j $ALL_STOP
 
 	sed -i "\%^$DIP\b%d" $ALLOW_HOSTS $DENY_HOSTS $GALLOW_HOSTS $GDENY_HOSTS
-	dil=`$IPT_H $IPT_FLAGS --numeric --list INPUT --line-numbers | grep -w $DIP | awk '{print$1}'`
-	dol=`$IPT_H $IPT_FLAGS --numeric --list OUTPUT --line-numbers | grep -w $DIP | awk '{print$1}'`
-	$IPT_H $IPT_FLAGS -D INPUT $dil >> /dev/null 2>&1
-	$IPT_H $IPT_FLAGS -D OUTPUT $dol >> /dev/null 2>&1
 
-	dil=`$IPT_H $IPT_FLAGS --numeric --list TALLOW --line-numbers | grep -w $DIP | tac | awk '{print$1}'`
-	dol=`$IPT_H $IPT_FLAGS --numeric --list TDENY --line-numbers | grep -w $DIP | tac | awk '{print$1}'`
-	for i in `echo $dil`; do
+	# Clean remaining rules from INPUT/OUTPUT (reverse order to preserve line numbers)
+	dil=$($IPT_H $IPT_FLAGS --numeric --list INPUT --line-numbers | grep -w "$DIP" | tac | awk '{print$1}')
+	for i in $dil; do
+		$IPT_H $IPT_FLAGS -D INPUT $i >> /dev/null 2>&1
+	done
+	dol=$($IPT_H $IPT_FLAGS --numeric --list OUTPUT --line-numbers | grep -w "$DIP" | tac | awk '{print$1}')
+	for i in $dol; do
+		$IPT_H $IPT_FLAGS -D OUTPUT $i >> /dev/null 2>&1
+	done
+
+	dil=$($IPT_H $IPT_FLAGS --numeric --list TALLOW --line-numbers | grep -w "$DIP" | tac | awk '{print$1}')
+	for i in $dil; do
 		$IPT_H $IPT_FLAGS -D TALLOW $i >> /dev/null 2>&1
 	done
-	for i in `echo $dol`; do
+	dol=$($IPT_H $IPT_FLAGS --numeric --list TDENY --line-numbers | grep -w "$DIP" | tac | awk '{print$1}')
+	for i in $dol; do
 		$IPT_H $IPT_FLAGS -D TDENY $i >> /dev/null 2>&1
 	done
 
-	dil=`$IPT_H $IPT_FLAGS --numeric --list TGALLOW --line-numbers | grep -w $DIP | tac | awk '{print$1}'`
-	dol=`$IPT_H $IPT_FLAGS --numeric --list TGDENY --line-numbers | grep -w $DIP | tac | awk '{print$1}'`
-	for i in `echo $dil`; do
+	dil=$($IPT_H $IPT_FLAGS --numeric --list TGALLOW --line-numbers | grep -w "$DIP" | tac | awk '{print$1}')
+	for i in $dil; do
 		$IPT_H $IPT_FLAGS -D TGALLOW $i >> /dev/null 2>&1
 	done
-	for i in `echo $dol`; do
+	dol=$($IPT_H $IPT_FLAGS --numeric --list TGDENY --line-numbers | grep -w "$DIP" | tac | awk '{print$1}')
+	for i in $dol; do
 		$IPT_H $IPT_FLAGS -D TGDENY $i >> /dev/null 2>&1
 	done
 }
@@ -1239,8 +1248,8 @@ if [ "$SET_EXPIRE" -ge "60" ]; then
                 time_diff=$(($check_time-$ban_time))
                 if [ "$time_diff" -ge "$expire_time" ]; then
                         eout "{trust} removed expired ban for $ip (${time_diff}s/${expire_time}s)"
-                        sed -i "\%$ip%d" $INSTALL_PATH/deny_hosts.rules
-                        $INSTALL_PATH/apf -u "$ip" >> /dev/null 2>&1
+                        sed -i "\%^$ip\b%d" "$INSTALL_PATH/deny_hosts.rules"
+                        cli_trust_remove "$ip" >> /dev/null 2>&1
                 fi
          done
  fi

@@ -1,4 +1,20 @@
 - 2.0.1 | Feb 14 2026:
+[Fix] expirebans() flock deadlock; spawned $INSTALL_PATH/apf -u as child process
+      which attempted to acquire the same flock held by parent, causing 60s hang
+      then silent failure; changed to direct cli_trust_remove() call
+      (functions.apf)
+[Fix] expirebans() sed not anchored; unanchored pattern \%$ip%d caused
+      10.0.0.1 removal to also delete 10.0.0.10; added ^ anchor and \b word
+      boundary (functions.apf)
+[Fix] cli_trust_remove() error suppression; ipt_for_host "|| true" masked IPv6
+      errors leaving $IPT_H in stale state; now returns error with message when
+      USE_IPV6 not enabled (functions.apf)
+[Fix] cli_trust_remove() first-match-only rule deletion; INPUT/OUTPUT cleanup
+      used single awk+delete which only removed first matching rule; converted
+      to tac + loop pattern matching TALLOW/TDENY for complete cleanup
+      (functions.apf)
+[Change] cli_trust_remove() modernized backtick subshells to $() syntax
+         (functions.apf)
 [Fix] IPv6 plain trust addresses silently dropped; allow_hosts()/deny_hosts()
       used grep -v ":" which excluded all IPv6 entries from Loop 1 plain IP
       processing; changed to grep -v "=" to filter only advanced syntax
