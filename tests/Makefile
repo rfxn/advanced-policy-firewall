@@ -36,7 +36,7 @@ test-ubuntu2204:
 test-ubuntu2404:
 	./run-tests.sh --os ubuntu2404
 
-# Deep legacy OS targets (EOL, not in CI) — manual only
+# Deep legacy OS targets (EOL, in CI matrix)
 test-centos6:
 	./run-tests.sh --os centos6
 
@@ -64,9 +64,11 @@ test-deep-legacy:
 # Full matrix (all CI targets) — sequential
 test-all:
 	./run-tests.sh --os debian12
+	./run-tests.sh --os centos6
 	./run-tests.sh --os centos7
 	./run-tests.sh --os rocky8
 	./run-tests.sh --os rocky9
+	./run-tests.sh --os ubuntu1204
 	./run-tests.sh --os ubuntu2004
 	./run-tests.sh --os ubuntu2204
 	./run-tests.sh --os ubuntu2404
@@ -85,5 +87,5 @@ test-deep-legacy-parallel:
 	  xargs -P $(HALF_CORES) -I{} ./run-tests.sh --os {}
 
 test-all-parallel:
-	printf '%s\n' debian12 centos7 rocky8 rocky9 ubuntu2004 ubuntu2204 ubuntu2404 | \
+	printf '%s\n' debian12 centos6 centos7 rocky8 rocky9 ubuntu1204 ubuntu2004 ubuntu2204 ubuntu2404 | \
 	  xargs -P $(HALF_CORES) -I{} ./run-tests.sh --os {}

@@ -13,7 +13,7 @@ jobs:
 
     strategy:
       matrix:
-        os: [debian12, centos7, rocky8, rocky9, ubuntu2004, ubuntu2204, ubuntu2404]
+        os: [debian12, centos6, centos7, rocky8, rocky9, ubuntu1204, ubuntu2004, ubuntu2204, ubuntu2404]
       fail-fast: false
 
     steps:
