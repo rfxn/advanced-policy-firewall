@@ -358,10 +358,17 @@ if [ "$BLK_MCATNET" == "1" ]; then
 	ipt4 -A OUTPUT -j MCAST
 
 	# IPv6 multicast blocking (ff00::/8)
+	# NDP (types 133-136) uses multicast destinations (ff02::) and must be
+	# exempted or IPv6 neighbor discovery breaks silently.
 	if [ "$USE_IPV6" == "1" ]; then
 		eout "{blk_mcat} deny all from ff00::/8 (IPv6)"
 		eout "{blk_mcat} deny all to ff00::/8 (IPv6)"
 		ipt6 -N MCAST6
+		# Exempt NDP — these use ff02:: multicast destinations
+		ipt6 -A MCAST6 -p ipv6-icmp --icmpv6-type 133 -j RETURN
+		ipt6 -A MCAST6 -p ipv6-icmp --icmpv6-type 134 -j RETURN
+		ipt6 -A MCAST6 -p ipv6-icmp --icmpv6-type 135 -j RETURN
+		ipt6 -A MCAST6 -p ipv6-icmp --icmpv6-type 136 -j RETURN
 		if [ "$LOG_DROP" == "1" ]; then
 			ipt6 -A MCAST6 -s ff00::/8 -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** MCAST6 ** "
 		fi

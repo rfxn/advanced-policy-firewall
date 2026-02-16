@@ -33,9 +33,9 @@ if [ ! "$IF" == "" ] && [ "$VF_ROUTE" == "1" ]; then
 	exit 1
   fi
 	if [ "$VAL_IF" == "" ]; then
-		eout "{glob} could not verify that interface $IF is routed to a network, aborting."
+		eout "{glob} could not verify that interface $i is routed to a network, aborting."
 	        if [ ! "$SET_VERBOSE" == "1" ]; then
-			echo "could not verify that interface $IF is routed to a network, aborting."
+			echo "could not verify that interface $i is routed to a network, aborting."
 		fi
 		exit 1
 	fi
@@ -52,9 +52,9 @@ if [ ! "$IFACE_TRUSTED" == "" ] && [ "$VF_ROUTE" == "1" ]; then
 	exit 1
   fi
         if [ "$VAL_IFACE_TRUSTED" == "" ]; then
-                eout "{glob} could not verify that interface $IFACE_TRUSTED is routed to a network, aborting."
+                eout "{glob} could not verify that interface $i is routed to a network, aborting."
 	        if [ ! "$SET_VERBOSE" == "1" ]; then
-			echo "could not verify that interface $IFACE_TRUSTED is routed to a network, aborting."
+			echo "could not verify that interface $i is routed to a network, aborting."
 		fi
                 exit 1
         fi
@@ -287,8 +287,6 @@ fi
 # SSH
 if [ "$HELPER_SSH" == "1" ]; then
 	ipt -A INPUT  -p tcp --sport $HELPER_SSH_PORT --dport 513:65535 -m state --state ESTABLISHED,RELATED -j ACCEPT
-	ipt -A INPUT  -p tcp --sport 1024:65535 --dport $HELPER_SSH_PORT --syn -m state --state ESTABLISHED,RELATED -j ACCEPT
-	ipt -A INPUT  -p udp --dport $HELPER_SSH_PORT -m state --state ESTABLISHED -j ACCEPT
 fi
 
 # Traceroute

@@ -1,4 +1,4 @@
-- 2.0.1 | Feb 15 2026:
+- 2.0.1 | Feb 16 2026:
 [New] ipset block list support: kernel-level hash tables for O(1) IP matching.
       USE_IPSET config toggle, ipset.rules definition file, ipset_load()/
       ipset_update()/ipset_flush() lifecycle functions, --ipset-update CLI
@@ -18,6 +18,15 @@
       old ipset v6.x compatibility on CentOS 6 and Ubuntu 12.04
       (tests/17-ipset.bats)
 [Fix] importconf now preserves ipset.rules during upgrades (importconf)
+[Fix] MCAST6 chain now exempts NDP ICMPv6 types 133-136 before blocking
+      ff00::/8; previously BLK_MCATNET=1 with USE_IPV6=1 broke IPv6
+      neighbor discovery by dropping multicast NDP packets (bt.rules)
+[Fix] SSH helper removed dead rule with mutually exclusive --syn and
+      --state ESTABLISHED,RELATED flags that could never match (firewall)
+[Fix] SSH helper removed spurious UDP ACCEPT rule — SSH is TCP-only;
+      rule incorrectly opened UDP on the SSH port (firewall)
+[Fix] Interface validation error messages now reference the specific
+      failing interface instead of the entire interface list (firewall)
 [Fix] valid_host() IPv4 now delegates to valid_ip_cidr() for octet range
       validation; rejects invalid addresses like 999.1.2.3 and masks > /32
       (functions.apf)
