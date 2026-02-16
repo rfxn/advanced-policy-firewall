@@ -9,15 +9,12 @@ source /opt/tests/helpers/assert-iptables.bash
 APF="/opt/apf/apf"
 APF_DIR="/opt/apf"
 
-IP6_AVAILABLE=true
-
 setup_file() {
     source /opt/tests/helpers/setup-netns.sh
     source /opt/tests/helpers/reset-apf.sh
     source /opt/tests/helpers/apf-config.sh
     apf_set_interface "veth-pub" ""
     if ! ip6tables_available; then
-        IP6_AVAILABLE=false
         return 0
     fi
     apf_set_config "USE_IPV6" "1"
@@ -29,7 +26,7 @@ setup_file() {
 }
 
 teardown_file() {
-    if [ "$IP6_AVAILABLE" != false ]; then
+    if ip6tables_available; then
         "$APF" -f 2>/dev/null || true
         source /opt/tests/helpers/apf-config.sh
         apf_set_config "USE_IPV6" "0"
@@ -39,11 +36,11 @@ teardown_file() {
 }
 
 setup() {
-    if [ "$IP6_AVAILABLE" = false ]; then skip "ip6tables not available"; fi
+    if ! ip6tables_available; then skip "ip6tables not available"; fi
 }
 
 teardown() {
-    if [ "$IP6_AVAILABLE" = false ]; then return 0; fi
+    if ! ip6tables_available; then return 0; fi
     # Clean IPv6 test entries from trust files on failure
     for pattern in "2001:db8"; do
         sed -i "/${pattern}/d" "$APF_DIR/allow_hosts.rules" 2>/dev/null || true

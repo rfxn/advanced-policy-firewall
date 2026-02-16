@@ -168,6 +168,7 @@ setup() {
 # --- IPv6 trust tests ---
 
 @test "apf -a accepts IPv6 address" {
+    if ! ip6tables_available; then skip "ip6tables not available"; fi
     run "$APF" -a 2001:db8::50 "ipv6 allow"
     assert_success
     run grep "2001:db8::50" "$APF_DIR/allow_hosts.rules"
