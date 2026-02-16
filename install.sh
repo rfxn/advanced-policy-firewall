@@ -62,6 +62,13 @@ install() {
 			fi
 		fi
 	fi
+	if [ -d "/etc/cron.d" ] && [ -f "cron.d.apf_ipset" ]; then
+		cp cron.d.apf_ipset /etc/cron.d/apf_ipset
+		chmod 644 /etc/cron.d/apf_ipset
+		if [ "$INSTALL_PATH" != "/etc/apf" ]; then
+			sed -i "s:/etc/apf:$INSTALL_PATH:g" /etc/cron.d/apf_ipset
+		fi
+	fi
 	if [ -f "/var/log/apf_log" ]; then
 		mv -f /var/log/apf_log /var/log/apf_log.prev
 	fi

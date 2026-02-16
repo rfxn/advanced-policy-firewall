@@ -257,6 +257,11 @@ case "$1" in
 -v|--version)
 	echo "$VER"
 	;;
+--ipset-update)
+	if [ "$USE_IPSET" == "1" ]; then
+		ipset_update
+	fi
+	;;
 *)
 	head
 	help

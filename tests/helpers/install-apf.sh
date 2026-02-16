@@ -51,6 +51,9 @@ install_apf() {
     # Disable reserved network blocking (we use RFC 5737 test addresses)
     sed -i 's/^BLK_RESNET=.*/BLK_RESNET="0"/' "$conf"
 
+    # Disable ipset block lists (tests enable individually)
+    sed -i 's/^USE_IPSET=.*/USE_IPSET="0"/' "$conf"
+
     # Ensure log file exists
     touch /var/log/apf_log
     chmod 600 /var/log/apf_log

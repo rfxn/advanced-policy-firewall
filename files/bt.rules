@@ -17,6 +17,9 @@ dlist_dshield_hosts
 dlist_spamhaus
 dlist_spamhaus_hosts
 
+# Load ipset block lists
+ipset_load
+
 # Block common drop ports
 cdports
 

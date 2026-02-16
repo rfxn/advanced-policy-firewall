@@ -16,6 +16,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     net-tools \
     iputils-ping \
     netcat-openbsd \
+    ipset \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
@@ -55,7 +56,8 @@ RUN cd /opt/apf-src && INSTALL_PATH=/opt/apf sh install.sh && \
     sed -i 's/^RAB=.*/RAB="0"/' "$conf" && \
     sed -i 's/^SET_FASTLOAD=.*/SET_FASTLOAD="0"/' "$conf" && \
     sed -i 's/^SET_REFRESH=.*/SET_REFRESH="0"/' "$conf" && \
-    sed -i 's/^BLK_RESNET=.*/BLK_RESNET="0"/' "$conf"
+    sed -i 's/^BLK_RESNET=.*/BLK_RESNET="0"/' "$conf" && \
+    sed -i 's/^USE_IPSET=.*/USE_IPSET="0"/' "$conf"
 
 # Save clean state for test resets
 RUN for f in allow_hosts.rules deny_hosts.rules; do \

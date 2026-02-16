@@ -1,4 +1,19 @@
 - 2.0.1 | Feb 15 2026:
+[New] ipset block list support: kernel-level hash tables for O(1) IP matching.
+      USE_IPSET config toggle, ipset.rules definition file, ipset_load()/
+      ipset_update()/ipset_flush() lifecycle functions, --ipset-update CLI
+      option for cron hot-reload, cron.d.apf_ipset cron job, ip_set/xt_set
+      module loading, check_deps() ipset warning (conf.apf, internals.conf,
+      functions.apf, bt.rules, apf, install.sh, ipset.rules, cron.d.apf_ipset)
+[New] ipset test suite: 12 tests covering set creation, chain attachment,
+      match rules, hot-reload, flush cleanup, empty/CIDR blocklists, logging
+      (tests/17-ipset.bats)
+[Change] All 10 Dockerfiles updated with ipset package and USE_IPSET="0"
+      config override for deterministic test behavior
+[Change] CentOS 6 and Ubuntu 12.04 added to GitHub Actions CI matrix
+      (.github/workflows/smoke-test.yml)
+[Change] Makefile test-all and test-all-parallel targets now include
+      centos6 and ubuntu1204 (tests/Makefile)
 [Fix] valid_host() IPv4 now delegates to valid_ip_cidr() for octet range
       validation; rejects invalid addresses like 999.1.2.3 and masks > /32
       (functions.apf)

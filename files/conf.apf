@@ -548,6 +548,21 @@ GA_URL="https://yourhost.com/glob_allow.rules"
 GD_URL="https://yourhost.com/glob_deny.rules"
 
 ##
+# [ipset Block Lists]
+##
+# ipset provides kernel-level hash tables for high-performance IP matching.
+# When enabled, blocklists defined in ipset.rules are loaded into ipset sets
+# and matched with a single iptables rule per list instead of one rule per IP.
+# Requires the 'ipset' utility (apt-get install ipset / yum install ipset).
+# When disabled or ipset is not installed, ipset.rules is ignored.
+USE_IPSET="0"
+
+# Default log rate limit for ipset blocklist matches (per minute per list).
+# Individual lists control logging via the log field in ipset.rules (0=off, 1=on).
+# Requires LOG_DROP="1" to be globally enabled.
+IPSET_LOG_RATE="30"
+
+##
 # [Logging and control settings]
 ##
 # Log all traffic that is filtered by the firewall

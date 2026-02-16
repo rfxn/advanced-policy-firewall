@@ -157,6 +157,12 @@ modinit() {
 		ml $mod
 	done
 
+	# ipset modules (non-fatal)
+	if [ "$USE_IPSET" == "1" ]; then
+		ml ip_set
+		ml xt_set
+	fi
+
 	# IPv6 modules (non-fatal; nft backend handles both protocols natively)
 	if [ "$USE_IPV6" == "1" ]; then
 		if [ ! -f "/proc/net/ip6_tables_names" ]; then
@@ -235,6 +241,11 @@ check_deps() {
   if [ -z "$DIFF" ]; then
    warn="$warn diff(fastload)"
   fi
+ fi
+
+ # Warn: ipset (when ipset block lists enabled)
+ if [ "$USE_IPSET" == "1" ] && [ -z "$IPSET" ]; then
+  warn="$warn ipset(ipset-blocklists)"
  fi
 
  # Emit warnings (non-fatal)
@@ -483,6 +494,8 @@ if [ -f "/proc/net/ipt_recent/DEFAULT" ]; then
 	eout "{glob} flushing xt/ipt_recent bans"
 	echo clear > /proc/net/ipt_recent/DEFAULT
 fi
+
+ipset_flush
 
 if [ ! "$1" = "1" ]; then
 	eout "{glob} firewall offline"
@@ -1207,6 +1220,229 @@ if [ ! "$(cat $ECNSHAME_HOSTS | grep -v "#")" == "" ]; then
                 fi
         done
 fi
+}
+
+ipset_load() {
+if [ "$USE_IPSET" != "1" ] || [ -z "$IPSET" ]; then
+	return
+fi
+local ipset_rules="$INSTALL_PATH/ipset.rules"
+if [ ! -f "$ipset_rules" ]; then
+	return
+fi
+eout "{ipset} loading ipset block lists"
+while IFS= read -r line; do
+	# Skip comments and blank lines
+	case "$line" in
+		\#*|"") continue ;;
+	esac
+
+	local name flow iptype logflag file_or_url
+	name=$(echo "$line" | cut -d: -f1)
+	flow=$(echo "$line" | cut -d: -f2)
+	iptype=$(echo "$line" | cut -d: -f3)
+	logflag=$(echo "$line" | cut -d: -f4)
+	# Field 5+ (handles URLs containing colons)
+	file_or_url=$(echo "$line" | sed 's%://%@PROTO@%' | cut -d: -f5- | sed 's%@PROTO@%://%')
+
+	# Validate fields
+	if [ -z "$name" ] || [ -z "$flow" ] || [ -z "$iptype" ] || [ -z "$logflag" ] || [ -z "$file_or_url" ]; then
+		eout "{ipset} skipping malformed entry: $line"
+		continue
+	fi
+	if [ "$flow" != "src" ] && [ "$flow" != "dst" ]; then
+		eout "{ipset} invalid flow '$flow' in entry: $name"
+		continue
+	fi
+	if [ "$iptype" != "ip" ] && [ "$iptype" != "net" ]; then
+		eout "{ipset} invalid type '$iptype' in entry: $name"
+		continue
+	fi
+	if [ "$logflag" != "0" ] && [ "$logflag" != "1" ]; then
+		eout "{ipset} invalid log value '$logflag' in entry: $name"
+		continue
+	fi
+
+	local hash_type="hash:$iptype"
+	local data_file=""
+
+	# Resolve file_or_url to a local file
+	if echo "$file_or_url" | grep -qE '^https?://'; then
+		# Download to temp dir
+		local url_tmp
+		url_tmp=$(mktemp -d "$INSTALL_PATH/.apf-XXXXXX")
+		local dl_ok=0
+		if [ -n "$CURL" ]; then
+			$CURL -sSL --connect-timeout 10 --retry 3 -o "$url_tmp/ipset_dl" "$file_or_url" >> /dev/null 2>&1 && dl_ok=1
+		fi
+		if [ "$dl_ok" != "1" ] && [ -n "$WGET" ]; then
+			$WGET -q -t 3 -T 10 -O "$url_tmp/ipset_dl" "$file_or_url" >> /dev/null 2>&1 && dl_ok=1
+		fi
+		if [ "$dl_ok" != "1" ]; then
+			eout "{ipset} download failed for $name: $file_or_url"
+			rm -rf "$url_tmp"
+			continue
+		fi
+		data_file="$url_tmp/ipset_dl"
+	else
+		data_file="$file_or_url"
+	fi
+
+	if [ ! -f "$data_file" ] || [ ! -s "$data_file" ]; then
+		eout "{ipset} empty or missing data for $name"
+		[ -n "$url_tmp" ] && rm -rf "$url_tmp"
+		continue
+	fi
+
+	# Create sets and populate with atomic swap
+	$IPSET create "$name" "$hash_type" maxelem 1048576 2>/dev/null || true
+	$IPSET create "${name}-tmp" "$hash_type" maxelem 1048576 2>/dev/null || true
+	$IPSET flush "${name}-tmp"
+
+	local count=0
+	while IFS= read -r entry; do
+		# Skip comments and blank lines
+		case "$entry" in
+			\#*|""|";;"*) continue ;;
+		esac
+		# Extract first field (handles formats with trailing comments/semicolons)
+		entry=$(echo "$entry" | awk '{print $1}' | tr -d ';')
+		[ -z "$entry" ] && continue
+		# IPv4 only filter
+		if ! echo "$entry" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+\.'; then
+			continue
+		fi
+		$IPSET add "${name}-tmp" "$entry" 2>/dev/null && count=$((count + 1))
+	done < "$data_file"
+
+	[ -n "$url_tmp" ] && rm -rf "$url_tmp"
+
+	if [ "$count" -eq 0 ]; then
+		eout "{ipset} no valid entries for $name, skipping"
+		$IPSET destroy "${name}-tmp" 2>/dev/null
+		$IPSET destroy "$name" 2>/dev/null
+		continue
+	fi
+
+	$IPSET swap "${name}-tmp" "$name"
+	$IPSET flush "${name}-tmp"
+	$IPSET destroy "${name}-tmp" 2>/dev/null
+	eout "{ipset} loaded $count entries into $name ($hash_type)"
+
+	# Create iptables chain
+	$IPT $IPT_FLAGS -N "IPSET_${name}" 2>/dev/null
+	if [ "$logflag" == "1" ] && [ "$LOG_DROP" == "1" ]; then
+		$IPT $IPT_FLAGS -A "IPSET_${name}" -m set --match-set "$name" "$flow" -m limit --limit="${IPSET_LOG_RATE}/minute" -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** IPSET_${name} ** "
+	fi
+	$IPT $IPT_FLAGS -A "IPSET_${name}" -m set --match-set "$name" "$flow" -j $ALL_STOP
+	$IPT $IPT_FLAGS -A INPUT -j "IPSET_${name}"
+	$IPT $IPT_FLAGS -A OUTPUT -j "IPSET_${name}"
+done < "$ipset_rules"
+}
+
+ipset_update() {
+if [ "$USE_IPSET" != "1" ] || [ -z "$IPSET" ]; then
+	return
+fi
+local ipset_rules="$INSTALL_PATH/ipset.rules"
+if [ ! -f "$ipset_rules" ]; then
+	return
+fi
+eout "{ipset} updating ipset block lists"
+while IFS= read -r line; do
+	case "$line" in
+		\#*|"") continue ;;
+	esac
+
+	local name flow iptype logflag file_or_url
+	name=$(echo "$line" | cut -d: -f1)
+	flow=$(echo "$line" | cut -d: -f2)
+	iptype=$(echo "$line" | cut -d: -f3)
+	logflag=$(echo "$line" | cut -d: -f4)
+	file_or_url=$(echo "$line" | sed 's%://%@PROTO@%' | cut -d: -f5- | sed 's%@PROTO@%://%')
+
+	if [ -z "$name" ] || [ -z "$file_or_url" ]; then
+		continue
+	fi
+
+	# Only update sets that already exist (created during full load)
+	if ! $IPSET list "$name" > /dev/null 2>&1; then
+		continue
+	fi
+
+	local hash_type="hash:$iptype"
+	local data_file=""
+	local url_tmp=""
+
+	if echo "$file_or_url" | grep -qE '^https?://'; then
+		url_tmp=$(mktemp -d "$INSTALL_PATH/.apf-XXXXXX")
+		local dl_ok=0
+		if [ -n "$CURL" ]; then
+			$CURL -sSL --connect-timeout 10 --retry 3 -o "$url_tmp/ipset_dl" "$file_or_url" >> /dev/null 2>&1 && dl_ok=1
+		fi
+		if [ "$dl_ok" != "1" ] && [ -n "$WGET" ]; then
+			$WGET -q -t 3 -T 10 -O "$url_tmp/ipset_dl" "$file_or_url" >> /dev/null 2>&1 && dl_ok=1
+		fi
+		if [ "$dl_ok" != "1" ]; then
+			eout "{ipset} update download failed for $name: $file_or_url"
+			rm -rf "$url_tmp"
+			continue
+		fi
+		data_file="$url_tmp/ipset_dl"
+	else
+		data_file="$file_or_url"
+	fi
+
+	if [ ! -f "$data_file" ] || [ ! -s "$data_file" ]; then
+		[ -n "$url_tmp" ] && rm -rf "$url_tmp"
+		continue
+	fi
+
+	$IPSET create "${name}-tmp" "$hash_type" maxelem 1048576 2>/dev/null || true
+	$IPSET flush "${name}-tmp"
+
+	local count=0
+	while IFS= read -r entry; do
+		case "$entry" in
+			\#*|""|";;"*) continue ;;
+		esac
+		entry=$(echo "$entry" | awk '{print $1}' | tr -d ';')
+		[ -z "$entry" ] && continue
+		if ! echo "$entry" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+\.'; then
+			continue
+		fi
+		$IPSET add "${name}-tmp" "$entry" 2>/dev/null && count=$((count + 1))
+	done < "$data_file"
+
+	[ -n "$url_tmp" ] && rm -rf "$url_tmp"
+
+	if [ "$count" -gt 0 ]; then
+		$IPSET swap "${name}-tmp" "$name"
+		eout "{ipset} updated $name with $count entries"
+	fi
+	$IPSET flush "${name}-tmp" 2>/dev/null
+	$IPSET destroy "${name}-tmp" 2>/dev/null
+done < "$ipset_rules"
+}
+
+ipset_flush() {
+if [ -z "$IPSET" ]; then
+	return
+fi
+local ipset_rules="$INSTALL_PATH/ipset.rules"
+if [ ! -f "$ipset_rules" ]; then
+	return
+fi
+while IFS= read -r line; do
+	case "$line" in
+		\#*|"") continue ;;
+	esac
+	local name
+	name=$(echo "$line" | cut -d: -f1)
+	[ -z "$name" ] && continue
+	$IPSET destroy "$name" 2>/dev/null || true
+	$IPSET destroy "${name}-tmp" 2>/dev/null || true
+done < "$ipset_rules"
 }
 
 glob_allow_download() {
