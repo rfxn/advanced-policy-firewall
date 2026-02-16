@@ -1,4 +1,9 @@
 - 2.0.1 | Feb 15 2026:
+[Fix] valid_host() IPv4 now delegates to valid_ip_cidr() for octet range
+      validation; rejects invalid addresses like 999.1.2.3 and masks > /32
+      (functions.apf)
+[Fix] valid_host() IPv6 CIDR mask now validated <= 128; rejects invalid
+      masks like /999 (functions.apf)
 [Fix] valid_host() IPv6 regex accepts compressed forms starting with ::
       (e.g. ::1, ::/0); leading hextet changed from {1,4} to {0,4}
       (functions.apf)

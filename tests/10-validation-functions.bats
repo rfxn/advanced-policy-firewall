@@ -155,3 +155,18 @@ setup_file() {
     run valid_host "gggg::1"
     assert_failure
 }
+
+@test "valid_host rejects 999.1.2.3 (IPv4 octet > 255)" {
+    run valid_host "999.1.2.3"
+    assert_failure
+}
+
+@test "valid_host rejects 1.2.3.4/33 (IPv4 CIDR mask > 32)" {
+    run valid_host "1.2.3.4/33"
+    assert_failure
+}
+
+@test "valid_host rejects 2001:db8::/999 (IPv6 CIDR mask > 128)" {
+    run valid_host "2001:db8::/999"
+    assert_failure
+}
