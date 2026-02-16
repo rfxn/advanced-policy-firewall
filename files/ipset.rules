@@ -1,4 +1,5 @@
 ## ipset block list definitions
+## See conf.apf [ipset Block Lists] for USE_IPSET and IPSET_LOG_RATE settings.
 ## Format: name:flow:ipset_type:log:file_or_url
 ##   name       — unique list name (used for ipset set and iptables chain naming)
 ##   flow       — src or dst (match source or destination address)

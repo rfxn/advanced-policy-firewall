@@ -206,8 +206,8 @@ gre_init() {
 	> "$INSTALL_PATH/internals/.gre.tunnels"
 
 	# Source tunnel definitions
-	if [ -f "$INSTALL_PATH/gre.conf" ]; then
-		. "$INSTALL_PATH/gre.conf"
+	if [ -f "$INSTALL_PATH/gre.rules" ]; then
+		. "$INSTALL_PATH/gre.rules"
 	fi
 
 	eout "{gre} tunnel initialization complete"

@@ -7,6 +7,7 @@
 ##
 #
 # GRE Tunnel Definitions for APF
+# See conf.apf [GRE Tunnels] for USE_GRE and GRE_* global settings.
 #
 # Set role and optional per-tunnel overrides, then call create_gretun.
 #

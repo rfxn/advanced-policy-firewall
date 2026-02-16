@@ -569,10 +569,10 @@ IPSET_LOG_RATE="$IPSET_LOG_RATE"
 # [GRE Tunnels]
 ##
 # GRE tunnel support provides encapsulated point-to-point links between hosts.
-# When enabled, tunnels defined in gre.conf are created on firewall start and
+# When enabled, tunnels defined in gre.rules are created on firewall start and
 # GRE protocol (47) traffic is explicitly allowed to/from tunnel endpoints.
 # Requires the 'ip' utility (iproute2 package).
-# When disabled, gre.conf is ignored.
+# When disabled, gre.rules is ignored.
 USE_GRE="$USE_GRE"
 
 # Keep tunnel interfaces alive when firewall is flushed/stopped.

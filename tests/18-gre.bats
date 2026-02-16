@@ -43,9 +43,9 @@ setup_file() {
 198.51.100.12
 EOF
 
-    # Create gre.conf with a source tunnel
+    # Create gre.rules with a source tunnel
     # local=203.0.113.2 (veth-pub address), remote=192.0.2.1 (TEST-NET, unreachable but tunnel created)
-    cat > "$APF_DIR/gre.conf" <<'GRECONF'
+    cat > "$APF_DIR/gre.rules" <<'GRECONF'
 #!/bin/bash
 role="source"
 create_gretun 1 203.0.113.2 192.0.2.1 /opt/apf/gre.ips.test
@@ -169,8 +169,8 @@ setup() {
 }
 
 @test "Invalid linkid rejected with error" {
-    # Write a gre.conf with invalid linkid
-    cat > "$APF_DIR/gre.conf" <<'GRECONF'
+    # Write a gre.rules with invalid linkid
+    cat > "$APF_DIR/gre.rules" <<'GRECONF'
 #!/bin/bash
 role="source"
 create_gretun 0 203.0.113.2 192.0.2.1
@@ -186,7 +186,7 @@ GRECONF
     assert_success
 
     # Restore valid config
-    cat > "$APF_DIR/gre.conf" <<'GRECONF'
+    cat > "$APF_DIR/gre.rules" <<'GRECONF'
 #!/bin/bash
 role="source"
 create_gretun 1 203.0.113.2 192.0.2.1 /opt/apf/gre.ips.test
