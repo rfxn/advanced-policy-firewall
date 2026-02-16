@@ -115,6 +115,9 @@ if [ "$SKIP_FASTLOAD_FIRSTRUN" == "" ] && [ "$SKIP_FASTLOAD_EXPIRED" == "" ] && 
 		eout "{glob} activating firewall, fast load ($IPT_BACKEND_CURRENT)"
 		if ! $IPTR $IPT_FLAGS $INSTALL_PATH/internals/.apf.restore 2>/dev/null; then
 			eout "{glob} fast load failed (iptables-restore error), going full load"
+		elif [ "$USE_IPV6" == "1" ] && [ -z "$IP6TR" ]; then
+			eout "{glob} fast load incomplete (ip6tables-restore not found), going full load"
+			flush
 		elif [ "$USE_IPV6" == "1" ] && [ -n "$IP6TR" ] && [ ! -f "$INSTALL_PATH/internals/.apf6.restore" ]; then
 			eout "{glob} fast load incomplete (IPv6 enabled but no IPv6 snapshot), going full load"
 			flush

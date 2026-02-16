@@ -86,6 +86,16 @@ setup_file() {
     assert_success
 }
 
+@test "valid_host accepts IPv6 ::1 (loopback)" {
+    run valid_host "::1"
+    assert_success
+}
+
+@test "valid_host accepts IPv6 ::/0 (any address)" {
+    run valid_host "::/0"
+    assert_success
+}
+
 @test "valid_host accepts IPv6 with CIDR 2001:db8::/32" {
     run valid_host "2001:db8::/32"
     assert_success
