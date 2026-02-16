@@ -514,7 +514,7 @@ DLIST_SPAMHAUS_URL="https://www.spamhaus.org/drop/drop.lasso"
 # DShield collects data about malicious activity from across the Internet.
 # This data is cataloged, summarized and can be used to discover trends in
 # activity, confirm widespread attacks, or assist in preparing better firewall
-# rules. This is a list of top networks that have exhibited suspicious activity.
+# rules. This is a list of top hosts that have exhibited suspicious activity.
 DLIST_DSHIELD="$DLIST_DSHIELD"
 DLIST_DSHIELD_URL="https://feeds.dshield.org/top10-2.txt"
 

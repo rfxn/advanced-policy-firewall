@@ -1,4 +1,22 @@
 - 2.0.1 | Feb 16 2026:
+[Fix] DShield /24 host inflation: dlist_dshield() no longer appends /24
+      to individual host IPs from the DShield feed; entries are now written
+      as-is, preventing collateral blocking of 256 addresses per host
+      (functions.apf)
+[Fix] dlist download resilience: dlist_dshield(), dlist_php(), and
+      dlist_spamhaus() now backup rules files before download and restore
+      from backup on failure; previously a failed download left rules files
+      empty, losing all existing entries (functions.apf)
+[Change] dlist parse-time validation: dlist_dshield(), dlist_php(), and
+      dlist_spamhaus() now validate entries via valid_ip_cidr() during
+      parsing; garbage from corrupted downloads is rejected before writing
+      to rules files (functions.apf)
+[Fix] conf.apf and .ca.def DShield description corrected from "top
+      networks" to "top hosts" to match actual feed content (conf.apf,
+      .ca.def)
+[New] DLIST chain-loading test suite: 11 tests covering DSHIELD/PHP/SDROP
+      chain creation, DROP rules, INPUT attachment, backup/restore
+      resilience, and invalid entry rejection (tests/19-dlist.bats)
 [Change] Subsystem definition file naming normalized: gre.conf renamed to
       gre.rules for consistency with ipset.rules and other .rules files;
       all references updated (gretunnel.sh, conf.apf, .ca.def, tests)

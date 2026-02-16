@@ -1053,6 +1053,10 @@ fi
 }
 
 dlist_php() {
+if [ -f "$PHP_HOSTS" ]; then
+   cp "$PHP_HOSTS" "$PHP_HOSTS.bk"
+   chmod 600 "$PHP_HOSTS" "$PHP_HOSTS.bk"
+fi
 if [ ! "$DLIST_PHP_URL" == "" ] && [ "$DLIST_PHP" == "1" ] && [ -f "$WGET" ]; then
    URL_TMP=$(mktemp -d "$INSTALL_PATH/.apf-XXXXXX")
    URL_FILE="${DLIST_PHP_URL##*/}"
@@ -1061,24 +1065,29 @@ if [ ! "$DLIST_PHP_URL" == "" ] && [ "$DLIST_PHP" == "1" ] && [ -f "$WGET" ]; th
    $WGET -t 1 -T 4 "$DLIST_PHP_URL" >> /dev/null 2>&1
    if [ $? -eq 0 ] && [ -f "$URL_TMP/$URL_FILE" ]; then
         eout "{php} parsing $URL_FILE into $PHP_HOSTS"
-        if [ -f "$PHP_HOSTS" ]; then
-                :> "$PHP_HOSTS"
-        fi
+        :> "$PHP_HOSTS"
         while IFS= read -r str; do
                 str=$(echo "$str" | grep -v "#" | grep -e '[0-9]' | awk '{print $1}')
                 if [ -n "$str" ]; then
-                    echo "$str" >> "$PHP_HOSTS"
+                    if valid_ip_cidr "$str"; then
+                        echo "$str" >> "$PHP_HOSTS"
+                    fi
                 fi
         done < "$URL_TMP/$URL_FILE"
    else
         eout "{php} download of $DLIST_PHP_URL failed"
+        if [ -f "$PHP_HOSTS.bk" ]; then
+            cp "$PHP_HOSTS.bk" "$PHP_HOSTS"
+            chmod 600 "$PHP_HOSTS" "$PHP_HOSTS.bk"
+        fi
    fi
    rm -rf "$URL_TMP"
    cd "$INSTALL_PATH"
 else
-   rm -f "$PHP_HOSTS"
-   touch "$PHP_HOSTS"
-   chmod 600 "$PHP_HOSTS"
+   if [ -f "$PHP_HOSTS.bk" ]; then
+       cp "$PHP_HOSTS.bk" "$PHP_HOSTS"
+       chmod 600 "$PHP_HOSTS" "$PHP_HOSTS.bk"
+   fi
 fi
 }
 
@@ -1107,6 +1116,10 @@ fi
 }
 
 dlist_dshield() {
+if [ -f "$DS_HOSTS" ]; then
+   cp "$DS_HOSTS" "$DS_HOSTS.bk"
+   chmod 600 "$DS_HOSTS" "$DS_HOSTS.bk"
+fi
 if [ ! "$DLIST_DSHIELD_URL" == "" ] && [ "$DLIST_DSHIELD" == "1" ] && [ -f "$WGET" ]; then
    URL_TMP=$(mktemp -d "$INSTALL_PATH/.apf-XXXXXX")
    URL_FILE="${DLIST_DSHIELD_URL##*/}"
@@ -1115,24 +1128,29 @@ if [ ! "$DLIST_DSHIELD_URL" == "" ] && [ "$DLIST_DSHIELD" == "1" ] && [ -f "$WGE
    $WGET -t 1 -T 4 "$DLIST_DSHIELD_URL" >> /dev/null 2>&1
    if [ $? -eq 0 ] && [ -f "$URL_TMP/$URL_FILE" ]; then
         eout "{dshield} parsing $URL_FILE into $DS_HOSTS"
-        if [ -f "$DS_HOSTS" ]; then
-                :> "$DS_HOSTS"
-        fi
+        :> "$DS_HOSTS"
         while IFS= read -r str; do
                 str=$(echo "$str" | grep -v "#" | grep -e '[0-9]' | awk '{print $1}')
                 if [ -n "$str" ]; then
-                    echo "$str/24" >> "$DS_HOSTS"
+                    if valid_ip_cidr "$str"; then
+                        echo "$str" >> "$DS_HOSTS"
+                    fi
                 fi
         done < "$URL_TMP/$URL_FILE"
    else
         eout "{dshield} download of $DLIST_DSHIELD_URL failed"
+        if [ -f "$DS_HOSTS.bk" ]; then
+            cp "$DS_HOSTS.bk" "$DS_HOSTS"
+            chmod 600 "$DS_HOSTS" "$DS_HOSTS.bk"
+        fi
    fi
    rm -rf "$URL_TMP"
    cd "$INSTALL_PATH"
 else
-   rm -f "$DS_HOSTS"
-   touch "$DS_HOSTS"
-   chmod 600 "$DS_HOSTS"
+   if [ -f "$DS_HOSTS.bk" ]; then
+       cp "$DS_HOSTS.bk" "$DS_HOSTS"
+       chmod 600 "$DS_HOSTS" "$DS_HOSTS.bk"
+   fi
 fi
 }
 
@@ -1161,6 +1179,10 @@ fi
 }
 
 dlist_spamhaus() {
+if [ -f "$DROP_HOSTS" ]; then
+   cp "$DROP_HOSTS" "$DROP_HOSTS.bk"
+   chmod 600 "$DROP_HOSTS" "$DROP_HOSTS.bk"
+fi
 if [ ! "$DLIST_SPAMHAUS_URL" == "" ] && [ "$DLIST_SPAMHAUS" == "1" ] && [ -f "$WGET" ]; then
    URL_TMP=$(mktemp -d "$INSTALL_PATH/.apf-XXXXXX")
    URL_FILE="${DLIST_SPAMHAUS_URL##*/}"
@@ -1169,24 +1191,29 @@ if [ ! "$DLIST_SPAMHAUS_URL" == "" ] && [ "$DLIST_SPAMHAUS" == "1" ] && [ -f "$W
    $WGET -t 1 -T 4 "$DLIST_SPAMHAUS_URL" >> /dev/null 2>&1
    if [ $? -eq 0 ] && [ -f "$URL_TMP/$URL_FILE" ]; then
         eout "{sdrop} parsing $URL_FILE into $DROP_HOSTS"
-        if [ -f "$DROP_HOSTS" ]; then
-                :> "$DROP_HOSTS"
-        fi
+        :> "$DROP_HOSTS"
         while IFS= read -r str; do
                 str=$(echo "$str" | grep -v "#" | grep "/" | awk '{print $1}' | tr -d ';')
                 if [ -n "$str" ]; then
-                    echo "$str" >> "$DROP_HOSTS"
+                    if valid_ip_cidr "$str"; then
+                        echo "$str" >> "$DROP_HOSTS"
+                    fi
                 fi
         done < "$URL_TMP/$URL_FILE"
    else
         eout "{sdrop} download of $DLIST_SPAMHAUS_URL failed"
+        if [ -f "$DROP_HOSTS.bk" ]; then
+            cp "$DROP_HOSTS.bk" "$DROP_HOSTS"
+            chmod 600 "$DROP_HOSTS" "$DROP_HOSTS.bk"
+        fi
    fi
    rm -rf "$URL_TMP"
    cd "$INSTALL_PATH"
 else
-   rm -f "$DROP_HOSTS"
-   touch "$DROP_HOSTS"
-   chmod 600 "$DROP_HOSTS"
+   if [ -f "$DROP_HOSTS.bk" ]; then
+       cp "$DROP_HOSTS.bk" "$DROP_HOSTS"
+       chmod 600 "$DROP_HOSTS" "$DROP_HOSTS.bk"
+   fi
 fi
 }
 
