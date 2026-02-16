@@ -77,12 +77,8 @@ tosroute PREROUTING
 . $PRERT
 
 # Allow all traffic on the loopback interface
-$IPT $IPT_FLAGS -A INPUT -i lo -s 0/0 -d 0/0 -j ACCEPT
-$IPT $IPT_FLAGS -A OUTPUT -o lo -s 0/0 -d 0/0 -j ACCEPT
-if [ "$USE_IPV6" == "1" ]; then
-	$IP6T $IPT_FLAGS -A INPUT -i lo -s ::/0 -d ::/0 -j ACCEPT
-	$IP6T $IPT_FLAGS -A OUTPUT -o lo -s ::/0 -d ::/0 -j ACCEPT
-fi
+ipt -A INPUT -i lo -j ACCEPT
+ipt -A OUTPUT -o lo -j ACCEPT
 
 
 # Allow all traffic on trusted interfaces

@@ -678,6 +678,8 @@ if [ ! "$(cat $file | grep -v "#")" == "" ]; then
                                 IPFLOW="s"
                         elif [ "$IPFLOW" == "d" ]; then
                                 IPFLOW="d"
+                        else
+                                continue
                         fi
                         PIP=$(trust_restore_ipv6 "$(echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$4}')")
 
@@ -703,6 +705,8 @@ if [ ! "$(cat $file | grep -v "#")" == "" ]; then
                         elif [ "$NFLOW" == "out" ]; then
                                 NFLOW="OUTPUT"
                                 NFLOW_T="outbound"
+                        else
+                                continue
                         fi
 
                         PFLOW=$(echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$2}')
@@ -712,6 +716,8 @@ if [ ! "$(cat $file | grep -v "#")" == "" ]; then
                         elif [ "$PFLOW" == "d" ]; then
                                 PFLOW="dport"
                                 PFLOW_T="to"
+                        else
+                                continue
                         fi
 
                         PPORT=$(echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$3}')
@@ -726,6 +732,8 @@ if [ ! "$(cat $file | grep -v "#")" == "" ]; then
                                 IPFLOW="s"
                         elif [ "$IPFLOW" == "d" ]; then
                                 IPFLOW="d"
+                        else
+                                continue
                         fi
                         PIP=$(trust_restore_ipv6 "$(echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$5}')")
 
@@ -753,6 +761,8 @@ if [ ! "$(cat $file | grep -v "#")" == "" ]; then
                                 PTYPE="tcp"
                         elif [ "$PTYPE" == "udp" ]; then
                                 PTYPE="udp"
+                        else
+                                continue
                         fi
 
                         NFLOW=$(echo $i | tr ':' ' ' | tr '=' ' '| awk '{print$2}')
@@ -762,6 +772,8 @@ if [ ! "$(cat $file | grep -v "#")" == "" ]; then
                         elif [ "$NFLOW" == "out" ]; then
                                 NFLOW="OUTPUT"
                                 NFLOW_T="outbound"
+                        else
+                                continue
                         fi
 
                         PFLOW=$(echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$3}')
@@ -771,6 +783,8 @@ if [ ! "$(cat $file | grep -v "#")" == "" ]; then
                         elif [ "$PFLOW" == "d" ]; then
                                 PFLOW="dport"
                                 PFLOW_T="to"
+                        else
+                                continue
                         fi
 
                         PPORT=$(echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$4}')
@@ -785,6 +799,8 @@ if [ ! "$(cat $file | grep -v "#")" == "" ]; then
                                 IPFLOW="s"
                         elif [ "$IPFLOW" == "d" ]; then
                                 IPFLOW="d"
+                        else
+                                continue
                         fi
                         PIP=$(trust_restore_ipv6 "$(echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$6}')")
 
@@ -865,6 +881,8 @@ if [ ! "$(cat $file | grep -v "#")" == "" ]; then
                                 IPFLOW="s"
                         elif [ "$IPFLOW" == "d" ]; then
                                 IPFLOW="d"
+                        else
+                                continue
                         fi
                         PIP=$(trust_restore_ipv6 "$(echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$4}')")
 
@@ -890,6 +908,8 @@ if [ ! "$(cat $file | grep -v "#")" == "" ]; then
                         elif [ "$NFLOW" == "out" ]; then
                                 NFLOW="OUTPUT"
                                 NFLOW_T="outbound"
+                        else
+                                continue
                         fi
 
                         PFLOW=$(echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$2}')
@@ -899,6 +919,8 @@ if [ ! "$(cat $file | grep -v "#")" == "" ]; then
                         elif [ "$PFLOW" == "d" ]; then
                                 PFLOW="dport"
                                 PFLOW_T="to"
+                        else
+                                continue
                         fi
 
                         PPORT=$(echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$3}')
@@ -913,6 +935,8 @@ if [ ! "$(cat $file | grep -v "#")" == "" ]; then
                                 IPFLOW="s"
                         elif [ "$IPFLOW" == "d" ]; then
                                 IPFLOW="d"
+                        else
+                                continue
                         fi
                         PIP=$(trust_restore_ipv6 "$(echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$5}')")
 
@@ -936,6 +960,8 @@ if [ ! "$(cat $file | grep -v "#")" == "" ]; then
                                 PTYPE="tcp"
                         elif [ "$PTYPE" == "udp" ]; then
                                 PTYPE="udp"
+                        else
+                                continue
                         fi
 
                         NFLOW=$(echo $i | tr ':' ' ' | tr '=' ' '| awk '{print$2}')
@@ -945,6 +971,8 @@ if [ ! "$(cat $file | grep -v "#")" == "" ]; then
                         elif [ "$NFLOW" == "out" ]; then
                                 NFLOW="OUTPUT"
                                 NFLOW_T="outbound"
+                        else
+                                continue
                         fi
 
                         PFLOW=$(echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$3}')
@@ -954,6 +982,8 @@ if [ ! "$(cat $file | grep -v "#")" == "" ]; then
                         elif [ "$PFLOW" == "d" ]; then
                                 PFLOW="dport"
                                 PFLOW_T="to"
+                        else
+                                continue
                         fi
 
                         PPORT=$(echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$4}')
@@ -968,6 +998,8 @@ if [ ! "$(cat $file | grep -v "#")" == "" ]; then
                                 IPFLOW="s"
                         elif [ "$IPFLOW" == "d" ]; then
                                 IPFLOW="d"
+                        else
+                                continue
                         fi
                         PIP=$(trust_restore_ipv6 "$(echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$6}')")
 
@@ -1031,11 +1063,12 @@ if [ ! "$DLIST_PHP_URL" == "" ] && [ "$DLIST_PHP" == "1" ] && [ -f "$WGET" ]; th
         if [ -f "$PHP_HOSTS" ]; then
                 :> "$PHP_HOSTS"
         fi
-        for str in $(cat "$URL_TMP/$URL_FILE" | grep -v "#" | grep -e '[0-9]' | awk '{print$1}'); do
-                if [ ! "$str" == "" ]; then
+        while IFS= read -r str; do
+                str=$(echo "$str" | grep -v "#" | grep -e '[0-9]' | awk '{print $1}')
+                if [ -n "$str" ]; then
                     echo "$str" >> "$PHP_HOSTS"
                 fi
-        done
+        done < "$URL_TMP/$URL_FILE"
    else
         eout "{php} download of $DLIST_PHP_URL failed"
    fi
@@ -1052,8 +1085,9 @@ dlist_php_hosts() {
 if [ ! "$(cat $PHP_HOSTS | grep -v "#")" == "" ]; then
         eout "{php} loading php_hosts.rules"
         ipt -N PHP
-        for i in $(cat $PHP_HOSTS | grep -v "#"); do
-                if [ ! "$i" == "" ] && [ -f "$PHP_HOSTS" ]; then
+        while IFS= read -r i; do
+                [[ "$i" == \#* || -z "$i" ]] && continue
+                if [ -f "$PHP_HOSTS" ]; then
 			if ! valid_ip_cidr "$i"; then
 				eout "{php} skipping invalid entry: $i"
 				continue
@@ -1065,7 +1099,7 @@ if [ ! "$(cat $PHP_HOSTS | grep -v "#")" == "" ]; then
                           $IPT_H $IPT_FLAGS -A PHP -s $i -d $ANY_ADDR -j $ALL_STOP
 			fi
                 fi
-        done
+        done < "$PHP_HOSTS"
         ipt -A INPUT -j PHP
         ipt -A OUTPUT -j PHP
 fi
@@ -1083,11 +1117,12 @@ if [ ! "$DLIST_DSHIELD_URL" == "" ] && [ "$DLIST_DSHIELD" == "1" ] && [ -f "$WGE
         if [ -f "$DS_HOSTS" ]; then
                 :> "$DS_HOSTS"
         fi
-        for str in $(cat "$URL_TMP/$URL_FILE" | grep -v "#" | grep -e '[0-9]' | awk '{print$1}'); do
-                if [ ! "$str" == "" ]; then
+        while IFS= read -r str; do
+                str=$(echo "$str" | grep -v "#" | grep -e '[0-9]' | awk '{print $1}')
+                if [ -n "$str" ]; then
                     echo "$str/24" >> "$DS_HOSTS"
                 fi
-        done
+        done < "$URL_TMP/$URL_FILE"
    else
         eout "{dshield} download of $DLIST_DSHIELD_URL failed"
    fi
@@ -1104,8 +1139,9 @@ dlist_dshield_hosts() {
 if [ ! "$(cat $DS_HOSTS | grep -v "#")" == "" ]; then
         eout "{dshield} loading ds_hosts.rules"
         ipt -N DSHIELD
-        for i in $(cat $DS_HOSTS | grep -v "#"); do
-                if [ ! "$i" == "" ] && [ -f "$DS_HOSTS" ]; then
+        while IFS= read -r i; do
+                [[ "$i" == \#* || -z "$i" ]] && continue
+                if [ -f "$DS_HOSTS" ]; then
 			if ! valid_ip_cidr "$i"; then
 				eout "{dshield} skipping invalid entry: $i"
 				continue
@@ -1117,7 +1153,7 @@ if [ ! "$(cat $DS_HOSTS | grep -v "#")" == "" ]; then
                           $IPT_H $IPT_FLAGS -A DSHIELD -s $i -d $ANY_ADDR -j $ALL_STOP
 			fi
                 fi
-        done
+        done < "$DS_HOSTS"
         ipt -A INPUT -j DSHIELD
         ipt -A OUTPUT -j DSHIELD
 fi
@@ -1135,11 +1171,12 @@ if [ ! "$DLIST_SPAMHAUS_URL" == "" ] && [ "$DLIST_SPAMHAUS" == "1" ] && [ -f "$W
         if [ -f "$DROP_HOSTS" ]; then
                 :> "$DROP_HOSTS"
         fi
-        for str in $(cat "$URL_TMP/$URL_FILE" | grep -v "#" | grep "/" | awk '{print$1}' | tr -d ';'); do
-                if [ ! "$str" == "" ]; then
+        while IFS= read -r str; do
+                str=$(echo "$str" | grep -v "#" | grep "/" | awk '{print $1}' | tr -d ';')
+                if [ -n "$str" ]; then
                     echo "$str" >> "$DROP_HOSTS"
                 fi
-        done
+        done < "$URL_TMP/$URL_FILE"
    else
         eout "{sdrop} download of $DLIST_SPAMHAUS_URL failed"
    fi
@@ -1157,8 +1194,9 @@ dlist_spamhaus_hosts() {
 if [ ! "$(cat $DROP_HOSTS | grep -v "#")" == "" ]; then
         eout "{sdrop} loading sdrop_hosts.rules"
         ipt -N SDROP
-        for i in $(cat $DROP_HOSTS | grep -v "#"); do
-                if [ ! "$i" == "" ] && [ -f "$DROP_HOSTS" ]; then
+        while IFS= read -r i; do
+                [[ "$i" == \#* || -z "$i" ]] && continue
+                if [ -f "$DROP_HOSTS" ]; then
 			if ! valid_ip_cidr "$i"; then
 				eout "{sdrop} skipping invalid entry: $i"
 				continue
@@ -1170,7 +1208,7 @@ if [ ! "$(cat $DROP_HOSTS | grep -v "#")" == "" ]; then
                           $IPT_H $IPT_FLAGS -A SDROP -s $i -d $ANY_ADDR -j $ALL_STOP
 			fi
                 fi
-        done
+        done < "$DROP_HOSTS"
         ipt -A INPUT -j SDROP
         ipt -A OUTPUT -j SDROP
 fi
@@ -1188,11 +1226,12 @@ if [ ! "$DLIST_ECNSHAME_URL" == "" ] && [ "$DLIST_ECNSHAME" == "1" ] && [ -f "$W
         if [ -f "$ECNSHAME_HOSTS" ]; then
                 :> "$ECNSHAME_HOSTS"
         fi
-        for str in $(cat "$URL_TMP/$URL_FILE"); do
-                if [ ! "$str" == "" ]; then
+        while IFS= read -r str; do
+                str=$(echo "$str" | grep -v "#" | grep -e '[0-9]' | awk '{print $1}')
+                if [ -n "$str" ]; then
                     echo "$str" >> "$ECNSHAME_HOSTS"
                 fi
-        done
+        done < "$URL_TMP/$URL_FILE"
    else
         eout "{ecnshame} download of $DLIST_ECNSHAME_URL failed"
    fi
@@ -1208,8 +1247,9 @@ fi
 dlist_ecnshame_hosts() {
 if [ ! "$(cat $ECNSHAME_HOSTS | grep -v "#")" == "" ]; then
         eout "{ecnshame} loading ecnshame_hosts.rules"
-        for i in $(cat $ECNSHAME_HOSTS | grep -v "#"); do
-                if [ ! "$i" == "" ] && [ -f "$ECNSHAME_HOSTS" ]; then
+        while IFS= read -r i; do
+                [[ "$i" == \#* || -z "$i" ]] && continue
+                if [ -f "$ECNSHAME_HOSTS" ]; then
 			if ! valid_ip_cidr "$i"; then
 				eout "{ecnshame} skipping invalid entry: $i"
 				continue
@@ -1218,7 +1258,7 @@ if [ ! "$(cat $ECNSHAME_HOSTS | grep -v "#")" == "" ]; then
 				$IPT_H $IPT_FLAGS -t mangle -A POSTROUTING -p tcp -d $i -j ECN --ecn-tcp-remove
 			fi
                 fi
-        done
+        done < "$ECNSHAME_HOSTS"
 fi
 }
 
@@ -1329,14 +1369,14 @@ while IFS= read -r line; do
 	$IPSET destroy "${name}-tmp" 2>/dev/null
 	eout "{ipset} loaded $count entries into $name ($hash_type)"
 
-	# Create iptables chain
-	$IPT $IPT_FLAGS -N "IPSET_${name}" 2>/dev/null
+	# Create iptables chain (IPv4 only — ipset entries are IPv4-filtered)
+	ipt4 -N "IPSET_${name}" 2>/dev/null
 	if [ "$logflag" == "1" ] && [ "$LOG_DROP" == "1" ]; then
-		$IPT $IPT_FLAGS -A "IPSET_${name}" -m set --match-set "$name" "$flow" -m limit --limit="${IPSET_LOG_RATE}/minute" -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** IPSET_${name} ** "
+		ipt4 -A "IPSET_${name}" -m set --match-set "$name" "$flow" -m limit --limit="${IPSET_LOG_RATE}/minute" -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** IPSET_${name} ** "
 	fi
-	$IPT $IPT_FLAGS -A "IPSET_${name}" -m set --match-set "$name" "$flow" -j $ALL_STOP
-	$IPT $IPT_FLAGS -A INPUT -j "IPSET_${name}"
-	$IPT $IPT_FLAGS -A OUTPUT -j "IPSET_${name}"
+	ipt4 -A "IPSET_${name}" -m set --match-set "$name" "$flow" -j $ALL_STOP
+	ipt4 -A INPUT -j "IPSET_${name}"
+	ipt4 -A OUTPUT -j "IPSET_${name}"
 done < "$ipset_rules"
 }
 
@@ -1494,12 +1534,13 @@ FILE="$1"
 if [ -f "$FILE" ]; then
 FNAME="${FILE##*/}"
 eout "{glob} loading $FNAME"
- for i in $(cat $FILE | grep -v "#"); do
-  if [ ! "$i" == "" ] && ipt_for_host "$i"; then
+ while IFS= read -r i; do
+  [[ "$i" == \#* || -z "$i" ]] && continue
+  if ipt_for_host "$i"; then
         $IPT_H $IPT_FLAGS -A INPUT -s $i -j $ALL_STOP
 	$IPT_H $IPT_FLAGS -A OUTPUT -d $i -j $ALL_STOP
   fi
- done
+ done < "$FILE"
 fi
 }
 
@@ -1579,7 +1620,7 @@ if [ "$SET_EXPIRE" -ge "60" ]; then
  if [ -f "$INSTALL_PATH/deny_hosts.rules" ]; then
          expire_time="$SET_EXPIRE"
          check_time=$(date +%s)
-         for i in $(cat $INSTALL_PATH/deny_hosts.rules | grep -vE "static|noexpire" | grep -iE "# added.*on.*" | awk '{print$3"|"$5"|"$6}'); do
+         while IFS= read -r i; do
                 declare -a arr
                 arr=($(echo ${i//|/ }))
                 ip=${arr[0]}
@@ -1592,7 +1633,7 @@ if [ "$SET_EXPIRE" -ge "60" ]; then
                         sed -i "\%^$ip\b%d" "$INSTALL_PATH/deny_hosts.rules"
                         cli_trust_remove "$ip" >> /dev/null 2>&1
                 fi
-         done
+         done < <(grep -vE "static|noexpire" "$INSTALL_PATH/deny_hosts.rules" | grep -iE "# added.*on.*" | awk '{print$3"|"$5"|"$6}')
  fi
 fi
 }
@@ -1609,7 +1650,7 @@ refresh() {
 	fi
 
         eout "{glob} refreshing trust system rules"
-	tmpra="$INSTALL_PATH/internals/refresh.allow.temp.$$"
+	tmpra=$(mktemp "$INSTALL_PATH/internals/refresh.allow.XXXXXX")
 
         if [ "$SET_EXPIRE" -ge "60" ]; then
                 # expire deny_hosts bans
@@ -1645,23 +1686,25 @@ refresh() {
 		$IP6TS | grep -E "TALLOW|TGALLOW" | grep -E '[0-9a-fA-F]*:[0-9a-fA-F:]+' | awk '{print$4}' | sort | uniq >> $tmpra
 	fi
         ipt -F REFRESH_TEMP
-        for i in $(cat $tmpra | grep -v "#"); do
-                if [ ! "$i" == "" ] && ipt_for_host "$i"; then
+        while IFS= read -r i; do
+                [[ "$i" == \#* || -z "$i" ]] && continue
+                if ipt_for_host "$i"; then
                  $IPT_H $IPT_FLAGS -A REFRESH_TEMP -s $i -d $ANY_ADDR -j ACCEPT
                  $IPT_H $IPT_FLAGS -A REFRESH_TEMP -d $i -s $ANY_ADDR -j ACCEPT
                 fi
-        done
-        tmprd="$INSTALL_PATH/internals/refresh.drop.temp.$$"
+        done < "$tmpra"
+        tmprd=$(mktemp "$INSTALL_PATH/internals/refresh.drop.XXXXXX")
         $IPTS | grep -E "TDENY|TGDENY" | grep -E '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | awk '{print$4}' | sort -n | uniq > $tmprd
 	if [ "$USE_IPV6" == "1" ] && [ -n "$IP6TS" ]; then
 		$IP6TS | grep -E "TDENY|TGDENY" | grep -E '[0-9a-fA-F]*:[0-9a-fA-F:]+' | awk '{print$4}' | sort | uniq >> $tmprd
 	fi
-        for i in $(cat $tmprd | grep -v "#"); do
-                if [ ! "$i" == "" ] && ipt_for_host "$i"; then
+        while IFS= read -r i; do
+                [[ "$i" == \#* || -z "$i" ]] && continue
+                if ipt_for_host "$i"; then
                  $IPT_H $IPT_FLAGS -A REFRESH_TEMP -s $i -d $ANY_ADDR -j $ALL_STOP
                  $IPT_H $IPT_FLAGS -A REFRESH_TEMP -d $i -s $ANY_ADDR -j $ALL_STOP
                 fi
-        done
+        done < "$tmprd"
         trim $DENY_HOSTS $SET_TRIM
         trim $GDENY_HOSTS $SET_TRIM
         ipt -F TDENY

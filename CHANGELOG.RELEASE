@@ -27,6 +27,22 @@
       rule incorrectly opened UDP on the SSH port (firewall)
 [Fix] Interface validation error messages now reference the specific
       failing interface instead of the entire interface list (firewall)
+[Change] ipset chain wiring uses ipt4() helper instead of raw $IPT for
+      consistency with dual-stack convention (functions.apf)
+[Change] Loopback rules use ipt() helper and remove redundant 0/0 source/
+      destination match (firewall)
+[Fix] Advanced trust syntax now rejects entries with unrecognized flow,
+      direction, or protocol fields instead of passing them as raw
+      iptables flags — prevents malformed trust entries from injecting
+      arbitrary arguments (functions.apf)
+[Fix] refresh() temp files now use mktemp instead of PID-based naming,
+      preventing symlink attack vectors (functions.apf)
+[Fix] dlist_ecnshame() download now filters for IP-shaped content and
+      strips comments, matching all other dlist download functions
+      (functions.apf)
+[Change] All dlist_*_hosts() chain-loading functions, dnet(), expirebans(),
+      and refresh() converted from for-in-cat to while-read loops,
+      eliminating glob expansion risk on trust file entries (functions.apf)
 [Fix] valid_host() IPv4 now delegates to valid_ip_cidr() for octet range
       validation; rejects invalid addresses like 999.1.2.3 and masks > /32
       (functions.apf)
