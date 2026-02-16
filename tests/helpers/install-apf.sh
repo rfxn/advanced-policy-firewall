@@ -54,6 +54,9 @@ install_apf() {
     # Disable ipset block lists (tests enable individually)
     sed -i 's/^USE_IPSET=.*/USE_IPSET="0"/' "$conf"
 
+    # Disable GRE tunnels (tests enable individually)
+    sed -i 's/^USE_GRE=.*/USE_GRE="0"/' "$conf"
+
     # Ensure log file exists
     touch /var/log/apf_log
     chmod 600 /var/log/apf_log

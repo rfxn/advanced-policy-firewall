@@ -57,7 +57,8 @@ RUN cd /opt/apf-src && INSTALL_PATH=/opt/apf sh install.sh && \
     sed -i 's/^SET_FASTLOAD=.*/SET_FASTLOAD="0"/' "$conf" && \
     sed -i 's/^SET_REFRESH=.*/SET_REFRESH="0"/' "$conf" && \
     sed -i 's/^BLK_RESNET=.*/BLK_RESNET="0"/' "$conf" && \
-    sed -i 's/^USE_IPSET=.*/USE_IPSET="0"/' "$conf"
+    sed -i 's/^USE_IPSET=.*/USE_IPSET="0"/' "$conf" && \
+    sed -i 's/^USE_GRE=.*/USE_GRE="0"/' "$conf"
 
 # Save clean state for test resets
 RUN for f in allow_hosts.rules deny_hosts.rules; do \

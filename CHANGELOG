@@ -1,4 +1,18 @@
 - 2.0.1 | Feb 16 2026:
+[New] GRE tunnel support: encapsulated point-to-point links with dedicated
+      GRE_IN/GRE_OUT chains, protocol 47 rules, and per-tunnel interface
+      accept rules. USE_GRE config toggle, gre.conf definition file,
+      create_gretun()/destroy_gretun()/gre_init()/gre_flush()/gre_teardown()/
+      gre_status() lifecycle functions, --gre-up/--gre-down/--gre-status CLI
+      options, auto-MTU calculation, keepalive, tunnel key, per-tunnel
+      overrides, source/target role routing (conf.apf, internals.conf,
+      gretunnel.sh, gre.conf, firewall, functions.apf, apf, .ca.def)
+[New] GRE test suite: 14 tests covering tunnel creation, chain structure,
+      protocol 47 rules, interface rules, addresses, MTU, IP routing,
+      disable/enable, flush persistence, teardown, validation
+      (tests/18-gre.bats)
+[Change] All 10 Dockerfiles and install-apf.sh updated with USE_GRE="0"
+      config override for deterministic test behavior
 [New] ipset block list support: kernel-level hash tables for O(1) IP matching.
       USE_IPSET config toggle, ipset.rules definition file, ipset_load()/
       ipset_update()/ipset_flush() lifecycle functions, --ipset-update CLI

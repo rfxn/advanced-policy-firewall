@@ -262,6 +262,19 @@ case "$1" in
 		ipset_update
 	fi
 	;;
+--gre-up)
+	if [ "$USE_GRE" == "1" ]; then
+		gre_init
+	fi
+	;;
+--gre-down)
+	if [ "$USE_GRE" == "1" ]; then
+		gre_teardown
+	fi
+	;;
+--gre-status)
+	gre_status
+	;;
 *)
 	head
 	help

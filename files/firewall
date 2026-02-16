@@ -95,6 +95,9 @@ if [ ! "$IFACE_TRUSTED" == "" ]; then
  done
 fi
 
+# Create GRE tunnels and firewall rules
+gre_init
+
 # Create TCP RESET & UDP PROHIBIT chains
 ipt -N RESET
 ipt -A RESET -p tcp -j REJECT --reject-with tcp-reset

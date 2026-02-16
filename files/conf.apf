@@ -563,6 +563,32 @@ USE_IPSET="0"
 IPSET_LOG_RATE="30"
 
 ##
+# [GRE Tunnels]
+##
+# GRE tunnel support provides encapsulated point-to-point links between hosts.
+# When enabled, tunnels defined in gre.conf are created on firewall start and
+# GRE protocol (47) traffic is explicitly allowed to/from tunnel endpoints.
+# Requires the 'ip' utility (iproute2 package).
+# When disabled, gre.conf is ignored.
+USE_GRE="0"
+
+# Keep tunnel interfaces alive when firewall is flushed/stopped.
+# When 1, only firewall rules are removed; tunnel interfaces persist.
+# When 0, tunnel interfaces are also torn down on flush.
+GRE_PERSIST="1"
+
+# GRE keepalive: interval (seconds) and retries before declaring tunnel dead.
+# Set to "0 0" to disable keepalive. Requires kernel >= 3.x.
+GRE_KEEPALIVE="10 3"
+
+# Tunnel MTU. Empty = auto-calculate (parent interface MTU minus 24 byte GRE
+# overhead). Set explicitly if needed (e.g., "1400" for double-encapsulation).
+GRE_MTU=""
+
+# IP TTL for GRE tunnel packets.
+GRE_TTL="255"
+
+##
 # [Logging and control settings]
 ##
 # Log all traffic that is filtered by the firewall

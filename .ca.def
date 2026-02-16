@@ -1,5 +1,10 @@
 USE_IPSET="${USE_IPSET:-0}"
 IPSET_LOG_RATE="${IPSET_LOG_RATE:-30}"
+USE_GRE="${USE_GRE:-0}"
+GRE_PERSIST="${GRE_PERSIST:-1}"
+GRE_KEEPALIVE="${GRE_KEEPALIVE:-10 3}"
+GRE_MTU="${GRE_MTU:-}"
+GRE_TTL="${GRE_TTL:-255}"
 
 cat > .conf.apf <<EOF
 #!/bin/sh
@@ -559,6 +564,32 @@ USE_IPSET="$USE_IPSET"
 # Individual lists control logging via the log field in ipset.rules (0=off, 1=on).
 # Requires LOG_DROP="1" to be globally enabled.
 IPSET_LOG_RATE="$IPSET_LOG_RATE"
+
+##
+# [GRE Tunnels]
+##
+# GRE tunnel support provides encapsulated point-to-point links between hosts.
+# When enabled, tunnels defined in gre.conf are created on firewall start and
+# GRE protocol (47) traffic is explicitly allowed to/from tunnel endpoints.
+# Requires the 'ip' utility (iproute2 package).
+# When disabled, gre.conf is ignored.
+USE_GRE="$USE_GRE"
+
+# Keep tunnel interfaces alive when firewall is flushed/stopped.
+# When 1, only firewall rules are removed; tunnel interfaces persist.
+# When 0, tunnel interfaces are also torn down on flush.
+GRE_PERSIST="$GRE_PERSIST"
+
+# GRE keepalive: interval (seconds) and retries before declaring tunnel dead.
+# Set to "0 0" to disable keepalive. Requires kernel >= 3.x.
+GRE_KEEPALIVE="$GRE_KEEPALIVE"
+
+# Tunnel MTU. Empty = auto-calculate (parent interface MTU minus 24 byte GRE
+# overhead). Set explicitly if needed (e.g., "1400" for double-encapsulation).
+GRE_MTU="$GRE_MTU"
+
+# IP TTL for GRE tunnel packets.
+GRE_TTL="$GRE_TTL"
 
 ##
 # [Logging and control settings]
