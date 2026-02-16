@@ -1,4 +1,6 @@
 - 2.0.1 | Feb 16 2026:
+[Fix] GRE protocol 47 test assertions widened for old iptables on Ubuntu
+      12.04 which displays -p 47 instead of -p gre (tests/18-gre.bats)
 [Fix] DShield /24 host inflation: dlist_dshield() no longer appends /24
       to individual host IPs from the DShield feed; entries are now written
       as-is, preventing collateral blocking of 256 addresses per host

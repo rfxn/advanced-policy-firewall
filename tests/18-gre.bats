@@ -84,12 +84,12 @@ setup() {
 }
 
 @test "Protocol 47 inbound rule for remote endpoint" {
-    # iptables -S normalizes: -p 47 -> -p gre, bare IP -> IP/32, -s before -p
-    assert_rule_exists_ips GRE_IN "-s 192.0.2.1.*-p gre -j ACCEPT"
+    # Modern iptables normalizes -p 47 to -p gre; old legacy keeps -p 47
+    assert_rule_exists_ips GRE_IN "-s 192.0.2.1.*-p (gre|47) -j ACCEPT"
 }
 
 @test "Protocol 47 outbound rule for remote endpoint" {
-    assert_rule_exists_ips GRE_OUT "-d 192.0.2.1.*-p gre -j ACCEPT"
+    assert_rule_exists_ips GRE_OUT "-d 192.0.2.1.*-p (gre|47) -j ACCEPT"
 }
 
 @test "Interface accept rule in GRE_IN" {
