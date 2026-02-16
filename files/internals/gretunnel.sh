@@ -27,19 +27,19 @@ create_gretun() {
 		return 1
 	fi
 
-	# Validate IPs
+	# Validate IPs (GRE requires IP addresses, not hostnames)
 	if [ -z "$routefrom" ] || [ -z "$routeto" ]; then
 		eout "{gre} error: routefrom and routeto are required"
 		unset gre_keepalive gre_mtu gre_ttl gre_key
 		return 1
 	fi
-	if ! valid_host "$routefrom"; then
-		eout "{gre} error: invalid routefrom address '$routefrom'"
+	if ! valid_ip_cidr "$routefrom"; then
+		eout "{gre} error: invalid routefrom IP address '$routefrom'"
 		unset gre_keepalive gre_mtu gre_ttl gre_key
 		return 1
 	fi
-	if ! valid_host "$routeto"; then
-		eout "{gre} error: invalid routeto address '$routeto'"
+	if ! valid_ip_cidr "$routeto"; then
+		eout "{gre} error: invalid routeto IP address '$routeto'"
 		unset gre_keepalive gre_mtu gre_ttl gre_key
 		return 1
 	fi
@@ -68,6 +68,13 @@ create_gretun() {
 	local ka="${gre_keepalive:-$GRE_KEEPALIVE}"
 	local key="${gre_key:-}"
 
+	# Validate key as integer if specified
+	if [ -n "$key" ] && ! echo "$key" | grep -qE '^[0-9]+$'; then
+		eout "{gre} error: invalid key '$key' (must be integer)"
+		unset gre_keepalive gre_mtu gre_ttl gre_key
+		return 1
+	fi
+
 	# Determine local/remote and tunnel IP based on role
 	local local_ip remote_ip greip greip_peer
 	if [ "$role" == "source" ]; then
@@ -84,12 +91,21 @@ create_gretun() {
 
 	# Create tunnel interface if it doesn't already exist (idempotent)
 	if ! $ip link show "$linkname" >/dev/null 2>&1; then
-		local tunnel_cmd="$ip tunnel add $linkname mode gre remote $remote_ip local $local_ip ttl $ttl"
 		if [ -n "$key" ]; then
-			tunnel_cmd="$tunnel_cmd key $key"
+			$ip tunnel add "$linkname" mode gre remote "$remote_ip" local "$local_ip" ttl "$ttl" key "$key"
+		else
+			$ip tunnel add "$linkname" mode gre remote "$remote_ip" local "$local_ip" ttl "$ttl"
 		fi
-		eval $tunnel_cmd
-		$ip link set "$linkname" up
+		if [ $? -ne 0 ]; then
+			eout "{gre} error: failed to create tunnel $linkname"
+			unset gre_keepalive gre_mtu gre_ttl gre_key
+			return 1
+		fi
+		if ! $ip link set "$linkname" up; then
+			eout "{gre} error: failed to bring up tunnel $linkname"
+			unset gre_keepalive gre_mtu gre_ttl gre_key
+			return 1
+		fi
 		$ip addr add "$greip/32" peer "$greip_peer/32" dev "$linkname"
 		eout "{gre} tunnel $linkname created: local=$local_ip remote=$remote_ip"
 	else
@@ -196,11 +212,15 @@ gre_init() {
 	# Load GRE kernel module (non-fatal)
 	ml ip_gre
 
-	# Create chains
-	ipt4 -N GRE_IN
-	ipt4 -N GRE_OUT
-	ipt4 -A INPUT -j GRE_IN
-	ipt4 -A OUTPUT -j GRE_OUT
+	# Create chains (idempotent — safe if already exists from prior apf -s)
+	if ! $IPT $IPT_FLAGS -L GRE_IN -n >/dev/null 2>&1; then
+		ipt4 -N GRE_IN
+		ipt4 -A INPUT -j GRE_IN
+	fi
+	if ! $IPT $IPT_FLAGS -L GRE_OUT -n >/dev/null 2>&1; then
+		ipt4 -N GRE_OUT
+		ipt4 -A OUTPUT -j GRE_OUT
+	fi
 
 	# Clear tracking file
 	> "$INSTALL_PATH/internals/.gre.tunnels"
@@ -245,6 +265,19 @@ gre_teardown() {
 		done < "$tracking"
 		> "$tracking"
 	fi
+
+	# Clean up firewall chains
+	if $IPT $IPT_FLAGS -L GRE_IN -n >/dev/null 2>&1; then
+		ipt4 -D INPUT -j GRE_IN 2>/dev/null || true
+		ipt4 -F GRE_IN
+		ipt4 -X GRE_IN
+	fi
+	if $IPT $IPT_FLAGS -L GRE_OUT -n >/dev/null 2>&1; then
+		ipt4 -D OUTPUT -j GRE_OUT 2>/dev/null || true
+		ipt4 -F GRE_OUT
+		ipt4 -X GRE_OUT
+	fi
+
 	eout "{gre} all tunnels torn down"
 }
 

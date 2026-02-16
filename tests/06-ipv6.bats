@@ -117,6 +117,10 @@ teardown() {
     assert_rule_exists_ip6 MCAST6 "ff00::/8"
 }
 
+@test "MCAST6 exempts NDP ICMPv6 from multicast block" {
+    assert_rule_exists_ip6s MCAST6 "ipv6-icmp.*RETURN"
+}
+
 @test "IPv6 trust add goes to ip6tables only" {
     "$APF" -u 2001:db8::50 2>/dev/null || true
     run "$APF" -a 2001:db8::50 "ipv6 test"

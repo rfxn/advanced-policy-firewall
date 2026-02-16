@@ -259,6 +259,7 @@ case "$1" in
 	;;
 --ipset-update)
 	if [ "$USE_IPSET" == "1" ]; then
+		mutex_lock
 		ipset_update
 	fi
 	;;

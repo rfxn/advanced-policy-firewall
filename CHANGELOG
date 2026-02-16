@@ -1,4 +1,38 @@
 - 2.0.1 | Feb 16 2026:
+[Fix] GRE eval command injection: create_gretun() no longer uses eval to
+      build the tunnel command; replaced with direct $ip tunnel add using
+      if/else for the optional key flag (gretunnel.sh)
+[Fix] allow_hosts()/deny_hosts() glob expansion: all 8 for-in-$(cat) loops
+      converted to while IFS= read -r with process substitution, eliminating
+      glob expansion risk on trust file entries (functions.apf)
+[Fix] DLIST disabled regression: dlist_php(), dlist_dshield(), and
+      dlist_spamhaus() else branches now clear the rules file when the feature
+      is disabled; previously restored from backup, contradicting operator
+      intent to disable the list (functions.apf)
+[Fix] --gre-down leaves stale firewall chains: gre_teardown() now flushes
+      and deletes GRE_IN/GRE_OUT chains and removes INPUT/OUTPUT jumps;
+      previously only destroyed tunnel interfaces (gretunnel.sh)
+[Fix] --gre-up idempotent: gre_init() now guards chain creation with
+      existence check; previously failed with "chain already exists" when
+      called on a running firewall (gretunnel.sh)
+[Fix] --ipset-update mutex: the --ipset-update CLI path now calls
+      mutex_lock() to prevent racing with concurrent apf -r (apf)
+[Fix] GRE tunnel creation exit codes: $ip tunnel add and $ip link set
+      return codes now checked; failure aborts with error message instead
+      of continuing to add firewall rules for non-existent interfaces
+      (gretunnel.sh)
+[Fix] GRE endpoint validation: create_gretun() now uses valid_ip_cidr()
+      instead of valid_host() for routefrom/routeto; GRE requires IP
+      addresses, not hostnames which the kernel silently rejects
+      (gretunnel.sh)
+[Fix] GRE key validation: tunnel key now validated as integer; non-numeric
+      values rejected with error message before reaching the kernel
+      (gretunnel.sh)
+[New] MCAST6 NDP RETURN test assertion: verifies ICMPv6 RETURN exemptions
+      in MCAST6 chain that protect NDP from multicast blocking
+      (tests/06-ipv6.bats)
+[New] DLIST disabled no-chain test: verifies DLIST_*=0 clears rules files
+      and creates no iptables chain (tests/19-dlist.bats)
 [Fix] GRE protocol 47 test assertions widened for old iptables on Ubuntu
       12.04 which displays -p 47 instead of -p gre (tests/18-gre.bats)
 [Fix] DShield /24 host inflation: dlist_dshield() no longer appends /24

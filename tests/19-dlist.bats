@@ -129,6 +129,27 @@ teardown_file() {
     [ "$drop_count" -ge 2 ]
 }
 
+@test "DLIST disabled clears rules file and creates no chain" {
+    "$APF" -f 2>/dev/null || true
+    source /opt/tests/helpers/apf-config.sh
+
+    # Pre-populate a rules file
+    echo "192.0.2.99" > "$APF_DIR/ds_hosts.rules"
+    chmod 600 "$APF_DIR/ds_hosts.rules"
+
+    apf_set_config "DLIST_DSHIELD" "0"
+    apf_set_config "DLIST_PHP" "0"
+    apf_set_config "DLIST_SPAMHAUS" "0"
+
+    "$APF" -s
+
+    # DSHIELD chain should NOT exist when DLIST_DSHIELD=0
+    assert_chain_not_exists DSHIELD
+
+    # Rules file should be empty (cleared by disabled dlist)
+    [ ! -s "$APF_DIR/ds_hosts.rules" ]
+}
+
 @test "invalid entries in rules file are skipped during chain loading" {
     "$APF" -f 2>/dev/null || true
     source /opt/tests/helpers/apf-config.sh

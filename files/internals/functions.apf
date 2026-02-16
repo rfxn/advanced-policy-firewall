@@ -637,14 +637,15 @@ if [ ! "$(cat $file | grep -v "#")" == "" ]; then
         eout "{glob} loading $file"
         #
         #
-        for i in $(cat $file | grep -v "#" | grep -v "="); do
-                if [ ! "$i" == "" ] && ! valid_host "$i"; then
+        while IFS= read -r i; do
+                [ -z "$i" ] && continue
+                if ! valid_host "$i"; then
                         eout "{trust} skipping invalid entry in $file: $i"
                         continue
                 fi
                 val=$(cat "$INSTALL_PATH/internals/.localaddrs" "$INSTALL_PATH/internals/.localaddrs6" 2>/dev/null | grep -w "$i")
                 if [ ! "$val" ]; then
-                 if [ ! "$i" == "" ] && [ -f "$file" ]; then
+                 if [ -f "$file" ]; then
                   if ipt_for_host "$i"; then
                         eout "{trust} allow all to/from $i"
                         $IPT_H $IPT_FLAGS -A $chain -s $i -d $ANY_ADDR -j ACCEPT
@@ -652,11 +653,11 @@ if [ ! "$(cat $file | grep -v "#")" == "" ]; then
                   fi
                  fi
 		fi
-        done
+        done < <(grep -v '#' "$file" | grep -v '=')
         #
         #
-        for i in $(cat $file | grep -v "#" | grep "=" | grep -vw in | grep -vw out | grep -v tcp | grep -v udp); do
-                if [ ! "$i" == "" ] && [ -f "$file" ]; then
+        while IFS= read -r i; do
+                if [ -n "$i" ] && [ -f "$file" ]; then
                         i=$(trust_protect_ipv6 "$i")
 
                         PFLOW=$(echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$1}')
@@ -692,11 +693,11 @@ if [ ! "$(cat $file | grep -v "#")" == "" ]; then
                          fi
                         fi
                 fi
-        done
+        done < <(grep -v '#' "$file" | grep '=' | grep -vw in | grep -vw out | grep -v tcp | grep -v udp)
         #
         #
-        for i in $(cat $file | grep -v "#" | grep "=" | grep -v "tcp" | grep -v "udp"); do
-                if [ ! "$i" == "" ] && [ -f "$file" ]; then
+        while IFS= read -r i; do
+                if [ -n "$i" ] && [ -f "$file" ]; then
                         i=$(trust_protect_ipv6 "$i")
 
                         NFLOW=$(echo $i | tr ':' ' ' | tr '=' ' '| awk '{print$1}')
@@ -750,11 +751,11 @@ if [ ! "$(cat $file | grep -v "#")" == "" ]; then
                          fi
                         fi
                 fi
-        done
+        done < <(grep -v '#' "$file" | grep '=' | grep -v tcp | grep -v udp)
         #
         #
-        for i in $(cat $file | grep -v "#" | grep "="); do
-                if [ ! "$i" == "" ] && [ -f "$file" ]; then
+        while IFS= read -r i; do
+                if [ -n "$i" ] && [ -f "$file" ]; then
                         i=$(trust_protect_ipv6 "$i")
 
                         PTYPE=$(echo $i | tr ':' ' ' | tr '=' ' '| awk '{print$1}')
@@ -821,7 +822,7 @@ if [ ! "$(cat $file | grep -v "#")" == "" ]; then
                          fi
                         fi
                 fi
-        done
+        done < <(grep -v '#' "$file" | grep '=')
 fi
 }
 
@@ -840,14 +841,15 @@ if [ ! "$(cat $file | grep -v "#")" == "" ]; then
         eout "{glob} loading $file"
         #
         #
-        for i in $(cat $file | grep -v "#" | grep -v "="); do
-                if [ ! "$i" == "" ] && ! valid_host "$i"; then
+        while IFS= read -r i; do
+                [ -z "$i" ] && continue
+                if ! valid_host "$i"; then
                         eout "{trust} skipping invalid entry in $file: $i"
                         continue
                 fi
                 val="$(cat "$INSTALL_PATH/internals/.localaddrs" "$INSTALL_PATH/internals/.localaddrs6" 2>/dev/null | grep -w "$i")"
                 if [ ! "$val" ]; then
-                 if [ ! "$i" == "" ] && [ -f "$file" ]; then
+                 if [ -f "$file" ]; then
                   if ipt_for_host "$i"; then
                         eout "{trust} deny all to/from $i"
                         $IPT_H $IPT_FLAGS -A $chain -s $i -d $ANY_ADDR -j $ALL_STOP
@@ -855,11 +857,11 @@ if [ ! "$(cat $file | grep -v "#")" == "" ]; then
                   fi
                  fi
 		fi
-        done
+        done < <(grep -v '#' "$file" | grep -v '=')
         #
         #
-	for i in $(cat $file | grep -v "#" | grep "=" | grep -vw in | grep -vw out | grep -v tcp | grep -v udp); do
-                if [ ! "$i" == "" ] && [ -f "$file" ]; then
+	while IFS= read -r i; do
+                if [ -n "$i" ] && [ -f "$file" ]; then
                         i=$(trust_protect_ipv6 "$i")
 
                         PFLOW=$(echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$1}')
@@ -895,11 +897,11 @@ if [ ! "$(cat $file | grep -v "#")" == "" ]; then
                          fi
                         fi
                 fi
-        done
+        done < <(grep -v '#' "$file" | grep '=' | grep -vw in | grep -vw out | grep -v tcp | grep -v udp)
         #
         #
-        for i in $(cat $file | grep -v "#" | grep "=" | grep -v "tcp" | grep -v "udp"); do
-                if [ ! "$i" == "" ] && [ -f "$file" ]; then
+        while IFS= read -r i; do
+                if [ -n "$i" ] && [ -f "$file" ]; then
                         i=$(trust_protect_ipv6 "$i")
 
                         NFLOW=$(echo $i | tr ':' ' ' | tr '=' ' '| awk '{print$1}')
@@ -949,11 +951,11 @@ if [ ! "$(cat $file | grep -v "#")" == "" ]; then
                          fi
                         fi
                 fi
-        done
+        done < <(grep -v '#' "$file" | grep '=' | grep -v tcp | grep -v udp)
         #
         #
-        for i in $(cat $file | grep -v "#" | grep "="); do
-                if [ ! "$i" == "" ] && [ -f "$file" ]; then
+        while IFS= read -r i; do
+                if [ -n "$i" ] && [ -f "$file" ]; then
                         i=$(trust_protect_ipv6 "$i")
 
                         PTYPE=$(echo $i | tr ':' ' ' | tr '=' ' '| awk '{print$1}')
@@ -1016,7 +1018,7 @@ if [ ! "$(cat $file | grep -v "#")" == "" ]; then
                          fi
                         fi
                 fi
-        done
+        done < <(grep -v '#' "$file" | grep '=')
 fi
 }
 
@@ -1084,10 +1086,9 @@ if [ ! "$DLIST_PHP_URL" == "" ] && [ "$DLIST_PHP" == "1" ] && [ -f "$WGET" ]; th
    rm -rf "$URL_TMP"
    cd "$INSTALL_PATH"
 else
-   if [ -f "$PHP_HOSTS.bk" ]; then
-       cp "$PHP_HOSTS.bk" "$PHP_HOSTS"
-       chmod 600 "$PHP_HOSTS" "$PHP_HOSTS.bk"
-   fi
+   rm -f "$PHP_HOSTS"
+   touch "$PHP_HOSTS"
+   chmod 600 "$PHP_HOSTS"
 fi
 }
 
@@ -1147,10 +1148,9 @@ if [ ! "$DLIST_DSHIELD_URL" == "" ] && [ "$DLIST_DSHIELD" == "1" ] && [ -f "$WGE
    rm -rf "$URL_TMP"
    cd "$INSTALL_PATH"
 else
-   if [ -f "$DS_HOSTS.bk" ]; then
-       cp "$DS_HOSTS.bk" "$DS_HOSTS"
-       chmod 600 "$DS_HOSTS" "$DS_HOSTS.bk"
-   fi
+   rm -f "$DS_HOSTS"
+   touch "$DS_HOSTS"
+   chmod 600 "$DS_HOSTS"
 fi
 }
 
@@ -1210,10 +1210,9 @@ if [ ! "$DLIST_SPAMHAUS_URL" == "" ] && [ "$DLIST_SPAMHAUS" == "1" ] && [ -f "$W
    rm -rf "$URL_TMP"
    cd "$INSTALL_PATH"
 else
-   if [ -f "$DROP_HOSTS.bk" ]; then
-       cp "$DROP_HOSTS.bk" "$DROP_HOSTS"
-       chmod 600 "$DROP_HOSTS" "$DROP_HOSTS.bk"
-   fi
+   rm -f "$DROP_HOSTS"
+   touch "$DROP_HOSTS"
+   chmod 600 "$DROP_HOSTS"
 fi
 }
 
