@@ -11,6 +11,18 @@ source /opt/tests/helpers/assert-iptables.bash
 APF="/opt/apf/apf"
 APF_DIR="/opt/apf"
 
+# Count members in an ipset set (portable across ipset versions).
+# Old ipset (v6.x on CentOS 6, Ubuntu 12.04) lacks "Number of entries:" line.
+assert_ipset_entry_count() {
+    local name="$1" expected="$2"
+    local count
+    count=$(ipset list "$name" | awk '/^Members:/{f=1;next} f && /./' | wc -l)
+    if [ "$count" -ne "$expected" ]; then
+        echo "Expected $expected entries in ipset '$name', got $count" >&2
+        return 1
+    fi
+}
+
 # Check if ipset is usable (binary + kernel support)
 ipset_available() {
     command -v ipset >/dev/null 2>&1 || return 1
@@ -89,8 +101,8 @@ teardown_file() {
     fi
     run ipset list test_block
     assert_success
-    # Should contain 3 entries
-    assert_output --partial "Number of entries: 3"
+    # Should contain 3 entries (count members for old ipset compatibility)
+    assert_ipset_entry_count test_block 3
 }
 
 @test "IPSET_test_block iptables chain exists" {
@@ -211,9 +223,7 @@ ISEOF
         skip "ipset not available"
     fi
     # The test blocklist has a comment line — verify only 3 IPs loaded
-    run ipset list test_block
-    assert_success
-    assert_output --partial "Number of entries: 3"
+    assert_ipset_entry_count test_block 3
 }
 
 @test "CIDR entries accepted in hash:net set" {
@@ -231,7 +241,7 @@ ISEOF
 
     run ipset list test_cidr
     assert_success
-    assert_output --partial "Number of entries: 2"
+    assert_ipset_entry_count test_cidr 2
 
     # Test that an IP within the CIDR is matched
     run ipset test test_cidr 198.51.100.50
