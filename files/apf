@@ -37,7 +37,7 @@ check_deps
 ##
 # Fast Load
 ##
-if [ "$SET_FASTLOAD" == "1" ]; then
+if [ "$SET_FASTLOAD" == "1" ] && [ "$DOCKER_COMPAT" != "1" ]; then
 # is this our first startup?
 # if so we certainly do not want fast load
 if [ ! -f "$INSTALL_PATH/internals/.last.full" ]; then
@@ -190,7 +190,7 @@ if [ "$MD5_FIRSTRUN" == "1" ]; then
 fi
 
 firewall_on=$($IPT $IPT_FLAGS -L --numeric | grep -vE "Chain|destination")
-if [ ! "$DEVEL_ON" == "1" ] && [ ! "$firewall_on" == "" ]; then
+if [ ! "$DEVEL_ON" == "1" ] && [ "$DOCKER_COMPAT" != "1" ] && [ ! "$firewall_on" == "" ]; then
 	$IPTS > $INSTALL_PATH/internals/.apf.restore
 	if [ "$USE_IPV6" == "1" ] && [ -n "$IP6TS" ]; then
 		$IP6TS > $INSTALL_PATH/internals/.apf6.restore

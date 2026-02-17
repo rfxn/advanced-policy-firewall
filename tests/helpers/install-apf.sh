@@ -57,6 +57,9 @@ install_apf() {
     # Disable GRE tunnels (tests enable individually)
     sed -i 's/^USE_GRE=.*/USE_GRE="0"/' "$conf"
 
+    # Disable Docker compat (tests enable individually)
+    sed -i 's/^DOCKER_COMPAT=.*/DOCKER_COMPAT="0"/' "$conf"
+
     # Ensure log file exists
     touch /var/log/apf_log
     chmod 600 /var/log/apf_log

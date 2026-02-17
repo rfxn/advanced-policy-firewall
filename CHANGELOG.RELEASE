@@ -1,4 +1,21 @@
 - 2.0.1 | Feb 16 2026:
+[New] Docker/container chain preservation mode (DOCKER_COMPAT); when enabled,
+      flush() only removes APF-owned chains, preserving Docker, containerd,
+      Kubernetes, and Podman chains in FORWARD and nat table. Fast load and
+      snapshot save automatically disabled in compat mode to prevent
+      iptables-restore from overwriting external chains (conf.apf,
+      functions.apf, apf, .ca.def)
+[New] flush_apf_chains() surgical flush function; removes only known APF
+      chains from filter table, flushes mangle PREROUTING/POSTROUTING,
+      resets INPUT/OUTPUT policies while leaving FORWARD policy and nat/raw
+      tables untouched (functions.apf)
+[New] Docker compat test suite: 10 tests covering chain preservation across
+      start/flush/restart, nuclear flush default, fast load skip, mangle vs
+      nat behavior (tests/20-docker-compat.bats)
+[Fix] flush_apf_chains() IPv6 chain list missing PHP, DSHIELD, SDROP;
+      these dual-stack chains (created via ipt -N) were cleaned from IPv4
+      but left as orphans in ip6tables when DOCKER_COMPAT=1 and USE_IPV6=1,
+      causing -N errors on subsequent start (functions.apf)
 [Fix] GRE eval command injection: create_gretun() no longer uses eval to
       build the tunnel command; replaced with direct $ip tunnel add using
       if/else for the optional key flag (gretunnel.sh)

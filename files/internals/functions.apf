@@ -457,37 +457,121 @@ cli_trust() {
  fi
 }
 
+flush_apf_chains() {
+	# Surgical flush: only remove APF-owned chains, preserving Docker/k8s/etc.
+	# Used when DOCKER_COMPAT="1" instead of nuclear flush.
+
+	# Flush INPUT and OUTPUT (APF owns these completely)
+	ipt4 -F INPUT
+	ipt4 -F OUTPUT
+	if [ "$USE_IPV6" == "1" ]; then
+		ipt6 -F INPUT
+		ipt6 -F OUTPUT
+	fi
+
+	# Remove jumps from INPUT/OUTPUT to APF chains before deleting them
+	local apf_chains="TALLOW TDENY TGALLOW TGDENY REFRESH_TEMP
+		RESET PROHIBIT RABPSCAN TELNET_LOG SSH_LOG
+		IDENT P2P DEG IN_SANITY OUT_SANITY FRAG_UDP
+		PZERO MCAST LMAC PHP DSHIELD SDROP"
+	for chain in $apf_chains; do
+		if $IPT $IPT_FLAGS -L "$chain" -n >/dev/null 2>&1; then
+			ipt4 -F "$chain"
+			ipt4 -X "$chain"
+		fi
+	done
+
+	# IPv6-specific chains
+	if [ "$USE_IPV6" == "1" ]; then
+		local apf_chains6="TALLOW TDENY TGALLOW TGDENY REFRESH_TEMP
+			RESET PROHIBIT RABPSCAN TELNET_LOG SSH_LOG
+			IDENT P2P PHP DSHIELD SDROP IN_SANITY6 OUT_SANITY6
+			FRAG_UDP6 PZERO6 MCAST6"
+		for chain in $apf_chains6; do
+			if $IP6T $IPT_FLAGS -L "$chain" -n >/dev/null 2>&1; then
+				ipt6 -F "$chain"
+				ipt6 -X "$chain"
+			fi
+		done
+	fi
+
+	# IPSET chains (dynamic names from ipset.rules)
+	if [ -n "$IPSET" ] && [ -f "$INSTALL_PATH/ipset.rules" ]; then
+		while IFS= read -r line; do
+			case "$line" in \#*|"") continue ;; esac
+			local name
+			name=$(echo "$line" | cut -d: -f1)
+			[ -z "$name" ] && continue
+			if $IPT $IPT_FLAGS -L "IPSET_${name}" -n >/dev/null 2>&1; then
+				ipt4 -F "IPSET_${name}"
+				ipt4 -X "IPSET_${name}"
+			fi
+		done < "$INSTALL_PATH/ipset.rules"
+	fi
+
+	# GRE chains (handled by gre_flush but also clean up here)
+	if $IPT $IPT_FLAGS -L GRE_IN -n >/dev/null 2>&1; then
+		ipt4 -F GRE_IN
+		ipt4 -X GRE_IN
+	fi
+	if $IPT $IPT_FLAGS -L GRE_OUT -n >/dev/null 2>&1; then
+		ipt4 -F GRE_OUT
+		ipt4 -X GRE_OUT
+	fi
+
+	# Flush mangle PREROUTING/POSTROUTING (tosroute/ECN)
+	ipt4 -t mangle -F PREROUTING 2>/dev/null || true
+	ipt4 -t mangle -F POSTROUTING 2>/dev/null || true
+	if [ "$USE_IPV6" == "1" ]; then
+		ipt6 -t mangle -F PREROUTING 2>/dev/null || true
+		ipt6 -t mangle -F POSTROUTING 2>/dev/null || true
+	fi
+
+	# Set INPUT/OUTPUT to ACCEPT; leave FORWARD as-is
+	ipt -P INPUT ACCEPT
+	ipt -P OUTPUT ACCEPT
+	# Note: FORWARD policy deliberately NOT touched
+}
+
 flush() {
 firewall_on=$($IPT $IPT_FLAGS -L --numeric | grep -vE "Chain|destination")
-if [ "$SET_FASTLOAD" == "1" ] && [ ! "$1" == "1" ] && [ ! "$DEVEL_ON" == "1" ] && [ ! "$firewall_on" == "" ]; then
+if [ "$SET_FASTLOAD" == "1" ] && [ "$DOCKER_COMPAT" != "1" ] && [ ! "$1" == "1" ] && [ ! "$DEVEL_ON" == "1" ] && [ ! "$firewall_on" == "" ]; then
 	$IPTS > $INSTALL_PATH/internals/.apf.restore
 	if [ "$USE_IPV6" == "1" ] && [ -n "$IP6TS" ]; then
 		$IP6TS > $INSTALL_PATH/internals/.apf6.restore
 	fi
 	eout "{glob} fast load snapshot saved"
 fi
-if [ ! "$1" = "1" ]; then
-	eout "{glob} flushing & zeroing chain policies"
-fi
-chains=$(cat /proc/net/ip_tables_names 2>/dev/null)
-# Fallback for nft backend where /proc/net/ip_tables_names is absent
-if [ -z "$chains" ]; then
-	chains="filter nat mangle raw"
-fi
-for i in $chains; do ipt4 -t $i -F; done
-for i in $chains; do ipt4 -t $i -X; done
-ipt -P INPUT ACCEPT
-ipt -P OUTPUT ACCEPT
-ipt -P FORWARD ACCEPT
 
-if [ "$USE_IPV6" == "1" ]; then
-	chains6=$(cat /proc/net/ip6_tables_names 2>/dev/null)
-	# Fallback for nft backend where /proc/net/ip6_tables_names is absent
-	if [ -z "$chains6" ]; then
-		chains6="filter nat mangle raw"
+if [ "$DOCKER_COMPAT" == "1" ]; then
+	if [ ! "$1" = "1" ]; then
+		eout "{glob} flushing APF chains (docker compat mode)"
 	fi
-	for i in $chains6; do ipt6 -t $i -F; done
-	for i in $chains6; do ipt6 -t $i -X; done
+	flush_apf_chains
+else
+	if [ ! "$1" = "1" ]; then
+		eout "{glob} flushing & zeroing chain policies"
+	fi
+	chains=$(cat /proc/net/ip_tables_names 2>/dev/null)
+	# Fallback for nft backend where /proc/net/ip_tables_names is absent
+	if [ -z "$chains" ]; then
+		chains="filter nat mangle raw"
+	fi
+	for i in $chains; do ipt4 -t $i -F; done
+	for i in $chains; do ipt4 -t $i -X; done
+	ipt -P INPUT ACCEPT
+	ipt -P OUTPUT ACCEPT
+	ipt -P FORWARD ACCEPT
+
+	if [ "$USE_IPV6" == "1" ]; then
+		chains6=$(cat /proc/net/ip6_tables_names 2>/dev/null)
+		# Fallback for nft backend where /proc/net/ip6_tables_names is absent
+		if [ -z "$chains6" ]; then
+			chains6="filter nat mangle raw"
+		fi
+		for i in $chains6; do ipt6 -t $i -F; done
+		for i in $chains6; do ipt6 -t $i -X; done
+	fi
 fi
 
 if [ -f "/proc/net/ipt_recent/DEFAULT" ]; then
