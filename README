@@ -58,39 +58,22 @@ powerful firewall. The filtering performed by APF is three fold:
    3) Sanity based policies
 
 The first, static rule based policies, is the most traditional method of
-firewalling. This is when the firewall has an unchanging set of instructions
-(rules) on how traffic should be handled in certain conditions. An example of
-a static rule based policy would be when you allow/deny an address access to the
-server with the trust system or open a new port with conf.apf. So the short of
-it is rules that infrequently or never change while the firewall is running.
+firewalling — an unchanging set of rules for how traffic should be handled.
+For example, allowing/denying an address via the trust system or opening a port
+in conf.apf.
 
-The second, connection based stateful policies, is a means to distinguish
-legitimate packets for different types of connections. Only packets matching a
-known connection will be allowed by the firewall; others will be rejected. An
-example of this would be FTP data transfers, in an older era of firewalling
-you would have to define a complex set of static policies to allow FTP data
-transfers to flow without a problem. That is not so with stateful policies,
-the firewall can see that an address has established a connection to port 21
-then "relate" that address to the data transfer portion of the connection and
-dynamically alter the firewall to allow the traffic.
+The second, connection based stateful policies, distinguishes legitimate packets
+by tracking known connections. For example, FTP data transfers are dynamically
+permitted by relating port 21 control connections to the data channel — no
+complex static rules needed.
 
-The third, sanity based policies, is the ability of the firewall to match
-various traffic patterns to known attack methods or scrutinize traffic to
-conform to Internet standards. An example of this would be when a would-be
-attacker attempts to forge the source IP address of data they are sending to
-you, APF can simply discard this traffic or optionally log it then discard it.
-To the same extent another example would be when a broken router on the
-Internet begins to relay malformed packets to you, APF can simply discard them
-or in other situations reply to the router and have it stop sending you new
-packets (TCP Reset).
+The third, sanity based policies, matches traffic against known attack methods
+and Internet standards. Forged source addresses are discarded, malformed packets
+from broken routers are dropped or replied to with TCP Reset.
 
-These three key filtering methods employed by APF are simply a generalization
-of how the firewall is constructed on a technical design level, there are a
-great many more features in APF that can be put to use. For a detailed
-description of all APF features you should review the configuration file
-conf.apf (under your install path) which has well outlined captions above all
-options. Below is
-a point form summary of most APF features for reference and review:
+For a detailed description of all APF features, review conf.apf (under your
+install path) which has well outlined captions above all options. Below is a
+point form summary of most APF features:
 
 - detailed and well commented configuration file
 - granular inbound and outbound network filtering
@@ -330,168 +313,60 @@ This section will cover some of the basic configuration options found inside
 of the conf.apf configuration file. These options, despite how basic, are the
 most vital in the proper operation of your firewall.
 
-Option: DEVEL_MODE
-Description: This tells APF to run in a development mode which in short means
-that the firewall will shut itself off every 5 minutes from a cronjob. When
-you install any version of APF, upgrade or new install, this feature is by
-default enabled to make sure the user does not lock themselves out of the
-system with configuration errors. Once you are satisfied that you have the
-firewall configured and operating as intended then you must disable it.
+DEVEL_MODE - Development/testing mode. The firewall shuts itself off every 5
+minutes via cronjob to prevent lockout from configuration errors. Enabled by
+default on new installs; disable once you are satisfied with your configuration.
 
-Option: INSTALL_PATH
-Description: As it implies, this is the installation path for APF and unless
-you have become a brave surgeon it is unlikely you will ever need to reconfigure
-this option - on we go.
+INSTALL_PATH - Installation path for APF (default: /etc/apf).
 
-Option: IFACE_UNTRUSTED
-Description: This variable controls the interface that firewall rules are applied
-against. This interface is commonly the Internet facing interface or any interface
-that faces the main network of untrusted communication (WAN).
+IFACE_UNTRUSTED - The Internet-facing interface that firewall rules are applied
+against (WAN interface).
 
-Option: IFACE_TRUSTED
-Description: It is common that you may want to set a specific interface as
-trusted to be excluded from the firewall, these may be administrative private
-links, virtualized VPN interfaces or a local area network that contains
-trusted resources. This feature is similar to what some term a demilitarized
-zone or DMZ for short; any interfaces set in this option will be exempt from
-all firewall rules with an implicit trust rule set early in the firewall load.
+IFACE_TRUSTED - Interfaces to exempt from all firewall rules with an implicit
+trust rule. Use for administrative private links, VPN interfaces, or trusted
+LANs (similar to a DMZ).
 
-Option: SET_VERBOSE
-Description: This option tells the apf script to print very detailed event logs
-to the screen as you are conducting firewall operations from the command line.
-This will allow for easier trouble shooting of firewall issues or to assist the
-user in better understanding what the firewall is doing rule-by-rule. Although
-the SET_VERBOSE option is new to APF, this level of logging has long been
-provided in the /var/log/apf_log file and still remains as such.
+SET_VERBOSE - Print detailed event logs to the screen during command line
+firewall operations for easier troubleshooting.
 
-Option: USE_IPV6
-Description: This option enables IPv6 dual-stack support for APF. When enabled,
-APF will load IPv6 kernel modules and apply ip6tables rules alongside all
-iptables rules. This includes IPv6 chain creation, port filtering, trust system
-support, packet sanity checks, and ICMPv6 filtering. NDP (Neighbor Discovery
-Protocol) types 133-136 are always permitted for IPv6 connectivity. The VNET
-subsystem does not currently support IPv6. IPv6 support requires that your
-system has IPv6 enabled in its networking configuration and that the ip6tables
-binary is available.
+USE_IPV6 - Enable IPv6 dual-stack support. APF will load IPv6 kernel modules
+and apply ip6tables rules alongside iptables. Includes IPv6 chain creation,
+port filtering, trust system support, packet sanity checks, and ICMPv6
+filtering. NDP types 133-136 are always permitted for IPv6 connectivity. When
+enabled, IG_ICMPV6_TYPES and EG_ICMPV6_TYPES control which ICMPv6 types are
+allowed. IPv6 sysctl hardening is applied when SYSCTL_ROUTE=1. IPv6 addresses
+in advanced trust syntax use bracket notation (e.g., d=22:s=[2001:db8::1]).
+The VNET subsystem does not currently support IPv6.
 
-When USE_IPV6 is enabled, the following additional configuration variables
-become active:
-  IG_ICMPV6_TYPES - inbound ICMPv6 types to accept (default: 1,2,3,4,128,129)
-  EG_ICMPV6_TYPES - outbound ICMPv6 types to accept (default: all)
-NDP (Neighbor Discovery Protocol) types 133-136 are always permitted regardless
-of these settings, as they are required for IPv6 connectivity.
+SET_FASTLOAD - Save and restore firewall snapshots for fast startup. Instead of
+regenerating every rule, APF loads from a saved snapshot. Configuration changes
+and iptables backend changes (legacy vs nft) are detected automatically, forcing
+a full reload when needed.
 
-IPv6 sysctl hardening is also applied when USE_IPV6=1 and SYSCTL_ROUTE=1:
-accept_source_route, accept_redirects, and accept_ra are disabled on all
-interfaces and the untrusted interface specifically. IPv6 forwarding is disabled
-unless the system is configured as a router.
+SET_VNET - Enable the virtual network subsystem (VNET) which generates per-IP
+policy files for aliased addresses. See section 3.4.
 
-IPv6 addresses in the advanced trust syntax (section 4.3) use bracket notation
-to protect colons from the field delimiter, e.g., d=22:s=[2001:db8::1].
+SET_ADDIFACE - Firewall additional untrusted interfaces through the VNET system.
+See section 3.4.
 
-Option: SET_FASTLOAD
-Description:  This tells APF to use a special feature to take saved snap shots
-of the running firewall. Instead of regenerating every single firewall rule
-when we stop/start the firewall, APF will use these snap shots to "fast load"
-the rules in bulk. There are internal features in APF that will detect when
-configuration has changed and then expire the snap shot forcing a full reload
-of the firewall. APF also detects changes between iptables backends (legacy vs
-nft) and will force a full reload if the backend has changed since the snapshot
-was taken, preventing restore errors from incompatible formats.
+Port filtering variables (global context, overridable via VNET per-IP rules):
 
-Option: SET_VNET
-Description: The ever curious option called SET_VNET — to put it briefly, this
-option controls the virtual network subsystem of APF also known as VNET. This
-is a subsystem that generates policy files for all aliased addresses on the
-IFACE_IN/OUT interfaces. In general this option is not needed for the normal
-operation of APF but is provided should you want to easily configured unique
-policies for the aliased addresses on an Interface. Please see topic 3.4 of
-this document for more advanced details related to this option.
+  IG_TCP_CPORTS   - inbound TCP ports ("server" ports, e.g., 22,80,443)
+  IG_UDP_CPORTS   - inbound UDP ports (e.g., 53 for DNS)
+  IG_ICMP_TYPES   - inbound ICMP types (see internals/icmp.types)
+  EGF             - top level toggle for outbound (egress) filtering;
+                    recommended to enable for robust protection
+  EG_TCP_CPORTS   - outbound TCP ports ("client" ports, e.g., 80,443)
+  EG_UDP_CPORTS   - outbound UDP ports (e.g., 53,873)
+  EG_ICMP_TYPES   - outbound ICMP types (see internals/icmp.types)
 
-Option: SET_ADDIFACE
-Description: This allows you to have additional untrusted interfaces firewalled
-by APF and this is done through the VNET system. So for example let assume you
-have a datacenter provided eth2 interface for local network backups but you
-know hundreds of other Internet facing servers are also on this network. In
-such a situation it would be the best course to enable this option (along with
-SET_VNET) so that the interface is firewalled. Please see topic 3.4 of this
-document for more advanced details related to this option.
+EG_DROP_CMD - Comma-separated executable names blocked from outbound network
+access (e.g., "eggdrop,psybnc,bitchx"). Uses iptables --cmd-owner match.
+Requires EGF="1". Depends on kernel xt_owner command support, detected at
+runtime and skipped gracefully if unavailable.
 
-Option: IG_TCP_CPORTS
-Description: This controls what TCP ports are allowed for incoming traffic, this
-is also known as the "server" or "listening services" ports. You would for
-example configure here the ports 21,25,80,110,443 if you were operating the
-FTP, SMTP, HTTP, POP3 & HTTPS services from this host. This is a global context
-rule and will apply to all addresses on this host unless virtual net rules are
-set to operate in another fashion.
-
-Option: IG_UDP_CPORTS
-Description: This controls what UDP ports are allowed for incoming traffic, this
-is also known as the "server" or "listening services" ports. You would for
-example configure here the ports 20,53 if you were operating the FTP & DNS
-services from this host. This is a global context rule and will apply to all
-addresses on this host unless virtual net rules are set to operate in another
-fashion.
-
-Option: IG_ICMP_TYPES
-Description: This controls what ICMP types are allowed for incoming traffic,
-these are control messages that the Internet uses to communicate any number of
-error messages during communication between hosts and networks. The default
-options should meet most needs however if you wish to filter a specific set
-of ICMP types you should review the 'internals/icmp.types' file. This is a
-global context rule and will apply to all addresses on this host unless virtual
-net rules are set to operate in another fashion.
-
-Option: EGF
-Description: This is a top level control feature for enabling or disabling all
-the outbound (egress) filtering features of the firewall. In the most basic
-setup from install, this will be disabled and the firewall will operate with
-inbound (ingress) filtering only. It is however recommended that you enable
-outbound (egress) filtering as it provides a very robust level of protection
-and is a common practice for controlling outbound traffic.
-
-Option: EG_TCP_CPORTS
-Description: This controls what TCP ports are allowed for outgoing traffic, this
-is also known as the "client side" communication on a host. Here we would set
-any ports we wish to communicate with on the Internet, for example if you use
-many remote RSS feeds on websites then you will want to make sure port 80,443
-is defined here so you can access the HTTP/HTTPS service on Internet servers.
-This is a global context rule and will apply to all addresses on this host
-unless virtual net rules are set to operate in another fashion.
-
-Option: EG_UDP_CPORTS
-Description: This controls what UDP ports are allowed for outgoing traffic, this
-is also known as the "client side" communication on a host. Here we would set
-any ports we wish to communicate with on the Internet, for example if you use
-many remote RSYNC servers then you will want to make sure port 873 is defined
-here so you can properly access the RSYNC service on Internet servers. This is
-a global context rule and will apply to all addresses on this host unless
-virtual net rules are set to operate in another fashion.
-
-Option: EG_ICMP_TYPES
-Description: This controls what ICMP types are allowed for outgoing traffic,
-these are control messages that the Internet uses to communicate any number of
-error messages during communication between hosts and networks. The default
-options should meet most needs however if you wish to filter a specific set
-of ICMP types you should review the 'internals/icmp.types' file. This is a
-global context rule and will apply to all addresses on this host unless virtual
-net rules are set to operate in another fashion.
-
-Option: EG_DROP_CMD
-Description: A comma-separated list of executable names that are blocked from
-making outbound network connections (e.g., "eggdrop,psybnc,bitchx"). Uses the
-iptables --cmd-owner match to identify the originating process. Requires
-outbound filtering (EGF="1") to be enabled. This feature depends on kernel
-support for xt_owner command matching, which APF detects at runtime and skips
-gracefully if unavailable.
-
-Option: LOG_DROP
-Description: The use of this option allows to firewall to perform very detailed
-firewall logging of packets as they are filtered by the firewall. This can help
-identify issues with the firewall or provide insightful information on who is
-taking pokes at the host. Typically however this option is left disabled on
-production systems as it can get very noisy in the log files which also can
-increase i/o wait loads to the disk from the heavy logging.
+LOG_DROP - Enable detailed firewall packet logging. Typically left disabled on
+production systems due to log volume and disk I/O impact.
 
 3.2) Configuration: Advanced Options
 The advanced options, although not required, are those which afford the firewall
@@ -500,106 +375,38 @@ These options should be reviewed on a case-by-case basis and enabled only as
 you determine their merit to meet a particular need on a host or network.
 
 
-Option: SET_MONOKERN
-Description: This option tells the system that instead of looking for iptables
-modules, that we should expect them to be compiled directly into the kernel. So
-unless you have a custom compiled kernel on your system where modular support
-is disabled or iptables (netfilter) is compiled in directly, you should not
-enable this option. There are also exceptions here if you have a unique system
-setup and APF is unable to find certain iptables modules but you know for a
-fact they are there, then enable this option.
+SET_MONOKERN - Expect iptables modules compiled directly into the kernel instead
+of loadable modules. Only enable for custom kernels with modular support
+disabled.
 
-Option: VF_ROUTE
-Description: This option will make sure that the IP addresses associated to
-the IFACE_* variables do actually have route entries. If a route entry can not
-be found then APF will not load as it is likely a configuration error has been
-made with possible results being a locked-up server.
+VF_ROUTE - Verify that IFACE_* addresses have route entries before loading.
+Prevents lockout from configuration errors.
 
-Option: VF_LGATE
-Description: This option will make sure that all traffic coming into this host
-is going through this defined MAC address. This is not something you will want
-enabled in most situations but it is something certain people will desire with
-servers residing behind a NAT/MASQ gateway for example.
+VF_LGATE - Require all traffic to arrive via a specific MAC address. Useful for
+servers behind a NAT/MASQ gateway.
 
-Option: TCP_STOP, UDP_STOP, ALL_STOP
-Description: These options tell the firewall in which way to go about filtering
-traffic, the supported values are DROP, RESET, REJECT and PROHIBIT. We will
-review these options below in short and provide the pro/con's of their uses.
+TCP_STOP, UDP_STOP, ALL_STOP - Control how filtered packets are handled:
 
- - The default is DROP which tells the firewall silently discard packets
-   and not reply to them at all, which some consider to be "stealth" firewall
-   behavior. The direct benefit is that it saves system resources, especially
-   during a DoS attack in not having to reply to every discarded packet. However
-   the problem is experienced attackers know the way TCP/IP works and it is such
-   that when you try to connect to a service that is unavailable, your server or
-   local router replies with an "icmp-port/host-unreachable" message. So when an
-   attacker probing your IP address receives no reply from the server or local
-   router to the scans, they will instantly know you are running a firewall,
-   possibly piquing curiosity more.
+  DROP     - silent discard (default); low resource use but reveals firewall
+             presence to experienced attackers who expect ICMP unreachable replies
+  RESET    - TCP RST reply; standards-compliant but uses resources to reply
+  REJECT   - ICMP error reply; port appears closed, not firewalled
+  PROHIBIT - ICMP-only reply; lighter than RESET, default expected behavior
+             for UDP
 
- - Then we have RESET which allows the firewall to reply to discarded packets
-   in such a way that it tries to make the remote host "reset/terminate" the
-   connection attempts to you. This option is more in-line with TCP/IP
-   standards however in most situations will provide no real benefits or
-   drawbacks. In some really isolated situations you may find that using RESET
-   during DoS attacks will help terminate connections more promptly but in
-   general this does not serve to counter the system resources expended to
-   send back replies to every single packet filtered.
+PKT_SANITY - Top level toggle for packet sanity checks. Ensures all packets
+conform to strict TCP/IP standards, making it very difficult for attackers to
+inject raw/custom packets. Sub-options (PKT_SANITY_INV, PKT_SANITY_FUDP,
+PKT_SANITY_PZERO, PKT_SANITY_STUFFED) are preconfigured to suit most situations.
+See conf.apf for details on each sub-option.
 
- - Then we have the REJECT value which is a more common alternative to DROP as
-   it allows the firewall to reply to packets with an error message. This
-   accomplishes the goal of filtering a packet while at the same time not
-   allowing the remote host to know that we are running a firewall, they just
-   think the port/service is closed/unavailable.
+Type of Service (TOS) - The TOS_* settings classify traffic priority based on
+port numbers. Default settings improve throughput and reliability for FTP, HTTP,
+SMTP, POP3 and IMAP. TOS configuration can have wide-ranging impact on service
+performance — review conf.apf for detailed TOS options.
 
- - Finally we have the PROHIBIT value which is specific for UDP_STOP but can
-   be used as other *_STOP values with similar effect. When we set PROHIBIT we
-   are telling the firewall to reply to the sender of packets with only ICMP
-   error messages instead of like the case with RESET, TCP packets. This is a
-   good alternative to reply to packets with as it does not load the system
-   as "much" during aggressive attacks. This is also the default expected
-   reply for UDP packets that are not accepted by a host, however APF will by
-   default use a DROP value on UDP packets.
-
-Option: PKT_SANITY
-Description: This option controls the way packets are scrutinized as they flow
-through the firewall. The main PKT_SANITY option is a top level toggle for all
-SANITY options and provides general packet flag sanity as a pre-scrub for the
-other sanity options. In short, this makes sure that all packets coming and
-going conform to strict TCP/IP standards. In doing so we make it very difficult
-for attackers to inject raw/custom packets into this host.
-
-Now onto the sanity filters, these are options that allow APF to scrutinize
-traffic coming into and out of the server so it conforms to TCP/IP standards
-and also filters common attack characteristics. There are a number of sanity
-options and each one has a well detailed caption in the configuration file. In
-addition, these options comes preconfigured to suite most situation needs and
-provide the best protection possible. With that, I will defer the PKT_SANITY
-details to the conf.apf file where you can find ample information on each
-option.
-
-Moving forward we now have the Type of Service (TOS) settings which provide a
-simple classification system to dictate traffic priority based on port numbers.
-The use of TOS in its respective capacities can have a wide ranging impact on the
-performance of your services, both positive and negative depending on settings.
-That is why it is very important that you understand and study the impact of any
-changes to TOS values and then act accordingly, as no two networks are alike. A
-very good rule of thumb with TOS configuration is to look at the name of the TOS
-value and apply some good judgement to how that name applies to certain service
-based traffic on your network. For example the TOS value Minimize-Cost designed
-to minimize data transmission would generally not be a good setting to improve the
-response time or throughput of HTTP connections. A more fitting setting for
-this would be "Maximum Throughput - Minimum Delay", as set to default for HTTP.
-The default TOS settings are designed to improve throughput and reliability for
-FTP,HTTP,SMTP,POP3 and IMAP, please review conf.apf under the TOS_ settings for
-further details on Type of Service (TOS).
-
-Following the TOS settings we find the traceroute settings TCR_ which tell the
-firewall if and how we should handle traceroute traffic. This is by default
-enabled in APF, mostly cause of popular demand but really there is no reason
-to have it enabled or disabled other than personal preference. The TCR_PASS
-option tells the firewall if we want to accept traceroutes and the TCR_PORTS
-option defines the UDP port range used for traceroute detection.
+Traceroute (TCR_*) - TCR_PASS controls whether traceroutes are accepted.
+TCR_PORTS defines the UDP port range used for detection.
 
 Kernel Tuning:
 APF applies kernel-level network hardening via sysctl when the firewall starts.

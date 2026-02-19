@@ -1,4 +1,13 @@
 - 2.0.1 | Feb 19 2026:
+[Change] README section 1 introduction compressed; three filtering type
+      explanations reduced from verbose paragraphs to concise summaries
+      (README, README.md)
+[Change] README section 3.1 compressed from Option:/Description: format to
+      concise variable-first format; port filtering variables grouped into
+      scannable list (README, README.md)
+[Change] README section 3.2 TCP_STOP/UDP_STOP/ALL_STOP verbose narrative
+      replaced with comparison table; PKT_SANITY, TOS, and TCR descriptions
+      tightened (README, README.md)
 [New] README sections 3.9 (Remote Block Lists), 3.10 (Logging & Control),
       3.11 (Implicit Blocking) documenting DLIST_*, LOG_*, BLK_* variables
       (README, README.md)
