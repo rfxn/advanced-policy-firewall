@@ -175,9 +175,11 @@ If one so desires they may customize the setup of APF by editing the variables i
 
 The package includes two convenience scripts, the first is `importconf` which will import all the variable settings from your previous version of APF into the new installation. The second is `get_ports`, a script which will output the system's currently in use 'server' ports for the user during the installation process in an effort to aid in configuring port settings.
 
-All previous versions of APF are saved upon the installation of newer versions and stored in `/etc/apf.bkDDMMYY-UTIME` format (e.g., `/etc/apf.bk190226-1708456789`). In addition, there is a `/etc/apf.bk.last` sym-link created to the last version of APF you had installed.
+All previous versions of APF are saved upon the installation of newer versions and stored in `/etc/apf.bkDDMMYY-UTIME` format (e.g., `/etc/apf.bk190226-1771538400`). In addition, there is a `/etc/apf.bk.last` sym-link created to the last version of APF you had installed.
 
 After installation is completed the documentation and convenience scripts are copied to `/etc/apf/doc` and `/etc/apf/extras` respectively.
+
+> **Note:** APF ships with `DEVEL_MODE="1"` enabled by default. This safety feature automatically flushes the firewall every 5 minutes to prevent lockout during initial configuration. Set `DEVEL_MODE="0"` in `conf.apf` once your configuration is verified and you are ready for persistent operation.
 
 ### 2.1 Boot Loading
 
@@ -368,7 +370,7 @@ name:flow:ipset_type:log:file_or_url
 Where:
 - `name` - unique list name (used for ipset set and iptables chain naming)
 - `flow` - `src` or `dst` (match source or destination address)
-- `ipset_type` - `ip` or `net` (`hash:ip` or `hash:net`)
+- `ipset_type` - `ip` or `net` (`hash:ip` for single addresses, `hash:net` for CIDR blocks)
 - `log` - `0` or `1` (per-list logging, rate governed by `IPSET_LOG_RATE`)
 - `file_or_url` - local file path or URL (`https://` for remote download)
 
@@ -382,7 +384,7 @@ Run `apf --ipset-update` to hot-reload all ipset block lists without restarting 
 
 ### 3.8 GRE Tunnels
 
-APF can manage GRE (Generic Routing Encapsulation) point-to-point tunnels with dedicated firewall chains and protocol 47 rules. This is useful for servers that need encrypted or encapsulated links to remote endpoints.
+APF can manage GRE (Generic Routing Encapsulation) point-to-point tunnels with dedicated firewall chains and protocol 47 rules. This is useful for servers that need encapsulated point-to-point links to remote endpoints.
 
 **`USE_GRE`** - Set to `"1"` to enable GRE tunnel management. Requires the `ip` utility (iproute2 package). When disabled, `gre.rules` is ignored.
 
@@ -434,7 +436,7 @@ APF can automatically download and apply IP block lists from external sources. E
 | `DLIST_PHP` | Project Honey Pot harvester/spammer IPs |
 | `DLIST_SPAMHAUS` | Spamhaus DROP list (stolen/zombie netblocks) |
 | `DLIST_DSHIELD` | DShield top suspicious hosts |
-| `DLIST_RESERVED` | ARIN reserved/unassigned networks |
+| `DLIST_RESERVED` | IANA reserved/unassigned networks |
 | `DLIST_ECNSHAME` | ECN broken hosts (requires `SYSCTL_ECN="1"`) |
 
 Each has a companion `_URL` variable (e.g., `DLIST_PHP_URL`) for the download source. Set the toggle to `"1"` to enable a list. Lists are validated during parsing and backed up before each download. Failed downloads restore from backup to prevent data loss. Note that `DLIST_RESERVED` interacts with `BLK_RESNET` — when both are enabled, the downloaded reserved.networks list supplements the built-in private.networks blocking.
@@ -539,13 +541,13 @@ There are two methods for adding entries to the trust files. The first is by edi
 
 ```bash
 # Trust an address
-apf -a ryanm.dynip.org "my home dynamic-ip"
+apf -a myhost.example.com "my home dynamic-ip"
 
 # Deny an address
 apf -d 192.168.3.111 "keeps trying to bruteforce"
 
 # Remove an address
-apf -u ryanm.dynip.org
+apf -u myhost.example.com
 ```
 
 Please take note that the `--remove|-u` option does not accept a comment string and will remove entries that match from allow_hosts.rules, deny_hosts.rules and the global extensions of these files.
@@ -583,14 +585,14 @@ s - source, d - destination, flow - packet flow in/out
 **Examples:**
 
 ```bash
-# inbound to destination port 22 from 24.202.16.11
-tcp:in:d=22:s=24.202.16.11
+# inbound to destination port 22 from 198.51.100.11
+tcp:in:d=22:s=198.51.100.11
 
-# outbound to destination port 23 to destination host 24.2.11.9
-out:d=23:d=24.2.11.9
+# outbound to destination port 23 to destination host 198.51.100.9
+out:d=23:d=198.51.100.9
 
-# inbound to destination port 3306 from 24.202.11.0/24
-d=3306:s=24.202.11.0/24
+# inbound to destination port 3306 from 198.51.100.0/24
+d=3306:s=198.51.100.0/24
 ```
 
 **IPv6 addresses** use bracket notation to protect colons from the field delimiter parser:

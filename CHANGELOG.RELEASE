@@ -6,6 +6,22 @@
       ryan@rfxn.com (README, README.md)
 [Fix] head() banner email changed from apf@rfxn.com to proj@rfxn.com
       matching all other contact references (apf)
+[Fix] README GRE section corrected "encrypted or encapsulated" to
+      "encapsulated point-to-point"; GRE provides encapsulation only, not
+      encryption (README, README.md)
+[Fix] README DLIST_RESERVED description corrected from "ARIN" to "IANA";
+      reserved networks list covers globally unassigned space, not just
+      North America (README, README.md)
+[Fix] README advanced trust examples replaced real public IPs (24.202.x.x)
+      with RFC 5737 documentation addresses (198.51.100.x) and personal
+      hostname ryanm.dynip.org with RFC 2606 myhost.example.com
+      (README, README.md)
+[Fix] README backup path example epoch corrected from 1708456789 (2024) to
+      1771538400 (2026) matching the DDMMYY portion 190226 (README, README.md)
+[New] README installation section: DEVEL_MODE="1" default behavior warning
+      added after install completion paragraph (README, README.md)
+[Change] README ipset_type description expanded: "hash:ip for single
+      addresses, hash:net for CIDR blocks" (README, README.md)
 [Change] README.md regenerated from updated README with proper Markdown
       formatting: anchor-linked TOC, fenced code blocks, Markdown tables,
       inline code (README.md)
