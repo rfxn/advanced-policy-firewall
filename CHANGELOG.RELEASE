@@ -1,4 +1,17 @@
 - 2.0.1 | Feb 19 2026:
+[Fix] README ipset.rules format corrected from pipe-separated 4-field to
+      colon-separated 5-field (name:flow:ipset_type:log:file_or_url)
+      matching actual file header (README, README.md)
+[Fix] README gre.rules description corrected from delimited data file to
+      bash script with role variable and create_gretun() function calls
+      (README, README.md)
+[Fix] README fabricated section 4.4 (Dynamic Trust Files) removed;
+      dyn_allow_hosts.rules and dyn_deny_hosts.rules do not exist in the
+      codebase (README, README.md)
+[Fix] README installation section corrected docs to doc matching
+      install.sh mkdir path (README, README.md)
+[Change] README section 4.2 now documents USE_RGT toggle for enabling
+      automatic global trust file downloads (README, README.md)
 [New] README.md Markdown version for GitHub rendering (README.md)
 [Change] README expanded with Docker compat, ipset, GRE tunnel, and IPv6
       documentation; grammar and structure fixes throughout (README)

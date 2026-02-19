@@ -28,7 +28,6 @@ APF is licensed under the GNU General Public License v2. See [COPYING.GPL](COPYI
   - [4.1 Trust System](#41-trust-system)
   - [4.2 Global Trust System](#42-global-trust-system)
   - [4.3 Advanced Trust Syntax](#43-advanced-trust-syntax)
-  - [4.4 Dynamic Trust Files](#44-dynamic-trust-files)
 - [5. License](#5-license)
 - [6. Support Information](#6-support-information)
 
@@ -175,7 +174,7 @@ The package includes two convenience scripts, the first is `importconf` which wi
 
 All previous versions of APF are saved upon the installation of newer versions and stored in `/etc/apf.bkDDMMYY-UTIME` format (e.g., `/etc/apf.bk190226-1708456789`). In addition, there is a `/etc/apf.bk.last` sym-link created to the last version of APF you had installed.
 
-After installation is completed the documentation and convenience scripts are copied to `/etc/apf/docs` and `/etc/apf/extras` respectively.
+After installation is completed the documentation and convenience scripts are copied to `/etc/apf/doc` and `/etc/apf/extras` respectively.
 
 ### 2.1 Boot Loading
 
@@ -348,14 +347,21 @@ The ipset subsystem uses kernel-level hash tables for high-performance IP matchi
 The block lists are defined in the `ipset.rules` file. Each line defines a set with the format:
 
 ```
-name|url|type|log
+name:flow:ipset_type:log:file_or_url
 ```
 
 Where:
-- `name` - unique set name (alphanumeric, used as ipset set name)
-- `url` - URL to download the IP list from
-- `type` - hash type: `ip` for individual IPs, `net` for CIDR networks
-- `log` - logging: `0`=off, `1`=on (uses `IPSET_LOG_RATE`)
+- `name` - unique list name (used for ipset set and iptables chain naming)
+- `flow` - `src` or `dst` (match source or destination address)
+- `ipset_type` - `ip` or `net` (`hash:ip` or `hash:net`)
+- `log` - `0` or `1` (per-list logging, rate governed by `IPSET_LOG_RATE`)
+- `file_or_url` - local file path or URL (`https://` for remote download)
+
+Examples:
+```
+firehol_level2:src:net:1:https://iplists.firehol.org/files/firehol_level2.netset
+my_blacklist:src:ip:0:/etc/apf/my_blacklist.txt
+```
 
 Run `apf --ipset-update` to hot-reload all ipset block lists without restarting the firewall. A cron job (`cron.d.apf_ipset`) is installed automatically to perform periodic updates.
 
@@ -373,7 +379,22 @@ APF can manage GRE (Generic Routing Encapsulation) point-to-point tunnels with d
 
 **`GRE_TTL`** - IP TTL for GRE tunnel packets. Default is `"255"`.
 
-Tunnels are defined in the `gre.rules` file. Each line defines a tunnel with fields for name, local IP, remote IP, optional key, and optional route entries. See `conf.apf` and the `gre.rules` file header for format details.
+Tunnels are defined in the `gre.rules` file, which is a bash script sourced during firewall startup. Each tunnel is created by setting a role variable and calling the `create_gretun` function:
+
+```bash
+role="source"  # or "target"
+create_gretun LINKID LOCAL_IP REMOTE_IP [IPFILE]
+```
+
+Where `LINKID` is a tunnel ID (1-99, interface = `gre${LINKID}`), `LOCAL_IP` is this host's public IP, `REMOTE_IP` is the remote endpoint, and `IPFILE` is an optional file of IPs to route through the tunnel (one per line). Addresses are auto-assigned: source=`192.168.${LINKID}.1`, target=`192.168.${LINKID}.2`.
+
+Per-tunnel overrides can be set before each `create_gretun` call:
+- `gre_keepalive="10 3"` - override `GRE_KEEPALIVE`
+- `gre_mtu="1400"` - override `GRE_MTU`
+- `gre_ttl="128"` - override `GRE_TTL`
+- `gre_key="12345"` - GRE key for tunnel identification
+
+See the `gre.rules` file header for complete examples.
 
 When tunnels are created, APF automatically:
 - Creates GRE_IN and GRE_OUT chains for tunnel traffic
@@ -471,7 +492,7 @@ Please take note that the `--remove|-u` option does not accept a comment string 
 
 ### 4.2 Global Trust System
 
-The global trust system extends the local trust files with centrally managed allow and deny lists that can be downloaded from a remote server. The files `glob_allow.rules` and `glob_deny.rules` are populated by setting the `GA_URL` and `GD_URL` variables in `conf.apf` to the URLs of your remote trust lists. APF will periodically download these lists and load them into the TGALLOW and TGDENY chains. This is useful for organizations managing multiple servers that need to share a common set of trusted or blocked addresses. The `--remove` (`-u`) option will also remove entries from the global trust files.
+The global trust system extends the local trust files with centrally managed allow and deny lists that can be downloaded from a remote server. The files `glob_allow.rules` and `glob_deny.rules` are populated by setting the `GA_URL` and `GD_URL` variables in `conf.apf` to the URLs of your remote trust lists. Set `USE_RGT="1"` in `conf.apf` to enable automatic downloading of global trust files. APF will periodically download these lists and load them into the TGALLOW and TGDENY chains. This is useful for organizations managing multiple servers that need to share a common set of trusted or blocked addresses. The `--remove` (`-u`) option will also remove entries from the global trust files.
 
 ### 4.3 Advanced Trust Syntax
 
@@ -517,10 +538,6 @@ Plain (non-advanced) IPv6 addresses can be added directly without brackets:
 ```
 2001:db8::1
 ```
-
-### 4.4 Dynamic Trust Files
-
-The dynamic trust files `dyn_allow_hosts.rules` and `dyn_deny_hosts.rules` are automatically managed by APF subsystems such as Reactive Address Blocking (RAB) and are not intended for manual editing. Entries in these files are transient and are cleared when the firewall is restarted. They use the same format as the static trust files (one IP or CIDR per line).
 
 ---
 
