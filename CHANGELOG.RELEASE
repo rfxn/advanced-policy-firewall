@@ -1,4 +1,11 @@
 - 2.0.1 | Feb 19 2026:
+[Change] README section 6 rewritten: dead forums.rfxnetworks.com reference
+      removed, support@r-fx.org removed, GitHub repository URL added
+      (README, README.md)
+[Change] README section 5 license email unified from ryan@r-fx.org to
+      ryan@rfxn.com (README, README.md)
+[Fix] head() banner email changed from apf@rfxn.com to proj@rfxn.com
+      matching all other contact references (apf)
 [Change] README.md regenerated from updated README with proper Markdown
       formatting: anchor-linked TOC, fenced code blocks, Markdown tables,
       inline code (README.md)

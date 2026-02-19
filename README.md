@@ -612,7 +612,7 @@ Plain (non-advanced) IPv6 addresses can be added directly without brackets:
 
 ## 5. License
 
-APF is developed and supported on a volunteer basis by Ryan MacDonald [ryan@r-fx.org].
+APF is developed and supported on a volunteer basis by Ryan MacDonald [ryan@rfxn.com].
 
 APF (Advanced Policy Firewall) is distributed under the GNU General Public License (GPL) without restrictions on usage or redistribution. The APF copyright statement, and GNU GPL, "COPYING.GPL" are included in the top-level directory of the distribution. Credit must be given for derivative works as required under GNU GPL.
 
@@ -620,9 +620,8 @@ APF (Advanced Policy Firewall) is distributed under the GNU General Public Licen
 
 ## 6. Support Information
 
-If you require any assistance with APF you may refer to the R-fx Networks community forums located at https://forums.rfxnetworks.com. You may also send an e-mail to proj@rfxn.com or support@r-fx.org.
+The APF source repository is at: https://github.com/rfxn/advanced-policy-firewall
 
-The official home page for APF is located at:
-https://www.rfxn.com/projects/advanced-policy-firewall/
+Bugs, feature requests, and general questions can be filed as GitHub issues or sent to proj@rfxn.com. When reporting issues, include the output of `apf --ovars` to help diagnose configuration problems.
 
-All bugs or feature requests should be sent to proj@rfxn.com and please be sure to include as much information as possible or conceptual ideas of how you think a new feature should work. When reporting issues, include the output of `apf --ovars` with your report to help diagnose configuration problems.
+The official project page is at: https://www.rfxn.com/projects/advanced-policy-firewall/
