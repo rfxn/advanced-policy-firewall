@@ -1,4 +1,13 @@
 - 2.0.1 | Feb 19 2026:
+[Change] README grammar, structure, and correctness fixes: "There is really
+      3 modes" corrected to "There are three modes"; "it will come pretty
+      bare in the way of preconfigured options" reworded; "that is contains"
+      corrected to "that contains"; "to put it brief" corrected to "to put
+      it briefly"; "respective" corrected to "respectively"; "generally not
+      be" corrected to "would generally not be"; ovars description separated
+      from support contact info; RAB options moved from section 3.2 into
+      section 3.3 where they belong; support email updated to proj@rfxn.com;
+      project URL updated; trailing whitespace removed throughout (README)
 [New] External INPUT/OUTPUT rule preservation in DOCKER_COMPAT mode;
       save_external_baseline() captures non-APF rules before flush,
       restore_external_baseline() replays them after flush; protects

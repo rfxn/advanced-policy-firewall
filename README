@@ -83,7 +83,8 @@ These three key filtering methods employed by APF are simply a generalization
 of how the firewall is constructed on a technical design level, there are a
 great many more features in APF that can be put to use. For a detailed
 description of all APF features you should review the configuration file
-/etc/apf/conf.apf which has well outlined captions above all options. Below is
+conf.apf (under your install path) which has well outlined captions above all
+options. Below is
 a point form summary of most APF features for reference and review:
 
 - detailed and well commented configuration file
@@ -93,7 +94,8 @@ a point form summary of most APF features for reference and review:
 - trust based rule files with an optional advanced syntax
 - global trust system where rules can be downloaded from a central management
   server
-- reactive address blocking (RAB), next generation in-line intrusion prevention
+- reactive address blocking (RAB), in-line intrusion prevention with automatic
+  address blocking on sanity violations and port scan detection
 - debug mode provided for testing new features and configuration setups
 - fast load feature that allows for 1000+ rules to load in under 1 second
 - inbound and outbound network interfaces can be independently configured
@@ -122,7 +124,7 @@ a point form summary of most APF features for reference and review:
 - dynamic configuration of your servers local DNS resolvers into the firewall
 - optional filtering of common p2p applications
 - optional filtering of private & reserved IP address space
-- optional implicit blocks of the ident service 
+- optional implicit blocks of the ident service
 - configurable connection tracking settings to scale the firewall to the size of
   your network
 - configurable kernel hooks (ties) to harden the system further to syn-flood
@@ -219,16 +221,17 @@ Bin Path: /usr/local/sbin/apf
 
 The package includes two convenience scripts, the first is importconf which will
 import all the variable settings from your previous version of APF into the
-new installation. The second is get_ports, a script which will output the 
+new installation. The second is get_ports, a script which will output the
 systems currently in use 'server' ports for the user during the installation
-process in an effort to aid in configuring port settings. 
+process in an effort to aid in configuring port settings.
 
 All previous versions of APF are saved upon the installation of newer
-versions and stored in /etc/apf.bkDDMMYY-UTIME format. In addition, there is a 
-/etc/apf.bk.last sym-link created to the last version of APF you had installed.
+versions and stored in /etc/apf.bkDDMMYY-UTIME format (e.g.,
+/etc/apf.bk190226-1708456789). In addition, there is a /etc/apf.bk.last
+sym-link created to the last version of APF you had installed.
 
 After installation is completed the documentation and convenience scripts are
-copied to /etc/apf/docs and /etc/apf/extras respective.
+copied to /etc/apf/docs and /etc/apf/extras respectively.
 
 2.1) Installation: Boot Loading
 On installation APF will install a systemd service unit (apf.service) on
@@ -236,7 +239,7 @@ systems with systemd, or an init script to /etc/init.d/apf on older systems,
 and configure it to load on boot. If you are setting up APF in a more
 custom situation then you may follow the below instructions.
 
-There is really 3 modes of operation for having APF firewall our system
+There are three modes of operation for having APF firewall your system
 and each has no real benefit except tailoring itself to your needs.
 
 The first and recommended approach on modern systems is systemd:
@@ -262,8 +265,8 @@ is, enable it with the 'apf -s' command when desired and disable it with the
 'apf -f' when desired.
 
 3) Configuration:
-On your first installation of APF it will come pretty bare in the way of 
-preconfigured options, this is intentional. The most common issue with many
+On your first installation of APF it ships with minimal preconfigured
+options, and this is intentional. The most common issue with many
 firewalls is that they come configured with so many options that a user may
 never use or disable, that it leaves systems riddled with firewall holes.
 
@@ -273,9 +276,10 @@ filtering options preset in the most compatible fashion for all users. All the
 real advanced options APF has to offer are by default disabled including
 outbound (egress) port filtering, reactive address blocking (rab) and the
 virtual network subsystem to name a few.
- 
-The main APF configuration file is located at /etc/apf/conf.apf and has 
-detailed usage information above all configuration variables. The file uses
+
+The main APF configuration file is conf.apf (under your install path,
+/etc/apf by default) and has detailed usage information above all
+configuration variables. The file uses
 integer based values for setting configuration options and they are
 0 = disabled
 1 = enabled
@@ -284,32 +288,32 @@ All configuration options use this integer value system unless otherwise
 indicated in the description of that option.
 
 You should put aside 5 minutes and review the configuration file from top to
-bottom taking the time to read all the captions for the options that are 
+bottom taking the time to read all the captions for the options that are
 provided. This may seem like a daunting task but a firewall is only as good
 as it is configured and that requires you, the administrator, to take a few
-minutes to understand what it is you are setting up. 
+minutes to understand what it is you are setting up.
 
 APF is a very powerful firewall that when setup to make use of all the advanced
 features, will provide a sophisticated and robust level of protection. Please
 continue reading further along this file for more information or see the
 support options at the bottom of this file for further assistance if you find
-yourself lost in the configuration process. 
+yourself lost in the configuration process.
 
 3.1) Configuration: Basic Options
 This section will cover some of the basic configuration options found inside
 of the conf.apf configuration file. These options, despite how basic, are the
-most vital in the proper operation of your firewall. 
+most vital in the proper operation of your firewall.
 
 Option: DEVEL_MODE
 Description: This tells APF to run in a development mode which in short means
 that the firewall will shut itself off every 5 minutes from a cronjob. When
-you install any version of APF, upgrade or new install, this feature is by 
+you install any version of APF, upgrade or new install, this feature is by
 default enabled to make sure the user does not lock themselves out of the
 system with configuration errors. Once you are satisfied that you have the
 firewall configured and operating as intended then you must disable it.
 
 Option: INSTALL_PATH
-Description: As it implies, this is the installation path for APF and unless 
+Description: As it implies, this is the installation path for APF and unless
 you have become a brave surgeon it is unlikely you will ever need to reconfigure
 this option - on we go.
 
@@ -321,9 +325,9 @@ that faces the main network of untrusted communication (WAN).
 Option: IFACE_TRUSTED
 Description: It is common that you may want to set a specific interface as
 trusted to be excluded from the firewall, these may be administrative private
-links, virtualized VPN interfaces or a local area network that is contains
-trusted resources. This feature is similar to what some term as demilitarized
-zone or DMZ for short, any interfaces set in this option will be exempt from
+links, virtualized VPN interfaces or a local area network that contains
+trusted resources. This feature is similar to what some term a demilitarized
+zone or DMZ for short; any interfaces set in this option will be exempt from
 all firewall rules with an implicit trust rule set early in the firewall load.
 
 Option: SET_VERBOSE
@@ -348,16 +352,16 @@ Option: SET_FASTLOAD
 Description:  This tells APF to use a special feature to take saved snap shots
 of the running firewall. Instead of regenerating every single firewall rule
 when we stop/start the firewall, APF will use these snap shots to "fast load"
-the rules in bulk. There are internal features in APF that will detect when 
+the rules in bulk. There are internal features in APF that will detect when
 configuration has changed and then expire the snap shot forcing a full reload
 of the firewall. APF also detects changes between iptables backends (legacy vs
 nft) and will force a full reload if the backend has changed since the snapshot
 was taken, preventing restore errors from incompatible formats.
 
 Option: SET_VNET
-Description: The ever curious option called SET_VNET, to put it brief this
+Description: The ever curious option called SET_VNET — to put it briefly, this
 option controls the virtual network subsystem of APF also known as VNET. This
-is a subsystem that generates policy files for all aliased addresses on the 
+is a subsystem that generates policy files for all aliased addresses on the
 IFACE_IN/OUT interfaces. In general this option is not needed for the normal
 operation of APF but is provided should you want to easily configured unique
 policies for the aliased addresses on an Interface. Please see topic 3.4 of
@@ -365,11 +369,11 @@ this document for more advanced details related to this option.
 
 Option: SET_ADDIFACE
 Description: This allows you to have additional untrusted interfaces firewalled
-by APF and this is done through the VNET system. So for example let assume you 
+by APF and this is done through the VNET system. So for example let assume you
 have a datacenter provided eth2 interface for local network backups but you
-know hundreds of other Internet facing servers are also on this network. In 
-such a situation it would be the best course to enable this option (along with 
-SET_VNET) so that the interface is firewalled. Please see topic 3.4 of this 
+know hundreds of other Internet facing servers are also on this network. In
+such a situation it would be the best course to enable this option (along with
+SET_VNET) so that the interface is firewalled. Please see topic 3.4 of this
 document for more advanced details related to this option.
 
 Option: IG_TCP_CPORTS
@@ -389,7 +393,7 @@ addresses on this host unless virtual net rules are set to operate in another
 fashion.
 
 Option: IG_ICMP_TYPES
-Description: This controls what ICMP types are allowed for incoming traffic, 
+Description: This controls what ICMP types are allowed for incoming traffic,
 these are control messages that the Internet uses to communicate any number of
 error messages during communication between hosts and networks. The default
 options should meet most needs however if you wish to filter a specific set
@@ -400,11 +404,10 @@ net rules are set to operate in another fashion.
 Option: EGF
 Description: This is a top level control feature for enabling or disabling all
 the outbound (egress) filtering features of the firewall. In the most basic
-setup of the firewall from install, this will be set to disabled and we will be
-operating in a mostly inbound (ingress) only filtering fashion. It is however
-recommended that you enable the outbound (egress) filtering as it provides a
-very robust level of protection and is a common practice to filtering outbound
-traffic.
+setup from install, this will be disabled and the firewall will operate with
+inbound (ingress) filtering only. It is however recommended that you enable
+outbound (egress) filtering as it provides a very robust level of protection
+and is a common practice for controlling outbound traffic.
 
 Option: EG_TCP_CPORTS
 Description: This controls what TCP ports are allowed for outgoing traffic, this
@@ -421,7 +424,7 @@ is also known as the "client side" communication on a host. Here we would set
 any ports we wish to communicate with on the Internet, for example if you use
 many remote RSYNC servers then you will want to make sure port 873 is defined
 here so you can properly access the RSYNC service on Internet servers. This is
-a global context rule and will apply to all addresses on this host unless 
+a global context rule and will apply to all addresses on this host unless
 virtual net rules are set to operate in another fashion.
 
 Option: EG_ICMP_TYPES
@@ -469,6 +472,92 @@ is going through this defined MAC address. This is not something you will want
 enabled in most situations but it is something certain people will desire with
 servers residing behind a NAT/MASQ gateway for example.
 
+Option: TCP_STOP, UDP_STOP, ALL_STOP
+Description: These options tell the firewall in which way to go about filtering
+traffic, the supported values are DROP, RESET, REJECT and PROHIBIT. We will
+review these options below in short and provide the pro/con's of their uses.
+
+ - The default is DROP which tells the firewall silently discard packets
+   and not reply to them at all, which some consider to be "stealth" firewall
+   behavior. The direct benefit is that it saves system resources, especially
+   during a DoS attack in not having to reply to every discarded packet. However
+   the problem is experienced attackers know the way TCP/IP works and it is such
+   that when you try to connect to a service that is unavailable, your server or
+   local router replies with an "icmp-port/host-unreachable" message. So when an
+   attacker probing your IP address receives no reply from the server or local
+   router to the scans, they will instantly know you are running a firewall,
+   possibly piquing curiosity more.
+
+ - Then we have RESET which allows the firewall to reply to discarded packets
+   in such a way that it tries to make the remote host "reset/terminate" the
+   connection attempts to you. This option is more in-line with TCP/IP
+   standards however in most situations will provide no real benefits or
+   drawbacks. In some really isolated situations you may find that using RESET
+   during DoS attacks will help terminate connections more promptly but in
+   general this does not serve to counter the system resources expended to
+   send back replies to every single packet filtered.
+
+ - Then we have the REJECT value which is a more common alternative to DROP as
+   it allows the firewall to reply to packets with an error message. This
+   accomplishes the goal of filtering a packet while at the same time not
+   allowing the remote host to know that we are running a firewall, they just
+   think the port/service is closed/unavailable.
+
+ - Finally we have the PROHIBIT value which is specific for UDP_STOP but can
+   be used as other *_STOP values with similar effect. When we set PROHIBIT we
+   are telling the firewall to reply to the sender of packets with only ICMP
+   error messages instead of like the case with RESET, TCP packets. This is a
+   good alternative to reply to packets with as it does not load the system
+   as "much" during aggressive attacks. This is also the default expected
+   reply for UDP packets that are not accepted by a host, however APF will by
+   default use a DROP value on UDP packets.
+
+Option: PKT_SANITY
+Description: This option controls the way packets are scrutinized as they flow
+through the firewall. The main PKT_SANITY option is a top level toggle for all
+SANITY options and provides general packet flag sanity as a pre-scrub for the
+other sanity options. In short, this makes sure that all packets coming and
+going conform to strict TCP/IP standards. In doing so we make it very difficult
+for attackers to inject raw/custom packets into this host.
+
+Now onto the sanity filters, these are options that allow APF to scrutinize
+traffic coming into and out of the server so it conforms to TCP/IP standards
+and also filters common attack characteristics. There are a number of sanity
+options and each one has a well detailed caption in the configuration file. In
+addition, these options comes preconfigured to suite most situation needs and
+provide the best protection possible. With that, I will defer the PKT_SANITY
+details to the conf.apf file where you can find ample information on each
+option.
+
+Moving forward we now have the Type of Service (TOS) settings which provide a
+simple classification system to dictate traffic priority based on port numbers.
+The use of TOS in its respective capacities can have a wide ranging impact on the
+performance of your services, both positive and negative depending on settings.
+That is why it is very important that you understand and study the impact of any
+changes to TOS values and then act accordingly, as no two networks are alike. A
+very good rule of thumb with TOS configuration is to look at the name of the TOS
+value and apply some good judgement to how that name applies to certain service
+based traffic on your network. For example the TOS value Minimize-Cost designed
+to minimize data transmission would generally not be a good setting to improve the
+response time or throughput of HTTP connections. A more fitting setting for
+this would be "Maximum Throughput - Minimum Delay", as set to default for HTTP.
+The default TOS settings are designed to improve throughput and reliability for
+FTP,HTTP,SMTP,POP3 and IMAP, please review conf.apf under the TOS_ settings for
+further details on Type of Service (TOS).
+
+Following the TOS settings we find the traceroute settings TCR_ which tell the
+firewall if and how we should handle traceroute traffic. This is by default
+enabled in APF, mostly cause of popular demand but really there is no reason
+to have it enabled or disabled other than personal preference. The TCR_PASS
+option tells the firewall if we want to accept traceroutes and the TCR_PORTS
+option defines the UDP port range used for traceroute detection.
+
+3.3) Configuration: Reactive Address Blocking
+The Reactive Address Blocking (RAB) system provides in-line intrusion
+prevention by automatically blocking addresses that trigger sanity violations
+or port scan detection. RAB is configured through the RAB_* variables in
+conf.apf.
+
 Option: RAB
 Description: This is a top level toggle for the reactive address blocking in
 APF and does nothing more than either enable or disable it.
@@ -509,7 +598,7 @@ Description: This controls if the firewall should log all violation hits from
 an address. It is recommended that this be enabled to provide insightful log
 data on addresses which are attempting to probe or conduct questionable actions
 against this host. The use of LOG_DROP variable set to 1 will override this to
-force logging. 
+force logging.
 
 Option: RAB_LOG_TRIP
 Description: This controls if the firewall should log all subsequent traffic
@@ -517,95 +606,6 @@ from an address that is already blocked for a violation hit, this can generate
 a lot of logs. However, the use of this option despite the depth of log data it
 may generate could provide valuable information as to the intents of an attacker.
 The use of LOG_DROP variable set to 1 will override this to force logging.
-
-Option: TCP_STOP, UDP_STOP, ALL_STOP
-Description: These options tell the firewall in which way to go about filtering
-traffic, the supported values are DROP, RESET, REJECT and PROHIBIT. We will 
-review these options below in short and provide the pro/con's of their uses.
-
- - The default is DROP which tells the firewall silently discard packets
-   and not reply to them at all, which some consider to be "stealth" firewall
-   behavior. The direct benefit is that it saves system resources, especially
-   during a DoS attack in not having to reply to every discarded packet. However
-   the problem is experienced attackers know the way TCP/IP works and it is such
-   that when you try to connect to a service that is unavailable, your server or
-   local router replies with an "icmp-port/host-unreachable" message. So when an
-   attacker probing your IP address receives no reply from the server or local
-   router to the scans, they will instantly know you are running a firewall, 
-   possibly piquing curiosity more.
-
- - Then we have RESET which allows the firewall to reply to discarded packets
-   in such a way that it tries to make the remote host "reset/terminate" the
-   connection attempts to you. This option is more in-line with TCP/IP 
-   standards however in most situations will provide no real benefits or
-   drawbacks. In some really isolated situations you may find that using RESET
-   during DoS attacks will help terminate connections more promptly but in
-   general this does not serve to counter the system resources expended to 
-   send back replies to every single packet filtered.
-
- - Then we have the REJECT value which is a more common alternative to DROP as
-   it allows the firewall to reply to packets with an error message. This
-   accomplishes the goal of filtering a packet while at the same time not
-   allowing the remote host to know that we are running a firewall, they just
-   think the port/service is closed/unavailable.
-
- - Finally we have the PROHIBIT value which is specific for UDP_STOP but can
-   be used as other *_STOP values with similar effect. When we set PROHIBIT we
-   are telling the firewall to reply to the sender of packets with only ICMP
-   error messages instead of like the case with RESET, TCP packets. This is a
-   good alternative to reply to packets with as it does not load the system
-   as "much" during aggressive attacks. This is also the default expected
-   reply for UDP packets that are not accepted by a host, however APF will by
-   default use a DROP value on UDP packets.
-
-Option: PKT_SANITY
-Description: This option controls the way packets are scrutinized as they flow 
-through the firewall. The main PKT_SANITY option is a top level toggle for all
-SANITY options and provides general packet flag sanity as a pre-scrub for the
-other sanity options. In short, this makes sure that all packets coming and
-going conform to strict TCP/IP standards. In doing so we make it very difficult
-for attackers to inject raw/custom packets into this host.
-
-Now onto the sanity filters, these are options that allow APF to scrutinize
-traffic coming into and out of the server so it conforms to TCP/IP standards
-and also filters common attack characteristics. There are a number of sanity
-options and each one has a well detailed caption in the configuration file. In
-addition, these options comes preconfigured to suite most situation needs and
-provide the best protection possible. With that, I will defer the PKT_SANITY
-details to the conf.apf file where you can find ample information on each
-option.
-
-Moving forward we now have the Type of Service (TOS) settings which provide a
-simple classification system to dictate traffic priority based on port numbers.
-The use of TOS in it respective capacities can have a wide ranging impact on the
-performance of your services, both positive and negative depending on settings.
-That is why it is very important that you understand and study the impact of any
-changes to TOS values and then act accordingly, as no two networks are alike. A 
-very good rule of thumb with TOS configuration is to look at the name of the TOS
-value and apply some good judgement to how that name applies to certain service
-based traffic on your network. For example the TOS value Minimize-Cost designed
-to minimize data transmission generally not be a good setting to improve the 
-response time or throughput of HTTP connections. A more fitting setting for
-this would be "Maximum Throughput - Minimum Delay", as set to default for HTTP.
-The default TOS settings are designed to improve throughput and reliability for
-FTP,HTTP,SMTP,POP3 and IMAP, please review conf.apf under the TOS_ settings for
-further details on Type of Service (TOS).
-
-Following the TOS settings we find the traceroute settings TCR_ which tell the
-firewall if and how we should handle traceroute traffic. This is by default
-enabled in APF, mostly cause of popular demand but really there is no reason
-to have it enabled or disabled other than personal preference. The TCR_PASS
-option tells the firewall if we want to accept traceroutes and the TCR_PORTS
-option defines the UDP port range used for traceroute detection.
-
-3.3) Configuration: Reactive Address Blocking
-The Reactive Address Blocking (RAB) system provides in-line intrusion
-prevention by automatically blocking addresses that trigger sanity violations
-or port scan detection. RAB is configured through the RAB_* variables in
-conf.apf. Key settings include RAB_SANITY for sanity violation blocking,
-RAB_PSCAN_LEVEL for port scan sensitivity (0-3), RAB_TIMER for block duration
-(up to 43200 seconds), and RAB_TRIP to reset the timer on repeat offenses.
-See section 3.2 above and conf.apf for detailed descriptions of each option.
 
 3.4) Configuration: Virtual Network Files
 When SET_VNET=1, APF generates per-IP policy files under the vnet/ directory
@@ -647,11 +647,11 @@ usage /usr/local/sbin/apf [OPTION]
 -v|--version ....................... output version number
 
 These options explain themselves very clearly such as the start/stop/restart
-operations. 
+operations.
 
 The -l|--list option will list all the firewall rules you currently have loaded,
 this is more of a feature intended for experienced users but nevertheless can be
-insightful for any administrator to peek at. 
+insightful for any administrator to peek at.
 
 As for the -t|--status option, this will simply show you page-by-page the APF
 status log that tracks any operations you perform with APF - if something is
@@ -669,9 +669,10 @@ is there for it. These options are immediate in action and do NOT require
 the firewall to be restarted. Please see the below sections of this file for
 more information on the trust system.
 
-Finally the -o|--ovars options is a debug feature, if something is not working as intended and you need help, please send an
-email to apf@r-fx.org and be sure to include the output of this option with
-your email.
+Finally the -o|--ovars option is a debug feature that outputs all configured
+variables and their current values. This is useful for troubleshooting
+configuration issues or when reporting problems. See section 6 for support
+contact information.
 
 4.1) General Usage: Trust System:
 The trust system in APF is a very traditional setup with two basic trust levels;
@@ -707,12 +708,12 @@ with bit masking.
 
 There are two methods for adding entries to the trust files and they are first
 and foremost by using an editor or interface of some type to edit the two files
-manually, such as nano (pico clone) or vi (old school editor). 
+manually, such as nano (pico clone) or vi (old school editor).
 
-The second is by using the 'apf' command with the options --allow (-a for 
-short), --deny (-d for short) and --remove (-u for short). The --allow|-a and 
+The second is by using the 'apf' command with the options --allow (-a for
+short), --deny (-d for short) and --remove (-u for short). The --allow|-a and
 --deny|-d flags both accept a comment option which is simply a string at the
-end of the command that you would like added to the trust rule files for 
+end of the command that you would like added to the trust rule files for
 reference. Here are some operating examples of these commands:
 
 Trust an address:
@@ -725,7 +726,7 @@ Remove an address:
 apf -u ryanm.dynip.org
 
 Please take note that the --remove|-u option does not accept a comment string
-for obvious reason and that it will remove entries that match from 
+for obvious reason and that it will remove entries that match from
 allow_hosts.rules, deny_hosts.rules and the global extensions of these files.
 
 4.2) General Usage: Global Trust System
@@ -795,11 +796,12 @@ required under GNU GPL.
 6) Support Information:
 If you require any assistance with APF you may refer to the R-fx Networks
 community forums located at https://forums.rfxnetworks.com. You may also send
-an e-mail to support@r-fx.org.
+an e-mail to proj@rfxn.com or support@r-fx.org.
 
 The official home page for APF is located at:
-https://www.rfxnetworks.com/apf.php
+https://www.rfxn.com/projects/advanced-policy-firewall/
 
-All bugs or feature requests should be sent to apf@r-fx.org and please be sure
+All bugs or feature requests should be sent to proj@rfxn.com and please be sure
 to include as much information as possible or conceptual ideas of how you think
-a new feature should work.
+a new feature should work. When reporting issues, include the output of
+'apf --ovars' with your report to help diagnose configuration problems.
