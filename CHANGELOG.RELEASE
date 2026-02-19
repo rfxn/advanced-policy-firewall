@@ -1,4 +1,35 @@
 - 2.0.1 | Feb 19 2026:
+[Fix] Stale variable references in conf.apf comments: USE_RD changed to
+      DLIST_RESERVED (BLK_RESNET), USE_ECNSHAME changed to DLIST_ECNSHAME
+      (SYSCTL_ECN) (conf.apf, .ca.def)
+[Fix] PKT_SANITY_FUDP comment corrected: UDP can fragment at IP layer;
+      changed from "no UDP packets should ever be fragmented" to "uncommon
+      in typical server traffic" (conf.apf, .ca.def)
+[Fix] TCP_STOP/UDP_STOP/ALL_STOP option descriptions corrected: removed
+      unsupported "TCP/IP default" claims, fixed "a icmp" to "an ICMP",
+      added missing PROHIBIT option to TCP_STOP and ALL_STOP
+      (conf.apf, .ca.def)
+[Fix] SYSCTL_SYN comment corrected: code raises SYN backlog to 4096, not
+      lowers it; changed to "lowering retry counts and increasing SYN
+      backlog capacity" (conf.apf, .ca.def)
+[Fix] SET_REFRESH comment corrected: describes trust chain refresh
+      (TALLOW/TDENY/TGALLOW/TGDENY), not full static rule reload
+      (conf.apf, .ca.def)
+[Fix] LOG_DROP comment clarified: "filtered" changed to "dropped/rejected"
+      (conf.apf, .ca.def)
+[Fix] BLK_PORTS garbled sentence rewritten to clear English
+      (conf.apf, .ca.def)
+[Fix] Dead MBone URL removed from BLK_MCATNET comment (conf.apf, .ca.def)
+[Fix] LOG_TARGET: ULOG marked deprecated, NFLOG noted as modern
+      alternative (conf.apf, .ca.def)
+[Fix] 9 typos/grammar fixes across conf.apf and .ca.def: assignement to
+      assignment, by-pass to bypass, hand-shake to handshake, whom to who,
+      as so to/so as to, can be used scale/used to scale, i.e:/i.e.,
+      too/to (LOG_LEVEL), first-person removed from LOG_LEVEL
+[Change] .ca.def LOG_IA comment updated with LOG_DROP dependency note
+      matching conf.apf (.ca.def)
+[Change] .ca.def SYSCTL_CONNTRACK adaptive variables now have individual
+      comments matching conf.apf (.ca.def)
 [Change] README section 6 rewritten: dead forums.rfxnetworks.com reference
       removed, support@r-fx.org removed, GitHub repository URL added
       (README, README.md)

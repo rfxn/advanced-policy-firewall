@@ -26,7 +26,7 @@ INSTALL_PATH="/etc/apf"
 # interface.
 IFACE_UNTRUSTED="eth0"
 
-# Trusted Network interface(s); all traffic on defined interface(s) will by-pass
+# Trusted Network interface(s); all traffic on defined interface(s) will bypass
 # ALL firewall rules, format is white space or comma separated list.
 IFACE_TRUSTED=""
 
@@ -68,12 +68,12 @@ SET_VNET="0"
 # defined by IFACE_* variables. This feature is ideal for systems running
 # private interfaces where not all hosts on the private network are trusted or
 # are otherwise exposed to "open" networks through this private interface
-# (i.e: the Internet, network accessible storage LAN, corporate WAN, etc.)
+# (i.e., the Internet, network accessible storage LAN, corporate WAN, etc.)
 SET_ADDIFACE="0"
 
 # This allows the firewall to work around modular kernel issues by assuming
 # that the system has all required firewall modules compiled directly into
-# kernel. This mode of operation is not generally recommended but can be used
+# kernel. This mode of operation is not generally recommended but can be used to
 # scale APF to unique situations.
 SET_MONOKERN="0"
 
@@ -91,10 +91,10 @@ DOCKER_COMPAT="0"
 # [value in seconds, 0 to disable, recommended 600]
 SET_EXPIRE="0"
 
-# This controls how often, if at all, we want the trust system to refresh rules.
-# The firewall will flush & reload all static rules, redownload global rules and
-# re-resolve any dns names in the rules. This is ideal when using dynamic dns
-# names or downloadable global trust rules.
+# This controls how often, if at all, the trust system refreshes rules.
+# The firewall will flush & reload trust chains (TALLOW/TDENY/TGALLOW/TGDENY),
+# redownload global rules and re-resolve any DNS names in the rules. This is
+# ideal when using dynamic DNS names or downloadable global trust rules.
 # [value in minutes, 0 to disable]
 SET_REFRESH="10"
 
@@ -176,23 +176,25 @@ RAB_LOG_TRIP="0"
 ##
 # How to handle TCP packet filtering?
 #
-#  RESET (sends a tcp-reset; TCP/IP default)
+#  RESET (send TCP RST; causes immediate connection close)
 #  DROP  (drop the packet; stealth ?)
 #  REJECT (reject the packet)
+#  PROHIBIT (send an icmp-host-prohibited)
 TCP_STOP="DROP"
 
 # How to handle UDP packet filtering?
 #
-#  RESET (sends a icmp-port-unreachable; TCP/IP default)
+#  RESET (send an ICMP port-unreachable; standard behavior)
 #  DROP  (drop the packet; stealth ?)
 #  REJECT (reject the packet)
-#  PROHIBIT (send an icmp-host-prohibited)
+#  PROHIBIT (send an ICMP host-prohibited)
 UDP_STOP="DROP"
 
-# How to handle all other packet filtering? 
+# How to handle all other packet filtering?
 #
 #  DROP  (drop the packet)
 #  REJECT (reject the packet)
+#  PROHIBIT (send an ICMP host-prohibited)
 ALL_STOP="DROP"
 
 # The sanity options control the way packets are scrutinized as they flow 
@@ -209,8 +211,8 @@ PKT_SANITY="1"
 # to affect many application protocols in undesirable ways.
 PKT_SANITY_INV="0"
 
-# Block any fragmented UDP packets, this is safe as no UDP packets should
-# ever be fragmented.
+# Block fragmented UDP packets. Fragmented UDP is uncommon in typical server
+# traffic and is frequently used in fragment-based attacks.
 PKT_SANITY_FUDP="1"
 
 # Block packets with a source or destination of port 0, this is safe as
@@ -258,9 +260,9 @@ ICMP_LIM="30/s"
 # service.
 RESV_DNS="1"
 
-# When RESV_DNS is enabled, all the untrusted name server traffic can fill the 
-# logs with client DNS traffic. This can be suppressed with an implicit drop 
-# of all such traffic (sport 53 inbound) as so to avoid log chains. If you run
+# When RESV_DNS is enabled, all the untrusted name server traffic can fill the
+# logs with client DNS traffic. This can be suppressed with an implicit drop
+# of all such traffic (sport 53 inbound) so as to avoid log chains. If you run
 # applications that have unique name servers configured, this may break them.
 RESV_DNS_DROP="1"
 
@@ -272,17 +274,16 @@ RESV_DNS_DROP="1"
 # ranges (4660_4678).
 BLK_P2P_PORTS="1214,2323,4660_4678,6257,6699,6346,6347,6881_6889,7778"
 
-# These are common Internet service ports that are understood in the wild 
-# services you would not want logged under normal circumstances. All ports
-# that are defined here will be implicitly dropped with no logging for
-# TCP/UDP traffic inbound or outbound. Format is comma separated for single
+# Common Internet service ports associated with frequently-probed services
+# that you would not want logged under normal circumstances. All ports
+# defined here will be implicitly dropped with no logging for TCP/UDP
+# traffic inbound or outbound. Format is comma separated for single
 # ports and an underscore separator for ranges (135_139).
 BLK_PORTS="135_139,111,513,520,445,1433,1434,1234,1524,3127"
 
-# You need multicasting if you intend to participate in the MBONE, a high 
+# You need multicasting if you intend to participate in the MBONE, a high
 # bandwidth network on top of the Internet which carries audio and video
-# broadcasts. More about MBONE at: www-itg.lbl.gov/mbone/, this is generally
-# safe to enable. 
+# broadcasts. This is generally safe to enable.
 BLK_MCATNET="0"
 
 # Block all private ipv4 addresses, this is address space reserved for private
@@ -294,9 +295,10 @@ BLK_PRVNET="0"
 
 # Block all ipv4 address space marked reserved for future use (unassigned),
 # such networks have no business talking on the Internet. However they may at
-# some point become live address space. The USE_RD option further in this file
-# allows for dynamic updating of this list on every full restart of APF. Refer
-# to the 'internals/reserved.networks' file for listing of address space.
+# some point become live address space. The DLIST_RESERVED option further in
+# this file allows for dynamic updating of this list on every full restart of
+# APF. Refer to the 'internals/reserved.networks' file for listing of address
+# space.
 BLK_RESNET="1"
 
 # Three related flaws were found in the Linux kernel’s handling of TCP Selective
@@ -355,7 +357,7 @@ SYSCTL_TCP="1"
 SYSCTL_TCP_NOSACK="0"
 
 # These are system control (sysctl) option changes intended to help mitigate
-# syn-flood attacks by lowering syn retry, syn backlog & syn time-out values.
+# syn-flood attacks by lowering retry counts and increasing SYN backlog capacity.
 SYSCTL_SYN="0"
 
 # These are system control (sysctl) option changes to provide protection from
@@ -372,7 +374,7 @@ SYSCTL_LOGMARTIANS="0"
 # (Explicit Congestion Notification). This feature provides an improved method 
 # for congestion avoidance by allowing the network to mark packets for 
 # transmission later, rather than dropping them from the queue. Please also
-# see related USE_ECNSHAME option further down in this file. 
+# see related DLIST_ECNSHAME option further down in this file.
 SYSCTL_ECN="0"
 
 # This system control (sysctl) option will allow you to make use of SynCookies 
@@ -381,10 +383,10 @@ SYSCTL_ECN="0"
 # transmissions with a hashed sequence number that must be correlated with the
 # sending host. The hash is made up of the sending host address, packet flags
 # etc.; if the sending host does not validate against the hash then the tcp
-# hand-shake is terminated. In short, this helps to mitigate syn-flood attacks.
+# handshake is terminated. In short, this helps to mitigate syn-flood attacks.
 # Note: syncookies seriously violates TCP protocol and can result in serious
 #       degradation of some services (i.e. SMTP); visible not by you, but your
-#       clients and relays whom are contacting your system.
+#       clients and relays who are contacting your system.
 SYSCTL_SYNCOOKIES="1"
 
 # This system control (sysctl) option allows for the use of Abort_On_Overflow
@@ -525,7 +527,7 @@ DLIST_DSHIELD="0"
 DLIST_DSHIELD_URL="https://feeds.dshield.org/top10-2.txt"
 
 # The reserved networks list is addresses which ARIN has marked as reserved
-# for future assignement and have no business as valid traffic on the internet.
+# for future assignment and have no business as valid traffic on the internet.
 # Such addresses are often used as spoofed (Fake) hosts during attacks, this
 # will update the reserved networks list in order to prevent new ip assignments 
 # on the internet from getting blocked; this option is only important when
@@ -599,16 +601,16 @@ GRE_TTL="255"
 ##
 # [Logging and control settings]
 ##
-# Log all traffic that is filtered by the firewall
+# Log all traffic that is dropped/rejected by the firewall
 LOG_DROP="0"
 
-# What log level should we send all log data too?
-# refer to man syslog.conf for levels
+# What log level should all log data be sent to?
+# Refer to man syslog.conf for levels.
 LOG_LEVEL="crit"
 
-# Where should we send all the logging data?
-# ULOG (Allow ulogd to handle the logging)
+# Where should all the logging data be sent?
 # LOG (Default; sends logging to kernel log)
+# ULOG (deprecated; use NFLOG with ulogd2 on modern kernels)
 LOG_TARGET="LOG"
 
 # Log interactive access over telnet & ssh; uses
