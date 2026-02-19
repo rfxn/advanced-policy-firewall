@@ -457,9 +457,43 @@ cli_trust() {
  fi
 }
 
+save_external_baseline() {
+	local bdir="$INSTALL_PATH/internals"
+	# Only save when APF is not running — INPUT/OUTPUT has only external rules
+	if $IPT $IPT_FLAGS -L TALLOW -n >/dev/null 2>&1; then
+		return  # APF running, baseline would include APF rules
+	fi
+	$IPT $IPT_FLAGS -S INPUT > "$bdir/.apf.input.baseline" 2>/dev/null
+	$IPT $IPT_FLAGS -S OUTPUT > "$bdir/.apf.output.baseline" 2>/dev/null
+	if [ "$USE_IPV6" == "1" ]; then
+		$IP6T $IPT_FLAGS -S INPUT > "$bdir/.apf6.input.baseline" 2>/dev/null
+		$IP6T $IPT_FLAGS -S OUTPUT > "$bdir/.apf6.output.baseline" 2>/dev/null
+	fi
+}
+
+restore_external_baseline() {
+	local bdir="$INSTALL_PATH/internals"
+	local f rule
+	for f in "$bdir/.apf.input.baseline" "$bdir/.apf.output.baseline"; do
+		[ -f "$f" ] || continue
+		while IFS= read -r rule; do
+			case "$rule" in -A*) $IPT $IPT_FLAGS $rule 2>/dev/null || true ;; esac
+		done < "$f"
+	done
+	if [ "$USE_IPV6" == "1" ]; then
+		for f in "$bdir/.apf6.input.baseline" "$bdir/.apf6.output.baseline"; do
+			[ -f "$f" ] || continue
+			while IFS= read -r rule; do
+				case "$rule" in -A*) $IP6T $IPT_FLAGS $rule 2>/dev/null || true ;; esac
+			done < "$f"
+		done
+	fi
+}
+
 flush_apf_chains() {
 	# Surgical flush: only remove APF-owned chains, preserving Docker/k8s/etc.
 	# Used when DOCKER_COMPAT="1" instead of nuclear flush.
+	save_external_baseline
 
 	# Flush INPUT and OUTPUT (APF owns these completely)
 	ipt4 -F INPUT
@@ -531,6 +565,7 @@ flush_apf_chains() {
 	ipt -P INPUT ACCEPT
 	ipt -P OUTPUT ACCEPT
 	# Note: FORWARD policy deliberately NOT touched
+	restore_external_baseline
 }
 
 flush() {

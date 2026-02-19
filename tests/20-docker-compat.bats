@@ -190,6 +190,45 @@ teardown() {
     [ ! -f "/opt/apf/internals/.apf.restore" ]
 }
 
+@test "DOCKER_COMPAT=1 start preserves external INPUT rules" {
+    # Simulate Docker Swarm adding an INPUT rule before APF starts
+    iptables -A INPUT -p tcp --dport 2377 -j ACCEPT
+    source /opt/tests/helpers/apf-config.sh
+    apf_set_config "DOCKER_COMPAT" "1"
+
+    "$APF" -s
+
+    # External INPUT rule should survive APF start
+    run iptables -S INPUT
+    assert_output --partial -- "--dport 2377"
+}
+
+@test "DOCKER_COMPAT=1 flush preserves external INPUT rules" {
+    iptables -A INPUT -p tcp --dport 2377 -j ACCEPT
+    source /opt/tests/helpers/apf-config.sh
+    apf_set_config "DOCKER_COMPAT" "1"
+
+    "$APF" -s
+    "$APF" -f
+
+    # External rule survives flush
+    run iptables -S INPUT
+    assert_output --partial -- "--dport 2377"
+}
+
+@test "DOCKER_COMPAT=1 restart preserves external INPUT rules" {
+    iptables -A INPUT -p tcp --dport 2377 -j ACCEPT
+    source /opt/tests/helpers/apf-config.sh
+    apf_set_config "DOCKER_COMPAT" "1"
+
+    "$APF" -r
+
+    run iptables -S INPUT
+    assert_output --partial -- "--dport 2377"
+    # APF chains also exist
+    assert_chain_exists TALLOW
+}
+
 @test "DOCKER_COMPAT=1 flush clears mangle but not nat" {
     create_docker_chains
     source /opt/tests/helpers/apf-config.sh

@@ -1,4 +1,14 @@
-- 2.0.1 | Feb 16 2026:
+- 2.0.1 | Feb 19 2026:
+[New] External INPUT/OUTPUT rule preservation in DOCKER_COMPAT mode;
+      save_external_baseline() captures non-APF rules before flush,
+      restore_external_baseline() replays them after flush; protects
+      Docker Swarm, kube-proxy, and Calico CNI rules from being
+      destroyed during APF start/restart/stop (functions.apf)
+[New] Docker compat external INPUT preservation tests: 3 tests covering
+      start, flush, and restart scenarios with simulated Docker Swarm
+      INPUT rule (tests/20-docker-compat.bats)
+[Change] DOCKER_COMPAT conf.apf comment updated to document INPUT/OUTPUT
+      preservation alongside FORWARD and nat (conf.apf)
 [New] Docker/container chain preservation mode (DOCKER_COMPAT); when enabled,
       flush() only removes APF-owned chains, preserving Docker, containerd,
       Kubernetes, and Podman chains in FORWARD and nat table. Fast load and
