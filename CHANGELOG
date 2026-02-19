@@ -1,4 +1,17 @@
 - 2.0.1 | Feb 19 2026:
+[New] README sections 3.6 (Docker/Container Compatibility), 3.7 (ipset Block
+      Lists), and 3.8 (GRE Tunnels) documenting all 2.0.1 subsystems (README)
+[New] CLI listing updated with --ipset-update, --gre-up, --gre-down,
+      --gre-status, and --unban alias note (README)
+[Change] Feature summary expanded with Docker compat, ipset, GRE tunnels,
+      dependency checking, ICMPv6 filtering, adaptive conntrack, and IPv6
+      sysctl hardening bullets (README)
+[Change] Section 1.1 expanded with dependency checking (check_deps())
+      description and OS-aware install hints (README)
+[Change] Section 3.1 USE_IPV6 expanded with IG_ICMPV6_TYPES/EG_ICMPV6_TYPES,
+      NDP protection, IPv6 sysctl hardening, and bracket notation reference
+      (README)
+[Change] Table of Contents updated with sections 3.6, 3.7, 3.8 (README)
 [Change] README grammar, structure, and correctness fixes: "There is really
       3 modes" corrected to "There are three modes"; "it will come pretty
       bare in the way of preconfigured options" reworded; "that is contains"

@@ -27,6 +27,9 @@ Contents:
 3.3 ........... Configuration: Reactive Address Blocking
 3.4 ........... Configuration: Virtual Network Files
 3.5 ........... Configuration: Global Variables & Custom Rules
+3.6 ........... Configuration: Docker/Container Compatibility
+3.7 ........... Configuration: ipset Block Lists
+3.8 ........... Configuration: GRE Tunnels
 4 ............. General Usage
 4.1 ........... General Usage: Trust System
 4.2 ........... General Usage: Global Trust System
@@ -147,6 +150,20 @@ a point form summary of most APF features for reference and review:
   USE_IPV6 is enabled, including ICMPv6 filtering and NDP
 - input validation on all trust system entries (IPv4, IPv6, CIDR, FQDN)
 - nft backend detection with safe fast load across iptables backend changes
+- Docker/container compatibility mode for coexistence with Docker, Podman,
+  Kubernetes, and containerd without destroying external chains
+- ipset block list support for kernel-level high-performance IP matching with
+  O(1) lookup; one iptables rule per list instead of one rule per IP
+- GRE tunnel management with dedicated chains, protocol 47 rules, lifecycle
+  controls (--gre-up/--gre-down/--gre-status), and persist-across-flush support
+- automatic dependency checking at startup with OS-aware install hints for
+  missing packages (apt-get, yum, dnf)
+- ICMPv6 type filtering (IG_ICMPV6_TYPES/EG_ICMPV6_TYPES) with automatic NDP
+  protection for types 133-136
+- adaptive connection tracking scaling that auto-grows conntrack_max when usage
+  exceeds 80%, with configurable ceiling and hash table sizing
+- IPv6 sysctl hardening: disables accept_source_route, accept_redirects, and
+  accept_ra when USE_IPV6=1
 - systemd service unit for modern init management
 - 3rd party add-on projects that complement APF features
 
@@ -200,6 +217,13 @@ Fedora (current releases)
 APF will generally run on any Linux distribution that provides iptables
 (legacy or nft backend) and a bash shell with standard GNU utilities
 (grep, awk, sed, etc.).
+
+APF includes automatic dependency checking at startup. Critical dependencies
+(iptables, ip, modprobe, ip6tables when USE_IPV6=1) will prevent the firewall
+from starting if missing. Optional dependencies (wget, iptables-save,
+iptables-restore, diff, ipset) produce warnings but allow startup to continue.
+Install hints are OS-aware and suggest the correct package manager command
+(apt-get, yum, or dnf) for your distribution.
 
 2) Installation
 The installation setup of APF is very straight forward, there is an included
@@ -347,6 +371,21 @@ Protocol) types 133-136 are always permitted for IPv6 connectivity. The VNET
 subsystem does not currently support IPv6. IPv6 support requires that your
 system has IPv6 enabled in its networking configuration and that the ip6tables
 binary is available.
+
+When USE_IPV6 is enabled, the following additional configuration variables
+become active:
+  IG_ICMPV6_TYPES - inbound ICMPv6 types to accept (default: 1,2,3,4,128,129)
+  EG_ICMPV6_TYPES - outbound ICMPv6 types to accept (default: all)
+NDP (Neighbor Discovery Protocol) types 133-136 are always permitted regardless
+of these settings, as they are required for IPv6 connectivity.
+
+IPv6 sysctl hardening is also applied when USE_IPV6=1 and SYSCTL_ROUTE=1:
+accept_source_route, accept_redirects, and accept_ra are disabled on all
+interfaces and the untrusted interface specifically. IPv6 forwarding is disabled
+unless the system is configured as a router.
+
+IPv6 addresses in the advanced trust syntax (section 4.3) use bracket notation
+to protect colons from the field delimiter, e.g., d=22:s=[2001:db8::1].
 
 Option: SET_FASTLOAD
 Description:  This tells APF to use a special feature to take saved snap shots
@@ -624,6 +663,105 @@ directly to the preroute.rules file which is loaded early in the firewall
 chain. Any valid iptables syntax can be used in these files, as they are
 sourced directly into the firewall's bash execution environment.
 
+3.6) Configuration: Docker/Container Compatibility
+When running APF alongside Docker, Podman, Kubernetes, or other container
+runtimes, the default flush behavior (which wipes all iptables rules and chains)
+will destroy the container runtime's networking rules. The DOCKER_COMPAT option
+solves this by switching APF to a surgical flush mode.
+
+Option: DOCKER_COMPAT
+Description: When set to "1", APF's flush operation only removes APF-owned
+chains from the filter table, leaving all external chains intact. Specifically:
+
+  - FORWARD chain policy and rules are preserved (Docker routing)
+  - nat table is left untouched (Docker port mapping and MASQUERADE rules)
+  - raw table is left untouched
+  - External INPUT and OUTPUT rules (non-APF) are saved before flush and
+    restored afterward, protecting rules from Docker Swarm, kube-proxy,
+    Calico CNI, and similar tools
+  - DOCKER, DOCKER-USER, DOCKER-ISOLATION, and container-runtime chains
+    in all tables are preserved
+  - mangle PREROUTING/POSTROUTING are still flushed (APF-managed)
+
+When DOCKER_COMPAT is enabled, SET_FASTLOAD is automatically disabled because
+iptables-restore would overwrite the external chains that DOCKER_COMPAT is
+designed to protect. Snapshot saving is also skipped in compat mode.
+
+Enable this option if you see Docker containers losing network connectivity
+after running 'apf -s' or 'apf -r'.
+
+3.7) Configuration: ipset Block Lists
+The ipset subsystem uses kernel-level hash tables for high-performance IP
+matching. Instead of creating one iptables rule per blocked IP address (which
+scales linearly), ipset creates a single iptables rule per block list that
+references a kernel hash set, providing O(1) lookup performance regardless of
+list size.
+
+Option: USE_IPSET
+Description: Set to "1" to enable ipset block list support. Requires the
+'ipset' utility to be installed (apt-get install ipset / yum install ipset).
+When disabled or ipset is not installed, the ipset.rules file is ignored.
+
+Option: IPSET_LOG_RATE
+Description: Default log rate limit (per minute) for ipset blocklist matches.
+Individual lists can control their own logging via the log field in ipset.rules.
+
+The block lists are defined in the ipset.rules file. Each line defines a set
+with the format:
+  name|url|type|log
+
+Where:
+  name - unique set name (alphanumeric, used as ipset set name)
+  url  - URL to download the IP list from
+  type - hash type: "ip" for individual IPs, "net" for CIDR networks
+  log  - logging: 0=off, 1=on (uses IPSET_LOG_RATE)
+
+CLI: Run 'apf --ipset-update' to hot-reload all ipset block lists without
+restarting the firewall. A cron job (cron.d.apf_ipset) is installed
+automatically to perform periodic updates.
+
+3.8) Configuration: GRE Tunnels
+APF can manage GRE (Generic Routing Encapsulation) point-to-point tunnels
+with dedicated firewall chains and protocol 47 rules. This is useful for
+servers that need encrypted or encapsulated links to remote endpoints.
+
+Option: USE_GRE
+Description: Set to "1" to enable GRE tunnel management. Requires the 'ip'
+utility (iproute2 package). When disabled, gre.rules is ignored.
+
+Option: GRE_PERSIST
+Description: When set to "1", tunnel interfaces are kept alive when the
+firewall is flushed or stopped. Only firewall rules are removed. When set
+to "0", tunnel interfaces are also torn down on flush. Default is "1".
+
+Option: GRE_KEEPALIVE
+Description: Keepalive interval (seconds) and retry count before declaring
+a tunnel dead. Format: "interval retries" (e.g., "10 3"). Set to "0 0" to
+disable keepalive. Requires kernel >= 3.x.
+
+Option: GRE_MTU
+Description: Tunnel MTU. Leave empty for auto-calculation (parent interface
+MTU minus 24 bytes GRE overhead). Set explicitly for double-encapsulation
+scenarios (e.g., "1400").
+
+Option: GRE_TTL
+Description: IP TTL for GRE tunnel packets. Default is "255".
+
+Tunnels are defined in the gre.rules file. Each line defines a tunnel with
+fields for name, local IP, remote IP, optional key, and optional route
+entries. See conf.apf and the gre.rules file header for format details.
+
+When tunnels are created, APF automatically:
+  - Creates GRE_IN and GRE_OUT chains for tunnel traffic
+  - Adds protocol 47 (GRE) ACCEPT rules for each tunnel endpoint
+  - Creates per-tunnel interface ACCEPT rules in INPUT and OUTPUT
+  - Configures MTU, keepalive, and IP addresses as specified
+
+CLI commands:
+  apf --gre-up       - bring up all tunnels defined in gre.rules
+  apf --gre-down     - tear down all tunnels and remove firewall rules
+  apf --gre-status   - show current tunnel interface status
+
 4) General Usage:
 The /usr/local/sbin/apf command has a number of options that will ease the
 day-to-day use of your firewall. Here is a quick snap-shot of the options:
@@ -645,6 +783,12 @@ usage /usr/local/sbin/apf [OPTION]
                                      and immediately remove rule from firewall
 -o|--ovars ......................... output all configuration options
 -v|--version ....................... output version number
+--ipset-update ..................... hot-reload ipset block lists from ipset.rules
+--gre-up .......................... bring up GRE tunnels from gre.rules
+--gre-down ........................ tear down GRE tunnels
+--gre-status ...................... show GRE tunnel status
+
+Note: --unban is accepted as an alias for -u|--remove.
 
 These options explain themselves very clearly such as the start/stop/restart
 operations.
