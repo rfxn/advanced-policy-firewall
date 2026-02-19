@@ -1,4 +1,28 @@
 - 2.0.1 | Feb 19 2026:
+[Change] DEVEL_MODE comment compressed from 3 to 2 lines (conf.apf, .ca.def)
+[Change] USE_IPV6 comment compressed from 5 to 3 lines (conf.apf, .ca.def)
+[Change] SET_VERBOSE comment rewritten: fixed tense, compressed from 4 to
+      2 lines (conf.apf, .ca.def)
+[Change] SET_FASTLOAD note (e) added: DEVEL_MODE bypasses snapshot
+      (conf.apf, .ca.def)
+[Change] SET_VNET comment: hardcoded /etc/apf path replaced with
+      $INSTALL_PATH; IPv6 limitation note added to .ca.def (conf.apf,
+      .ca.def)
+[Change] SET_EXPIRE comment clarified: "equiv. seconds" replaced with
+      concrete example "10 min = 600s" (conf.apf, .ca.def)
+[Change] VF_ROUTE comment: redundant "IFACE_*" replaced with explicit
+      "IFACE_UNTRUSTED and IFACE_TRUSTED" (conf.apf, .ca.def)
+[Change] RAB intro compressed from 7 lines to 3 lines (conf.apf, .ca.def)
+[Change] RAB_LOG_HIT/RAB_LOG_TRIP: verbose LOG_DROP override sentence
+      compressed to "LOG_DROP=1 overrides this" (conf.apf, .ca.def)
+[Change] SYSCTL_TCP_NOSACK: verbose duplicate CVE block replaced with
+      brief cross-reference to BLK_TCP_SACK_PANIC (conf.apf, .ca.def)
+[Change] SYSCTL_ROUTE: added note about IPv6 forwarding effect when
+      USE_IPV6=1 (conf.apf, .ca.def)
+[Change] DLIST_PHP: removed "first and only" marketing copy
+      (conf.apf, .ca.def)
+[Change] DLIST_ECNSHAME: removed "clueless" editorial language, compressed
+      from 7 to 3 lines (conf.apf, .ca.def)
 [Fix] Stale variable references in conf.apf comments: USE_RD changed to
       DLIST_RESERVED (BLK_RESNET), USE_ECNSHAME changed to DLIST_ECNSHAME
       (SYSCTL_ECN) (conf.apf, .ca.def)

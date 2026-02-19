@@ -23,8 +23,8 @@ cat > .conf.apf <<EOF
 # [Main]
 ##
 # !!! Do not leave set to (1) !!!
-# When set to enabled; 5 minute cronjob is set to stop the firewall. Set
-# this off (0) when firewall is determined to be operating as desired.
+# A 5 minute cronjob stops the firewall while enabled. Disable (0) once
+# firewall is operating as desired.
 DEVEL_MODE="1"
 
 # The installation path of APF; this can be changed but it is not recommended.
@@ -39,17 +39,13 @@ IFACE_UNTRUSTED="$IFACE_UNTRUSTED"
 # ALL firewall rules, format is white space or comma separated list.
 IFACE_TRUSTED="$IFACE_TRUSTED"
 
-# This option enables IPv6 support for APF and loads all appropriate IPv6 kernel
-# modules. This feature depends on IPv6 support being enabled in your networking
-# configuration and that the modules are explicitly available. Please ensure that
-# you do not have IPv6 disabled via modprobe.conf/.d or in sysconfig files.
+# Enable IPv6 support and load IPv6 kernel modules. Requires IPv6 enabled in
+# networking configuration and modules available (not disabled via modprobe.conf/.d).
 # Note: The VNET (virtual network) feature does not currently support IPv6.
 USE_IPV6="$USE_IPV6"
 
-# This option will allow for all status events to be displayed in real time on
-# the console as you use the firewall. Typically, APF used to operate silent
-# with all logging piped to \$LOG_APF. The use of this option will not disable
-# the standard log file displayed by apf --status but rather compliment it.
+# Display all status events in real time on the console. Does not disable
+# the standard log file (apf --status) but rather complements it.
 SET_VERBOSE="$SET_VERBOSE"
 
 # The fast load feature makes use of the iptables-save/restore facilities to do
@@ -61,13 +57,16 @@ SET_VERBOSE="$SET_VERBOSE"
 #       b) if snapshot age exceeds 12 hours, the snapshot is expired
 #       c) if conf or a .rule has changed since last load, snapshot is expired
 #       d) if it is your first run of APF since install, snapshot is generated
-#       - an expired snapshot means APF will do a full start rule-by-rule 
+#       e) if DEVEL_MODE is enabled, the snapshot is bypassed
+#       - an expired snapshot means APF will do a full start rule-by-rule
 SET_FASTLOAD="$SET_FASTLOAD"
 
 # Virtual Network Sub-System (VNET) creates independent policy rule set for
-# each IP on a system to /etc/apf/vnet/IP.rules. These rule files can be 
-# configured with conf.apf variables for unique but convenient firewall 
+# each IP on a system to \$INSTALL_PATH/vnet/IP.rules. These rule files can be
+# configured with conf.apf variables for unique but convenient firewall
 # policies or custom iptables entries for even greater flexibility.
+# Note: VNET is IPv4-only. IPv6 addresses cannot be used as filenames and
+# IPv6 does not use the interface aliasing model that VNET relies on.
 SET_VNET="$SET_VNET"
 
 # This feature firewalls any additional interfaces on the server as untrusted 
@@ -94,7 +93,7 @@ DOCKER_COMPAT="$DOCKER_COMPAT"
 
 # The expiry interval, in seconds, that bans will be expired out of the trust
 # system. This only applies to local bans from deny_hosts.rules and not global
-# import rules. The value must not be less than equiv. seconds of SET_REFRESH.
+# import rules. Must not be less than SET_REFRESH in seconds (e.g., 10 min = 600s).
 # [value in seconds, 0 to disable, recommended 600]
 SET_EXPIRE="$SET_EXPIRE"
 
@@ -117,10 +116,9 @@ SET_REFRESH_MD5="$SET_REFRESH_MD5"
 # entries to maintain the set limit. [value is max lines, 0 for unlimited]
 SET_TRIM="$SET_TRIM"
 
-# Verifies that the IFACE_* and IFACE_TRUSTED interfaces are actually routed
-# to something. If configured interfaces are found with no routes setup then
-# APF will exit with an error to prevent further issues (such as being locked 
-# out of the system).
+# Verifies that the IFACE_UNTRUSTED and IFACE_TRUSTED interfaces are actually
+# routed. If configured interfaces have no routes, APF will exit with an error
+# to prevent further issues (such as being locked out of the system).
 VF_ROUTE="$VF_ROUTE"
 
 # Verifies that all inbound traffic is sourced from a defined local gateway MAC
@@ -133,14 +131,9 @@ VF_LGATE="$VF_LGATE"
 ##
 # [Reactive Address Blocking]
 ##
-# The use of RAB is such that it allows the firewall to track an address as it
-# traverses the firewall rules and subsequently associate that address across
-# any number of violations. This allows the firewall to react to critical
-# policy violations by blocking addresses temporarily on the assumed precaution
-# that we are protecting the host from what the address may do on the pretext
-# of what the address has already done. The interface that allows RAB to work
-# resides inside the kernel and makes use of the iptables 'ipt_recent' module,
-# so there is no external programs causing any additional load.
+# Reactive Address Blocking (RAB) tracks policy violations per address and
+# temporarily blocks offenders. Powered by xt/ipt_recent kernel module — no
+# external programs or additional load required.
 RAB="$RAB"
 
 # This enables RAB for sanity violations, which is when an address breaks a
@@ -171,12 +164,12 @@ RAB_TIMER="$RAB_TIMER"
 RAB_TRIP="$RAB_TRIP"
 
 # This controls if the firewall should log all violation hits from an address.
-# The use of LOG_DROP variable set to 1 will override this to force logging.
+# LOG_DROP=1 overrides this to force logging.
 RAB_LOG_HIT="$RAB_LOG_HIT"
 
 # This controls if the firewall should log all subsequent traffic from an address
 # that is already blocked for a violation hit, this can generate a lot of logs.
-# The use of LOG_DROP variable set to 1 will override this to force logging.
+# LOG_DROP=1 overrides this to force logging.
 RAB_LOG_TRIP="$RAB_LOG_TRIP"
 
 ##
@@ -359,15 +352,9 @@ SYSCTL_CONNTRACK_BUCKETS="$SYSCTL_CONNTRACK_BUCKETS"
 # performance and reliability.
 SYSCTL_TCP="$SYSCTL_TCP"
 
-# Three related flaws were found in the Linux kernel’s handling of TCP Selective
-# Acknowledgement (SACK) packets handling with low MSS size. The extent of impact
-# is understood to be limited to denial of service at this time.
-#
-# ref: https://access.redhat.com/security/vulnerabilities/tcpsack
-#      CVE-2019-11477, CVE-2019-11478, CVE-2019-11479
-#
-# This can be safely ignored if you are running on a modern patched kernel newer
-# than June 16th 2019.
+# Disable TCP SACK entirely. Alternative to BLK_TCP_SACK_PANIC (see above).
+# Safe to ignore on patched kernels (post-June 2019).
+# ref: CVE-2019-11477, CVE-2019-11478, CVE-2019-11479
 SYSCTL_TCP_NOSACK="$SYSCTL_TCP_NOSACK"
 
 # These are system control (sysctl) option changes intended to help mitigate
@@ -375,8 +362,8 @@ SYSCTL_TCP_NOSACK="$SYSCTL_TCP_NOSACK"
 SYSCTL_SYN="$SYSCTL_SYN"
 
 # These are system control (sysctl) option changes to provide protection from
-# spoofed packets and ip/arp/route redirection. If you are performing advanced
-# routing policies on this host such as NAT/MASQ you should disable this.
+# spoofed packets and ip/arp/route redirection. When USE_IPV6=1, also disables
+# IPv6 forwarding. Disable this if performing NAT/MASQ or advanced routing.
 SYSCTL_ROUTE="$SYSCTL_ROUTE"
 
 # This system control (sysctl) option will log all network traffic that is
@@ -515,10 +502,9 @@ EG_DROP_CMD="$EG_DROP_CMD"
 ##
 # [Remote Rule Imports]
 ##
-# Project Honey Pot is the first and only distributed system for identifying
-# spammers and the spambots they use to scrape addresses from your website.
-# This aggregate list combines Harvesters, Spammers and SMTP Dictionary attacks
-# from the PHP IP Data at:  https://www.projecthoneypot.org/list_of_ips.php
+# Project Honey Pot identifies spammers and the spambots they use to scrape
+# addresses from websites. This list combines Harvesters, Spammers and SMTP
+# Dictionary attacks. More info: https://www.projecthoneypot.org/list_of_ips.php
 DLIST_PHP="$DLIST_PHP"
 DLIST_PHP_URL="https://cdn.rfxn.com/downloads/php_list"
 
@@ -545,13 +531,9 @@ DLIST_DSHIELD_URL="https://feeds.dshield.org/top10-2.txt"
 DLIST_RESERVED="$DLIST_RESERVED"
 DLIST_RESERVED_URL="https://cdn.rfxn.com/downloads/reserved.networks"
 
-# ECN is an extension which helps reduce congestion. Unfortunately some
-# clueless software/hardware vendors have setup their sites or implemented
-# TCP/IP in a very broken manner. If you try to talk to these sites with ECN
-# turned on, they will drop all packets from you. This feature uses the ECN
-# hall of shame list to turn off ECN in packets to these hosts so your traffic
-# is accepted as intended. This option is dependent on setting SYSCTL_ECN="1"
-# otherwise it stays disabled.
+# Some hosts have broken ECN implementations and drop packets from ECN-enabled
+# senders. This feature uses a list of known-broken hosts to disable ECN in
+# packets sent to them. Requires SYSCTL_ECN="1", otherwise stays disabled.
 DLIST_ECNSHAME="$DLIST_ECNSHAME"
 DLIST_ECNSHAME_URL="https://cdn.rfxn.com/downloads/ecnshame.lst"
 
