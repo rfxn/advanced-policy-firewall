@@ -12,6 +12,7 @@ elif [ -f "/proc/sys/net/nf_conntrack_max" ]; then
 	echo $SYSCTL_CONNTRACK > /proc/sys/net/nf_conntrack_max
 fi
 
+# Conntrack timeouts: 600s established (default 432000), 90s time-wait (default 120)
 if [ -f "/proc/sys/net/netfilter/nf_conntrack_tcp_timeout_established" ]; then
 	echo 600 > /proc/sys/net/netfilter/nf_conntrack_tcp_timeout_established
 	echo 90 > /proc/sys/net/netfilter/nf_conntrack_tcp_timeout_time_wait
@@ -47,6 +48,8 @@ if [ -f "/proc/sys/net/netfilter/nf_conntrack_helper" ]; then
 	echo 0 > /proc/sys/net/netfilter/nf_conntrack_helper
 fi
 
+# Unconditional hardening: widen ephemeral port range, ignore bogus ICMP errors
+# and ICMP broadcasts (smurf attack mitigation)
 echo '24577 65534' > /proc/sys/net/ipv4/ip_local_port_range
 echo 1 > /proc/sys/net/ipv4/icmp_ignore_bogus_error_responses
 echo 1 > /proc/sys/net/ipv4/icmp_echo_ignore_broadcasts
@@ -86,6 +89,7 @@ fi
 # TCP Parameters
 if [ "$SYSCTL_TCP" == "1" ]; then
 	eout "{glob} setting sysctl_tcp enabled"
+	# tcp_tw_recycle removed in kernel 4.12; only set if proc file exists
 	if [ -f "/proc/sys/net/ipv4/tcp_tw_recycle" ]; then
 		echo 0 > /proc/sys/net/ipv4/tcp_tw_recycle
 	fi

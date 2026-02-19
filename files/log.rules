@@ -1,5 +1,6 @@
 eout "{glob} loading log.rules"
 
+# Log NEW interactive access (SSH/telnet) reaching INPUT — requires LOG_DROP=1
 if [ "$LOG_DROP" == "1" ]; then
  if [ "$LOG_IA" == "1" ]; then
 	ipt -N TELNET_LOG

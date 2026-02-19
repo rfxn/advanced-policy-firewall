@@ -1,4 +1,18 @@
 - 2.0.1 | Feb 19 2026:
+[Fix] bt.rules: "Block Traffic With Invalid Flags" comment corrected to
+      "Block INVALID connection states and unusual TCP options" (bt.rules)
+[Fix] bt.rules: "p2p networks" comment corrected to "p2p ports"; dead
+      service names (WinMX, Napster, Kazaa, etc.) removed (bt.rules)
+[Fix] vnetgen exit code: SET_VNET=0 now exits 0 (disabled is not an error)
+      instead of exit 1 (vnetgen)
+[New] sysctl.rules: added comments for hardcoded conntrack timeouts (600s
+      established, 90s time-wait vs kernel defaults) (sysctl.rules)
+[New] sysctl.rules: added comment for unconditional port range and ICMP
+      settings (sysctl.rules)
+[New] sysctl.rules: added note that tcp_tw_recycle was removed in kernel
+      4.12 (sysctl.rules)
+[New] log.rules: added comment explaining LOG_IA purpose and LOG_DROP
+      dependency above the conditional (log.rules)
 [Fix] vnetgen.def typos: "defined" → "define" (2 occurrences),
       "iptable" → "iptables" (vnet/vnetgen.def)
 [Fix] vnetgen.def invalid example IP 1.0.1.0.1 → RFC 5737 192.0.2.1

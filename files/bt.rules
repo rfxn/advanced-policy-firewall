@@ -165,7 +165,7 @@ if [ "$PKT_SANITY" == "1" ]; then
 	ipt4 -A OUT_SANITY -p tcp --tcp-flags ACK,URG URG -j $TCP_STOP
 
 	if [ "$PKT_SANITY_INV" == "1" ]; then
-	# Block Traffic With Invalid Flags
+	# Block INVALID connection states and unusual TCP options
 	        eout "{pkt_sanity} check inbound for INVALID states"
 	        eout "{pkt_sanity} check outbound for INVALID states"
 	        eout "{pkt_sanity} deny inbound tcp-option 64"
@@ -384,8 +384,7 @@ fi
 
 if [ ! "$BLK_P2P_PORTS" == "" ]; then
         eout "{blk_p2p} set active BLK_P2P"
-        # Drop traffic to/from common p2p networks
-        # winmx,napster,bittorrent,gnutella,edonkey,kazaa,morpheus
+        # Drop traffic to/from common p2p ports
         ipt -N P2P
         for i in $(echo $BLK_P2P_PORTS | tr ',' ' '); do
                 MVAL=$(echo $i | grep "_")
