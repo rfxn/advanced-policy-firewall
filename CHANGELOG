@@ -1,26 +1,7 @@
 - 2.0.1 | Feb 19 2026:
-[New] README sections 3.6 (Docker/Container Compatibility), 3.7 (ipset Block
-      Lists), and 3.8 (GRE Tunnels) documenting all 2.0.1 subsystems (README)
-[New] CLI listing updated with --ipset-update, --gre-up, --gre-down,
-      --gre-status, and --unban alias note (README)
-[Change] Feature summary expanded with Docker compat, ipset, GRE tunnels,
-      dependency checking, ICMPv6 filtering, adaptive conntrack, and IPv6
-      sysctl hardening bullets (README)
-[Change] Section 1.1 expanded with dependency checking (check_deps())
-      description and OS-aware install hints (README)
-[Change] Section 3.1 USE_IPV6 expanded with IG_ICMPV6_TYPES/EG_ICMPV6_TYPES,
-      NDP protection, IPv6 sysctl hardening, and bracket notation reference
-      (README)
-[Change] Table of Contents updated with sections 3.6, 3.7, 3.8 (README)
-[Change] README grammar, structure, and correctness fixes: "There is really
-      3 modes" corrected to "There are three modes"; "it will come pretty
-      bare in the way of preconfigured options" reworded; "that is contains"
-      corrected to "that contains"; "to put it brief" corrected to "to put
-      it briefly"; "respective" corrected to "respectively"; "generally not
-      be" corrected to "would generally not be"; ovars description separated
-      from support contact info; RAB options moved from section 3.2 into
-      section 3.3 where they belong; support email updated to proj@rfxn.com;
-      project URL updated; trailing whitespace removed throughout (README)
+[New] README.md Markdown version for GitHub rendering (README.md)
+[Change] README expanded with Docker compat, ipset, GRE tunnel, and IPv6
+      documentation; grammar and structure fixes throughout (README)
 [New] External INPUT/OUTPUT rule preservation in DOCKER_COMPAT mode;
       save_external_baseline() captures non-APF rules before flush,
       restore_external_baseline() replays them after flush; protects
@@ -225,10 +206,6 @@
       to "value 1 to enable, 0 to disable" matching conf.apf (.ca.def)
 [New] IPv6 trust syntax documentation added to deny_hosts.rules with
       bracket notation examples matching allow_hosts.rules (deny_hosts.rules)
-[Change] README overhauled: modernized platform/module lists, documented
-      USE_IPV6 and nft backend detection, filled all stub sections (3.3-3.5,
-      4.2, 4.4), added IPv6 trust examples, synced help listing with help()
-      output, added -v/--version, updated URLs to HTTPS, ~20 typo fixes
 [Fix] head() email domain standardized from @rfxn.org to @rfxn.com (apf)
 [Change] help() output updated: -a/-d options now show IP/IPv6/CIDR/FQDN
       instead of IP/FQDN (functions.apf)
