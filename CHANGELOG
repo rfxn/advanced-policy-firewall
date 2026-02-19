@@ -22,6 +22,16 @@
       added after install completion paragraph (README, README.md)
 [Change] README ipset_type description expanded: "hash:ip for single
       addresses, hash:net for CIDR blocks" (README, README.md)
+[Change] README section 3 preamble compressed from 33 lines to 9; removed
+      redundant prose about config philosophy (README, README.md)
+[Change] README section 3.3 RAB converted from Option:/Description: format
+      to concise variable-first format matching section 3.1 (README)
+[Change] README section 4 CLI explanations tightened; removed restatements
+      of information already in the usage table (README, README.md)
+[Change] README sections 3.6/3.7/3.8 Option:/Description: labels converted
+      to variable-first format for consistency (README)
+[Change] README feature list: removed vague "3rd party add-on projects"
+      entry that was unexplained (README, README.md)
 [Change] README.md regenerated from updated README with proper Markdown
       formatting: anchor-linked TOC, fenced code blocks, Markdown tables,
       inline code (README.md)

@@ -101,7 +101,6 @@ For a detailed description of all APF features, review `conf.apf` (under your in
 - **Adaptive connection tracking scaling** that auto-grows conntrack_max when usage exceeds 80%, with configurable ceiling and hash table sizing
 - **IPv6 sysctl hardening**: disables accept_source_route, accept_redirects, and accept_ra when `USE_IPV6=1`
 - systemd service unit for modern init management
-- 3rd party add-on projects that complement APF features
 
 ### 1.1 Supported Systems & Requirements
 
@@ -215,18 +214,9 @@ It is **NOT** recommended that you use multiple startup methods together.
 
 ## 3. Configuration
 
-On your first installation of APF it ships with minimal preconfigured options, and this is intentional. The most common issue with many firewalls is that they come configured with so many options that a user may never use or disable, that it leaves systems riddled with firewall holes.
+APF ships with minimal preconfigured options by design. Only port 22 (SSH) is open by default, with advanced features like outbound filtering, reactive address blocking, and the virtual network subsystem disabled.
 
-Now with that said, APF comes configured with only a single incoming port enabled by default and that is port 22 SSH. Along with a set of common practice filtering options preset in the most compatible fashion for all users. All the real advanced options APF has to offer are by default disabled including outbound (egress) port filtering, reactive address blocking (RAB) and the virtual network subsystem to name a few.
-
-The main APF configuration file is `conf.apf` (under your install path, `/etc/apf` by default) and has detailed usage information above all configuration variables. The file uses integer based values for setting configuration options and they are:
-
-- `0` = disabled
-- `1` = enabled
-
-All configuration options use this integer value system unless otherwise indicated in the description of that option.
-
-You should put aside 5 minutes and review the configuration file from top to bottom taking the time to read all the captions for the options that are provided. This may seem like a daunting task but a firewall is only as good as it is configured and that requires you, the administrator, to take a few minutes to understand what it is you are setting up.
+The main configuration file is `conf.apf` (under your install path, `/etc/apf` by default). It uses integer values (`0` = disabled, `1` = enabled) for most options unless otherwise noted. Each option has detailed usage information directly above it in the file — review it from top to bottom before starting the firewall.
 
 ### 3.1 Basic Options
 
@@ -504,15 +494,13 @@ usage /usr/local/sbin/apf [OPTION]
 
 Note: `--unban` is accepted as an alias for `-u|--remove`.
 
-The **`-l|--list`** option will list all the firewall rules you currently have loaded. This is more of a feature intended for experienced users but can be insightful for any administrator.
+The **`-l|--list`** option shows all loaded iptables rules. The **`-t|--status`** option pages through the APF status log at `/var/log/apf_log`.
 
-The **`-t|--status`** option will show you page-by-page the APF status log that tracks any operations you perform with APF. If something is not working properly, this is what you want to run.
+The **`-e|--refresh`** option flushes trust chains and reloads them from rule files, re-resolving any DNS names. Useful for dynamic DNS entries in the trust system.
 
-The **`-e|--refresh`** option will flush the trust system chains and reload them from the rule files. This also causes any DNS names in the rules to re-resolve. Ideal for dynamic DNS names in the trust system.
+The **`-a|--allow`** and **`-d|--deny`** options add entries to the trust system immediately without a firewall restart. Both accept an optional comment string. The **`-u|--remove`** option removes an address from all trust files. See [section 4.1](#41-trust-system) for details.
 
-The **`-a|--allow`** and **`-d|--deny`** options let you quickly allow or deny access. The **`-u|--remove`** option removes an entry. These options are immediate in action and do NOT require the firewall to be restarted. See the sections below for more information on the trust system.
-
-The **`-o|--ovars`** option is a debug feature that outputs all configured variables and their current values. This is useful for troubleshooting configuration issues or when reporting problems. See [section 6](#6-support-information) for support contact information.
+The **`-o|--ovars`** option outputs all configured variables and their values — useful for troubleshooting or when reporting problems (see [section 6](#6-support-information)).
 
 ### 4.1 Trust System
 

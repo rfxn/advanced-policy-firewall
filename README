@@ -150,7 +150,6 @@ point form summary of most APF features:
 - IPv6 sysctl hardening: disables accept_source_route, accept_redirects, and
   accept_ra when USE_IPV6=1
 - systemd service unit for modern init management
-- 3rd party add-on projects that complement APF features
 
 1.1) Introduction: Supported Systems & Requirements
 The APF package is designed to run on Linux based operating systems that have
@@ -279,39 +278,15 @@ is, enable it with the 'apf -s' command when desired and disable it with the
 'apf -f' when desired.
 
 3) Configuration:
-On your first installation of APF it ships with minimal preconfigured
-options, and this is intentional. The most common issue with many
-firewalls is that they come configured with so many options that a user may
-never use or disable, that it leaves systems riddled with firewall holes.
+APF ships with minimal preconfigured options by design. Only port 22 (SSH) is
+open by default, with advanced features like outbound filtering, reactive
+address blocking, and the virtual network subsystem disabled.
 
-Now with that said, APF comes configured with only a single incoming port
-enabled by default and that is port 22 SSH. Along with a set of common practice
-filtering options preset in the most compatible fashion for all users. All the
-real advanced options APF has to offer are by default disabled including
-outbound (egress) port filtering, reactive address blocking (rab) and the
-virtual network subsystem to name a few.
-
-The main APF configuration file is conf.apf (under your install path,
-/etc/apf by default) and has detailed usage information above all
-configuration variables. The file uses
-integer based values for setting configuration options and they are
-0 = disabled
-1 = enabled
-
-All configuration options use this integer value system unless otherwise
-indicated in the description of that option.
-
-You should put aside 5 minutes and review the configuration file from top to
-bottom taking the time to read all the captions for the options that are
-provided. This may seem like a daunting task but a firewall is only as good
-as it is configured and that requires you, the administrator, to take a few
-minutes to understand what it is you are setting up.
-
-APF is a very powerful firewall that when setup to make use of all the advanced
-features, will provide a sophisticated and robust level of protection. Please
-continue reading further along this file for more information or see the
-support options at the bottom of this file for further assistance if you find
-yourself lost in the configuration process.
+The main configuration file is conf.apf (under your install path, /etc/apf by
+default). It uses integer values (0 = disabled, 1 = enabled) for most options
+unless otherwise noted. Each option has detailed usage information directly
+above it in the file — review it from top to bottom before starting the
+firewall.
 
 3.1) Configuration: Basic Options
 This section will cover some of the basic configuration options found inside
@@ -436,54 +411,24 @@ prevention by automatically blocking addresses that trigger sanity violations
 or port scan detection. RAB is configured through the RAB_* variables in
 conf.apf.
 
-Option: RAB
-Description: This is a top level toggle for the reactive address blocking in
-APF and does nothing more than either enable or disable it.
+RAB - master toggle for reactive address blocking.
 
-Option: RAB_SANITY
-Description: This enables RAB for sanity violations, which is when an address
-breaks a strict conformity standard such as trying to spoof an address or modify
-packet flags. When addresses are found to have made such violations they are
-temporarily banned for the duration of RAB_TIMER value in seconds.
+RAB_SANITY - enable RAB for packet sanity violations (spoofed addresses,
+modified flags). Offenders are temporarily blocked for RAB_TIMER seconds.
 
-Option: RAB_PSCAN_LEVEL
-Description: This enables RAB for port scan violations, which is when an
-address attempts to connect to a port that has been classified as malicious.
-These are ports which are not commonly used in today's Internet but are
-the subject of scrutiny by attackers, such as ports 1,7,9,11. The values for
-this option are broken into 4 integers and they are 0 for disabled, 1 for
-low security, 2 for medium security and 3 for high security.
+RAB_PSCAN_LEVEL - port scan detection level: 0 disabled, 1 low, 2 medium,
+3 high. Triggers on connections to known malicious ports (1, 7, 9, 11, etc.).
 
-Option: RAB_HITCOUNT
-Description: This controls the amount of violation hits an address must have
-before it is blocked. It is a good idea to keep this very low to prevent
-evasive measures. The default is 0 or 1, meaning instant block on first hit.
+RAB_HITCOUNT - violation hits before blocking (default: 1, instant block).
 
-Option: RAB_TIMER
-Description: This is the amount of time (in seconds) that an address gets
-blocked for if a violation is triggered, the default is 300s (5 minutes). This
-option has a max accepted value of 43200 seconds or 12 hours.
+RAB_TIMER - block duration in seconds (default: 300, max: 43200).
 
-Option: RAB_TRIP
-Description: This allows RAB to 'trip' the block timer back to 0 seconds if an
-address attempts ANY subsequent communication while still on the initial block
-period. This option really is one of the more exciting features of the RAB
-system as it can cut off an attack at the legs before it ever mounts into
-something tangible against the system.
+RAB_TRIP - reset block timer on any subsequent traffic from a blocked address.
 
-Option: RAB_LOG_HIT
-Description: This controls if the firewall should log all violation hits from
-an address. It is recommended that this be enabled to provide insightful log
-data on addresses which are attempting to probe or conduct questionable actions
-against this host. The use of LOG_DROP variable set to 1 will override this to
-force logging.
+RAB_LOG_HIT - log violation hits (recommended; LOG_DROP=1 overrides to force).
 
-Option: RAB_LOG_TRIP
-Description: This controls if the firewall should log all subsequent traffic
-from an address that is already blocked for a violation hit, this can generate
-a lot of logs. However, the use of this option despite the depth of log data it
-may generate could provide valuable information as to the intents of an attacker.
-The use of LOG_DROP variable set to 1 will override this to force logging.
+RAB_LOG_TRIP - log all traffic from already-blocked addresses. Verbose but
+useful for understanding attacker behavior. LOG_DROP=1 overrides to force.
 
 3.4) Configuration: Virtual Network Files
 When SET_VNET=1, APF generates per-IP policy files under the vnet/ directory
@@ -508,8 +453,7 @@ runtimes, the default flush behavior (which wipes all iptables rules and chains)
 will destroy the container runtime's networking rules. The DOCKER_COMPAT option
 solves this by switching APF to a surgical flush mode.
 
-Option: DOCKER_COMPAT
-Description: When set to "1", APF's flush operation only removes APF-owned
+DOCKER_COMPAT - When set to "1", APF's flush operation only removes APF-owned
 chains from the filter table, leaving all external chains intact. Specifically:
 
   - FORWARD chain policy and rules are preserved (Docker routing)
@@ -536,14 +480,13 @@ scales linearly), ipset creates a single iptables rule per block list that
 references a kernel hash set, providing O(1) lookup performance regardless of
 list size.
 
-Option: USE_IPSET
-Description: Set to "1" to enable ipset block list support. Requires the
+USE_IPSET - Set to "1" to enable ipset block list support. Requires the
 'ipset' utility to be installed (apt-get install ipset / yum install ipset).
 When disabled or ipset is not installed, the ipset.rules file is ignored.
 
-Option: IPSET_LOG_RATE
-Description: Default log rate limit (per minute) for ipset blocklist matches.
-Individual lists can control their own logging via the log field in ipset.rules.
+IPSET_LOG_RATE - Default log rate limit (per minute) for ipset blocklist
+matches. Individual lists can control their own logging via the log field in
+ipset.rules.
 
 The block lists are defined in the ipset.rules file. Each line defines a set
 with the format:
@@ -569,27 +512,22 @@ APF can manage GRE (Generic Routing Encapsulation) point-to-point tunnels
 with dedicated firewall chains and protocol 47 rules. This is useful for
 servers that need encapsulated point-to-point links to remote endpoints.
 
-Option: USE_GRE
-Description: Set to "1" to enable GRE tunnel management. Requires the 'ip'
+USE_GRE - Set to "1" to enable GRE tunnel management. Requires the 'ip'
 utility (iproute2 package). When disabled, gre.rules is ignored.
 
-Option: GRE_PERSIST
-Description: When set to "1", tunnel interfaces are kept alive when the
+GRE_PERSIST - When set to "1", tunnel interfaces are kept alive when the
 firewall is flushed or stopped. Only firewall rules are removed. When set
 to "0", tunnel interfaces are also torn down on flush. Default is "1".
 
-Option: GRE_KEEPALIVE
-Description: Keepalive interval (seconds) and retry count before declaring
+GRE_KEEPALIVE - Keepalive interval (seconds) and retry count before declaring
 a tunnel dead. Format: "interval retries" (e.g., "10 3"). Set to "0 0" to
 disable keepalive. Requires kernel >= 3.x.
 
-Option: GRE_MTU
-Description: Tunnel MTU. Leave empty for auto-calculation (parent interface
+GRE_MTU - Tunnel MTU. Leave empty for auto-calculation (parent interface
 MTU minus 24 bytes GRE overhead). Set explicitly for double-encapsulation
 scenarios (e.g., "1400").
 
-Option: GRE_TTL
-Description: IP TTL for GRE tunnel packets. Default is "255".
+GRE_TTL - IP TTL for GRE tunnel packets. Default is "255".
 
 Tunnels are defined in the gre.rules file, which is a bash script sourced
 during firewall startup. Each tunnel is created by setting a role variable
@@ -701,33 +639,19 @@ usage /usr/local/sbin/apf [OPTION]
 
 Note: --unban is accepted as an alias for -u|--remove.
 
-These options explain themselves very clearly such as the start/stop/restart
-operations.
+The -l|--list option shows all loaded iptables rules. The -t|--status option
+pages through the APF status log at /var/log/apf_log.
 
-The -l|--list option will list all the firewall rules you currently have loaded,
-this is more of a feature intended for experienced users but nevertheless can be
-insightful for any administrator to peek at.
+The -e|--refresh option flushes trust chains and reloads them from rule files,
+re-resolving any DNS names. Useful for dynamic DNS entries in the trust system.
 
-As for the -t|--status option, this will simply show you page-by-page the APF
-status log that tracks any operations you perform with APF - if something is
-not working properly, this is what you want to run.
+The -a|--allow and -d|--deny options add entries to the trust system immediately
+without a firewall restart. Both accept an optional comment string. The
+-u|--remove option removes an address from all trust files. See section 4.1
+for details.
 
-The -e|--refresh option will flush the trust system chains and reload them from
-the rule files, this will also cause any dns names in the rules to re-resolve.
-This feature is ideal if you have dynamic dns names in the trust system, apart
-from that it has few other uses.
-
-If you need to quickly allow or deny someone access on the system then the
--a|--allow and -d|--deny options are your champions. If you need to quickly
-remove an allow or deny entry from the firewall then the -u|--remove option
-is there for it. These options are immediate in action and do NOT require
-the firewall to be restarted. Please see the below sections of this file for
-more information on the trust system.
-
-Finally the -o|--ovars option is a debug feature that outputs all configured
-variables and their current values. This is useful for troubleshooting
-configuration issues or when reporting problems. See section 6 for support
-contact information.
+The -o|--ovars option outputs all configured variables and their values — useful
+for troubleshooting or when reporting problems (see section 6).
 
 4.1) General Usage: Trust System:
 The trust system in APF is a very traditional setup with two basic trust levels;
