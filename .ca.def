@@ -252,8 +252,10 @@ TOS_16="$TOS_16"
 
 # Allow traceroute requests on the defined range of ports. This feature
 # is not required for normal operations and some even prefer it disabled.
-# Enable Traceroute 	# Traceroute ports
-TCR_PASS="$TCR_PASS"		TCR_PORTS="$TCR_PORTS"
+# Enable Traceroute
+TCR_PASS="$TCR_PASS"
+# Traceroute ports
+TCR_PORTS="$TCR_PORTS"
 
 # Set a reasonable packet/time ratio for ICMP packets, exceeding this flow
 # will result in dropped ICMP packets. Supported values are in the form of: 

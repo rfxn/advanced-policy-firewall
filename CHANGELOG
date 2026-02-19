@@ -1,4 +1,19 @@
 - 2.0.1 | Feb 19 2026:
+[Fix] vnetgen.def typos: "defined" → "define" (2 occurrences),
+      "iptable" → "iptables" (vnet/vnetgen.def)
+[Fix] vnetgen.def invalid example IP 1.0.1.0.1 → RFC 5737 192.0.2.1
+      (vnet/vnetgen.def)
+[Fix] "line-seperated" → "line-separated" in all 4 trust rules files
+      (allow_hosts.rules, deny_hosts.rules, glob_allow.rules,
+      glob_deny.rules)
+[Fix] multicast.networks: dead MBone URL removed, per-block comments
+      collapsed to brief summary, IANA URL upgraded to HTTPS
+[Fix] reserved.networks: "Unassigned/reserved" label → "Special-purpose /
+      non-routable", IANA URL upgraded to HTTPS
+[Fix] private.networks: faqs.org RFC mirror replaced with rfc-editor.org
+      canonical URL
+[Change] .ca.def TCR_PASS/TCR_PORTS split from one line to two for
+      consistency (.ca.def)
 [Change] DEVEL_MODE comment compressed from 3 to 2 lines (conf.apf, .ca.def)
 [Change] USE_IPV6 comment compressed from 5 to 3 lines (conf.apf, .ca.def)
 [Change] SET_VERBOSE comment rewritten: fixed tense, compressed from 4 to

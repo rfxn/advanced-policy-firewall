@@ -3,7 +3,7 @@
 #
 # Trust based rule file to define addresses that are implicitly denied.
 #
-# Format of this file is line-seperated addresses, IP masking is supported.
+# Format of this file is line-separated addresses, IP masking is supported.
 # Example:
 # 192.168.2.1
 # 192.168.5.0/24
