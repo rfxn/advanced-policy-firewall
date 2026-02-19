@@ -671,6 +671,10 @@ help() {
 	echo "                                     and immediately remove rule from firewall"
 	echo "-o|--ovars ......................... output all configuration options"
 	echo "-v|--version ....................... output version number"
+	echo "--ipset-update ..................... hot-reload ipset block lists"
+	echo "--gre-up .......................... bring up GRE tunnels from gre.rules"
+	echo "--gre-down ........................ tear down GRE tunnels"
+	echo "--gre-status ...................... show GRE tunnel status"
 }
 
 tosroute() {

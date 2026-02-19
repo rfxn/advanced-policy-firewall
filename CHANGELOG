@@ -2,6 +2,8 @@
 [New] README.md Markdown version for GitHub rendering (README.md)
 [Change] README expanded with Docker compat, ipset, GRE tunnel, and IPv6
       documentation; grammar and structure fixes throughout (README)
+[Change] help() output updated with --ipset-update, --gre-up, --gre-down,
+      --gre-status options (functions.apf)
 [New] External INPUT/OUTPUT rule preservation in DOCKER_COMPAT mode;
       save_external_baseline() captures non-APF rules before flush,
       restore_external_baseline() replays them after flush; protects
