@@ -1,4 +1,7 @@
 - 2.0.1 | Feb 19 2026:
+[Change] README.md regenerated from updated README with proper Markdown
+      formatting: anchor-linked TOC, fenced code blocks, Markdown tables,
+      inline code (README.md)
 [Change] README section 1 introduction compressed; three filtering type
       explanations reduced from verbose paragraphs to concise summaries
       (README, README.md)
