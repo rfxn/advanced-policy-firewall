@@ -1,4 +1,13 @@
 - 2.0.1 | Feb 19 2026:
+[New] README sections 3.9 (Remote Block Lists), 3.10 (Logging & Control),
+      3.11 (Implicit Blocking) documenting DLIST_*, LOG_*, BLK_* variables
+      (README, README.md)
+[New] README section 3.2 expanded with Kernel Tuning summary covering
+      SYSCTL_* variables (README, README.md)
+[New] README section 4.1 expanded with SET_EXPIRE, SET_REFRESH,
+      SET_REFRESH_MD5, SET_TRIM trust system controls (README, README.md)
+[New] README section 3.1 expanded with EG_DROP_CMD user/app filtering
+      documentation (README, README.md)
 [Fix] README ipset.rules format corrected from pipe-separated 4-field to
       colon-separated 5-field (name:flow:ipset_type:log:file_or_url)
       matching actual file header (README, README.md)

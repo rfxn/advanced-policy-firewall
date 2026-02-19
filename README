@@ -30,6 +30,9 @@ Contents:
 3.6 ........... Configuration: Docker/Container Compatibility
 3.7 ........... Configuration: ipset Block Lists
 3.8 ........... Configuration: GRE Tunnels
+3.9 ........... Configuration: Remote Block Lists
+3.10 .......... Configuration: Logging & Control
+3.11 .......... Configuration: Implicit Blocking
 4 ............. General Usage
 4.1 ........... General Usage: Trust System
 4.2 ........... General Usage: Global Trust System
@@ -474,6 +477,14 @@ of ICMP types you should review the 'internals/icmp.types' file. This is a
 global context rule and will apply to all addresses on this host unless virtual
 net rules are set to operate in another fashion.
 
+Option: EG_DROP_CMD
+Description: A comma-separated list of executable names that are blocked from
+making outbound network connections (e.g., "eggdrop,psybnc,bitchx"). Uses the
+iptables --cmd-owner match to identify the originating process. Requires
+outbound filtering (EGF="1") to be enabled. This feature depends on kernel
+support for xt_owner command matching, which APF detects at runtime and skips
+gracefully if unavailable.
+
 Option: LOG_DROP
 Description: The use of this option allows to firewall to perform very detailed
 firewall logging of packets as they are filtered by the firewall. This can help
@@ -589,6 +600,23 @@ enabled in APF, mostly cause of popular demand but really there is no reason
 to have it enabled or disabled other than personal preference. The TCR_PASS
 option tells the firewall if we want to accept traceroutes and the TCR_PORTS
 option defines the UDP port range used for traceroute detection.
+
+Kernel Tuning:
+APF applies kernel-level network hardening via sysctl when the firewall starts.
+These settings are controlled by the SYSCTL_* variables in conf.apf:
+
+  SYSCTL_CONNTRACK       - connection tracking table size (default 131072)
+  SYSCTL_CONNTRACK_ADAPTIVE - auto-scale conntrack_max at 80% usage
+  SYSCTL_TCP             - TCP performance/security tweaks (timestamps, SACK)
+  SYSCTL_TCP_NOSACK      - disable TCP SACK (CVE-2019 mitigations)
+  SYSCTL_SYN             - syn-flood mitigation (backlog, retry, timeout)
+  SYSCTL_ROUTE           - spoofing/redirect protection (rp_filter, etc.)
+  SYSCTL_LOGMARTIANS     - log impossible source addresses
+  SYSCTL_ECN             - Explicit Congestion Notification
+  SYSCTL_SYNCOOKIES      - SYN cookie flood protection
+  SYSCTL_OVERFLOW        - overflow control
+
+See conf.apf for detailed descriptions of each setting and their sub-options.
 
 3.3) Configuration: Reactive Address Blocking
 The Reactive Address Blocking (RAB) system provides in-line intrusion
@@ -782,6 +810,57 @@ CLI commands:
   apf --gre-down     - tear down all tunnels and remove firewall rules
   apf --gre-status   - show current tunnel interface status
 
+3.9) Configuration: Remote Block Lists
+APF can automatically download and apply IP block lists from external sources.
+Each list is loaded into a dedicated iptables chain on full firewall start.
+The following DLIST_* variables in conf.apf control these lists:
+
+  DLIST_PHP        - Project Honey Pot harvester/spammer IPs
+  DLIST_SPAMHAUS   - Spamhaus DROP list (stolen/zombie netblocks)
+  DLIST_DSHIELD    - DShield top suspicious hosts
+  DLIST_RESERVED   - ARIN reserved/unassigned networks
+  DLIST_ECNSHAME   - ECN broken hosts (requires SYSCTL_ECN="1")
+
+Each has a companion _URL variable (e.g., DLIST_PHP_URL) for the download
+source. Set the toggle to "1" to enable a list. Lists are validated during
+parsing and backed up before each download. Failed downloads restore from
+backup to prevent data loss. Note that DLIST_RESERVED interacts with
+BLK_RESNET — when both are enabled, the downloaded reserved.networks list
+supplements the built-in private.networks blocking.
+
+3.10) Configuration: Logging & Control
+APF provides configurable logging of filtered packets through the LOG_*
+variables in conf.apf:
+
+  LOG_DROP      - master toggle for firewall packet logging
+  LOG_LEVEL     - syslog level for log entries (default: crit)
+  LOG_TARGET    - LOG (kernel syslog) or ULOG (ulogd userspace)
+  LOG_IA        - log interactive access (SSH/Telnet, requires LOG_DROP="1")
+  LOG_LGATE     - log foreign gateway traffic
+  LOG_EXT       - extended logging (TCP/IP options in output)
+  LOG_RATE      - max logged events per minute (default: 30)
+  LOG_APF       - path to APF status log (default: /var/log/apf_log)
+
+For iptables concurrency control, IPT_LOCK_SUPPORT and IPT_LOCK_TIMEOUT
+configure the -w lock flag behavior for iptables >= 1.4.20. This prevents
+concurrent iptables modifications from corrupting rule state.
+
+3.11) Configuration: Implicit Blocking
+The BLK_* variables in conf.apf control implicit blocking of specific traffic
+patterns without explicit port rules. These apply globally to all interfaces:
+
+  BLK_P2P_PORTS      - block common P2P protocol ports (e.g., BitTorrent,
+                        Kazaa, eDonkey)
+  BLK_PORTS          - silently drop common attack ports (NetBIOS, RPC, etc.)
+                        without logging
+  BLK_MCATNET        - block multicast traffic (224.0.0.0/4, ff00::/8)
+  BLK_PRVNET         - block private IPv4 address space (10/8, 172.16/12,
+                        192.168/16, etc.) on untrusted interfaces
+  BLK_RESNET         - block reserved/unassigned IPv4 space
+  BLK_TCP_SACK_PANIC - block low-MSS TCP SACK exploit packets (CVE-2019-11477)
+  BLK_IDENT          - REJECT ident (TCP 113) requests instead of silently
+                        dropping; some services stall without ident response
+
 4) General Usage:
 The /usr/local/sbin/apf command has a number of options that will ease the
 day-to-day use of your firewall. Here is a quick snap-shot of the options:
@@ -892,6 +971,15 @@ apf -u ryanm.dynip.org
 Please take note that the --remove|-u option does not accept a comment string
 for obvious reason and that it will remove entries that match from
 allow_hosts.rules, deny_hosts.rules and the global extensions of these files.
+
+The trust system has several operational controls in conf.apf:
+
+  SET_EXPIRE       - auto-expire deny entries after N seconds (0 to disable).
+                     Use "static" or "noexpire" in a ban comment to exempt it.
+  SET_REFRESH      - refresh interval in minutes for trust rules and DNS
+                     re-resolution (default: 10)
+  SET_REFRESH_MD5  - skip refresh if trust files are unchanged (1 to enable)
+  SET_TRIM         - max deny entries before oldest are purged (default: 250)
 
 4.2) General Usage: Global Trust System
 The global trust system extends the local trust files with centrally managed

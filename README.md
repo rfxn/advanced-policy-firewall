@@ -24,6 +24,9 @@ APF is licensed under the GNU General Public License v2. See [COPYING.GPL](COPYI
   - [3.6 Docker/Container Compatibility](#36-dockercontainer-compatibility)
   - [3.7 ipset Block Lists](#37-ipset-block-lists)
   - [3.8 GRE Tunnels](#38-gre-tunnels)
+  - [3.9 Remote Block Lists](#39-remote-block-lists)
+  - [3.10 Logging & Control](#310-logging--control)
+  - [3.11 Implicit Blocking](#311-implicit-blocking)
 - [4. General Usage](#4-general-usage)
   - [4.1 Trust System](#41-trust-system)
   - [4.2 Global Trust System](#42-global-trust-system)
@@ -266,6 +269,8 @@ IPv6 addresses in the advanced trust syntax ([section 4.3](#43-advanced-trust-sy
 - **`EG_UDP_CPORTS`** - UDP ports allowed for outgoing traffic
 - **`EG_ICMP_TYPES`** - ICMP types allowed for outgoing traffic
 
+**`EG_DROP_CMD`** - A comma-separated list of executable names that are blocked from making outbound network connections (e.g., `"eggdrop,psybnc,bitchx"`). Uses the iptables `--cmd-owner` match to identify the originating process. Requires outbound filtering (`EGF="1"`) to be enabled. This feature depends on kernel support for xt_owner command matching, which APF detects at runtime and skips gracefully if unavailable.
+
 **`LOG_DROP`** - Enables detailed firewall logging of filtered packets. Typically left disabled on production systems as it can get very noisy in the log files.
 
 ### 3.2 Advanced Options
@@ -290,6 +295,23 @@ The advanced options, although not required, are those which afford the firewall
 **Type of Service (TOS)** - The `TOS_*` settings provide a simple classification system to dictate traffic priority based on port numbers. Default settings improve throughput and reliability for FTP, HTTP, SMTP, POP3 and IMAP.
 
 **Traceroute (`TCR_*`)** - Controls if and how traceroute traffic is handled. `TCR_PASS` controls acceptance and `TCR_PORTS` defines the UDP port range used for detection.
+
+**Kernel Tuning** - APF applies kernel-level network hardening via sysctl when the firewall starts. These settings are controlled by the `SYSCTL_*` variables in `conf.apf`:
+
+| Variable | Purpose |
+|----------|---------|
+| `SYSCTL_CONNTRACK` | Connection tracking table size (default 131072) |
+| `SYSCTL_CONNTRACK_ADAPTIVE` | Auto-scale conntrack_max at 80% usage |
+| `SYSCTL_TCP` | TCP performance/security tweaks (timestamps, SACK) |
+| `SYSCTL_TCP_NOSACK` | Disable TCP SACK (CVE-2019 mitigations) |
+| `SYSCTL_SYN` | Syn-flood mitigation (backlog, retry, timeout) |
+| `SYSCTL_ROUTE` | Spoofing/redirect protection (rp_filter, etc.) |
+| `SYSCTL_LOGMARTIANS` | Log impossible source addresses |
+| `SYSCTL_ECN` | Explicit Congestion Notification |
+| `SYSCTL_SYNCOOKIES` | SYN cookie flood protection |
+| `SYSCTL_OVERFLOW` | Overflow control |
+
+See `conf.apf` for detailed descriptions of each setting and their sub-options.
 
 ### 3.3 Reactive Address Blocking
 
@@ -410,6 +432,51 @@ apf --gre-down     # tear down all tunnels and remove firewall rules
 apf --gre-status   # show current tunnel interface status
 ```
 
+### 3.9 Remote Block Lists
+
+APF can automatically download and apply IP block lists from external sources. Each list is loaded into a dedicated iptables chain on full firewall start. The following `DLIST_*` variables in `conf.apf` control these lists:
+
+| Variable | Description |
+|----------|-------------|
+| `DLIST_PHP` | Project Honey Pot harvester/spammer IPs |
+| `DLIST_SPAMHAUS` | Spamhaus DROP list (stolen/zombie netblocks) |
+| `DLIST_DSHIELD` | DShield top suspicious hosts |
+| `DLIST_RESERVED` | ARIN reserved/unassigned networks |
+| `DLIST_ECNSHAME` | ECN broken hosts (requires `SYSCTL_ECN="1"`) |
+
+Each has a companion `_URL` variable (e.g., `DLIST_PHP_URL`) for the download source. Set the toggle to `"1"` to enable a list. Lists are validated during parsing and backed up before each download. Failed downloads restore from backup to prevent data loss. Note that `DLIST_RESERVED` interacts with `BLK_RESNET` — when both are enabled, the downloaded reserved.networks list supplements the built-in private.networks blocking.
+
+### 3.10 Logging & Control
+
+APF provides configurable logging of filtered packets through the `LOG_*` variables in `conf.apf`:
+
+| Variable | Purpose |
+|----------|---------|
+| `LOG_DROP` | Master toggle for firewall packet logging |
+| `LOG_LEVEL` | Syslog level for log entries (default: `crit`) |
+| `LOG_TARGET` | `LOG` (kernel syslog) or `ULOG` (ulogd userspace) |
+| `LOG_IA` | Log interactive access (SSH/Telnet, requires `LOG_DROP="1"`) |
+| `LOG_LGATE` | Log foreign gateway traffic |
+| `LOG_EXT` | Extended logging (TCP/IP options in output) |
+| `LOG_RATE` | Max logged events per minute (default: 30) |
+| `LOG_APF` | Path to APF status log (default: `/var/log/apf_log`) |
+
+For iptables concurrency control, `IPT_LOCK_SUPPORT` and `IPT_LOCK_TIMEOUT` configure the `-w` lock flag behavior for iptables >= 1.4.20. This prevents concurrent iptables modifications from corrupting rule state.
+
+### 3.11 Implicit Blocking
+
+The `BLK_*` variables in `conf.apf` control implicit blocking of specific traffic patterns without explicit port rules. These apply globally to all interfaces:
+
+| Variable | Purpose |
+|----------|---------|
+| `BLK_P2P_PORTS` | Block common P2P protocol ports (e.g., BitTorrent, Kazaa, eDonkey) |
+| `BLK_PORTS` | Silently drop common attack ports (NetBIOS, RPC, etc.) without logging |
+| `BLK_MCATNET` | Block multicast traffic (`224.0.0.0/4`, `ff00::/8`) |
+| `BLK_PRVNET` | Block private IPv4 address space (`10/8`, `172.16/12`, `192.168/16`, etc.) on untrusted interfaces |
+| `BLK_RESNET` | Block reserved/unassigned IPv4 space |
+| `BLK_TCP_SACK_PANIC` | Block low-MSS TCP SACK exploit packets (CVE-2019-11477) |
+| `BLK_IDENT` | REJECT ident (TCP 113) requests instead of silently dropping; some services stall without ident response |
+
 ---
 
 ## 4. General Usage
@@ -489,6 +556,15 @@ apf -u ryanm.dynip.org
 ```
 
 Please take note that the `--remove|-u` option does not accept a comment string and will remove entries that match from allow_hosts.rules, deny_hosts.rules and the global extensions of these files.
+
+The trust system has several operational controls in `conf.apf`:
+
+| Variable | Purpose |
+|----------|---------|
+| `SET_EXPIRE` | Auto-expire deny entries after N seconds (`0` to disable). Use `"static"` or `"noexpire"` in a ban comment to exempt it. |
+| `SET_REFRESH` | Refresh interval in minutes for trust rules and DNS re-resolution (default: 10) |
+| `SET_REFRESH_MD5` | Skip refresh if trust files are unchanged (`1` to enable) |
+| `SET_TRIM` | Max deny entries before oldest are purged (default: 250) |
 
 ### 4.2 Global Trust System
 
