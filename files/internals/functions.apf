@@ -1379,7 +1379,9 @@ if [ ! "$DLIST_ECNSHAME_URL" == "" ] && [ "$DLIST_ECNSHAME" == "1" ] && [ -f "$W
         while IFS= read -r str; do
                 str=$(echo "$str" | grep -v "#" | grep -e '[0-9]' | awk '{print $1}')
                 if [ -n "$str" ]; then
-                    echo "$str" >> "$ECNSHAME_HOSTS"
+                    if valid_ip_cidr "$str"; then
+                        echo "$str" >> "$ECNSHAME_HOSTS"
+                    fi
                 fi
         done < "$URL_TMP/$URL_FILE"
    else

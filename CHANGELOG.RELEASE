@@ -1,4 +1,16 @@
 - 2.0.1 | Feb 20 2026:
+[Fix] sysctl.rules tcp_fack write guarded behind proc file existence;
+      removed in kernel 4.15 (sysctl.rules)
+[Fix] IPv6 sysctl writes guarded behind proc file existence; prevents
+      errors on systems without IPv6 proc entries (sysctl.rules)
+[Fix] reserved.networks: added 0.0.0.0/8 "this network" range
+      (RFC 1122); commonly spoofed source address (reserved.networks)
+[Fix] IP6_NET link-local filter: grep -v fe80 added before head -n1 to
+      prevent fe80:: link-local from being selected over global unicast
+      address (internals.conf)
+[Change] dlist_ecnshame() download validation: entries now validated via
+      valid_ip_cidr() during parsing, matching all other dlist download
+      functions (functions.apf)
 [Fix] Dead $ADR variable removed; referenced non-existent ad/ad.rules
       directory, removed from MD5_FILES glob (internals.conf)
 [Fix] Duplicate MD5_FILES definition removed from apf; clobbered the
