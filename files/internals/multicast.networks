@@ -1,24 +1,6 @@
-# multicast
-#
-# http://www.iana.org/assignments/ipv4-address-space
-# http://www-itg.lbl.gov/mbone/www-itg.lbl.gov/mbone/
-#
-# 224/8   Sep 81   IANA - Multicast
-# 225/8   Sep 81   IANA - Multicast
-# 226/8   Sep 81   IANA - Multicast
-# 227/8   Sep 81   IANA - Multicast
-# 228/8   Sep 81   IANA - Multicast
-# 229/8   Sep 81   IANA - Multicast
-# 230/8   Sep 81   IANA - Multicast
-# 231/8   Sep 81   IANA - Multicast
-# 232/8   Sep 81   IANA - Multicast
-# 233/8   Sep 81   IANA - Multicast
-# 234/8   Sep 81   IANA - Multicast
-# 235/8   Sep 81   IANA - Multicast
-# 236/8   Sep 81   IANA - Multicast
-# 237/8   Sep 81   IANA - Multicast
-# 238/8   Sep 81   IANA - Multicast
-# 239/8   Sep 81   IANA - Multicast
+# Multicast address space (224.0.0.0/4)
+# IANA assigned, Sep 1981
+# https://www.iana.org/assignments/ipv4-address-space
 #
 224.0.0.0/8
 225.0.0.0/8

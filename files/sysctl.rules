@@ -12,6 +12,7 @@ elif [ -f "/proc/sys/net/nf_conntrack_max" ]; then
 	echo $SYSCTL_CONNTRACK > /proc/sys/net/nf_conntrack_max
 fi
 
+# Conntrack timeouts: 600s established (default 432000), 90s time-wait (default 120)
 if [ -f "/proc/sys/net/netfilter/nf_conntrack_tcp_timeout_established" ]; then
 	echo 600 > /proc/sys/net/netfilter/nf_conntrack_tcp_timeout_established
 	echo 90 > /proc/sys/net/netfilter/nf_conntrack_tcp_timeout_time_wait
@@ -20,6 +21,35 @@ elif [ -f "/proc/sys/net/ipv4/netfilter/ip_conntrack_tcp_timeout_established" ];
 	echo 90 > /proc/sys/net/ipv4/netfilter/ip_conntrack_tcp_timeout_time_wait
 fi
 
+# Conntrack hash table sizing
+if [ -n "$SYSCTL_CONNTRACK_BUCKETS" ] && [ -f "/sys/module/nf_conntrack/parameters/hashsize" ]; then
+	echo "$SYSCTL_CONNTRACK_BUCKETS" > /sys/module/nf_conntrack/parameters/hashsize
+fi
+
+# Adaptive conntrack scaling
+if [ "$SYSCTL_CONNTRACK_ADAPTIVE" == "1" ] && [ -f "/proc/sys/net/nf_conntrack_count" ]; then
+	ct_current=$(cat /proc/sys/net/nf_conntrack_count 2>/dev/null)
+	ct_max=$(cat /proc/sys/net/nf_conntrack_max 2>/dev/null)
+	if [ -n "$ct_current" ] && [ -n "$ct_max" ]; then
+		ct_threshold=$((ct_max * 80 / 100))
+		if [ "$ct_current" -ge "$ct_threshold" ] && [ "$ct_max" -lt "$SYSCTL_CONNTRACK_HIGH" ]; then
+			ct_new=$((ct_max + SYSCTL_CONNTRACK_INCREMENT))
+			if [ "$ct_new" -gt "$SYSCTL_CONNTRACK_HIGH" ]; then
+				ct_new=$SYSCTL_CONNTRACK_HIGH
+			fi
+			echo "$ct_new" > /proc/sys/net/nf_conntrack_max
+			eout "{glob} conntrack_max scaled from $ct_max to $ct_new (current: $ct_current)"
+		fi
+	fi
+fi
+
+# Disable conntrack helpers (ALGs) to reduce attack surface
+if [ -f "/proc/sys/net/netfilter/nf_conntrack_helper" ]; then
+	echo 0 > /proc/sys/net/netfilter/nf_conntrack_helper
+fi
+
+# Unconditional hardening: widen ephemeral port range, ignore bogus ICMP errors
+# and ICMP broadcasts (smurf attack mitigation)
 echo '24577 65534' > /proc/sys/net/ipv4/ip_local_port_range
 echo 1 > /proc/sys/net/ipv4/icmp_ignore_bogus_error_responses
 echo 1 > /proc/sys/net/ipv4/icmp_echo_ignore_broadcasts
@@ -27,10 +57,8 @@ echo 1 > /proc/sys/net/ipv4/icmp_echo_ignore_broadcasts
 if [ "$SYSCTL_LOGMARTIANS" == "1" ]; then
 	eout "{glob} setting sysctl_logmartians enabled"
 	echo 1 > /proc/sys/net/ipv4/conf/$IFACE_UNTRUSTED/log_martians
-	echo 1 > /proc/sys/net/ipv4/conf/$IFACE_UNTRUSTED/log_martians
 else
         eout "{glob} setting sysctl_logmartians disabled"
-        echo 0 > /proc/sys/net/ipv4/conf/$IFACE_UNTRUSTED/log_martians
         echo 0 > /proc/sys/net/ipv4/conf/$IFACE_UNTRUSTED/log_martians
 fi
 
@@ -61,17 +89,23 @@ fi
 # TCP Parameters
 if [ "$SYSCTL_TCP" == "1" ]; then
 	eout "{glob} setting sysctl_tcp enabled"
-	echo 0 > /proc/sys/net/ipv4/tcp_tw_recycle
+	# tcp_tw_recycle removed in kernel 4.12; only set if proc file exists
+	if [ -f "/proc/sys/net/ipv4/tcp_tw_recycle" ]; then
+		echo 0 > /proc/sys/net/ipv4/tcp_tw_recycle
+	fi
 	echo 1 > /proc/sys/net/ipv4/tcp_tw_reuse
 	echo 1 > /proc/sys/net/ipv4/tcp_window_scaling
 	echo 0 > /proc/sys/net/ipv4/tcp_timestamps
-	if [ "$SYSCTL_TCP_NOSACK" ]; then
+	if [ "$SYSCTL_TCP_NOSACK" == "1" ]; then
 		echo 0 > /proc/sys/net/ipv4/tcp_sack
 	else
 		echo 1 > /proc/sys/net/ipv4/tcp_sack
 	fi
         echo 1 > /proc/sys/net/ipv4/tcp_dsack
-	echo 1 > /proc/sys/net/ipv4/tcp_fack
+	# tcp_fack removed in kernel 4.15
+	if [ -f "/proc/sys/net/ipv4/tcp_fack" ]; then
+		echo 1 > /proc/sys/net/ipv4/tcp_fack
+	fi
 	echo 1800 > /proc/sys/net/ipv4/tcp_keepalive_time
 	echo 30 > /proc/sys/net/ipv4/tcp_fin_timeout
 	echo 3 > /proc/sys/net/ipv4/tcp_retries1
@@ -89,8 +123,6 @@ fi
 if [ "$SYSCTL_ROUTE" == "1" ]; then
 	eout "{glob} setting sysctl_routing enabled"
 	echo 1 > /proc/sys/net/ipv4/conf/$IFACE_UNTRUSTED/rp_filter
-	echo 1 > /proc/sys/net/ipv4/conf/$IFACE_UNTRUSTED/rp_filter
-	echo 0 > /proc/sys/net/ipv4/conf/$IFACE_UNTRUSTED/accept_source_route
 	echo 0 > /proc/sys/net/ipv4/conf/$IFACE_UNTRUSTED/accept_source_route
 	echo 0 > /proc/sys/net/ipv4/conf/all/bootp_relay
 	echo 0 > /proc/sys/net/ipv4/ip_forward
@@ -99,15 +131,39 @@ if [ "$SYSCTL_ROUTE" == "1" ]; then
 	echo 0 > /proc/sys/net/ipv4/secure_redirects
 	echo 0 > /proc/sys/net/ipv4/send_redirects
 	echo 0 > /proc/sys/net/ipv4/proxy_arp
-else
-        echo 0 > /proc/sys/net/ipv4/conf/$IFACE_UNTRUSTED/rp_filter
-        echo 0 > /proc/sys/net/ipv4/conf/$IFACE_UNTRUSTED/rp_filter
-        echo 1 > /proc/sys/net/ipv4/conf/all/bootp_relay
-        echo 1 > /proc/sys/net/ipv4/ip_forward
-	echo 1 > /proc/sys/net/ipv4/conf/all/forwarding
-
 fi
 
 echo 1 > /proc/sys/net/ipv4/route/flush
+
+# IPv6 hardening
+if [ "$USE_IPV6" == "1" ]; then
+	if [ -f "/proc/sys/net/ipv6/conf/all/accept_source_route" ]; then
+		echo 0 > /proc/sys/net/ipv6/conf/all/accept_source_route
+	fi
+	if [ -f "/proc/sys/net/ipv6/conf/all/accept_redirects" ]; then
+		echo 0 > /proc/sys/net/ipv6/conf/all/accept_redirects
+	fi
+	if [ -f "/proc/sys/net/ipv6/conf/$IFACE_UNTRUSTED/accept_source_route" ]; then
+		echo 0 > /proc/sys/net/ipv6/conf/$IFACE_UNTRUSTED/accept_source_route
+	fi
+	if [ -f "/proc/sys/net/ipv6/conf/$IFACE_UNTRUSTED/accept_redirects" ]; then
+		echo 0 > /proc/sys/net/ipv6/conf/$IFACE_UNTRUSTED/accept_redirects
+	fi
+	if [ "$SYSCTL_ROUTE" == "1" ]; then
+		if [ -f "/proc/sys/net/ipv6/conf/all/forwarding" ]; then
+			echo 0 > /proc/sys/net/ipv6/conf/all/forwarding
+		fi
+	fi
+	if [ -f "/proc/sys/net/ipv6/conf/all/accept_ra" ]; then
+		echo 0 > /proc/sys/net/ipv6/conf/all/accept_ra
+	fi
+	if [ -f "/proc/sys/net/ipv6/conf/$IFACE_UNTRUSTED/accept_ra" ]; then
+		echo 0 > /proc/sys/net/ipv6/conf/$IFACE_UNTRUSTED/accept_ra
+	fi
+	if [ -f "/proc/sys/net/ipv6/route/flush" ]; then
+		echo 1 > /proc/sys/net/ipv6/route/flush
+	fi
+	eout "{glob} setting ipv6 sysctl hardening enabled"
+fi
 
 # END SYSCTL config

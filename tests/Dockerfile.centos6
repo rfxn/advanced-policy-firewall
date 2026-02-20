@@ -1,0 +1,82 @@
+FROM centos:6
+
+# CentOS 6 is EOL (Nov 2020) — use vault repos
+RUN sed -i 's|^mirrorlist=|#mirrorlist=|g' /etc/yum.repos.d/CentOS-*.repo && \
+    sed -i 's|^#baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|g' /etc/yum.repos.d/CentOS-*.repo
+
+RUN yum install -y \
+    iptables \
+    iptables-ipv6 \
+    iproute \
+    module-init-tools \
+    procps \
+    coreutils \
+    diffutils \
+    wget \
+    gawk \
+    sed \
+    grep \
+    net-tools \
+    iputils \
+    nc \
+    ipset \
+    ca-certificates \
+    tar \
+    gzip \
+    bash \
+    && yum clean all
+
+# CentOS 6 wget may not support TLS 1.2+ for GitHub.
+# Download bats from a local copy or use curl as fallback.
+RUN mkdir -p /opt/bats && \
+    (wget --no-check-certificate -qO- https://github.com/bats-core/bats-core/archive/refs/tags/v1.11.0.tar.gz || \
+     curl -sSL -k https://github.com/bats-core/bats-core/archive/refs/tags/v1.11.0.tar.gz) | \
+      tar xz -C /opt/bats --strip-components=1 && \
+    /opt/bats/install.sh /usr/local && \
+    mkdir -p /usr/local/lib/bats/bats-support && \
+    (wget --no-check-certificate -qO- https://github.com/bats-core/bats-support/archive/refs/tags/v0.3.0.tar.gz || \
+     curl -sSL -k https://github.com/bats-core/bats-support/archive/refs/tags/v0.3.0.tar.gz) | \
+      tar xz -C /usr/local/lib/bats/bats-support --strip-components=1 && \
+    mkdir -p /usr/local/lib/bats/bats-assert && \
+    (wget --no-check-certificate -qO- https://github.com/bats-core/bats-assert/archive/refs/tags/v2.1.0.tar.gz || \
+     curl -sSL -k https://github.com/bats-core/bats-assert/archive/refs/tags/v2.1.0.tar.gz) | \
+      tar xz -C /usr/local/lib/bats/bats-assert --strip-components=1
+
+# Prepare for network namespace support
+RUN mkdir -p /run/netns
+
+# Copy APF source tree
+COPY . /opt/apf-src
+
+# Copy tests
+COPY tests/ /opt/tests/
+
+# Pre-install APF with test config
+RUN cd /opt/apf-src && INSTALL_PATH=/opt/apf sh install.sh && \
+    conf="/opt/apf/conf.apf" && \
+    sed -i 's/^SET_MONOKERN=.*/SET_MONOKERN="1"/' "$conf" && \
+    sed -i 's/^DEVEL_MODE=.*/DEVEL_MODE="0"/' "$conf" && \
+    sed -i 's/^VF_ROUTE=.*/VF_ROUTE="0"/' "$conf" && \
+    sed -i 's/^DLIST_PHP=.*/DLIST_PHP="0"/' "$conf" && \
+    sed -i 's/^DLIST_SPAMHAUS=.*/DLIST_SPAMHAUS="0"/' "$conf" && \
+    sed -i 's/^DLIST_DSHIELD=.*/DLIST_DSHIELD="0"/' "$conf" && \
+    sed -i 's/^DLIST_RESERVED=.*/DLIST_RESERVED="0"/' "$conf" && \
+    sed -i 's/^DLIST_ECNSHAME=.*/DLIST_ECNSHAME="0"/' "$conf" && \
+    sed -i 's/^USE_RGT=.*/USE_RGT="0"/' "$conf" && \
+    sed -i 's/^RAB=.*/RAB="0"/' "$conf" && \
+    sed -i 's/^SET_FASTLOAD=.*/SET_FASTLOAD="0"/' "$conf" && \
+    sed -i 's/^SET_REFRESH=.*/SET_REFRESH="0"/' "$conf" && \
+    sed -i 's/^BLK_RESNET=.*/BLK_RESNET="0"/' "$conf" && \
+    sed -i 's/^USE_IPSET=.*/USE_IPSET="0"/' "$conf" && \
+    sed -i 's/^USE_GRE=.*/USE_GRE="0"/' "$conf"
+
+# Save clean state for test resets
+RUN for f in allow_hosts.rules deny_hosts.rules; do \
+      sed '/^[^#]/d' "/opt/apf/$f" > "/opt/apf/$f.clean"; \
+    done && \
+    cp /opt/apf/conf.apf /opt/apf/conf.apf.clean
+
+WORKDIR /opt/tests
+
+# Default: run all tests with tap formatter
+CMD ["bats", "--formatter", "tap", "/opt/tests/"]

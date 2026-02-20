@@ -1,8 +1,8 @@
 #!/bin/bash
 ##
-# Advanced Policy Firewall (APF) v1.7.6
-#             (C) 2002-2019, R-fx Networks <proj@rfxn.com>
-#             (C) 2019, Ryan MacDonald <ryan@rfxn.com>
+# Advanced Policy Firewall (APF) v2.0.1
+#             (C) 2002-2026, R-fx Networks <proj@rfxn.com>
+#             (C) 2026, Ryan MacDonald <ryan@rfxn.com>
 # This program may be freely redistributed under the terms of the GNU GPL v2
 ##
 ### BEGIN INIT INFO
@@ -18,45 +18,35 @@
 # description: Advanced Policy Firewall (APF); iptables firewall wrapper
 ### END INIT INFO
 
-# source function library
-. /etc/rc.d/init.d/functions
-# import variables
-. /etc/apf/conf.apf
-. /etc/apf/internals/internals.conf
-
-ipt="/sbin/iptables"
-inspath="/etc/apf"
-prog="apf"
+INSTALL_PATH="/etc/apf"
 
 case "$1" in
 start)
-        echo -n "Starting APF:"
-        /usr/local/sbin/apf --start >> /dev/null 2>&1
-        echo_success
-        echo
-        ;;
+	echo -n "Starting APF: "
+	$INSTALL_PATH/apf --start >> /dev/null 2>&1
+	echo "done"
+	;;
 stop)
-        echo -n "Stopping APF:"
-        /usr/local/sbin/apf --stop >> /dev/null 2>&1
-        echo_success
-        echo
-        ;;
+	echo -n "Stopping APF: "
+	$INSTALL_PATH/apf --stop >> /dev/null 2>&1
+	echo "done"
+	;;
 restart)
-        $0 stop
-        $0 start
-        ;;
-condrestart)
-	if $ipt $IPT_FLAGS -n -L TALLOW > /dev/null 2>&1 && \
-	    $ipt $IPT_FLAGS -n -L TDENY > /dev/null 2>&1 && \
-	    $ipt $IPT_FLAGS -n -L TGALLOW > /dev/null 2>&1 && \
-	    $ipt $IPT_FLAGS -n -L TGDENY > /dev/null 2>&1; then
-	    $0 stop
-	    $0 start
+	$0 stop
+	$0 start
+	;;
+status)
+	. $INSTALL_PATH/conf.apf
+	. $INSTALL_PATH/internals/internals.conf
+	if $IPT $IPT_FLAGS -n -L TALLOW > /dev/null 2>&1; then
+		echo "APF is running."
 	else
-		echo "APF not running, doing nothing."
+		echo "APF is not running."
+		exit 3
 	fi
 	;;
 *)
-        echo "usage: $0 [start|stop|restart|condrestart]"
+	echo "usage: $0 {start|stop|restart|status}"
+	exit 1
 esac
 exit 0

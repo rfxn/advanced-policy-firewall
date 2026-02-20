@@ -1,22 +1,22 @@
 #!/bin/bash
 #
 ##
-# Advanced Policy Firewall (APF) v1.7.6
-#             (C) 2002-2019, R-fx Networks <proj@rfxn.com>
-#             (C) 2019, Ryan MacDonald <ryan@rfxn.com>
+# Advanced Policy Firewall (APF) v2.0.1
+#             (C) 2002-2026, R-fx Networks <proj@rfxn.com>
+#             (C) 2026, Ryan MacDonald <ryan@rfxn.com>
 # This program may be freely redistributed under the terms of the GNU GPL v2
 ##
 #
 CNF="/etc/apf/conf.apf"
-if [ -f $CNF ]; then
-   source $CNF
+if [ -f "$CNF" ]; then
+   source "$CNF"
 else
    echo "$CNF not found, aborting."
    exit 1
 fi
 
 if [ "$SET_VNET" == "0" ]; then
-	exit 1
+	exit 0
 fi
 
 if [ ! -f "$INSTALL_PATH/vnet/vnetgen.def" ]; then
@@ -24,25 +24,25 @@ if [ ! -f "$INSTALL_PATH/vnet/vnetgen.def" ]; then
         exit 1
 fi
 
-if [ ! -f "$ip" ] && [ ! -f "$ifconfig" ]; then
-        eout "{glob} $ip and $ifconfig not found; aborting"
-	echo "$ip and $ifconfig not found; aborting"
+if [ -z "$ip" ] && [ -z "$ifconfig" ]; then
+        eout "{glob} ip and ifconfig not found; aborting"
+	echo "ip and ifconfig not found; aborting"
         exit 1
-elif [ -f "$ip" ]; then
- for addr in `/sbin/ip addr list | tr '/' ' ' | grep -w inet | grep -w $IF | grep -v 127.0.0.1 | grep -vw $NET | awk '{print$2}'`; do
+elif [ -n "$ip" ]; then
+ for addr in $($ip addr list | tr '/' ' ' | grep -w inet | grep -w "$IF" | grep -v 127.0.0.1 | grep -vw "$NET" | awk '{print$2}'); do
   if [ ! -f "$INSTALL_PATH/vnet/$addr.rules" ]; then
-        touch $INSTALL_PATH/vnet/$addr.rules
-        chmod 600 $INSTALL_PATH/vnet/$addr.rules
-        . $INSTALL_PATH/vnet/vnetgen.def
+        touch "$INSTALL_PATH/vnet/$addr.rules"
+        chmod 600 "$INSTALL_PATH/vnet/$addr.rules"
+        . "$INSTALL_PATH/vnet/vnetgen.def"
   fi
  done
-elif [ -f "$ifconfig" ]; then
-for iface in `ifconfig | grep -w $IF | awk '{print$1}'`; do
-  for addr in `ifconfig $iface | grep -w inet | tr ':' ' ' | grep -vw $NET | awk '{print$3}'`; do
+elif [ -n "$ifconfig" ]; then
+for iface in $($ifconfig | grep -w "$IF" | awk '{print$1}'); do
+  for addr in $($ifconfig $iface | grep -w inet | tr ':' ' ' | grep -vw "$NET" | awk '{print$3}'); do
     if [ ! -f "$INSTALL_PATH/vnet/$addr.rules" ]; then
-        touch $INSTALL_PATH/vnet/$addr.rules
-        chmod 600 $INSTALL_PATH/vnet/$addr.rules
-        . $INSTALL_PATH/vnet/vnetgen.def
+        touch "$INSTALL_PATH/vnet/$addr.rules"
+        chmod 600 "$INSTALL_PATH/vnet/$addr.rules"
+        . "$INSTALL_PATH/vnet/vnetgen.def"
     fi
   done
 done
@@ -51,31 +51,33 @@ fi
 
 if [ "$SET_ADDIFACE" == "1" ]; then
  ## associate a vnet rule for ip's on additional interfaces other than the main
- for anet in `ifconfig | grep Link | grep -vwE "inet|inet6|lo|$IFACE_UNTRUSTED|$IFACE_UNTRUSTED" | awk '{print$1}'`; do
-  if [ -f "$ip" ]; then
-  valtif=`echo $TIF | grep $anet`
+ if [ -n "$ip" ]; then
+  for anet in $($ip -o link show 2>/dev/null | awk -F': ' '{print $2}' | grep -vwE "lo|$IFACE_UNTRUSTED"); do
+   valtif=$(echo "$IFACE_TRUSTED" | tr ',' ' ' | grep -w "$anet")
    if [ "$valtif" == "" ]; then
-    for addr in `/sbin/ip addr list | tr '/' ' ' | grep -w inet | grep -w $anet | grep -v 127.0.0.1 | grep -vw $NET | awk '{print$2}'`; do
+    for addr in $($ip addr list "$anet" 2>/dev/null | tr '/' ' ' | grep -w inet | grep -v 127.0.0.1 | grep -vw "$NET" | awk '{print$2}'); do
      if [ ! -f "$INSTALL_PATH/vnet/$addr.rules" ]; then
-        touch $INSTALL_PATH/vnet/$addr.rules
-        chmod 600 $INSTALL_PATH/vnet/$addr.rules
-        . $INSTALL_PATH/vnet/vnetgen.def
+        touch "$INSTALL_PATH/vnet/$addr.rules"
+        chmod 600 "$INSTALL_PATH/vnet/$addr.rules"
+        . "$INSTALL_PATH/vnet/vnetgen.def"
      fi
     done
    fi
-  elif [ -f "$ifconfig" ]; then
-   for iface in `ifconfig | grep -w $anet | awk '{print$1}'`; do
-    valtif=`echo $TIF | grep $anet`
-    if [ "$valtif" == "" ]; then 
-     for addr in `ifconfig $iface | grep -w inet | tr ':' ' ' | grep -vw $NET | awk '{print$3}'`; do
+  done
+ elif [ -n "$ifconfig" ]; then
+  for anet in $($ifconfig | grep -E '^[a-zA-Z0-9]' | awk '{print$1}' | tr -d ':' | grep -vwE "lo|$IFACE_UNTRUSTED"); do
+   for iface in $($ifconfig | grep -w "$anet" | awk '{print$1}'); do
+    valtif=$(echo "$IFACE_TRUSTED" | tr ',' ' ' | grep -w "$anet")
+    if [ "$valtif" == "" ]; then
+     for addr in $($ifconfig "$iface" | grep -w inet | tr ':' ' ' | grep -vw "$NET" | awk '{print$3}'); do
       if [ ! -f "$INSTALL_PATH/vnet/$addr.rules" ]; then
-        touch $INSTALL_PATH/vnet/$addr.rules
-        chmod 600 $INSTALL_PATH/vnet/$addr.rules
-        . $INSTALL_PATH/vnet/vnetgen.def
+        touch "$INSTALL_PATH/vnet/$addr.rules"
+        chmod 600 "$INSTALL_PATH/vnet/$addr.rules"
+        . "$INSTALL_PATH/vnet/vnetgen.def"
       fi
      done
     fi
    done
-  fi
- done
+  done
+ fi
 fi

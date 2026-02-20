@@ -1,0 +1,14 @@
+[Unit]
+Description=Advanced Policy Firewall (APF)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/etc/apf/apf --start
+ExecStop=/etc/apf/apf --stop
+ExecReload=/etc/apf/apf --restart
+
+[Install]
+WantedBy=multi-user.target

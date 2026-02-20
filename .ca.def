@@ -1,22 +1,30 @@
+USE_IPSET="${USE_IPSET:-0}"
+IPSET_LOG_RATE="${IPSET_LOG_RATE:-30}"
+USE_GRE="${USE_GRE:-0}"
+GRE_PERSIST="${GRE_PERSIST:-1}"
+GRE_KEEPALIVE="${GRE_KEEPALIVE:-10 3}"
+GRE_MTU="${GRE_MTU:-}"
+GRE_TTL="${GRE_TTL:-255}"
+
 cat > .conf.apf <<EOF
 #!/bin/sh
 #
 ##
-# Advanced Policy Firewall (APF) v1.7.5
-#             (C) 2002-2019, R-fx Networks <proj@rfxn.com>
-#             (C) 2019, Ryan MacDonald <ryan@rfxn.com>
+# Advanced Policy Firewall (APF) v2.0.1
+#             (C) 2002-2026, R-fx Networks <proj@rfxn.com>
+#             (C) 2026, Ryan MacDonald <ryan@rfxn.com>
 # This program may be freely redistributed under the terms of the GNU GPL v2
 ##
 # NOTE: This file should be edited with word/line wrapping off,
-#       if your using pico/nano please start use the -w switch
+#       if you're using pico/nano please use the -w switch
 #       (e.g: nano -w filename)
 
 ##
 # [Main]
 ##
 # !!! Do not leave set to (1) !!!
-# When set to enabled; 5 minute cronjob is set to stop the firewall. Set
-# this off (0) when firewall is determined to be operating as desired.
+# A 5 minute cronjob stops the firewall while enabled. Disable (0) once
+# firewall is operating as desired.
 DEVEL_MODE="1"
 
 # The installation path of APF; this can be changed but it is not recommended.
@@ -27,21 +35,17 @@ INSTALL_PATH="$INSTALL_PATH"
 # interface.
 IFACE_UNTRUSTED="$IFACE_UNTRUSTED"
 
-# Trusted Network interface(s); all traffic on defined interface(s) will by-pass
+# Trusted Network interface(s); all traffic on defined interface(s) will bypass
 # ALL firewall rules, format is white space or comma separated list.
 IFACE_TRUSTED="$IFACE_TRUSTED"
 
-# This option enables IPv6 support for APF and loads all appropriate IPv6 kernel
-# modules. This feature depends on IPv6 support being enabled in your networking
-# configuration and that the modules are explicitly available. Please ensure that
-# you do not have IPv6 disabled via modprobe.conf/.d or in sysconfig files.
+# Enable IPv6 support and load IPv6 kernel modules. Requires IPv6 enabled in
+# networking configuration and modules available (not disabled via modprobe.conf/.d).
 # Note: The VNET (virtual network) feature does not currently support IPv6.
 USE_IPV6="$USE_IPV6"
 
-# This option will allow for all status events to be displayed in real time on
-# the console as you use the firewall. Typically, APF used to operate silent
-# with all logging piped to \$LOG_APF. The use of this option will not disable
-# the standard log file displayed by apf --status but rather compliment it.
+# Display all status events in real time on the console. Does not disable
+# the standard log file (apf --status) but rather complements it.
 SET_VERBOSE="$SET_VERBOSE"
 
 # The fast load feature makes use of the iptables-save/restore facilities to do
@@ -53,13 +57,16 @@ SET_VERBOSE="$SET_VERBOSE"
 #       b) if snapshot age exceeds 12 hours, the snapshot is expired
 #       c) if conf or a .rule has changed since last load, snapshot is expired
 #       d) if it is your first run of APF since install, snapshot is generated
-#       - an expired snapshot means APF will do a full start rule-by-rule 
+#       e) if DEVEL_MODE is enabled, the snapshot is bypassed
+#       - an expired snapshot means APF will do a full start rule-by-rule
 SET_FASTLOAD="$SET_FASTLOAD"
 
 # Virtual Network Sub-System (VNET) creates independent policy rule set for
-# each IP on a system to /etc/apf/vnet/IP.rules. These rule files can be 
-# configured with conf.apf variables for unique but convenient firewall 
+# each IP on a system to \$INSTALL_PATH/vnet/IP.rules. These rule files can be
+# configured with conf.apf variables for unique but convenient firewall
 # policies or custom iptables entries for even greater flexibility.
+# Note: VNET is IPv4-only. IPv6 addresses cannot be used as filenames and
+# IPv6 does not use the interface aliasing model that VNET relies on.
 SET_VNET="$SET_VNET"
 
 # This feature firewalls any additional interfaces on the server as untrusted 
@@ -67,43 +74,51 @@ SET_VNET="$SET_VNET"
 # defined by IFACE_* variables. This feature is ideal for systems running 
 # private interfaces where not all hosts on the private network are trusted or 
 # are otherwise exposed to "open" networks through this private interface 
-# (i.e: the Internet, network accessible storage LAN, corporate WAN, etc..)
+# (i.e., the Internet, network accessible storage LAN, corporate WAN, etc.)
 SET_ADDIFACE="$SET_ADDIFACE"
 
 # This allows the firewall to work around modular kernel issues by assuming
 # that the system has all required firewall modules compiled directly into
-# kernel. This mode of operation is not generally recommended but can be used
+# kernel. This mode of operation is not generally recommended but can be used to
 # scale APF to unique situations.
 SET_MONOKERN="$SET_MONOKERN"
 
+# Docker/container compatibility mode. When enabled, APF will only flush its
+# own chains during start/restart/stop, preserving chains and rules created
+# by Docker, containerd, Kubernetes, Podman, or other software that manages
+# the FORWARD chain and nat table. This also disables fast load, since
+# iptables-restore would overwrite external chains.
+# Note: This applies to any software using FORWARD/nat -- not just Docker.
+DOCKER_COMPAT="$DOCKER_COMPAT"
+
 # The expiry interval, in seconds, that bans will be expired out of the trust
 # system. This only applies to local bans from deny_hosts.rules and not global
-# import rules. The value must not be less than equiv. seconds of SET_REFRESH.
+# import rules. Must not be less than SET_REFRESH in seconds (e.g., 10 min = 600s).
 # [value in seconds, 0 to disable, recommended 600]
 SET_EXPIRE="$SET_EXPIRE"
 
-# This controls how often, if at all, we want the trust system to refresh rules.
-# The firewall will flush & reload all static rules, redownload global rules and
-# re-resolve any dns names in the rules. This is ideal when using dynamic dns
-# names or downloadable global trust rules. [value in minutes, 0 to disable]
+# This controls how often, if at all, the trust system refreshes rules.
+# The firewall will flush & reload trust chains (TALLOW/TDENY/TGALLOW/TGDENY),
+# redownload global rules and re-resolve any DNS names in the rules. This is
+# ideal when using dynamic DNS names or downloadable global trust rules.
+# [value in minutes, 0 to disable]
 SET_REFRESH="$SET_REFRESH"
 
 # The refreshing of large allow/deny trust files can be resource intensive, this
 # feature checks for changes to trust files between refreshes and only performs
 # a refresh if contents have changed. If you are using dynamic DNS names in trust
 # rules, which require regular DNS refreshes, you should keep this disabled.
-# [value in minutes, 0 to disable]
+# [value 1 to enable, 0 to disable]
 SET_REFRESH_MD5="$SET_REFRESH_MD5"
 
 # This is the total amount of rules allowed inside of the deny trust system.
 # When this limit is reached, the deny rule files will begin to purge older
 # entries to maintain the set limit. [value is max lines, 0 for unlimited]
-SET_TRIM="250"
+SET_TRIM="$SET_TRIM"
 
-# Verifies that the IFACE_* and IFACE_TRUSTED interfaces are actually routed
-# to something. If configured interfaces are found with no routes setup then
-# APF will exit with an error to prevent further issues (such as being locked 
-# out of the system).
+# Verifies that the IFACE_UNTRUSTED and IFACE_TRUSTED interfaces are actually
+# routed. If configured interfaces have no routes, APF will exit with an error
+# to prevent further issues (such as being locked out of the system).
 VF_ROUTE="$VF_ROUTE"
 
 # Verifies that all inbound traffic is sourced from a defined local gateway MAC
@@ -116,14 +131,9 @@ VF_LGATE="$VF_LGATE"
 ##
 # [Reactive Address Blocking]
 ##
-# The use of RAB is such that it allows the firewall to track an address as it
-# traverses the firewall rules and subsequently associate that address across
-# any number of violations. This allows the firewall to react to critical
-# policy violations by blocking addresses temporarily on the assumed precaution
-# that we are protecting the host from what the address may do on the pretext
-# of what the address has already done. The interface that allows RAB to work
-# resides inside the kernel and makes use of the iptables 'ipt_recent' module,
-# so there is no external programs causing any additional load.
+# Reactive Address Blocking (RAB) tracks policy violations per address and
+# temporarily blocks offenders. Powered by xt/ipt_recent kernel module — no
+# external programs or additional load required.
 RAB="$RAB"
 
 # This enables RAB for sanity violations, which is when an address breaks a
@@ -150,16 +160,16 @@ RAB_HITCOUNT="$RAB_HITCOUNT"
 RAB_TIMER="$RAB_TIMER"
 
 # This allows RAB to 'trip' the block timer back to 0 seconds if an address
-# attempts ANY subsiquent communication while still on the inital block period.
+# attempts ANY subsequent communication while still on the initial block period.
 RAB_TRIP="$RAB_TRIP"
 
 # This controls if the firewall should log all violation hits from an address.
-# The use of LOG_DROP variable set to 1 will override this to force logging.
+# LOG_DROP=1 overrides this to force logging.
 RAB_LOG_HIT="$RAB_LOG_HIT"
 
-# This controls if the firewall should log all subsiqent traffic from an address
-# that is already blocked for a violation hit, this can generate allot of logs.
-# The use of LOG_DROP variable set to 1 will override this to force logging.
+# This controls if the firewall should log all subsequent traffic from an address
+# that is already blocked for a violation hit, this can generate a lot of logs.
+# LOG_DROP=1 overrides this to force logging.
 RAB_LOG_TRIP="$RAB_LOG_TRIP"
 
 ##
@@ -167,23 +177,25 @@ RAB_LOG_TRIP="$RAB_LOG_TRIP"
 ##
 # How to handle TCP packet filtering?
 #
-#  RESET (sends a tcp-reset; TCP/IP default)
+#  RESET (send TCP RST; causes immediate connection close)
 #  DROP  (drop the packet; stealth ?)
 #  REJECT (reject the packet)
+#  PROHIBIT (send an icmp-host-prohibited)
 TCP_STOP="$TCP_STOP"
 
 # How to handle UDP packet filtering?
 #
-#  RESET (sends a icmp-port-unreachable; TCP/IP default)
+#  RESET (send an ICMP port-unreachable; standard behavior)
 #  DROP  (drop the packet; stealth ?)
 #  REJECT (reject the packet)
-#  PROHIBIT (send an icmp-host-prohibited)
+#  PROHIBIT (send an ICMP host-prohibited)
 UDP_STOP="$UDP_STOP"
 
-# How to handle all other packet filtering? 
+# How to handle all other packet filtering?
 #
 #  DROP  (drop the packet)
 #  REJECT (reject the packet)
+#  PROHIBIT (send an ICMP host-prohibited)
 ALL_STOP="$ALL_STOP"
 
 # The sanity options control the way packets are scrutinized as they flow
@@ -200,8 +212,8 @@ PKT_SANITY="$PKT_SANITY"
 # to affect many application protocols in undesirable ways.
 PKT_SANITY_INV="$PKT_SANITY_INV"
 
-# Block any fragmented UDP packets, this is safe as no UDP packets should
-# ever be fragmented.
+# Block fragmented UDP packets. Fragmented UDP is uncommon in typical server
+# traffic and is frequently used in fragment-based attacks.
 PKT_SANITY_FUDP="$PKT_SANITY_FUDP"
 
 # Block packets with a source or destination of port 0, this is safe as
@@ -221,7 +233,7 @@ PKT_SANITY_PZERO="$PKT_SANITY_PZERO"
 TOS_DEF="$TOS_DEF"
 
 # Set the default TOS port range
-TOS_DEF_RANGE="512:65535"
+TOS_DEF_RANGE="$TOS_DEF_RANGE"
 
 # 0: Ports for Normal-Service
 TOS_0="$TOS_0"
@@ -240,8 +252,10 @@ TOS_16="$TOS_16"
 
 # Allow traceroute requests on the defined range of ports. This feature
 # is not required for normal operations and some even prefer it disabled.
-# Enable Traceroute 	# Traceroute ports
-TCR_PASS="$TCR_PASS"		TCR_PORTS="33434:33534"
+# Enable Traceroute
+TCR_PASS="$TCR_PASS"
+# Traceroute ports
+TCR_PORTS="$TCR_PORTS"
 
 # Set a reasonable packet/time ratio for ICMP packets, exceeding this flow
 # will result in dropped ICMP packets. Supported values are in the form of: 
@@ -255,9 +269,9 @@ ICMP_LIM="$ICMP_LIM"
 # service.
 RESV_DNS="$RESV_DNS"
 
-# When RESV_DNS is enabled, all the untrusted name server traffic can fill the 
-# logs with client DNS traffic. This can be suppressed with an implicit drop 
-# of all such traffic (sport 53 inbound) as so to avoid log chains. If you run
+# When RESV_DNS is enabled, all the untrusted name server traffic can fill the
+# logs with client DNS traffic. This can be suppressed with an implicit drop
+# of all such traffic (sport 53 inbound) so as to avoid log chains. If you run
 # applications that have unique name servers configured, this may break them.
 RESV_DNS_DROP="$RESV_DNS_DROP"
 
@@ -269,17 +283,16 @@ RESV_DNS_DROP="$RESV_DNS_DROP"
 # ranges (4660_4678).
 BLK_P2P_PORTS="$BLK_P2P_PORTS"
 
-# These are common Internet service ports that are understood in the wild 
-# services you would not want logged under normal circumstances. All ports
-# that are defined here will be implicitly dropped with no logging for
-# TCP/UDP traffic inbound or outbound. Format is comma separated for single
+# Common Internet service ports associated with frequently-probed services
+# that you would not want logged under normal circumstances. All ports
+# defined here will be implicitly dropped with no logging for TCP/UDP
+# traffic inbound or outbound. Format is comma separated for single
 # ports and an underscore separator for ranges (135_139).
 BLK_PORTS="$BLK_PORTS"
 
-# You need multicasting if you intend to participate in the MBONE, a high 
+# You need multicasting if you intend to participate in the MBONE, a high
 # bandwidth network on top of the Internet which carries audio and video
-# broadcasts. More about MBONE at: www-itg.lbl.gov/mbone/, this is generally
-# safe to enable. 
+# broadcasts. This is generally safe to enable.
 BLK_MCATNET="$BLK_MCATNET"
 
 # Block all private ipv4 addresses, this is address space reserved for private
@@ -291,9 +304,10 @@ BLK_PRVNET="$BLK_PRVNET"
 
 # Block all ipv4 address space marked reserved for future use (unassigned),
 # such networks have no business talking on the Internet. However they may at
-# some point become live address space. The USE_RD option further in this file
-# allows for dynamic updating of this list on every full restart of APF. Refer
-# to the 'internals/reserved.networks' file for listing of address space.
+# some point become live address space. The DLIST_RESERVED option further in
+# this file allows for dynamic updating of this list on every full restart of
+# APF. Refer to the 'internals/reserved.networks' file for listing of address
+# space.
 BLK_RESNET="$BLK_RESNET"
 
 # Block all ident (tcp 113) requests in and out of the server IF the port is
@@ -324,30 +338,35 @@ BLK_TCP_SACK_PANIC="$BLK_TCP_SACK_PANIC"
 # service attacks.
 SYSCTL_CONNTRACK="$SYSCTL_CONNTRACK"
 
+# When enabled, automatically scales conntrack_max up when usage exceeds 80%
+# of the current limit. Scaling occurs on each firewall start/restart.
+# INCREMENT: amount to add per scaling event
+# HIGH: absolute ceiling (will not scale above this value)
+# BUCKETS: hash table size (nf_conntrack hashsize); higher values reduce
+# lookup latency at the cost of kernel memory
+SYSCTL_CONNTRACK_ADAPTIVE="$SYSCTL_CONNTRACK_ADAPTIVE"
+SYSCTL_CONNTRACK_INCREMENT="$SYSCTL_CONNTRACK_INCREMENT"
+SYSCTL_CONNTRACK_HIGH="$SYSCTL_CONNTRACK_HIGH"
+SYSCTL_CONNTRACK_BUCKETS="$SYSCTL_CONNTRACK_BUCKETS"
+
 # These are system control (sysctl) option changes to disable TCP features
 # that can be abused in addition to tweaking other TCP features for increased
 # performance and reliability.
 SYSCTL_TCP="$SYSCTL_TCP"
 
-# Three related flaws were found in the Linux kernel’s handling of TCP Selective
-# Acknowledgement (SACK) packets handling with low MSS size. The extent of impact
-# is understood to be limited to denial of service at this time.
-#
-# ref: https://access.redhat.com/security/vulnerabilities/tcpsack
-#      CVE-2019-11477, CVE-2019-11478, CVE-2019-11479
-#
-# This can be safely ignored if you are running on a modern patched kernel newer
-# than June 16th 2109.
+# Disable TCP SACK entirely. Alternative to BLK_TCP_SACK_PANIC (see above).
+# Safe to ignore on patched kernels (post-June 2019).
+# ref: CVE-2019-11477, CVE-2019-11478, CVE-2019-11479
 SYSCTL_TCP_NOSACK="$SYSCTL_TCP_NOSACK"
 
 # These are system control (sysctl) option changes intended to help mitigate
-# syn-flood attacks by lowering syn retry, syn backlog & syn time-out values.
+# syn-flood attacks by lowering retry counts and increasing SYN backlog capacity.
 SYSCTL_SYN="$SYSCTL_SYN"
 
 # These are system control (sysctl) option changes to provide protection from
-# spoofed packets and ip/arp/route redirection. If you are performing advanced
-# routing policies on this host such as NAT/MASQ you should disable this.
-SYSCTL_ROUTE="0"
+# spoofed packets and ip/arp/route redirection. When USE_IPV6=1, also disables
+# IPv6 forwarding. Disable this if performing NAT/MASQ or advanced routing.
+SYSCTL_ROUTE="$SYSCTL_ROUTE"
 
 # This system control (sysctl) option will log all network traffic that is
 # from impossible source addresses. This option can discover attacks or issues
@@ -358,7 +377,7 @@ SYSCTL_LOGMARTIANS="$SYSCTL_LOGMARTIANS"
 # (Explicit Congestion Notification). This feature provides an improved method 
 # for congestion avoidance by allowing the network to mark packets for 
 # transmission later, rather than dropping them from the queue. Please also
-# see related USE_ECNSHAME option further down in this file. 
+# see related DLIST_ECNSHAME option further down in this file.
 SYSCTL_ECN="$SYSCTL_ECN"
 
 # This system control (sysctl) option will allow you to make use of SynCookies 
@@ -366,11 +385,11 @@ SYSCTL_ECN="$SYSCTL_ECN"
 # socket becomes overflowed. The cookie is used to interrupt the flow of syn
 # transmissions with a hashed sequence number that must be correlated with the
 # sending host. The hash is made up of the sending host address, packet flags
-# etc..; if the sending host does not validate against the hash then the tcp
-# hand-shake is terminated. In short, this helps to mitigate syn-flood attacks.
+# etc.; if the sending host does not validate against the hash then the tcp
+# handshake is terminated. In short, this helps to mitigate syn-flood attacks.
 # Note: syncookies seriously violates TCP protocol and can result in serious
 #       degradation of some services (i.e. SMTP); visible not by you, but your
-#       clients and relays whom are contacting your system.
+#       clients and relays who are contacting your system.
 SYSCTL_SYNCOOKIES="$SYSCTL_SYNCOOKIES"
 
 # This system control (sysctl) option allows for the use of Abort_On_Overflow
@@ -415,6 +434,10 @@ IG_UDP_CPORTS="$IG_UDP_CPORTS"
 # 'internals/icmp.types' for type definition; 'all' is wildcard for any
 IG_ICMP_TYPES="$IG_ICMP_TYPES"
 
+# Common ICMPv6 inbound (ingress) types
+# NDP types 133-136 are always permitted regardless of this setting
+IG_ICMPV6_TYPES="$IG_ICMPV6_TYPES"
+
 # Configure outbound (egress) accepted services. This is an optional
 # feature; services and customized entries may be made directly to an ip's
 # virtual net file located in the vnet/ directory.
@@ -441,6 +464,10 @@ EG_UDP_CPORTS="$EG_UDP_CPORTS"
 # Common ICMP outbound (egress) types
 # 'internals/icmp.types' for type definition; 'all' is wildcard for any
 EG_ICMP_TYPES="$EG_ICMP_TYPES"
+
+# Common ICMPv6 outbound (egress) types
+# NDP types 133-136 are always permitted regardless of this setting
+EG_ICMPV6_TYPES="$EG_ICMPV6_TYPES"
 
 # Configure user-id specific outbound (egress) port access. This is a more
 # granular feature to limit the scope of outbound packet flows with user-id
@@ -477,45 +504,40 @@ EG_DROP_CMD="$EG_DROP_CMD"
 ##
 # [Remote Rule Imports]
 ##
-# Project Honey Pot is the first and only distributed system for identifying
-# spammers and the spambots they use to scrape addresses from your website.
-# This aggregate list combines Harvesters, Spammers and SMTP Dictionary attacks
-# from the PHP IP Data at:  http://www.projecthoneypot.org/list_of_ips.php
+# Project Honey Pot identifies spammers and the spambots they use to scrape
+# addresses from websites. This list combines Harvesters, Spammers and SMTP
+# Dictionary attacks. More info: https://www.projecthoneypot.org/list_of_ips.php
 DLIST_PHP="$DLIST_PHP"
-DLIST_PHP_URL="http://rfxn.com/downloads/php_list"
+DLIST_PHP_URL="https://cdn.rfxn.com/downloads/php_list"
 
 # The Spamhaus Don't Route Or Peer List (DROP) is an advisory "drop all
 # traffic" list, consisting of stolen 'zombie' netblocks and netblocks
 # controlled entirely by professional spammers. For more information please
-# see http://www.spamhaus.org/drop/.
+# see https://www.spamhaus.org/drop/.
 DLIST_SPAMHAUS="$DLIST_SPAMHAUS"
-DLIST_SPAMHAUS_URL="http://www.spamhaus.org/drop/drop.lasso"
+DLIST_SPAMHAUS_URL="https://www.spamhaus.org/drop/drop.lasso"
 
 # DShield collects data about malicious activity from across the Internet.
 # This data is cataloged, summarized and can be used to discover trends in
 # activity, confirm widespread attacks, or assist in preparing better firewall
-# rules. This is a list of top networks that have exhibited suspicious activity.
+# rules. This is a list of top hosts that have exhibited suspicious activity.
 DLIST_DSHIELD="$DLIST_DSHIELD"
-DLIST_DSHIELD_URL="http://feeds.dshield.org/top10-2.txt"
+DLIST_DSHIELD_URL="https://feeds.dshield.org/top10-2.txt"
 
 # The reserved networks list is addresses which ARIN has marked as reserved
-# for future assignement and have no business as valid traffic on the internet.
+# for future assignment and have no business as valid traffic on the internet.
 # Such addresses are often used as spoofed (Fake) hosts during attacks, this
 # will update the reserved networks list in order to prevent new ip assignments
 # on the internet from getting blocked; this option is only important when
 # BLK_RESNET is set to enabled.
-DLIST_RESERVED="1"
-DLIST_RESERVED_URL="http://rfxn.com/downloads/reserved.networks"
+DLIST_RESERVED="$DLIST_RESERVED"
+DLIST_RESERVED_URL="https://cdn.rfxn.com/downloads/reserved.networks"
 
-# ECN is an extension which helps reduce congestion. Unfortunately some
-# clueless software/hardware vendors have setup their sites or implemented
-# TCP/IP in a very broken manner. If you try to talk to these sites with ECN
-# turned on, they will drop all packets from you. This feature uses the ECN
-# hall of shame list to turn off ECN in packets to these hosts so your traffic
-# is accepted as intended. This option is dependent on setting SYSCTL_ECN="1"
-# otherwise it stays disabled.
+# Some hosts have broken ECN implementations and drop packets from ECN-enabled
+# senders. This feature uses a list of known-broken hosts to disable ECN in
+# packets sent to them. Requires SYSCTL_ECN="1", otherwise stays disabled.
 DLIST_ECNSHAME="$DLIST_ECNSHAME"
-DLIST_ECNSHAME_URL="http://rfxn.com/downloads/ecnshame.lst"
+DLIST_ECNSHAME_URL="https://cdn.rfxn.com/downloads/ecnshame.lst"
 
 ##
 # Global Trust
@@ -531,22 +553,65 @@ GA_URL="$GA_URL"
 GD_URL="$GD_URL"
 
 ##
+# [ipset Block Lists]
+##
+# ipset provides kernel-level hash tables for high-performance IP matching.
+# When enabled, blocklists defined in ipset.rules are loaded into ipset sets
+# and matched with a single iptables rule per list instead of one rule per IP.
+# Requires the 'ipset' utility (apt-get install ipset / yum install ipset).
+# When disabled or ipset is not installed, ipset.rules is ignored.
+USE_IPSET="$USE_IPSET"
+
+# Default log rate limit for ipset blocklist matches (per minute per list).
+# Individual lists control logging via the log field in ipset.rules (0=off, 1=on).
+# Requires LOG_DROP="1" to be globally enabled.
+IPSET_LOG_RATE="$IPSET_LOG_RATE"
+
+##
+# [GRE Tunnels]
+##
+# GRE tunnel support provides encapsulated point-to-point links between hosts.
+# When enabled, tunnels defined in gre.rules are created on firewall start and
+# GRE protocol (47) traffic is explicitly allowed to/from tunnel endpoints.
+# Requires the 'ip' utility (iproute2 package).
+# When disabled, gre.rules is ignored.
+USE_GRE="$USE_GRE"
+
+# Keep tunnel interfaces alive when firewall is flushed/stopped.
+# When 1, only firewall rules are removed; tunnel interfaces persist.
+# When 0, tunnel interfaces are also torn down on flush.
+GRE_PERSIST="$GRE_PERSIST"
+
+# GRE keepalive: interval (seconds) and retries before declaring tunnel dead.
+# Set to "0 0" to disable keepalive. Requires kernel >= 3.x.
+GRE_KEEPALIVE="$GRE_KEEPALIVE"
+
+# Tunnel MTU. Empty = auto-calculate (parent interface MTU minus 24 byte GRE
+# overhead). Set explicitly if needed (e.g., "1400" for double-encapsulation).
+GRE_MTU="$GRE_MTU"
+
+# IP TTL for GRE tunnel packets.
+GRE_TTL="$GRE_TTL"
+
+##
 # [Logging and control settings]
 ##
-# Log all traffic that is filtered by the firewall
+# Log all traffic that is dropped/rejected by the firewall
 LOG_DROP="$LOG_DROP"
 
-# What log level should we send all log data too?
-# refer to man syslog.conf for levels
+# What log level should all log data be sent to?
+# Refer to man syslog.conf for levels.
 LOG_LEVEL="$LOG_LEVEL"
 
-# Where should we send all the logging data?
-# ULOG (Allow ulogd to handle the logging)
+# Where should all the logging data be sent?
 # LOG (Default; sends logging to kernel log)
+# ULOG (deprecated; use NFLOG with ulogd2 on modern kernels)
 LOG_TARGET="$LOG_TARGET"
 
 # Log interactive access over telnet & ssh; uses
 # custom log prefix of ** SSH ** & ** TELNET **
+# Note: requires LOG_DROP="1" to be enabled. Only logs NEW connections
+# that reach INPUT chain (i.e., not already accepted by port rules).
 LOG_IA="$LOG_IA"
 
 # Log all foreign gateway traffic

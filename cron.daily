@@ -1,2 +1,2 @@
 #!/bin/bash
-/etc/init.d/apf restart >> /dev/null 2>&1
+/etc/apf/apf -r >> /dev/null 2>&1

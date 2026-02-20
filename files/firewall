@@ -1,9 +1,9 @@
 #!/bin/bash
 #
 ##
-# Advanced Policy Firewall (APF) v1.7.6
-#             (C) 2002-2019, R-fx Networks <proj@rfxn.com>
-#             (C) 2019, Ryan MacDonald <ryan@rfxn.com>
+# Advanced Policy Firewall (APF) v2.0.1
+#             (C) 2002-2026, R-fx Networks <proj@rfxn.com>
+#             (C) 2026, Ryan MacDonald <ryan@rfxn.com>
 # This program may be freely redistributed under the terms of the GNU GPL v2
 ##
 #
@@ -12,14 +12,8 @@ CNF="/etc/apf/conf.apf"
 if [ -f "$CNF" ] && [ ! "$CNF" == "" ]; then
    source $CNF
 else
-   head
    echo "\$CNF not found; aborting"
    exit 1
-fi
-
-if [ ! -f "$ip" ] && [ ! -f "$ifconfig" ]; then
-	eout "{glob} $ip and $ifconfig not found; aborting"
-	exit 1
 fi
 
 # load our iptables modules
@@ -29,38 +23,48 @@ modinit
 flush 1
 
 if [ ! "$IF" == "" ] && [ "$VF_ROUTE" == "1" ]; then
- for i in `echo $IF`; do
-  VAL_IF=`/sbin/route -n | grep -w $i`
+ for i in $(echo $IF); do
+  if [ -n "$ip" ]; then
+	VAL_IF=$($ip route show dev $i 2>/dev/null)
+  elif command -v route > /dev/null 2>&1; then
+	VAL_IF=$(route -n | grep -w "$i")
+  else
+	eout "{glob} neither ip nor route found; cannot verify interface $i"
+	exit 1
+  fi
 	if [ "$VAL_IF" == "" ]; then
-		eout "{glob} could not verify that interface $IF is routed to a network, aborting."
+		eout "{glob} could not verify that interface $i is routed to a network, aborting."
 	        if [ ! "$SET_VERBOSE" == "1" ]; then
-			echo "could not verify that interface $IF is routed to a network, aborting."
+			echo "could not verify that interface $i is routed to a network, aborting."
 		fi
 		exit 1
 	fi
  done
 fi
 if [ ! "$IFACE_TRUSTED" == "" ] && [ "$VF_ROUTE" == "1" ]; then
- for i in `echo $IFACE_TRUSTED | tr ',' ' '`; do
-  VAL_IFACE_TRUSTED=`/sbin/route -n | grep -w $i`
+ for i in $(echo $IFACE_TRUSTED | tr ',' ' '); do
+  if [ -n "$ip" ]; then
+	VAL_IFACE_TRUSTED=$($ip route show dev $i 2>/dev/null)
+  elif command -v route > /dev/null 2>&1; then
+	VAL_IFACE_TRUSTED=$(route -n | grep -w "$i")
+  else
+	eout "{glob} neither ip nor route found; cannot verify interface $i"
+	exit 1
+  fi
         if [ "$VAL_IFACE_TRUSTED" == "" ]; then
-                eout "{glob} could not verify that interface $IFACE_TRUSTED is routed to a network, aborting."
+                eout "{glob} could not verify that interface $i is routed to a network, aborting."
 	        if [ ! "$SET_VERBOSE" == "1" ]; then
-			echo "could not verify that interface $IFACE_TRUSTED is routed to a network, aborting."
+			echo "could not verify that interface $i is routed to a network, aborting."
 		fi
                 exit 1
         fi
  done
 fi
 
-if [ "$DLIST_PHP" == "1" ] || [ "$DLIST_SPAMHAUS" == "1" ] || [ "$DLIST_DSHIELD" == "1" ] || [ "$DLIST_RESERVED" == "1" ] || [ "$DLIST_ECNSHAME" == "1" ] || [ "$USE_RGT" == "1" ]; then
-	if [ ! -f "$WGET" ]; then
-		echo "DLIST_* or RGT enabled but wget binary not found, aborting"
-		exit 1
-	fi
+$ip addr list $IFACE_UNTRUSTED | grep -w inet | grep -v inet6 | tr '/' ' ' | awk '{print$2}' > $INSTALL_PATH/internals/.localaddrs
+if [ "$USE_IPV6" == "1" ]; then
+	$ip addr list $IFACE_UNTRUSTED | grep -w inet6 | tr '/' ' ' | awk '{print$2}' > $INSTALL_PATH/internals/.localaddrs6
 fi
-
-/sbin/ip addr list $IFACE_UNTRUSTED | grep -w inet | grep -v inet6 | tr '/' ' ' | awk '{print$2}' > /etc/apf/internals/.localaddrs
 
 if [ "$RAB" == "0" ]; then
 	RAB_LOG_HIT=0
@@ -73,39 +77,40 @@ tosroute PREROUTING
 . $PRERT
 
 # Allow all traffic on the loopback interface
-$IPT $IPT_FLAGS -A INPUT -i lo -s 0/0 -d 0/0 -j ACCEPT
-$IPT $IPT_FLAGS -A OUTPUT -o lo -s 0/0 -d 0/0 -j ACCEPT
-if [ "$USE_IPV6" == "1" ]; then
-	$IP6T -A INPUT -i lo -s 0/0 -d 0/0 -j ACCEPT
-	$IP6T -A OUTPUT -o lo -s 0/0 -d 0/0 -j ACCEPT
-fi
+ipt -A INPUT -i lo -j ACCEPT
+ipt -A OUTPUT -o lo -j ACCEPT
 
 
 # Allow all traffic on trusted interfaces
 if [ ! "$IFACE_TRUSTED" == "" ]; then
- for i in `echo $IFACE_TRUSTED | tr ',' ' '`; do
- VAL_IF=`/sbin/ip addr list | grep -w $i`
+ for i in $(echo $IFACE_TRUSTED | tr ',' ' '); do
+ VAL_IF=$($ip addr list | grep -w "$i")
  if [ "$VAL_IF" == "" ]; then
         eout "{glob} unable to verify status of interface $i; assuming untrusted"
  else
         eout "{glob} allow all to/from trusted interface $i"
-        $IPT $IPT_FLAGS -A INPUT -i $i -s 0/0 -d 0/0 -j ACCEPT
-        $IPT $IPT_FLAGS -A OUTPUT -o $i -s 0/0 -d 0/0 -j ACCEPT
+        ipt -A INPUT -i $i -j ACCEPT
+        ipt -A OUTPUT -o $i -j ACCEPT
  fi
  done
 fi
 
+# Create GRE tunnels and firewall rules
+gre_init
+
 # Create TCP RESET & UDP PROHIBIT chains
-$IPT $IPT_FLAGS -N RESET
-$IPT $IPT_FLAGS -A RESET -p tcp -j REJECT --reject-with tcp-reset
-$IPT $IPT_FLAGS -N PROHIBIT
-$IPT $IPT_FLAGS -A PROHIBIT -j REJECT --reject-with icmp-host-prohibited
+ipt -N RESET
+ipt -A RESET -p tcp -j REJECT --reject-with tcp-reset
+ipt -A RESET -j DROP
+ipt -N PROHIBIT
+ipt4 -A PROHIBIT -j REJECT --reject-with icmp-host-prohibited
+ipt6 -A PROHIBIT -j REJECT --reject-with icmp6-adm-prohibited
 
 # Load our SYSCTL rules
 . $INSTALL_PATH/sysctl.rules >> /dev/null 2>&1
 
 # Fix MTU/MSS Problems
-$IPT $IPT_FLAGS -A OUTPUT -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu
+ipt -A OUTPUT -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu
 
 # Block common nonroutable IP networks
 if [ "$BLK_MCATNET" = "1" ]; then
@@ -122,21 +127,21 @@ if [ "$BLK_RESNET" = "1" ]; then
 fi
 
 # Create (glob)trust system chains
-$IPT $IPT_FLAGS -N TALLOW
-$IPT $IPT_FLAGS -N TDENY
-$IPT $IPT_FLAGS -N TGALLOW
-$IPT $IPT_FLAGS -N TGDENY
-$IPT $IPT_FLAGS -N REFRESH_TEMP
-$IPT $IPT_FLAGS -A INPUT -j REFRESH_TEMP
-$IPT $IPT_FLAGS -A OUTPUT -j REFRESH_TEMP
-$IPT $IPT_FLAGS -A INPUT -j TALLOW
-$IPT $IPT_FLAGS -A OUTPUT -j TALLOW
-$IPT $IPT_FLAGS -A INPUT -j TGALLOW
-$IPT $IPT_FLAGS -A OUTPUT -j TGALLOW
-$IPT $IPT_FLAGS -A INPUT -j TDENY
-$IPT $IPT_FLAGS -A OUTPUT -j TDENY
-$IPT $IPT_FLAGS -A INPUT -j TGDENY
-$IPT $IPT_FLAGS -A OUTPUT -j TGDENY
+ipt -N TALLOW
+ipt -N TDENY
+ipt -N TGALLOW
+ipt -N TGDENY
+ipt -N REFRESH_TEMP
+ipt -A INPUT -j REFRESH_TEMP
+ipt -A OUTPUT -j REFRESH_TEMP
+ipt -A INPUT -j TALLOW
+ipt -A OUTPUT -j TALLOW
+ipt -A INPUT -j TGALLOW
+ipt -A OUTPUT -j TGALLOW
+ipt -A INPUT -j TDENY
+ipt -A OUTPUT -j TDENY
+ipt -A INPUT -j TGDENY
+ipt -A OUTPUT -j TGDENY
 
 # Load our Blocked Traffic rules
 . $INSTALL_PATH/bt.rules
@@ -164,12 +169,12 @@ if [ "$RAB" == "1" ]; then
  fi
 
  if [ "$LOG_DROP" == "1" ] || [ "$RAB_LOG_TRIP" == "1" ]; then
-	$IPT $IPT_FLAGS -A INPUT -p all -m recent --rcheck --hitcount $RAB_HITCOUNT --seconds $RAB_TIMER -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** RABTRIP ** "
+	ipt -A INPUT -p all -m recent --rcheck --hitcount $RAB_HITCOUNT --seconds $RAB_TIMER -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** RABTRIP ** "
  fi
- $IPT $IPT_FLAGS -A INPUT -p all -m recent $RAB_TRIP_FLAGS --hitcount $RAB_HITCOUNT --seconds $RAB_TIMER -j $ALL_STOP
+ ipt -A INPUT -p all -m recent $RAB_TRIP_FLAGS --hitcount $RAB_HITCOUNT --seconds $RAB_TIMER -j $ALL_STOP
 
  # RAB portscan rules
- if [ ! "$RAB_PSCAN_LEVEL" == "0" ] || [ ! "$RAB_PSCAN_LEVEL" == "" ]; then
+ if [ ! "$RAB_PSCAN_LEVEL" == "0" ] && [ ! "$RAB_PSCAN_LEVEL" == "" ]; then
   eout "{rab} set active RAB_PSCAN"
   case "$RAB_PSCAN_LEVEL" in
   1)
@@ -182,22 +187,24 @@ if [ "$RAB" == "1" ]; then
   RAB_PSCAN_PORTS="$RAB_PSCAN_LEVEL_3"
   esac
   eout "{rab} RAB_PSCAN monitored ports $RAB_PSCAN_PORTS"
-  $IPT $IPT_FLAGS -N RABPSCAN
-  LDNS=`cat /etc/resolv.conf  | grep -v "#" | grep -w nameserver | awk '{print$2}' | grep -v 127.0.0.1`
+  ipt -N RABPSCAN
+  LDNS=$(cat /etc/resolv.conf  | grep -v "#" | grep -w nameserver | awk '{print$2}' | grep -v 127.0.0.1)
   if [ "$LDNS" ]; then
-	for i in `echo $LDNS`; do
-		$IPT $IPT_FLAGS -I RABPSCAN -s $i -j RETURN
+	for i in $(echo $LDNS); do
+		if ipt_for_host "$i"; then
+			$IPT_H $IPT_FLAGS -I RABPSCAN -s $i -j RETURN
+		fi
 	done
   fi
-  for i in `echo $RAB_PSCAN_PORTS | tr ',' ' '`; do
+  for i in $(echo $RAB_PSCAN_PORTS | tr ',' ' '); do
    if [ "$LOG_DROP" == "1" ] || [ "$RAB_LOG_HIT" == "1" ]; then
-	   $IPT $IPT_FLAGS -A RABPSCAN -p tcp --dport $i -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** RABHIT ** "
-	   $IPT $IPT_FLAGS -A RABPSCAN -p udp --dport $i -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** RABHIT ** "
+	   ipt -A RABPSCAN -p tcp --dport $i -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** RABHIT ** "
+	   ipt -A RABPSCAN -p udp --dport $i -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** RABHIT ** "
    fi
-   $IPT $IPT_FLAGS -A RABPSCAN -p tcp --dport $i -m recent --set -j $TCP_STOP
-   $IPT $IPT_FLAGS -A RABPSCAN -p udp --dport $i -m recent --set -j $UDP_STOP
+   ipt -A RABPSCAN -p tcp --dport $i -m recent --set -j $TCP_STOP
+   ipt -A RABPSCAN -p udp --dport $i -m recent --set -j $UDP_STOP
   done
-  $IPT $IPT_FLAGS -A INPUT -j RABPSCAN
+  ipt -A INPUT -j RABPSCAN
  fi
 fi
 
@@ -223,73 +230,82 @@ fi
 . $INSTALL_PATH/main.rules
 
 # Drop NEW tcp connections after this point
-$IPT $IPT_FLAGS -A INPUT  -p tcp ! --syn -m state --state NEW -j $ALL_STOP
-$IPT $IPT_FLAGS -A INPUT  -p tcp -m state --state ESTABLISHED,RELATED -j ACCEPT
-$IPT $IPT_FLAGS -A INPUT  -p udp -m state --state ESTABLISHED,RELATED -j ACCEPT
-$IPT $IPT_FLAGS -A OUTPUT  -p tcp --dport 1024:65535 -m state --state ESTABLISHED,RELATED -j ACCEPT
-$IPT $IPT_FLAGS -A OUTPUT  -p udp --dport 1024:65535 -m state --state ESTABLISHED,RELATED -j ACCEPT
+ipt -A INPUT  -p tcp ! --syn -m state --state NEW -j $ALL_STOP
+ipt -A INPUT  -p tcp -m state --state ESTABLISHED,RELATED -j ACCEPT
+ipt -A INPUT  -p udp -m state --state ESTABLISHED,RELATED -j ACCEPT
+ipt -A OUTPUT  -p tcp --dport 1024:65535 -m state --state ESTABLISHED,RELATED -j ACCEPT
+ipt -A OUTPUT  -p udp --dport 1024:65535 -m state --state ESTABLISHED,RELATED -j ACCEPT
 
 # DNS
 if [ -f "/etc/resolv.conf" ] && [ "$RESV_DNS" == "1" ]; then
-LDNS=`cat /etc/resolv.conf  | grep -v "#" | grep -w nameserver | awk '{print$2}' | grep -v 127.0.0.1`
+LDNS=$(cat /etc/resolv.conf  | grep -v "#" | grep -w nameserver | awk '{print$2}' | grep -v 127.0.0.1)
   if [ ! "$LDNS" == "" ]; then
-        for i in `echo $LDNS`; do
+        for i in $(echo $LDNS); do
         eout "{glob} resolv dns discovery for $i"
-        $IPT $IPT_FLAGS -A INPUT -p udp -s $i --sport 53 --dport 1023:65535 -j ACCEPT
-        $IPT $IPT_FLAGS -A INPUT -p tcp -s $i --sport 53 --dport 1023:65535 -j ACCEPT
-        $IPT $IPT_FLAGS -A OUTPUT -p udp -d $i --dport 53 --sport 1023:65535 -j ACCEPT
-        $IPT $IPT_FLAGS -A OUTPUT -p tcp -d $i --dport 53 --sport 1023:65535 -j ACCEPT
-        if [ "$RESV_DNS_DROP" == "1" ]; then
-                $IPT $IPT_FLAGS -A OUTPUT -p udp -d $i --dport 53 --sport 1023:65535 -j ACCEPT
-                $IPT $IPT_FLAGS -A OUTPUT -p tcp -d $i --dport 53 --sport 1023:65535 -j ACCEPT
+        if echo "$i" | grep -q ':'; then
+                # IPv6 nameserver
+                if [ "$USE_IPV6" == "1" ]; then
+                ipt6 -A INPUT -p udp -s $i --sport 53 --dport 1024:65535 -m state --state ESTABLISHED,RELATED -j ACCEPT
+                ipt6 -A INPUT -p tcp -s $i --sport 53 --dport 1024:65535 -m state --state ESTABLISHED,RELATED -j ACCEPT
+                ipt6 -A OUTPUT -p udp -d $i --dport 53 --sport 1024:65535 -j ACCEPT
+                ipt6 -A OUTPUT -p tcp -d $i --dport 53 --sport 1024:65535 -j ACCEPT
+                fi
+        else
+                # IPv4 nameserver
+                ipt4 -A INPUT -p udp -s $i --sport 53 --dport 1024:65535 -m state --state ESTABLISHED,RELATED -j ACCEPT
+                ipt4 -A INPUT -p tcp -s $i --sport 53 --dport 1024:65535 -m state --state ESTABLISHED,RELATED -j ACCEPT
+                ipt4 -A OUTPUT -p udp -d $i --dport 53 --sport 1024:65535 -j ACCEPT
+                ipt4 -A OUTPUT -p tcp -d $i --dport 53 --sport 1024:65535 -j ACCEPT
         fi
         done
         if [ "$RESV_DNS_DROP" == "1" ]; then
-                $IPT $IPT_FLAGS -A INPUT  -p tcp -s 0/0 --sport 53 --dport 1023:65535 -j $ALL_STOP
-                $IPT $IPT_FLAGS -A INPUT  -p udp -s 0/0 --sport 53 --dport 1023:65535 -j $ALL_STOP
+                ipt4 -A INPUT  -p tcp --sport 53 --dport 1024:65535 -j $ALL_STOP
+                ipt4 -A INPUT  -p udp --sport 53 --dport 1024:65535 -j $ALL_STOP
+                if [ "$USE_IPV6" == "1" ]; then
+                ipt6 -A INPUT  -p tcp --sport 53 --dport 1024:65535 -j $ALL_STOP
+                ipt6 -A INPUT  -p udp --sport 53 --dport 1024:65535 -j $ALL_STOP
+                fi
         fi
   fi
 else
-        $IPT $IPT_FLAGS -A INPUT  -p udp --sport 53 --dport 1023:65535 -j ACCEPT
-        $IPT $IPT_FLAGS -A INPUT  -p tcp --sport 53 --dport 1023:65535 -j ACCEPT
-        $IPT $IPT_FLAGS -A OUTPUT -p udp --dport 53 --sport 1023:65535 -j ACCEPT
-        $IPT $IPT_FLAGS -A OUTPUT -p tcp --dport 53 --sport 1023:65535 -j ACCEPT
+        ipt -A INPUT  -p udp --sport 53 --dport 1024:65535 -m state --state ESTABLISHED,RELATED -j ACCEPT
+        ipt -A INPUT  -p tcp --sport 53 --dport 1024:65535 -m state --state ESTABLISHED,RELATED -j ACCEPT
+        ipt -A OUTPUT -p udp --dport 53 --sport 1024:65535 -j ACCEPT
+        ipt -A OUTPUT -p tcp --dport 53 --sport 1024:65535 -j ACCEPT
 fi
 
 # FTP
 if [ "$HELPER_FTP" == "1" ]; then
-$IPT $IPT_FLAGS -A INPUT  -p tcp --sport 1023:65535 --dport $HELPER_FTP_PORT -m state --state RELATED,ESTABLISHED -j ACCEPT
-$IPT $IPT_FLAGS -A INPUT  -p tcp -m multiport --dport $HELPER_FTP_PORT,$HELPER_FTP_DATA -m state --state ESTABLISHED,RELATED -j ACCEPT
-$IPT $IPT_FLAGS -A INPUT  -p udp -m multiport --dport $HELPER_FTP_PORT,$HELPER_FTP_DATA -m state --state ESTABLISHED,RELATED -j ACCEPT
-$IPT $IPT_FLAGS -A OUTPUT  -p tcp --dport 1023:65535 --sport $HELPER_FTP_PORT -m state --state RELATED,ESTABLISHED -j ACCEPT
-$IPT $IPT_FLAGS -A OUTPUT  -p tcp -m multiport --dport $HELPER_FTP_PORT,$HELPER_FTP_DATA -m state --state ESTABLISHED,RELATED -j ACCEPT
-$IPT $IPT_FLAGS -A OUTPUT  -p udp -m multiport --dport $HELPER_FTP_PORT,$HELPER_FTP_DATA -m state --state ESTABLISHED,RELATED -j ACCEPT
+ipt -A INPUT  -p tcp --sport 1024:65535 --dport $HELPER_FTP_PORT -m state --state RELATED,ESTABLISHED -j ACCEPT
+ipt -A INPUT  -p tcp -m multiport --dport $HELPER_FTP_PORT,$HELPER_FTP_DATA -m state --state ESTABLISHED,RELATED -j ACCEPT
+ipt -A INPUT  -p udp -m multiport --dport $HELPER_FTP_PORT,$HELPER_FTP_DATA -m state --state ESTABLISHED,RELATED -j ACCEPT
+ipt -A OUTPUT  -p tcp --dport 1024:65535 --sport $HELPER_FTP_PORT -m state --state RELATED,ESTABLISHED -j ACCEPT
+ipt -A OUTPUT  -p tcp -m multiport --dport $HELPER_FTP_PORT,$HELPER_FTP_DATA -m state --state ESTABLISHED,RELATED -j ACCEPT
+ipt -A OUTPUT  -p udp -m multiport --dport $HELPER_FTP_PORT,$HELPER_FTP_DATA -m state --state ESTABLISHED,RELATED -j ACCEPT
 fi
 
 # SSH
 if [ "$HELPER_SSH" == "1" ]; then
-	$IPT $IPT_FLAGS -A INPUT  -p tcp --sport $HELPER_SSH_PORT --dport 513:65535 -m state --state ESTABLISHED,RELATED -j ACCEPT
-	$IPT $IPT_FLAGS -A INPUT  -p tcp --sport 1024:65535 --dport $HELPER_SSH_PORT --syn -m state --state ESTABLISHED,RELATED -j ACCEPT
-	$IPT $IPT_FLAGS -A INPUT  -p udp --dport $HELPER_SSH_PORT -m state --state ESTABLISHED -j ACCEPT
+	ipt -A INPUT  -p tcp --sport $HELPER_SSH_PORT --dport 1024:65535 -m state --state ESTABLISHED,RELATED -j ACCEPT
 fi
 
 # Traceroute
 if [ "$TCR_PASS" == "1" ]; then
-	$IPT $IPT_FLAGS -A INPUT  -p udp -m state --state NEW --dport $TCR_PORTS -j ACCEPT
-        $IPT $IPT_FLAGS -A OUTPUT  -p udp -m state --state NEW --dport $TCR_PORTS -j ACCEPT
+	ipt -A INPUT  -p udp -m state --state NEW --dport $TCR_PORTS -j ACCEPT
+        ipt -A OUTPUT  -p udp -m state --state NEW --dport $TCR_PORTS -j ACCEPT
 fi
 
 
 if [ "$LOG_DROP" == "1" ]; then
 # Default TCP/UDP INPUT log chain
-         $IPT $IPT_FLAGS -A INPUT -p tcp -m limit --limit $LOG_RATE/minute  -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** IN_TCP DROP ** "
-         $IPT $IPT_FLAGS -A INPUT -p udp -m limit --limit $LOG_RATE/minute  -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** IN_UDP DROP ** "
+         ipt -A INPUT -p tcp -m limit --limit $LOG_RATE/minute  -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** IN_TCP DROP ** "
+         ipt -A INPUT -p udp -m limit --limit $LOG_RATE/minute  -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** IN_UDP DROP ** "
 fi
 
 if [ "$LOG_DROP" == "1" ] && [ "$EGF" == "1" ]; then
 # Default TCP/UDP OUTPUT log chain
-         $IPT $IPT_FLAGS -A OUTPUT -p tcp -m limit --limit $LOG_RATE/minute  -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** OUT_TCP DROP ** "
-         $IPT $IPT_FLAGS -A OUTPUT -p udp -m limit --limit $LOG_RATE/minute  -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** OUT_UDP DROP ** "
+         ipt -A OUTPUT -p tcp -m limit --limit $LOG_RATE/minute  -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** OUT_TCP DROP ** "
+         ipt -A OUTPUT -p udp -m limit --limit $LOG_RATE/minute  -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** OUT_UDP DROP ** "
 fi
 
 
@@ -305,17 +321,17 @@ tosroute POSTROUTING
 
 # Default Output Policies
 if [ ! "$EGF" == "1" ] || [ "$EGF" == "" ]; then
-        $IPT $IPT_FLAGS -A OUTPUT -j ACCEPT
+        ipt -A OUTPUT -j ACCEPT
         eout "{glob} default (egress) output accept"
 elif [ "$EGF" == "1" ]; then
-	$IPT $IPT_FLAGS -A OUTPUT -p tcp -j $TCP_STOP
-	$IPT $IPT_FLAGS -A OUTPUT -p udp -j $UDP_STOP
-        $IPT $IPT_FLAGS -A OUTPUT -p all -j $ALL_STOP
+	ipt -A OUTPUT -p tcp -j $TCP_STOP
+	ipt -A OUTPUT -p udp -j $UDP_STOP
+        ipt -A OUTPUT -p all -j $ALL_STOP
         eout "{glob} default (egress) output drop"
 fi
 
 # Default Input Policies
 eout "{glob} default (ingress) input drop"
-$IPT $IPT_FLAGS -A INPUT -p tcp -j $TCP_STOP
-$IPT $IPT_FLAGS -A INPUT -p udp -j $UDP_STOP
-$IPT $IPT_FLAGS -A INPUT -p all -j $ALL_STOP
+ipt -A INPUT -p tcp -j $TCP_STOP
+ipt -A INPUT -p udp -j $UDP_STOP
+ipt -A INPUT -p all -j $ALL_STOP

@@ -1,0 +1,37 @@
+#!/bin/bash
+##
+# Advanced Policy Firewall (APF) v2.0.1
+#             (C) 2002-2026, R-fx Networks <proj@rfxn.com>
+#             (C) 2026, Ryan MacDonald <ryan@rfxn.com>
+# This program may be freely redistributed under the terms of the GNU GPL v2
+##
+#
+# GRE Tunnel Definitions for APF
+# See conf.apf [GRE Tunnels] for USE_GRE and GRE_* global settings.
+#
+# Set role and optional per-tunnel overrides, then call create_gretun.
+#
+#   role         -- "source" (routing from) or "target" (routing to)
+#
+#   create_gretun LINKID LOCAL_IP REMOTE_IP [IPFILE]
+#     LINKID     -- tunnel ID 1-99 (interface = gre${LINKID})
+#     LOCAL_IP   -- this host's public IP
+#     REMOTE_IP  -- remote tunnel endpoint IP
+#     IPFILE     -- optional: file of IPs to route (one per line)
+#                   source: adds host routes via tunnel
+#                   target: binds IPs on tunnel interface
+#
+# Addresses: source=192.168.${LINKID}.1  target=192.168.${LINKID}.2
+#
+# Per-tunnel overrides (set before create_gretun, auto-cleared after):
+#   gre_keepalive="10 3"   -- override GRE_KEEPALIVE
+#   gre_mtu="1400"         -- override GRE_MTU
+#   gre_ttl="128"          -- override GRE_TTL
+#   gre_key="12345"        -- GRE key for tunnel identification
+#
+# Examples:
+# role="source"
+# create_gretun 1 69.41.230.6 207.210.200.179 /etc/apf/gre.ips.1
+#
+# role="target"
+# create_gretun 1 207.210.200.179 69.41.230.6 /etc/apf/gre.ips.1
