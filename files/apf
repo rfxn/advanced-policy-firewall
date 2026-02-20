@@ -239,10 +239,16 @@ case "$1" in
 	cli_trust "TDENY" "DENY" "$DENY_HOSTS" "$2" "$3"
 	;;
 -u|--remove|--unban)
-	cli_trust_remove $2 >> /dev/null 2>&1
-	eout "{trust} removed $2 from trust system"
-	if [ ! "$SET_VERBOSE" == "1" ]; then
-	        echo "Removed $2 from trust system."
+	if cli_trust_remove "$2"; then
+		eout "{trust} removed $2 from trust system"
+		if [ "$SET_VERBOSE" != "1" ]; then
+			echo "Removed $2 from trust system."
+		fi
+	else
+		eout "{trust} $2 not found in trust system"
+		if [ "$SET_VERBOSE" != "1" ]; then
+			echo "$2 not found in trust system."
+		fi
 	fi
 	;;
 -e|--refresh)
@@ -264,11 +270,13 @@ case "$1" in
 	;;
 --gre-up)
 	if [ "$USE_GRE" == "1" ]; then
+		mutex_lock
 		gre_init
 	fi
 	;;
 --gre-down)
 	if [ "$USE_GRE" == "1" ]; then
+		mutex_lock
 		gre_teardown
 	fi
 	;;

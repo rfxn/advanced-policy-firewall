@@ -285,7 +285,7 @@ fi
 
 # SSH
 if [ "$HELPER_SSH" == "1" ]; then
-	ipt -A INPUT  -p tcp --sport $HELPER_SSH_PORT --dport 513:65535 -m state --state ESTABLISHED,RELATED -j ACCEPT
+	ipt -A INPUT  -p tcp --sport $HELPER_SSH_PORT --dport 1024:65535 -m state --state ESTABLISHED,RELATED -j ACCEPT
 fi
 
 # Traceroute

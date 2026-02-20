@@ -1,4 +1,17 @@
 - 2.0.1 | Feb 20 2026:
+[Fix] apf -u now reports success/failure; previously swallowed all
+      output and unconditionally printed "removed" even when host was
+      not found in trust system (apf)
+[Fix] importconf now preserves glob_allow.rules and glob_deny.rules
+      during upgrade; previously only *_hosts.rules were migrated,
+      losing curated global allow/deny lists (importconf)
+[Change] importconf path references quoted for spaces safety
+      (importconf)
+[Fix] SSH helper return traffic port range corrected from 513:65535 to
+      1024:65535; port 513 is rlogin, modern SSH uses ephemeral ports
+      >= 1024 (firewall)
+[Fix] --gre-up/--gre-down now acquire mutex_lock before running;
+      previously could race with concurrent apf -s or apf -f (apf)
 [Fix] sysctl.rules tcp_fack write guarded behind proc file existence;
       removed in kernel 4.15 (sysctl.rules)
 [Fix] IPv6 sysctl writes guarded behind proc file existence; prevents
