@@ -1,4 +1,9 @@
 - 2.0.1 | Feb 20 2026:
+[Fix] cron.daily rewritten to call APF directly instead of
+      /etc/init.d/apf restart; init.d path is broken on systemd-only
+      systems (cron.daily)
+[Fix] install.sh now sed-replaces /etc/apf in cron.daily when using
+      custom INSTALL_PATH (install.sh)
 [Fix] apf -u now reports success/failure; previously swallowed all
       output and unconditionally printed "removed" even when host was
       not found in trust system (apf)

@@ -32,6 +32,9 @@ install() {
         rm -f /etc/cron.daily/apf
         cp cron.daily /etc/cron.daily/apf
         chmod 755 /etc/cron.daily/apf
+	if [ "$INSTALL_PATH" != "/etc/apf" ]; then
+		sed -i "s:/etc/apf:$INSTALL_PATH:g" /etc/cron.daily/apf
+	fi
 	# Service installation: prefer systemd, then SysV init, then rc.local
 	if [ -d "/run/systemd/system" ]; then
 		cp -f apf.service /etc/systemd/system/apf.service
