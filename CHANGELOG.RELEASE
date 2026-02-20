@@ -1,4 +1,12 @@
 - 2.0.1 | Feb 20 2026:
+[Fix] OUT_SANITY missing 4 TCP flag pairs vs IN_SANITY; added
+      ALL FIN,URG,PSH, ALL SYN,RST,ACK,FIN,URG, ALL ALL, ALL FIN
+      to both IPv4 OUT_SANITY and IPv6 OUT_SANITY6 (bt.rules)
+[Fix] DNS INPUT rules now require ESTABLISHED,RELATED state; prevents
+      spoofed packets from being accepted on source port 53 (firewall)
+[Fix] RESET chain catch-all DROP added for non-TCP packets; previously
+      non-TCP traffic falling through to RESET returned to calling
+      chain without action (firewall)
 [Fix] cron.daily rewritten to call APF directly instead of
       /etc/init.d/apf restart; init.d path is broken on systemd-only
       systems (cron.daily)

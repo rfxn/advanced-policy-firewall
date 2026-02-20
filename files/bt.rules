@@ -134,6 +134,10 @@ if [ "$PKT_SANITY" == "1" ]; then
         eout "{pkt_sanity} deny outbound tcp-flag pairs ACK,FIN FIN"
         eout "{pkt_sanity} deny outbound tcp-flag pairs ACK,PSH PSH"
         eout "{pkt_sanity} deny outbound tcp-flag pairs ACK,URG URG"
+        eout "{pkt_sanity} deny outbound tcp-flag pairs ALL FIN,URG,PSH"
+        eout "{pkt_sanity} deny outbound tcp-flag pairs ALL SYN,RST,ACK,FIN,URG"
+        eout "{pkt_sanity} deny outbound tcp-flag pairs ALL ALL"
+        eout "{pkt_sanity} deny outbound tcp-flag pairs ALL FIN"
 	ipt4 -N OUT_SANITY
         if [ "$LOG_DROP" == "1" ]; then
 	 ipt4 -A OUT_SANITY  -p tcp --tcp-flags ALL NONE -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** SANITY ** "
@@ -163,6 +167,22 @@ if [ "$PKT_SANITY" == "1" ]; then
 	 ipt4 -A OUT_SANITY -p tcp --tcp-flags ACK,URG URG -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** SANITY ** "
 	fi
 	ipt4 -A OUT_SANITY -p tcp --tcp-flags ACK,URG URG -j $TCP_STOP
+        if [ "$LOG_DROP" == "1" ]; then
+	 ipt4 -A OUT_SANITY -p tcp --tcp-flags ALL FIN,URG,PSH -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** SANITY ** "
+	fi
+	ipt4 -A OUT_SANITY -p tcp --tcp-flags ALL FIN,URG,PSH -j $TCP_STOP
+        if [ "$LOG_DROP" == "1" ]; then
+	 ipt4 -A OUT_SANITY -p tcp --tcp-flags ALL SYN,RST,ACK,FIN,URG -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** SANITY ** "
+	fi
+	ipt4 -A OUT_SANITY -p tcp --tcp-flags ALL SYN,RST,ACK,FIN,URG -j $TCP_STOP
+        if [ "$LOG_DROP" == "1" ]; then
+	 ipt4 -A OUT_SANITY -p tcp --tcp-flags ALL ALL -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** SANITY ** "
+	fi
+	ipt4 -A OUT_SANITY -p tcp --tcp-flags ALL ALL -j $TCP_STOP
+        if [ "$LOG_DROP" == "1" ]; then
+	 ipt4 -A OUT_SANITY -p tcp --tcp-flags ALL FIN -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** SANITY ** "
+	fi
+	ipt4 -A OUT_SANITY -p tcp --tcp-flags ALL FIN -j $TCP_STOP
 
 	if [ "$PKT_SANITY_INV" == "1" ]; then
 	# Block INVALID connection states and unusual TCP options
@@ -266,7 +286,8 @@ if [ "$PKT_SANITY" == "1" ] && [ "$USE_IPV6" == "1" ]; then
 
 	ipt6 -N OUT_SANITY6
 	for flags in "ALL NONE" "SYN,FIN SYN,FIN" "SYN,RST SYN,RST" "FIN,RST FIN,RST" \
-		     "ACK,FIN FIN" "ACK,PSH PSH" "ACK,URG URG"; do
+		     "ACK,FIN FIN" "ACK,PSH PSH" "ACK,URG URG" "ALL FIN,URG,PSH" \
+		     "ALL SYN,RST,ACK,FIN,URG" "ALL ALL" "ALL FIN"; do
 		mask=$(echo $flags | awk '{print$1}')
 		comp=$(echo $flags | awk '{print$2}')
 		if [ "$LOG_DROP" == "1" ]; then

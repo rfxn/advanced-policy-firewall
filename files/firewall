@@ -101,6 +101,7 @@ gre_init
 # Create TCP RESET & UDP PROHIBIT chains
 ipt -N RESET
 ipt -A RESET -p tcp -j REJECT --reject-with tcp-reset
+ipt -A RESET -j DROP
 ipt -N PROHIBIT
 ipt4 -A PROHIBIT -j REJECT --reject-with icmp-host-prohibited
 ipt6 -A PROHIBIT -j REJECT --reject-with icmp6-adm-prohibited
@@ -244,15 +245,15 @@ LDNS=$(cat /etc/resolv.conf  | grep -v "#" | grep -w nameserver | awk '{print$2}
         if echo "$i" | grep -q ':'; then
                 # IPv6 nameserver
                 if [ "$USE_IPV6" == "1" ]; then
-                ipt6 -A INPUT -p udp -s $i --sport 53 --dport 1024:65535 -j ACCEPT
-                ipt6 -A INPUT -p tcp -s $i --sport 53 --dport 1024:65535 -j ACCEPT
+                ipt6 -A INPUT -p udp -s $i --sport 53 --dport 1024:65535 -m state --state ESTABLISHED,RELATED -j ACCEPT
+                ipt6 -A INPUT -p tcp -s $i --sport 53 --dport 1024:65535 -m state --state ESTABLISHED,RELATED -j ACCEPT
                 ipt6 -A OUTPUT -p udp -d $i --dport 53 --sport 1024:65535 -j ACCEPT
                 ipt6 -A OUTPUT -p tcp -d $i --dport 53 --sport 1024:65535 -j ACCEPT
                 fi
         else
                 # IPv4 nameserver
-                ipt4 -A INPUT -p udp -s $i --sport 53 --dport 1024:65535 -j ACCEPT
-                ipt4 -A INPUT -p tcp -s $i --sport 53 --dport 1024:65535 -j ACCEPT
+                ipt4 -A INPUT -p udp -s $i --sport 53 --dport 1024:65535 -m state --state ESTABLISHED,RELATED -j ACCEPT
+                ipt4 -A INPUT -p tcp -s $i --sport 53 --dport 1024:65535 -m state --state ESTABLISHED,RELATED -j ACCEPT
                 ipt4 -A OUTPUT -p udp -d $i --dport 53 --sport 1024:65535 -j ACCEPT
                 ipt4 -A OUTPUT -p tcp -d $i --dport 53 --sport 1024:65535 -j ACCEPT
         fi
@@ -267,8 +268,8 @@ LDNS=$(cat /etc/resolv.conf  | grep -v "#" | grep -w nameserver | awk '{print$2}
         fi
   fi
 else
-        ipt -A INPUT  -p udp --sport 53 --dport 1024:65535 -j ACCEPT
-        ipt -A INPUT  -p tcp --sport 53 --dport 1024:65535 -j ACCEPT
+        ipt -A INPUT  -p udp --sport 53 --dport 1024:65535 -m state --state ESTABLISHED,RELATED -j ACCEPT
+        ipt -A INPUT  -p tcp --sport 53 --dport 1024:65535 -m state --state ESTABLISHED,RELATED -j ACCEPT
         ipt -A OUTPUT -p udp --dport 53 --sport 1024:65535 -j ACCEPT
         ipt -A OUTPUT -p tcp --dport 53 --sport 1024:65535 -j ACCEPT
 fi
