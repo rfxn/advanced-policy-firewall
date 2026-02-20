@@ -1,788 +1,338 @@
 - 2.0.1 | Feb 20 2026:
-[Fix] OUT_SANITY missing 4 TCP flag pairs vs IN_SANITY; added
-      ALL FIN,URG,PSH, ALL SYN,RST,ACK,FIN,URG, ALL ALL, ALL FIN
-      to both IPv4 OUT_SANITY and IPv6 OUT_SANITY6 (bt.rules)
-[Fix] DNS INPUT rules now require ESTABLISHED,RELATED state; prevents
-      spoofed packets from being accepted on source port 53 (firewall)
-[Fix] RESET chain catch-all DROP added for non-TCP packets; previously
-      non-TCP traffic falling through to RESET returned to calling
-      chain without action (firewall)
-[Fix] cron.daily rewritten to call APF directly instead of
-      /etc/init.d/apf restart; init.d path is broken on systemd-only
-      systems (cron.daily)
-[Fix] install.sh now sed-replaces /etc/apf in cron.daily when using
-      custom INSTALL_PATH (install.sh)
-[Fix] apf -u now reports success/failure; previously swallowed all
-      output and unconditionally printed "removed" even when host was
-      not found in trust system (apf)
-[Fix] importconf now preserves glob_allow.rules and glob_deny.rules
-      during upgrade; previously only *_hosts.rules were migrated,
-      losing curated global allow/deny lists (importconf)
-[Change] importconf path references quoted for spaces safety
-      (importconf)
-[Fix] SSH helper return traffic port range corrected from 513:65535 to
-      1024:65535; port 513 is rlogin, modern SSH uses ephemeral ports
-      >= 1024 (firewall)
-[Fix] --gre-up/--gre-down now acquire mutex_lock before running;
-      previously could race with concurrent apf -s or apf -f (apf)
-[Fix] sysctl.rules tcp_fack write guarded behind proc file existence;
-      removed in kernel 4.15 (sysctl.rules)
-[Fix] IPv6 sysctl writes guarded behind proc file existence; prevents
-      errors on systems without IPv6 proc entries (sysctl.rules)
-[Fix] reserved.networks: added 0.0.0.0/8 "this network" range
-      (RFC 1122); commonly spoofed source address (reserved.networks)
-[Fix] IP6_NET link-local filter: grep -v fe80 added before head -n1 to
-      prevent fe80:: link-local from being selected over global unicast
-      address (internals.conf)
-[Change] dlist_ecnshame() download validation: entries now validated via
-      valid_ip_cidr() during parsing, matching all other dlist download
-      functions (functions.apf)
-[Fix] Dead $ADR variable removed; referenced non-existent ad/ad.rules
-      directory, removed from MD5_FILES glob (internals.conf)
-[Fix] Duplicate MD5_FILES definition removed from apf; clobbered the
-      correct definition in internals.conf which includes $RABP (apf)
-[Fix] logrotate.d.apf postrotate removed; killall -HUP rsyslogd is
-      irrelevant since APF writes its log directly via eout(), not
-      through syslog (logrotate.d.apf)
-[Fix] bt.rules: "Block Traffic With Invalid Flags" comment corrected to
-      "Block INVALID connection states and unusual TCP options" (bt.rules)
-[Fix] bt.rules: "p2p networks" comment corrected to "p2p ports"; dead
-      service names (WinMX, Napster, Kazaa, etc.) removed (bt.rules)
-[Fix] vnetgen exit code: SET_VNET=0 now exits 0 (disabled is not an error)
-      instead of exit 1 (vnetgen)
-[New] sysctl.rules: added comments for hardcoded conntrack timeouts (600s
-      established, 90s time-wait vs kernel defaults) (sysctl.rules)
-[New] sysctl.rules: added comment for unconditional port range and ICMP
-      settings (sysctl.rules)
-[New] sysctl.rules: added note that tcp_tw_recycle was removed in kernel
-      4.12 (sysctl.rules)
-[New] log.rules: added comment explaining LOG_IA purpose and LOG_DROP
-      dependency above the conditional (log.rules)
-[Fix] vnetgen.def typos: "defined" → "define" (2 occurrences),
-      "iptable" → "iptables" (vnet/vnetgen.def)
-[Fix] vnetgen.def invalid example IP 1.0.1.0.1 → RFC 5737 192.0.2.1
-      (vnet/vnetgen.def)
-[Fix] "line-seperated" → "line-separated" in all 4 trust rules files
-      (allow_hosts.rules, deny_hosts.rules, glob_allow.rules,
-      glob_deny.rules)
-[Fix] multicast.networks: dead MBone URL removed, per-block comments
-      collapsed to brief summary, IANA URL upgraded to HTTPS
-[Fix] reserved.networks: "Unassigned/reserved" label → "Special-purpose /
-      non-routable", IANA URL upgraded to HTTPS
-[Fix] private.networks: faqs.org RFC mirror replaced with rfc-editor.org
-      canonical URL
-[Change] .ca.def TCR_PASS/TCR_PORTS split from one line to two for
-      consistency (.ca.def)
-[Change] DEVEL_MODE comment compressed from 3 to 2 lines (conf.apf, .ca.def)
-[Change] USE_IPV6 comment compressed from 5 to 3 lines (conf.apf, .ca.def)
-[Change] SET_VERBOSE comment rewritten: fixed tense, compressed from 4 to
-      2 lines (conf.apf, .ca.def)
-[Change] SET_FASTLOAD note (e) added: DEVEL_MODE bypasses snapshot
-      (conf.apf, .ca.def)
-[Change] SET_VNET comment: hardcoded /etc/apf path replaced with
-      $INSTALL_PATH; IPv6 limitation note added to .ca.def (conf.apf,
-      .ca.def)
-[Change] SET_EXPIRE comment clarified: "equiv. seconds" replaced with
-      concrete example "10 min = 600s" (conf.apf, .ca.def)
-[Change] VF_ROUTE comment: redundant "IFACE_*" replaced with explicit
-      "IFACE_UNTRUSTED and IFACE_TRUSTED" (conf.apf, .ca.def)
-[Change] RAB intro compressed from 7 lines to 3 lines (conf.apf, .ca.def)
-[Change] RAB_LOG_HIT/RAB_LOG_TRIP: verbose LOG_DROP override sentence
-      compressed to "LOG_DROP=1 overrides this" (conf.apf, .ca.def)
-[Change] SYSCTL_TCP_NOSACK: verbose duplicate CVE block replaced with
-      brief cross-reference to BLK_TCP_SACK_PANIC (conf.apf, .ca.def)
-[Change] SYSCTL_ROUTE: added note about IPv6 forwarding effect when
-      USE_IPV6=1 (conf.apf, .ca.def)
-[Change] DLIST_PHP: removed "first and only" marketing copy
-      (conf.apf, .ca.def)
-[Change] DLIST_ECNSHAME: removed "clueless" editorial language, compressed
-      from 7 to 3 lines (conf.apf, .ca.def)
-[Fix] Stale variable references in conf.apf comments: USE_RD changed to
-      DLIST_RESERVED (BLK_RESNET), USE_ECNSHAME changed to DLIST_ECNSHAME
-      (SYSCTL_ECN) (conf.apf, .ca.def)
-[Fix] PKT_SANITY_FUDP comment corrected: UDP can fragment at IP layer;
-      changed from "no UDP packets should ever be fragmented" to "uncommon
-      in typical server traffic" (conf.apf, .ca.def)
-[Fix] TCP_STOP/UDP_STOP/ALL_STOP option descriptions corrected: removed
-      unsupported "TCP/IP default" claims, fixed "a icmp" to "an ICMP",
-      added missing PROHIBIT option to TCP_STOP and ALL_STOP
-      (conf.apf, .ca.def)
-[Fix] SYSCTL_SYN comment corrected: code raises SYN backlog to 4096, not
-      lowers it; changed to "lowering retry counts and increasing SYN
-      backlog capacity" (conf.apf, .ca.def)
-[Fix] SET_REFRESH comment corrected: describes trust chain refresh
-      (TALLOW/TDENY/TGALLOW/TGDENY), not full static rule reload
-      (conf.apf, .ca.def)
-[Fix] LOG_DROP comment clarified: "filtered" changed to "dropped/rejected"
-      (conf.apf, .ca.def)
-[Fix] BLK_PORTS garbled sentence rewritten to clear English
-      (conf.apf, .ca.def)
-[Fix] Dead MBone URL removed from BLK_MCATNET comment (conf.apf, .ca.def)
-[Fix] LOG_TARGET: ULOG marked deprecated, NFLOG noted as modern
-      alternative (conf.apf, .ca.def)
-[Fix] 9 typos/grammar fixes across conf.apf and .ca.def: assignement to
-      assignment, by-pass to bypass, hand-shake to handshake, whom to who,
-      as so to/so as to, can be used scale/used to scale, i.e:/i.e.,
-      too/to (LOG_LEVEL), first-person removed from LOG_LEVEL
-[Change] .ca.def LOG_IA comment updated with LOG_DROP dependency note
-      matching conf.apf (.ca.def)
-[Change] .ca.def SYSCTL_CONNTRACK adaptive variables now have individual
-      comments matching conf.apf (.ca.def)
-[Change] README section 6 rewritten: dead forums.rfxnetworks.com reference
-      removed, support@r-fx.org removed, GitHub repository URL added
-      (README, README.md)
-[Change] README section 5 license email unified from ryan@r-fx.org to
-      ryan@rfxn.com (README, README.md)
-[Fix] head() banner email changed from apf@rfxn.com to proj@rfxn.com
-      matching all other contact references (apf)
-[Fix] README GRE section corrected "encrypted or encapsulated" to
-      "encapsulated point-to-point"; GRE provides encapsulation only, not
-      encryption (README, README.md)
-[Fix] README DLIST_RESERVED description corrected from "ARIN" to "IANA";
-      reserved networks list covers globally unassigned space, not just
-      North America (README, README.md)
-[Fix] README advanced trust examples replaced real public IPs (24.202.x.x)
-      with RFC 5737 documentation addresses (198.51.100.x) and personal
-      hostname ryanm.dynip.org with RFC 2606 myhost.example.com
-      (README, README.md)
-[Fix] README backup path example epoch corrected from 1708456789 (2024) to
-      1771538400 (2026) matching the DDMMYY portion 190226 (README, README.md)
-[New] README installation section: DEVEL_MODE="1" default behavior warning
-      added after install completion paragraph (README, README.md)
-[Change] README ipset_type description expanded: "hash:ip for single
-      addresses, hash:net for CIDR blocks" (README, README.md)
-[Change] README section 3 preamble compressed from 33 lines to 9; removed
-      redundant prose about config philosophy (README, README.md)
-[Change] README section 3.3 RAB converted from Option:/Description: format
-      to concise variable-first format matching section 3.1 (README)
-[Change] README section 4 CLI explanations tightened; removed restatements
-      of information already in the usage table (README, README.md)
-[Change] README sections 3.6/3.7/3.8 Option:/Description: labels converted
-      to variable-first format for consistency (README)
-[Change] README feature list: removed vague "3rd party add-on projects"
-      entry that was unexplained (README, README.md)
-[Change] README.md regenerated from updated README with proper Markdown
-      formatting: anchor-linked TOC, fenced code blocks, Markdown tables,
-      inline code (README.md)
-[Change] README section 1 introduction compressed; three filtering type
-      explanations reduced from verbose paragraphs to concise summaries
-      (README, README.md)
-[Change] README section 3.1 compressed from Option:/Description: format to
-      concise variable-first format; port filtering variables grouped into
-      scannable list (README, README.md)
-[Change] README section 3.2 TCP_STOP/UDP_STOP/ALL_STOP verbose narrative
-      replaced with comparison table; PKT_SANITY, TOS, and TCR descriptions
-      tightened (README, README.md)
-[New] README sections 3.9 (Remote Block Lists), 3.10 (Logging & Control),
-      3.11 (Implicit Blocking) documenting DLIST_*, LOG_*, BLK_* variables
-      (README, README.md)
-[New] README section 3.2 expanded with Kernel Tuning summary covering
-      SYSCTL_* variables (README, README.md)
-[New] README section 4.1 expanded with SET_EXPIRE, SET_REFRESH,
-      SET_REFRESH_MD5, SET_TRIM trust system controls (README, README.md)
-[New] README section 3.1 expanded with EG_DROP_CMD user/app filtering
-      documentation (README, README.md)
-[Fix] README ipset.rules format corrected from pipe-separated 4-field to
-      colon-separated 5-field (name:flow:ipset_type:log:file_or_url)
-      matching actual file header (README, README.md)
-[Fix] README gre.rules description corrected from delimited data file to
-      bash script with role variable and create_gretun() function calls
-      (README, README.md)
-[Fix] README fabricated section 4.4 (Dynamic Trust Files) removed;
-      dyn_allow_hosts.rules and dyn_deny_hosts.rules do not exist in the
-      codebase (README, README.md)
-[Fix] README installation section corrected docs to doc matching
-      install.sh mkdir path (README, README.md)
-[Change] README section 4.2 now documents USE_RGT toggle for enabling
-      automatic global trust file downloads (README, README.md)
-[New] README.md Markdown version for GitHub rendering (README.md)
-[Change] README expanded with Docker compat, ipset, GRE tunnel, and IPv6
-      documentation; grammar and structure fixes throughout (README)
-[Change] help() output updated with --ipset-update, --gre-up, --gre-down,
-      --gre-status options (functions.apf)
-[New] External INPUT/OUTPUT rule preservation in DOCKER_COMPAT mode;
-      save_external_baseline() captures non-APF rules before flush,
-      restore_external_baseline() replays them after flush; protects
-      Docker Swarm, kube-proxy, and Calico CNI rules from being
-      destroyed during APF start/restart/stop (functions.apf)
-[New] Docker compat external INPUT preservation tests: 3 tests covering
-      start, flush, and restart scenarios with simulated Docker Swarm
-      INPUT rule (tests/20-docker-compat.bats)
-[Change] DOCKER_COMPAT conf.apf comment updated to document INPUT/OUTPUT
-      preservation alongside FORWARD and nat (conf.apf)
-[New] Docker/container chain preservation mode (DOCKER_COMPAT); when enabled,
-      flush() only removes APF-owned chains, preserving Docker, containerd,
-      Kubernetes, and Podman chains in FORWARD and nat table. Fast load and
-      snapshot save automatically disabled in compat mode to prevent
-      iptables-restore from overwriting external chains (conf.apf,
+
+  -- New Subsystems --
+
+[New] Docker/container chain preservation mode (DOCKER_COMPAT); surgical
+      flush via flush_apf_chains() removes only APF-owned chains, preserving
+      Docker, containerd, Kubernetes, and Podman chains in FORWARD and nat.
+      save_external_baseline()/restore_external_baseline() captures and
+      replays non-APF INPUT/OUTPUT rules across flush cycles. Fast load
+      and snapshot save auto-disabled in compat mode (conf.apf,
       functions.apf, apf, .ca.def)
-[New] flush_apf_chains() surgical flush function; removes only known APF
-      chains from filter table, flushes mangle PREROUTING/POSTROUTING,
-      resets INPUT/OUTPUT policies while leaving FORWARD policy and nat/raw
-      tables untouched (functions.apf)
-[New] Docker compat test suite: 10 tests covering chain preservation across
-      start/flush/restart, nuclear flush default, fast load skip, mangle vs
-      nat behavior (tests/20-docker-compat.bats)
-[Fix] flush_apf_chains() IPv6 chain list missing PHP, DSHIELD, SDROP;
-      these dual-stack chains (created via ipt -N) were cleaned from IPv4
-      but left as orphans in ip6tables when DOCKER_COMPAT=1 and USE_IPV6=1,
-      causing -N errors on subsequent start (functions.apf)
-[Fix] GRE eval command injection: create_gretun() no longer uses eval to
-      build the tunnel command; replaced with direct $ip tunnel add using
-      if/else for the optional key flag (gretunnel.sh)
-[Fix] allow_hosts()/deny_hosts() glob expansion: all 8 for-in-$(cat) loops
-      converted to while IFS= read -r with process substitution, eliminating
-      glob expansion risk on trust file entries (functions.apf)
-[Fix] DLIST disabled regression: dlist_php(), dlist_dshield(), and
-      dlist_spamhaus() else branches now clear the rules file when the feature
-      is disabled; previously restored from backup, contradicting operator
-      intent to disable the list (functions.apf)
-[Fix] --gre-down leaves stale firewall chains: gre_teardown() now flushes
-      and deletes GRE_IN/GRE_OUT chains and removes INPUT/OUTPUT jumps;
-      previously only destroyed tunnel interfaces (gretunnel.sh)
-[Fix] --gre-up idempotent: gre_init() now guards chain creation with
-      existence check; previously failed with "chain already exists" when
-      called on a running firewall (gretunnel.sh)
-[Fix] --ipset-update mutex: the --ipset-update CLI path now calls
-      mutex_lock() to prevent racing with concurrent apf -r (apf)
-[Fix] GRE tunnel creation exit codes: $ip tunnel add and $ip link set
-      return codes now checked; failure aborts with error message instead
-      of continuing to add firewall rules for non-existent interfaces
-      (gretunnel.sh)
-[Fix] GRE endpoint validation: create_gretun() now uses valid_ip_cidr()
-      instead of valid_host() for routefrom/routeto; GRE requires IP
-      addresses, not hostnames which the kernel silently rejects
-      (gretunnel.sh)
-[Fix] GRE key validation: tunnel key now validated as integer; non-numeric
-      values rejected with error message before reaching the kernel
-      (gretunnel.sh)
-[New] MCAST6 NDP RETURN test assertion: verifies ICMPv6 RETURN exemptions
-      in MCAST6 chain that protect NDP from multicast blocking
-      (tests/06-ipv6.bats)
-[New] DLIST disabled no-chain test: verifies DLIST_*=0 clears rules files
-      and creates no iptables chain (tests/19-dlist.bats)
-[Fix] GRE protocol 47 test assertions widened for old iptables on Ubuntu
-      12.04 which displays -p 47 instead of -p gre (tests/18-gre.bats)
-[Fix] DShield /24 host inflation: dlist_dshield() no longer appends /24
-      to individual host IPs from the DShield feed; entries are now written
-      as-is, preventing collateral blocking of 256 addresses per host
-      (functions.apf)
-[Fix] dlist download resilience: dlist_dshield(), dlist_php(), and
-      dlist_spamhaus() now backup rules files before download and restore
-      from backup on failure; previously a failed download left rules files
-      empty, losing all existing entries (functions.apf)
-[Change] dlist parse-time validation: dlist_dshield(), dlist_php(), and
-      dlist_spamhaus() now validate entries via valid_ip_cidr() during
-      parsing; garbage from corrupted downloads is rejected before writing
-      to rules files (functions.apf)
-[Fix] conf.apf and .ca.def DShield description corrected from "top
-      networks" to "top hosts" to match actual feed content (conf.apf,
-      .ca.def)
-[New] DLIST chain-loading test suite: 11 tests covering DSHIELD/PHP/SDROP
-      chain creation, DROP rules, INPUT attachment, backup/restore
-      resilience, and invalid entry rejection (tests/19-dlist.bats)
-[Change] Subsystem definition file naming normalized: gre.conf renamed to
-      gre.rules for consistency with ipset.rules and other .rules files;
-      all references updated (gretunnel.sh, conf.apf, .ca.def, tests)
-[Change] ipset.rules and gre.rules headers now cross-reference their
-      conf.apf config sections for discoverability
-[Fix] importconf now preserves gre.rules during upgrades; previously
-      user tunnel definitions were lost on upgrade (importconf)
+[New] ipset block list support: kernel-level hash tables for O(1) IP
+      matching. USE_IPSET config toggle, ipset.rules definition file,
+      ipset_load()/ipset_update()/ipset_flush() lifecycle functions,
+      --ipset-update CLI for cron hot-reload, cron.d.apf_ipset job,
+      ip_set/xt_set module loading (conf.apf, internals.conf,
+      functions.apf, bt.rules, apf, install.sh, ipset.rules)
 [New] GRE tunnel support: encapsulated point-to-point links with dedicated
-      GRE_IN/GRE_OUT chains, protocol 47 rules, and per-tunnel interface
-      accept rules. USE_GRE config toggle, gre.rules definition file,
-      create_gretun()/destroy_gretun()/gre_init()/gre_flush()/gre_teardown()/
-      gre_status() lifecycle functions, --gre-up/--gre-down/--gre-status CLI
-      options, auto-MTU calculation, keepalive, tunnel key, per-tunnel
-      overrides, source/target role routing (conf.apf, internals.conf,
+      GRE_IN/GRE_OUT chains, protocol 47 rules, per-tunnel interface accept
+      rules. USE_GRE config toggle, gre.rules definition file, lifecycle
+      functions (create_gretun/destroy_gretun/gre_init/gre_flush/
+      gre_teardown/gre_status), --gre-up/--gre-down/--gre-status CLI,
+      auto-MTU, keepalive, tunnel key, role routing (conf.apf, internals.conf,
       gretunnel.sh, gre.rules, firewall, functions.apf, apf, .ca.def)
-[New] GRE test suite: 14 tests covering tunnel creation, chain structure,
-      protocol 47 rules, interface rules, addresses, MTU, IP routing,
-      disable/enable, flush persistence, teardown, validation
-      (tests/18-gre.bats)
-[Change] All 10 Dockerfiles and install-apf.sh updated with USE_GRE="0"
-      config override for deterministic test behavior
-[New] ipset block list support: kernel-level hash tables for O(1) IP matching.
-      USE_IPSET config toggle, ipset.rules definition file, ipset_load()/
-      ipset_update()/ipset_flush() lifecycle functions, --ipset-update CLI
-      option for cron hot-reload, cron.d.apf_ipset cron job, ip_set/xt_set
-      module loading, check_deps() ipset warning (conf.apf, internals.conf,
-      functions.apf, bt.rules, apf, install.sh, ipset.rules, cron.d.apf_ipset)
-[New] ipset test suite: 12 tests covering set creation, chain attachment,
-      match rules, hot-reload, flush cleanup, empty/CIDR blocklists, logging
-      (tests/17-ipset.bats)
-[Change] All 10 Dockerfiles updated with ipset package and USE_IPSET="0"
-      config override for deterministic test behavior
-[Change] CentOS 6 and Ubuntu 12.04 added to GitHub Actions CI matrix
-      (.github/workflows/smoke-test.yml)
-[Change] Makefile test-all and test-all-parallel targets now include
-      centos6 and ubuntu1204 (tests/Makefile)
-[Fix] ipset entry count assertions use portable member counting for
-      old ipset v6.x compatibility on CentOS 6 and Ubuntu 12.04
-      (tests/17-ipset.bats)
-[Fix] importconf now preserves ipset.rules during upgrades (importconf)
-[Fix] MCAST6 chain now exempts NDP ICMPv6 types 133-136 before blocking
-      ff00::/8; previously BLK_MCATNET=1 with USE_IPV6=1 broke IPv6
-      neighbor discovery by dropping multicast NDP packets (bt.rules)
-[Fix] SSH helper removed dead rule with mutually exclusive --syn and
-      --state ESTABLISHED,RELATED flags that could never match (firewall)
-[Fix] SSH helper removed spurious UDP ACCEPT rule — SSH is TCP-only;
-      rule incorrectly opened UDP on the SSH port (firewall)
-[Fix] Interface validation error messages now reference the specific
-      failing interface instead of the entire interface list (firewall)
-[Change] ipset chain wiring uses ipt4() helper instead of raw $IPT for
-      consistency with dual-stack convention (functions.apf)
-[Change] Loopback rules use ipt() helper and remove redundant 0/0 source/
-      destination match (firewall)
-[Fix] Advanced trust syntax now rejects entries with unrecognized flow,
-      direction, or protocol fields instead of passing them as raw
-      iptables flags — prevents malformed trust entries from injecting
-      arbitrary arguments (functions.apf)
-[Fix] refresh() temp files now use mktemp instead of PID-based naming,
-      preventing symlink attack vectors (functions.apf)
-[Fix] dlist_ecnshame() download now filters for IP-shaped content and
-      strips comments, matching all other dlist download functions
-      (functions.apf)
-[Change] All dlist_*_hosts() chain-loading functions, dnet(), expirebans(),
-      and refresh() converted from for-in-cat to while-read loops,
-      eliminating glob expansion risk on trust file entries (functions.apf)
-[Fix] valid_host() IPv4 now delegates to valid_ip_cidr() for octet range
-      validation; rejects invalid addresses like 999.1.2.3 and masks > /32
-      (functions.apf)
-[Fix] valid_host() IPv6 CIDR mask now validated <= 128; rejects invalid
-      masks like /999 (functions.apf)
-[Fix] valid_host() IPv6 regex accepts compressed forms starting with ::
-      (e.g. ::1, ::/0); leading hextet changed from {1,4} to {0,4}
-      (functions.apf)
-[Fix] Fast load with USE_IPV6=1 falls through to full load when
-      ip6tables-restore is missing instead of silently succeeding
-      with only IPv4 rules loaded (apf)
-[Fix] IPv6 tests skip gracefully when ip6tables kernel module is unavailable;
-      adds ip6tables_available() helper and per-test skip guards across 6
-      test files for GH Actions CentOS 7 compatibility; fixed BATS subprocess
-      isolation issue with variable-based skip (tests/helpers/assert-iptables.bash,
-      tests/04-trust-system.bats, tests/06-ipv6.bats, tests/08-fastload.bats,
-      tests/09-flush-cleanup.bats, tests/11-advanced-trust.bats,
-      tests/16-dependency-check.bats)
-[New] Deep legacy test targets: CentOS 6 (vault.centos.org) and Ubuntu 12.04
-      (old-releases.ubuntu.com) reintroduced as manual test targets with
-      Dockerfiles, run-tests.sh, and Makefile deep-legacy group
-      (tests/Dockerfile.centos6, tests/Dockerfile.ubuntu1204)
-[Fix] CentOS 6 Dockerfile: added iptables-ipv6 package for ip6tables support
-[Fix] Packet sanity test patterns widened to handle third iptables output
-      format (tcpflags: 0xNN/0xNN) found on very old legacy systems
-      (tests/07-packet-sanity.bats)
-[Fix] apf -l dependency check test uses timeout to prevent hang when editor
-      (vi) is present in container (tests/16-dependency-check.bats)
-[Change] Removed Dockerfiles for Ubuntu 16.04 and Ubuntu 18.04; repos are
-         no longer accessible. Test matrix aligned to CI targets: Debian 12,
-         CentOS 7, Rocky 8/9, Ubuntu 20.04/22.04/24.04. Rocky 10 retained
-         for manual testing (tests/Makefile, tests/run-tests.sh)
-[Fix] list() predictable temp file replaced with mktemp; PID-based
-      $INSTALL_PATH/.iptrules.$$ changed to mktemp with XXXXXX suffix;
-      all file references now quoted (functions.apf)
 [New] Centralized dependency checking via check_deps(); validates iptables,
       ip, modprobe, ip6tables (critical) and wget, iptables-save/restore,
       diff (warning) before firewall start with OS-aware install hints
       (functions.apf, apf)
-[Change] Ad-hoc ip/ifconfig existence check removed from firewall; superseded
-         by check_deps() with correct -z test instead of buggy -f test
-         (firewall)
-[Change] Ad-hoc wget/DLIST hard abort removed from firewall; downgraded to
-         warning in check_deps() since dlist_* functions handle missing wget
-         gracefully (firewall)
-[New] Dependency check test file (16-dependency-check.bats) with 8 tests
-      covering critical/optional detection, install hints, and non-start
-      commands bypassing checks (tests/)
-[Fix] Fast load error handling: iptables-restore and ip6tables-restore exit
-      codes now checked; corrupted or incompatible snapshots fall through to
-      full load instead of reporting success with no rules applied (apf)
-[Fix] Fast load IPv6 snapshot gap: when USE_IPV6=1 but no IPv6 snapshot
-      exists (first boot after enabling IPv6), partial IPv4-only fast load
-      is now detected, flushed, and falls through to full load (apf)
-[Fix] .ca.def SET_REFRESH_MD5 description corrected from "value in minutes"
-      to "value 1 to enable, 0 to disable" matching conf.apf (.ca.def)
-[New] IPv6 trust syntax documentation added to deny_hosts.rules with
-      bracket notation examples matching allow_hosts.rules (deny_hosts.rules)
-[Fix] head() email domain standardized from @rfxn.org to @rfxn.com (apf)
-[Change] help() output updated: -a/-d options now show IP/IPv6/CIDR/FQDN
-      instead of IP/FQDN (functions.apf)
-[Change] Error messages in cli_trust() and cli_trust_remove() now mention
-      IPv6 addresses explicitly (functions.apf)
-[Change] Fast load eout message now includes iptables backend type
-      (legacy/nf_tables) for easier troubleshooting (apf)
-[Fix] conf.apf and .ca.def comment typos: subsiquent→subsequent,
-      inital→initial, allot→a lot, etc..→etc., your→you're,
-      HTTP→HTTPS in comment URLs (conf.apf, .ca.def)
-[Change] Test suite performance: consolidated redundant flush+start cycles in
-      08-fastload.bats (3 IPv6 tests merged into 1), 09-flush-cleanup.bats
-      (5 flush tests merged into 1), and 11-advanced-trust.bats (17 per-test
-      flush+start cycles replaced with single setup_file() load)
-[Change] APF pre-installed during Docker build; test files use fast reset-apf.sh
-      helper instead of re-running install.sh (~2.5s saved per test file)
-[New] Parallel test targets: make -C tests test-all-parallel runs all OS targets
-      concurrently using half available cores
-[Change] Makefile moved from project root to tests/ directory; use
-      make -C tests test (tests/Makefile)
-[Change] GHA workflow uses docker/build-push-action with buildx layer caching
-      for faster CI builds (.github/workflows/smoke-test.yml)
-[Change] Deleted stale GHA failure files from pre-Phase 35 test run
-      (tests/centos7.github.failure, tests/ubuntu2204.github.failure)
-[Change] wget download functions no longer force IPv4-only transport; removed
-      -4 flag from all 7 $WGET calls to allow dual-stack connectivity via
-      happy eyeballs; IPv6-only hosts can now download blocklists
-      (functions.apf)
-[Fix] importconf cross-test contamination; trust file entries from prior test
-      runs no longer persist across reinstalls in test suite
-      (tests/helpers/install-apf.sh)
-[Fix] sysctl log_martians test false positive; previously accepted both 0 and 1
-      (always passing); now verifies write actually takes effect or skips when
-      Docker kernel ignores sysctl writes (tests/12-sysctl.bats)
-[Fix] OUTPUT policy test false positive; replaced fragile tail/grep with
-      assert_chain_policy helper (tests/02-chain-verification.bats)
-[Change] Per-test teardown() added to test files 06, 11, 13 to prevent dirty
-      state from leaking between tests on mid-test failure
-      (tests/06-ipv6.bats, tests/11-advanced-trust.bats,
-      tests/13-refresh-expiry.bats)
-[New] Fast load restore path test; verifies iptables-restore from snapshot
-      actually restores chains on second start (tests/08-fastload.bats)
-[New] RAB test file (15-rab.bats) with 7 tests covering chain structure,
-      portscan rules, and logging; gracefully skips when xt_recent kernel
-      module unavailable in Docker (tests/15-rab.bats)
-[Change] Backtick command substitutions modernized to $() across all files:
-      functions.apf (97), cports.common (36), apf (8), firewall (9),
-      bt.rules (4), vnetgen (3), main.vnet (2), importconf (2),
-      install.sh (4) — 165 total replacements
-[Fix] lgate_mac() log prefix typo "FORIGN" corrected to "FOREIGN"
-      (functions.apf)
-[Change] Variable quoting hardened across critical paths: eout(), trim(),
-      cli_trust(), cli_trust_remove(), status(), devm() file operations
-      (functions.apf)
-[Change] Trust file local-address checks quote $HOST, $i, $PIP and file
-      path arguments (functions.apf)
-[Change] apf entry point: quoted $LOG_APF, $DS_HOSTS, $DENY_HOSTS,
-      $ALLOW_HOSTS in touch/chmod/test operations (apf)
-[Fix] vnetgen: [ -f "$ip" ] semantic error changed to [ -n "$ip" ] and
-      [ -z "$ip" ] for correct command-availability detection (vnetgen)
-[Change] vnetgen: quoted $IF, $NET, $anet, $iface, $IFACE_TRUSTED and
-      all touch/chmod/source paths (vnetgen)
-[Change] firewall: quoted $i in trusted interface grep (firewall)
-[Change] bt.rules: quoted $IG_TCP_CPORTS in IDENT port check (bt.rules)
-[Fix] cli_trust() duplicate check matched comment lines, causing false
-      "already exists" after apf -u/-a cycle; now filters comments and
-      restores whole-word matching (functions.apf)
-[Fix] IPv6 trust tests missing USE_IPV6=1 in test setup; added to
-      04-trust-system.bats and 11-advanced-trust.bats
-[Change] URL filename extraction in 7 download functions replaced backtick
-         tr/grep/tail pipeline with ${URL##*/} parameter expansion
-         (functions.apf)
-[Fix] unquoted cd $INSTALL_PATH in 7 download function cleanup paths; now
-      quoted as cd "$INSTALL_PATH" (functions.apf)
-[Change] conf.apf GA_URL/GD_URL example URLs updated from http:// to
-         https:// matching all other DLIST URLs (conf.apf)
-[Fix] trim() log message typo "triming" corrected to "trimming"
-      (functions.apf)
-[Change] internals.conf 6 backtick command substitutions modernized to $()
-         syntax (internals.conf)
-[Change] cli_trust() two-pass grep consolidated to single grep -Fl call
-         (functions.apf)
-[Change] dnet() filename extraction replaced backtick tr/tail pipeline with
-         ${FILE##*/} parameter expansion (functions.apf)
-[New] IPv6 fragmented UDP blocking; FRAG_UDP6 chain uses -m frag --fragmore
-      to match IPv6 fragment extension headers; includes RAB logging and
-      sanity flags matching IPv4 FRAG_UDP behavior (bt.rules)
-[Fix] refresh() IPv4-only load check; only checked $IPT for TALLOW chain;
-      now falls back to $IP6T when USE_IPV6=1 so IPv6-only rule sets are
-      correctly detected (functions.apf)
-[New] IPv6 trust syntax documentation added to glob_allow.rules and
-      glob_deny.rules matching allow_hosts.rules format (glob rules)
-[Fix] hardcoded /sbin/route replaced with command -v route for portable
-      detection; route binary at /usr/sbin/route on RHEL 8+/Debian 12+
-      (firewall)
-[Fix] get_ports IPv6 parsing; rev|cut -d: split on IPv6 colons producing
-      wrong ports; replaced with sed 's/.*://'; ::1 loopback now filtered
-      alongside 127.* (get_ports)
-[Change] list() editor discovery uses command -v loop instead of hardcoded
-         paths /usr/bin/pico, /usr/bin/nano, /bin/vi (functions.apf)
-[Fix] firewall dead head command removed from CNF error path (firewall)
-[Fix] expirebans() flock deadlock; spawned $INSTALL_PATH/apf -u as child process
-      which attempted to acquire the same flock held by parent, causing 60s hang
-      then silent failure; changed to direct cli_trust_remove() call
-      (functions.apf)
-[Fix] expirebans() sed not anchored; unanchored pattern \%$ip%d caused
-      10.0.0.1 removal to also delete 10.0.0.10; added ^ anchor and \b word
-      boundary (functions.apf)
-[Fix] cli_trust_remove() error suppression; ipt_for_host "|| true" masked IPv6
-      errors leaving $IPT_H in stale state; now returns error with message when
-      USE_IPV6 not enabled (functions.apf)
-[Fix] cli_trust_remove() first-match-only rule deletion; INPUT/OUTPUT cleanup
-      used single awk+delete which only removed first matching rule; converted
-      to tac + loop pattern matching TALLOW/TDENY for complete cleanup
-      (functions.apf)
-[Change] cli_trust_remove() modernized backtick subshells to $() syntax
-         (functions.apf)
-[Change] Blocklist chains (PHP, DSHIELD, SDROP) converted from $IPT to ipt()
-         for dual-stack chain creation/attachment; per-entry rules use
-         ipt_for_host() routing with $IPT_H/$ANY_ADDR (functions.apf)
-[Change] ECN shame list converted from $IPT to ipt_for_host() routing for
-         IPv6-capable mangle rules (functions.apf)
-[Change] dnet() deny network loader converted from ipt4() to ipt_for_host()
-         routing; IPv6 deny networks now blocked when USE_IPV6=1
-         (functions.apf)
-[New] Conntrack hash table sizing via SYSCTL_CONNTRACK_BUCKETS; writes to
-      /sys/module/nf_conntrack/parameters/hashsize when set (sysctl.rules)
-[New] Adaptive conntrack scaling; SYSCTL_CONNTRACK_ADAPTIVE auto-scales
-      conntrack_max when usage exceeds 80% threshold, capped at
-      SYSCTL_CONNTRACK_HIGH ceiling (sysctl.rules, conf.apf)
+[New] systemd service unit (apf.service); install.sh prefers systemd over
+      SysV init when /run/systemd/system detected (install.sh)
+[New] -v|--version CLI option outputs version number (apf, functions.apf)
+[New] Adaptive conntrack scaling (SYSCTL_CONNTRACK_ADAPTIVE); auto-scales
+      conntrack_max when usage exceeds 80%, capped at SYSCTL_CONNTRACK_HIGH.
+      Hash table sizing via SYSCTL_CONNTRACK_BUCKETS (sysctl.rules, conf.apf)
 [New] nf_conntrack_helper disabled by default to reduce ALG attack surface
       (CVE-2013-6390, CVE-2019-8956) (sysctl.rules)
-[Fix] IPv6 sysctl per-interface scope; accept_source_route and
-      accept_redirects now set on both /conf/all/ and /conf/$IFACE_UNTRUSTED/
-      matching IPv4 hardening pattern; previously only set on /conf/all/
-      (sysctl.rules)
-[Fix] IPv6 route flush added; /proc/sys/net/ipv6/route/flush now triggered
-      alongside IPv4 flush when USE_IPV6=1 (sysctl.rules)
-[Fix] IPv6 plain trust addresses silently dropped; allow_hosts()/deny_hosts()
-      used grep -v ":" which excluded all IPv6 entries from Loop 1 plain IP
-      processing; changed to grep -v "=" to filter only advanced syntax
-      (functions.apf)
-[New] IPv6 advanced trust bracket notation; bracketed IPv6 addresses in
-      trust syntax (e.g., d=22:s=[2001:db8::1]) protect colons from the
-      field delimiter parser; trust_protect_ipv6()/trust_restore_ipv6()
-      helpers handle bracket escaping transparently (functions.apf)
-[Fix] IPv6 sanity chains missing RAB integration; IN_SANITY6/OUT_SANITY6
-      and PZERO6 now include $RAB_SANITY_FLAGS and RAB_LOG_HIT logging,
-      matching IPv4 IN_SANITY/OUT_SANITY behavior (bt.rules)
-[Change] RAB trip rules converted from $IPT to ipt() for IPv6 dual-stack;
-         xt_recent tracks both IPv4 and IPv6 addresses (firewall)
-[Change] RABPSCAN chain converted from $IPT to ipt() for IPv6 dual-stack;
-         DNS whitelist now routes IPv4/IPv6 nameservers via ipt_for_host()
-         (firewall)
-[Change] VNET IPv4-only limitation documented in conf.apf; IPv6 uses
-         neither interface aliasing nor colon-safe filenames (conf.apf)
-[New] IPv6 trust syntax documentation with bracket notation examples
-      (allow_hosts.rules)
-[New] BATS smoke test suite with Docker and network namespace support;
-      14 test files (180 tests) covering install/CLI, chains, ports, trust,
-      multi-interface, IPv6, packet sanity, fast load, flush, validation,
-      advanced trust syntax, sysctl, refresh/expiry, and install paths (tests/)
-[New] Multi-OS Docker test matrix: Debian 12, CentOS 7, Rocky 8/9,
-      Ubuntu 20.04/22.04/24.04; with Dockerfiles for CentOS 6, Rocky 10,
-      Ubuntu 16.04/18.04 (tests/Dockerfile.*)
-[New] Cross-distro netcat portability helper for nc/ncat differences
-      (tests/helpers/detect-nc.sh)
-[New] Backend-portable iptables assertions using iptables -S; supports both
-      nft and legacy backends (tests/helpers/assert-iptables.bash)
-[New] Makefile with per-OS test targets, test-modern/test-legacy/test-all
-      groups (Makefile)
-[New] GitHub Actions CI matrix across 7 OS targets (.github/workflows/)
-[Change] run-tests.sh supports --os flag for distro selection (tests/)
-[Fix] flush() inoperative on nft backend; /proc/net/ip_tables_names absent on
-      iptables-nft causes flush loops to skip entirely, leaving all rules in
-      place after apf -f; now falls back to hardcoded table list
-      (functions.apf)
-[Change] which replaced with command -v (POSIX builtin) for all 16 binary
-         discovery variables in internals.conf
-[Change] mutex_lock()/mutex_unlock() rewritten with flock for atomic kernel-level
-         locking; eliminates TOCTOU race in polling lock (functions.apf)
-[New] -v|--version CLI option outputs version number (apf, functions.apf)
-[New] systemd service unit (apf.service); install.sh prefers systemd over SysV
-      init when /run/systemd/system detected (install.sh)
-[Change] apf.init modernized: removed RHEL-specific /etc/rc.d/init.d/functions
-         dependency, uses $INSTALL_PATH, added status command (apf.init)
-[Change] install.sh now sed-replaces $INSTALL_PATH in init script and systemd
-         service when non-default path used (install.sh)
-[Change] get_ports uses ss as primary with netstat fallback; netstat removed
-         from modern distros (extras/get_ports)
+
+  -- IPv6 Dual-Stack Support --
+
+[New] Dual-stack iptables helpers: ipt() applies to both $IPT/$IP6T when
+      USE_IPV6=1; ipt4()/ipt6() for protocol-specific rules; ipt_for_host()
+      routes by address family; ipt_dst()/ipt_src() for VNET-aware port
+      rules. Adopted across firewall, bt.rules, log.rules, cports.common,
+      functions.apf
+[New] valid_host() and valid_ip_cidr() input validation functions; validates
+      IPv4 octets (0-255), CIDR masks (0-32 / 0-128), IPv6 colon groups,
+      compressed forms (::1, ::/0), FQDN dot requirement (functions.apf)
+[New] IPv6 port filtering with ipt_dst()/ipt_src() VNET-aware helpers;
+      ICMPv6 filtering via IG_ICMPV6_TYPES/EG_ICMPV6_TYPES; NDP types
+      133-136 always permitted (cports.common, conf.apf, functions.apf)
 [New] IPv6 PKT_SANITY: IN_SANITY6/OUT_SANITY6 chains with TCP flag checks,
-      INVALID state blocking, and PZERO6 port-zero filtering (bt.rules)
+      INVALID state blocking, PZERO6 port-zero filtering, and FRAG_UDP6 for
+      fragmented UDP; includes RAB integration matching IPv4 (bt.rules)
 [New] IPv6 multicast blocking; MCAST6 chain blocks ff00::/8 when
-      BLK_MCATNET=1 and USE_IPV6=1 (bt.rules)
-[New] $IP6TS/$IP6TR variables for ip6tables-save/ip6tables-restore discovery
-      (internals.conf)
-[New] IPv6 fast load save/restore; ip6tables snapshot saved as .apf6.restore
-      alongside IPv4 snapshot, restored on fast load when USE_IPV6=1 (apf)
-[Change] list() now shows both IPv4 and IPv6 rules when USE_IPV6=1
-      (functions.apf)
-[Change] flush() fast save now includes ip6tables snapshot when USE_IPV6=1
-      (functions.apf)
-[Change] refresh() now extracts and preserves IPv6 trust addresses from
-      ip6tables-save during trust chain refresh; uses ipt() for chain flushes
-      (functions.apf)
-[New] ipt_for_host() helper routes iptables commands to correct table based on
-      host address family; detects IPv6 by ':' presence, sets $IPT_H/$ANY_ADDR
-[Fix] trust system IPv6 support; cli_trust(), cli_trust_remove(), allow_hosts(),
-      deny_hosts() now detect IPv6 addresses and apply rules to ip6tables with
-      ::/0 instead of incorrectly routing them through iptables with 0/0
-[Fix] .localaddrs6 checked alongside .localaddrs in all trust functions to
-      prevent local IPv6 addresses from being added to trust system
-[New] valid_host() and valid_ip_cidr() input validation functions for trust
-      system operations
-[New] ipt()/ipt4()/ipt6() dual-stack iptables helper functions; ipt() runs
-      both IPv4 and IPv6 when USE_IPV6=1, ipt4()/ipt6() for protocol-specific
-[New] IPv6 kernel module loading when USE_IPV6=1; ip6_tables, ip6table_filter,
-      nf_conntrack_ipv6
-[New] nft backend detection; iptables-save snapshot includes backend marker
-      (.apf.restore.backend) for safe restore across nft/legacy iptables
-[Fix] RAB_PSCAN_LEVEL always-true condition; || changed to && (firewall)
-[Fix] EG_DROP_CMD dead code; comparison to "1" changed to non-empty check
-      (cports.common)
-[Fix] missing $ prefix on LOG_DROP variable reference (cports.common)
-[Fix] RESV_DNS_DROP duplicate ACCEPT rules removed from DNS filtering loop
-      (firewall)
-[Fix] fastload message incorrectly stated "1h" when threshold is 12h (apf)
-[Fix] ovars() broken AWK expression rewritten with ${!var} indirect expansion
-      (functions.apf)
-[Fix] duplicate IPFLOW variable checks corrected to PFLOW in trust parsing
-      x6 (functions.apf)
-[Fix] cli_trust() now validates HOST input via valid_host() before trust
-      operations (functions.apf)
-[Fix] sed delimiter hardened to % in cli_trust_remove() and expirebans() to
-      prevent metacharacter injection (functions.apf)
-[Fix] blocklist integrity validation added via valid_ip_cidr() in all dlist_*
-      download functions (functions.apf)
-[Fix] unquoted variable expansion in file operations (install.sh, functions.apf)
-[Fix] hardcoded /sbin/ip replaced with $ip variable for cross-OS compatibility;
-      breaks on RHEL 8+/Ubuntu 20+ where ip is at /usr/sbin/ip (firewall,
-      vnetgen)
-[Fix] hardcoded /sbin/iptables-save replaced with $IPTS variable
-      (functions.apf)
-[Fix] 35+ hardcoded /etc/apf/ paths replaced with $INSTALL_PATH across
-      download functions, expirebans(), refresh(), cron, temp files, trust
-      md5 (functions.apf, apf)
-[Fix] all 8 $IP6T calls now include $IPT_FLAGS lock flag; previously skipped
-      -w timeout causing potential concurrent modification (functions.apf,
-      firewall, bt.rules)
-[Fix] IPv6 loopback rules corrected from 0/0 to ::/0 (firewall)
-[Fix] SYSCTL_TCP_NOSACK non-empty test corrected to == "1"; setting to "0"
-      previously still disabled SACK (sysctl.rules)
-[Fix] tcp_tw_recycle guarded behind /proc file existence; removed in kernel
-      4.12 (sysctl.rules)
-[Fix] 4 duplicate sysctl writes removed: log_martians x2, rp_filter x2,
-      accept_source_route x2 (sysctl.rules)
-[Fix] conf.apf date typo "2109" corrected to "2019"
-[Fix] cli_trust_remove() now validates input via valid_host() (functions.apf)
-[Fix] valid_host() IPv6 regex tightened to require colon-separated groups;
-      previously accepted invalid strings like "ff" or "::::" (functions.apf)
-[Fix] dead variables removed: LSTOP, LACCEPT, TOS_DEF_TOS, DSTOP
-      (internals.conf)
-[Fix] unused MOD assignment removed from ml() function (functions.apf)
-[Fix] duplicate cron.daily conditional collapsed in install.sh
-[Fix] $ip usage guarded behind -n check to prevent errors when ip binary
-      is absent (internals.conf)
-[Fix] vnetgen ifconfig fallback uses interface line detection instead of
-      grep Link which fails on modern net-tools (vnetgen)
-[Fix] deprecated $[...] arithmetic replaced with $((...)) across all files
-[Fix] ipchains check guarded behind kernel 2.4 detection (functions.apf)
-[Fix] --cmd-owner runtime detection with graceful skip for kernels that
-      removed xt_owner cmd support (cports.common)
-[Change] module loading rewritten with modprobe --dry-run for portable
-         detection across .ko, .ko.xz, .ko.zst extensions (functions.apf)
-[Change] ip route used as primary with route as fallback for interface
-         validation (firewall)
-[Change] ifconfig made optional; ip command used as primary in VNET
-         subsystem (vnetgen, main.vnet)
-[Change] which lsmod/rmmod no longer passes redundant absolute paths
-         (internals.conf)
-[New] ipt()/ipt4()/ipt6() helpers adopted across rule files; protocol-agnostic
-      rules now apply to both IPv4 and IPv6 when USE_IPV6=1 (firewall, bt.rules,
-      log.rules, functions.apf)
-[Change] chain creation, MSS clamping, connection state, default policies,
-         helpers (FTP/SSH/Traceroute), logging, P2P, and IDENT rules now use
-         ipt() for dual-stack support (firewall, bt.rules, log.rules)
-[Change] common drop ports (cdports) now use ipt() for dual-stack blocking
-         (functions.apf)
-[Change] flush() refactored: default policies use ipt(), table flush loops
-         use ipt4/ipt6 with separate proc chain lists (functions.apf)
-[Change] cports.common port rules converted to ipt4() with redundant -s 0/0
-         removed; true dual-stack port filtering deferred to Phase 10
-         (cports.common)
-[Change] packet sanity, fragment, multicast, lgate_mac rules converted to
-         explicit ipt4() to clarify IPv4-specific intent (bt.rules,
-         functions.apf)
-[Change] BLK_TCP_SACK_PANIC collapsed from separate $IPT/$IP6T blocks to
-         single ipt() call (bt.rules)
-[Change] EG_DROP_CMD section converted to ipt4(); redundant -s 0/0 -d 0/0
-         removed (cports.common)
-[New] IPv6 local address detection; .localaddrs6 generated alongside
-      .localaddrs when USE_IPV6=1 (firewall)
+      BLK_MCATNET=1 and USE_IPV6=1, with NDP ICMPv6 types 133-136
+      exempted before DROP to preserve neighbor discovery (bt.rules)
+[New] IPv6 trust system: cli_trust(), cli_trust_remove(), allow_hosts(),
+      deny_hosts() detect IPv6 addresses and route to ip6tables with ::/0;
+      bracket notation for advanced trust (e.g., d=22:s=[2001:db8::1])
+      with trust_protect_ipv6()/trust_restore_ipv6() escaping; .localaddrs6
+      prevents local IPv6 from being trust-listed (functions.apf)
+[New] IPv6 fast load save/restore; ip6tables snapshot saved as .apf6.restore,
+      restored when USE_IPV6=1; falls through to full load when
+      ip6tables-restore missing or snapshot absent (apf)
+[New] IPv6 sysctl hardening when USE_IPV6=1: disables accept_source_route,
+      accept_redirects, accept_ra on /conf/all/ and /conf/$IFACE_UNTRUSTED/;
+      disables forwarding when SYSCTL_ROUTE=1; route flush alongside IPv4;
+      all writes guarded behind proc file existence (sysctl.rules)
+[New] IPv6 DNS filtering; resolv.conf nameservers routed to ipt4/ipt6
+      by address type (firewall)
 [New] IPv6 PROHIBIT chain with icmp6-adm-prohibited reject target (firewall)
-[New] ipt_dst()/ipt_src() VNET-aware dual-stack helpers for port filtering;
-      IPv4 gets -d/-s $VNET, IPv6 applies without address restriction
-      (functions.apf)
-[New] ICMPv6 filtering support with IG_ICMPV6_TYPES and EG_ICMPV6_TYPES
-      config variables; NDP types 133-136 always permitted (cports.common,
-      conf.apf)
-[New] IPv6 DNS filtering; nameservers from resolv.conf routed to ipt4/ipt6
-      based on address type (firewall)
-[Change] trusted interface rules converted to ipt() dual-stack; redundant
-         -s 0/0 -d 0/0 removed (firewall)
-[Change] TCP/UDP port filtering converted from ipt4 to ipt_dst/ipt_src for
-         dual-stack support; IPv6 gets port rules when USE_IPV6=1 (cports.common)
-[Change] RESV_DNS_DROP rules converted to ipt4/ipt6 with IPv6 coverage when
-         USE_IPV6=1 (firewall)
-[Change] cl_cports() clears ICMPv6 variables between VNET iterations
+[New] IPv6 local address detection; .localaddrs6 generated when USE_IPV6=1
+      (firewall)
+[New] IPv6 kernel module loading (ip6_tables, ip6table_filter,
+      nf_conntrack_ipv6) when USE_IPV6=1 (functions.apf)
+[New] $IP6TS/$IP6TR variables for ip6tables-save/restore (internals.conf)
+[New] nft backend detection; snapshot includes backend marker
+      (.apf.restore.backend) for safe restore across nft/legacy (apf)
+[Change] Chain creation, MSS clamping, connection state, default policies,
+         helpers (FTP/SSH/Traceroute), logging, P2P/IDENT, cdports, RAB/
+         RABPSCAN, blocklist chains (PHP/DSHIELD/SDROP), ECN shame, dnet()
+         converted to ipt()/ipt4()/ipt6()/ipt_for_host() for dual-stack
+         (firewall, bt.rules, log.rules, functions.apf, cports.common)
+[Change] flush() refactored with ipt4/ipt6 table loops; list()/refresh()
+         handle IPv6; cl_cports() clears ICMPv6 between VNET iterations
          (functions.apf)
-[Fix] SYSCTL_ROUTE else branch removed; previously ENABLED ip_forward,
-      bootp_relay, and forwarding when routing protection was off, turning
-      server into a router (sysctl.rules)
-[Fix] allow_hosts() and deny_hosts() now validate plain IP entries via
-      valid_host() before passing to iptables; prevents injection from
-      malicious trust file entries (functions.apf)
-[Fix] cli_trust_remove() sed pattern anchored with ^ and \b to prevent
-      substring matching; 10.0.0.1 no longer removes 10.0.0.10
-      (functions.apf)
-[Fix] EG_DROP_CMD LOG rule now includes --cmd-owner filter; previously
-      logged ALL packets in DEG chain instead of only matched commands
-      (cports.common)
-[Change] temp directories in download functions use mktemp -d for atomic
-         creation; eliminates PID-based predictable paths and TOCTOU race
-         (functions.apf)
+[Change] VNET IPv4-only limitation documented in conf.apf
+
+  -- Security Hardening --
+
+[Fix] SYSCTL_ROUTE else branch removed; previously enabled ip_forward,
+      bootp_relay, and forwarding when routing disabled, turning server
+      into a router (sysctl.rules)
+[Fix] GRE eval command injection: create_gretun() replaced eval with direct
+      $ip tunnel add using if/else for optional key flag (gretunnel.sh)
+[Fix] Advanced trust syntax rejects unrecognized flow, direction, or protocol
+      fields; prevents malformed entries from injecting arbitrary iptables
+      arguments (functions.apf)
+[Fix] Trust system input validation: cli_trust() and cli_trust_remove()
+      validate via valid_host(); allow_hosts()/deny_hosts() validate plain
+      IP entries before passing to iptables (functions.apf)
+[Fix] Blocklist integrity: valid_ip_cidr() applied in all dlist_* download
+      functions including ecnshame; garbage from corrupted downloads rejected
+      at parse time (functions.apf)
+[Fix] sed delimiter hardened to % in cli_trust_remove() and expirebans();
+      cli_trust_remove() pattern anchored with ^ and \b to prevent substring
+      matching (functions.apf)
+[Fix] EG_DROP_CMD LOG rule now includes --cmd-owner filter; previously logged
+      ALL packets in DEG chain (cports.common)
+[Fix] Predictable temp files replaced with mktemp: refresh(), list(), and all
+      7 download functions now use mktemp/mktemp -d (functions.apf)
+[Fix] for-in-$(cat) glob expansion: allow_hosts(), deny_hosts(), all
+      dlist_*_hosts(), dnet(), expirebans(), refresh() converted to
+      while IFS= read -r (functions.apf)
+[Fix] wget exit code checked in all 7 download functions; partial downloads
+      no longer processed (functions.apf)
+[Fix] Unquoted variable expansion hardened in file operations (install.sh,
+      functions.apf)
 [Change] DLIST download URLs updated from HTTP to HTTPS for all upstream
          sources: cdn.rfxn.com, spamhaus.org, feeds.dshield.org (conf.apf,
          .ca.def)
-[Fix] VER in apf CLI updated from "1.7.6-2" to "2.0.1" (apf)
-[Fix] ALL_STOP unconditional override removed from internals.conf; now only
-      defaults to DROP when unset by conf.apf (internals.conf)
-[Fix] tosroute() uses return instead of break for early exit (functions.apf)
-[Fix] EG_DROP_CMD default value changed from space-separated to comma-separated
-      to match the tr ',' parser in cports.common (conf.apf)
-[Fix] DEVEL_ON timing: fast load now checks DEVEL_MODE directly instead of
-      DEVEL_ON which is set after the check point (apf)
-[Fix] refresh() APF detection changed from PROHIBIT grep to TALLOW chain;
-      works with non-default UDP_STOP settings (functions.apf)
+
+  -- Bug Fixes --
+
+[Fix] OUT_SANITY missing 4 TCP flag pairs vs IN_SANITY; added ALL FIN,URG,PSH,
+      ALL SYN,RST,ACK,FIN,URG, ALL ALL, ALL FIN to both IPv4 OUT_SANITY and
+      IPv6 OUT_SANITY6 (bt.rules)
+[Fix] DNS INPUT rules now require ESTABLISHED,RELATED state; prevents spoofed
+      packets from being accepted on source port 53 (firewall)
+[Fix] RESET chain catch-all DROP added for non-TCP packets (firewall)
+[Fix] SSH helper: removed dead rule (mutually exclusive --syn + --state
+      ESTABLISHED,RELATED); removed spurious UDP rule (SSH is TCP-only);
+      return traffic port range corrected from 513:65535 to 1024:65535
+      (firewall)
+[Fix] RAB_PSCAN_LEVEL always-true condition; || changed to && (firewall)
+[Fix] EG_DROP_CMD dead code; == "1" changed to non-empty check (cports.common)
+[Fix] Missing $ prefix on LOG_DROP variable reference (cports.common)
+[Fix] RESV_DNS_DROP duplicate ACCEPT rules removed (firewall)
+[Fix] DNS port range corrected from 1023:65535 to 1024:65535 (firewall)
+[Fix] ovars() broken AWK rewritten with ${!var} indirect expansion
+      (functions.apf)
+[Fix] Duplicate IPFLOW variable checks corrected to PFLOW x6 (functions.apf)
+[Fix] flush() inoperative on nft backend; /proc/net/ip_tables_names absent
+      causes flush to skip; now falls back to hardcoded table list
+      (functions.apf)
+[Fix] expirebans() flock deadlock; spawned apf -u child tried to acquire
+      parent's flock; changed to direct cli_trust_remove() (functions.apf)
+[Fix] expirebans() sed not anchored; 10.0.0.1 removal also deleted 10.0.0.10;
+      added ^ anchor and \b word boundary (functions.apf)
+[Fix] cli_trust_remove() error suppression; "|| true" masked IPv6 errors
+      leaving $IPT_H stale (functions.apf)
+[Fix] cli_trust_remove() first-match-only deletion; converted to tac + loop
+      for complete INPUT/OUTPUT cleanup (functions.apf)
+[Fix] cli_trust() duplicate check matched comment lines; now filters comments
+      and uses whole-word matching (functions.apf)
+[Fix] refresh() detection changed from PROHIBIT grep to TALLOW chain; works
+      with non-default UDP_STOP (functions.apf)
 [Fix] refresh() double REFRESH_TEMP flush removed; allow rules no longer
-      destroyed before deny rules are loaded (functions.apf)
-[Fix] DNS port range corrected from 1023:65535 to 1024:65535 in all DNS
-      rules (firewall)
+      destroyed before deny rules loaded (functions.apf)
+[Fix] refresh() IPv4-only load check; falls back to $IP6T when USE_IPV6=1
+      (functions.apf)
+[Fix] IPv6 plain trust addresses silently dropped; grep -v ":" changed to
+      grep -v "=" to filter only advanced syntax (functions.apf)
+[Fix] DLIST disabled regression: else branches now clear rules file instead
+      of restoring from backup, matching operator intent (functions.apf)
+[Fix] DShield /24 host inflation: no longer appends /24 to individual host
+      IPs; prevents collateral blocking of 256 addresses per host
+      (functions.apf)
+[Fix] dlist download resilience: backup before download, restore on failure;
+      prevents failed downloads from emptying rules files (functions.apf)
+[Fix] flush_apf_chains() IPv6 chain list missing PHP, DSHIELD, SDROP; caused
+      -N errors on subsequent start with DOCKER_COMPAT=1 (functions.apf)
+[Fix] --gre-down stale chains; gre_teardown() now flushes/deletes GRE_IN/
+      GRE_OUT and removes jumps (gretunnel.sh)
+[Fix] --gre-up idempotent; guards chain creation with existence check
+      (gretunnel.sh)
+[Fix] --gre-up/--gre-down/--ipset-update now acquire mutex_lock (apf)
+[Fix] GRE tunnel creation exit codes checked; failure aborts before adding
+      rules for non-existent interfaces (gretunnel.sh)
+[Fix] GRE endpoint validation uses valid_ip_cidr(); tunnel key validated as
+      integer (gretunnel.sh)
+[Fix] Fast load error handling: restore exit codes checked; corrupted
+      snapshots fall through to full load; IPv6 snapshot gap detected when
+      USE_IPV6=1 but no .apf6.restore exists (apf)
+[Fix] apf -u now reports success/failure instead of unconditionally printing
+      "removed" (apf)
+[Fix] cron.daily rewritten to call APF directly instead of /etc/init.d/apf;
+      install.sh sed-replaces path for custom INSTALL_PATH (cron.daily,
+      install.sh)
+[Fix] All 8 $IP6T calls now include $IPT_FLAGS lock flag (functions.apf,
+      firewall, bt.rules)
+[Fix] IPv6 loopback rules corrected from 0/0 to ::/0 (firewall)
+[Fix] SYSCTL_TCP_NOSACK non-empty test corrected to == "1" (sysctl.rules)
+[Fix] tcp_tw_recycle and tcp_fack guarded behind /proc file existence;
+      removed in kernel 4.12 and 4.15 respectively (sysctl.rules)
+[Fix] 4 duplicate sysctl writes removed (sysctl.rules)
+[Fix] VER updated from "1.7.6-2" to "2.0.1" (apf)
+[Fix] ALL_STOP unconditional override removed; now defaults only when unset
+      (internals.conf)
+[Fix] tosroute() uses return instead of break (functions.apf)
+[Fix] EG_DROP_CMD default changed from space-separated to comma-separated
+      matching tr ',' parser (conf.apf)
+[Fix] DEVEL_ON timing: fast load checks DEVEL_MODE directly (apf)
 [Fix] BLK_P2P_PORTS duplicate port 6346 removed (conf.apf)
-[Fix] .ca.def date typo "2109" corrected to "2019"
-[Fix] $TIF undefined variable replaced with $IFACE_TRUSTED in vnetgen;
-      SET_ADDIFACE trusted interface exclusion now functional (vnetgen)
-[Change] LOG_IA dependency on LOG_DROP documented in conf.apf
-[Fix] /etc/init.d/apf hardcoded paths replaced with $INSTALL_PATH/apf -f
-      in devm() cron, allow_hosts(), deny_hosts() (functions.apf)
-[Fix] importconf copy destinations changed from /etc/apf/ to $INSTALL_PATH/
+[Fix] Dead variables removed: $ADR (+ MD5_FILES reference), LSTOP, LACCEPT,
+      TOS_DEF_TOS, DSTOP, unused MOD in ml(); duplicate MD5_FILES in apf
+      removed (internals.conf, apf, functions.apf)
+[Fix] $TIF undefined replaced with $IFACE_TRUSTED (vnetgen)
+[Fix] vnetgen: [ -f "$ip" ] changed to [ -n "$ip" ]; ifconfig fallback fixed
+      for modern net-tools; SET_VNET=0 exits 0 not 1 (vnetgen)
+[Fix] Interface validation error messages reference specific failing interface
+      instead of entire list (firewall)
+[Fix] Dead head command removed from CNF error path (firewall)
+[Fix] Hardcoded paths replaced: /sbin/ip→$ip, /sbin/iptables-save→$IPTS,
+      /sbin/route→command -v route, 35+ /etc/apf/→$INSTALL_PATH, /etc/init.d/
+      apf→$INSTALL_PATH/apf (firewall, vnetgen, functions.apf, apf)
+[Fix] IP6_NET link-local filter: grep -v fe80 before head -n1 prevents fe80::
+      from being selected over global unicast (internals.conf)
+[Fix] $ip usage guarded behind -n check (internals.conf)
+[Fix] reserved.networks: added 0.0.0.0/8 "this network" (RFC 1122);
+      private.networks: added RFC 6598 100.64.0.0/10 (data files)
+[Fix] ipchains check guarded behind kernel 2.4 (functions.apf)
+[Fix] --cmd-owner runtime detection with graceful skip (cports.common)
+[Fix] Deprecated $[...] arithmetic replaced with $((...)) across all files
+[Fix] get_ports IPv6: rev|cut -d: replaced with sed; ::1 filtered (get_ports)
+[Fix] Typos corrected: lgate_mac() "FORIGN"→"FOREIGN", trim() "triming"→
+      "trimming", fastload "1h"→"12h" (functions.apf, apf)
+[Fix] head() email standardized to proj@rfxn.com (apf)
+
+  -- Code Modernization --
+
+[Change] Backtick command substitutions modernized to $() across all files;
+         165 total replacements (functions.apf, cports.common, apf, firewall,
+         bt.rules, vnetgen, main.vnet, importconf, install.sh, internals.conf)
+[Change] Variable quoting hardened across critical paths: eout(), trim(),
+         cli_trust*(), status(), devm(), trust file checks, apf entry point,
+         vnetgen, firewall, bt.rules (functions.apf, apf, vnetgen, firewall,
+         bt.rules)
+[Change] which replaced with command -v (POSIX) for all 16 binary discovery
+         variables (internals.conf)
+[Change] mutex_lock()/mutex_unlock() rewritten with flock for atomic
+         kernel-level locking (functions.apf)
+[Change] Module loading rewritten with modprobe --dry-run for portable
+         detection across .ko/.ko.xz/.ko.zst (functions.apf)
+[Change] ip route primary with route fallback for interface validation;
+         ifconfig optional, ip primary in VNET (firewall, vnetgen, main.vnet)
+[Change] get_ports uses ss primary with netstat fallback (extras/get_ports)
+[Change] list() editor discovery uses command -v loop (functions.apf)
+[Change] URL/filename extraction uses ${URL##*/} parameter expansion
+         (functions.apf)
+[Change] wget -4 flag removed; dual-stack via happy eyeballs (functions.apf)
+[Change] Loopback rules use ipt() with redundant 0/0 removed (firewall)
+
+  -- Configuration & Documentation --
+
+[Change] conf.apf comment improvements: compressed DEVEL_MODE, USE_IPV6,
+         SET_VERBOSE, SET_EXPIRE, VF_ROUTE, RAB intro/log options,
+         SYSCTL_TCP_NOSACK, DLIST_PHP, DLIST_ECNSHAME; added SET_FASTLOAD
+         DEVEL_MODE bypass note, SET_VNET IPv6 limitation, SYSCTL_ROUTE
+         IPv6 forwarding note, LOG_IA LOG_DROP dependency (conf.apf, .ca.def)
+[Fix] conf.apf factual errors: PKT_SANITY_FUDP UDP fragmentation claim,
+      TCP/UDP/ALL_STOP option lists (added PROHIBIT), SYSCTL_SYN backlog
+      direction, SET_REFRESH scope, LOG_DROP wording, BLK_PORTS grammar,
+      LOG_TARGET ULOG deprecation, dead MBone URL, stale USE_RD/USE_ECNSHAME
+      references, DShield "top networks"→"top hosts" (conf.apf, .ca.def)
+[Fix] conf.apf/.ca.def typos: assignement, by-pass, hand-shake, subsiquent,
+      inital, allot, "2109"→"2019", your→you're, HTTP→HTTPS URLs, a→an ICMP,
+      first-person removed from LOG_LEVEL (conf.apf, .ca.def)
+[Fix] .ca.def SET_REFRESH_MD5 description corrected to boolean (0/1) (.ca.def)
+[Change] .ca.def synchronized: LOG_IA/SYSCTL_CONNTRACK comments match
+         conf.apf; TCR_PASS/TCR_PORTS split to separate lines (.ca.def)
+[New] .ca.def variable imports: USE_IPSET, IPSET_LOG_RATE, USE_GRE, GRE_*,
+      SYSCTL_CONNTRACK_*; hardcoded SET_TRIM/TOS_DEF_RANGE/TCR_PORTS/
+      SYSCTL_ROUTE/DLIST_RESERVED converted to $variable (.ca.def)
+[Change] README overhaul: compressed introduction and config sections to
+         concise variable-first format; new sections for Remote Block Lists,
+         Logging & Control, Implicit Blocking, Kernel Tuning, trust controls;
+         Docker compat, ipset, GRE, IPv6 documentation added; removed
+         fabricated Dynamic Trust Files section and dead forum reference;
+         support email updated; DEVEL_MODE warning added (README, README.md)
+[Fix] README corrections: GRE "encrypted"→"encapsulated", DLIST "ARIN"→
+      "IANA", real IPs→RFC 5737, epoch updated, ipset.rules/gre.rules format
+      corrected, "docs"→"doc" install path (README, README.md)
+[New] README.md Markdown version with anchor-linked TOC, fenced code blocks,
+      and tables (README.md)
+[New] IPv6 trust syntax documentation with bracket notation examples added
+      to all 4 trust rules files (allow/deny_hosts.rules, glob rules)
+[Fix] Data file corrections: "line-seperated"→"line-separated" in 4 trust
+      files; dead MBone URL in multicast.networks; reserved.networks label
+      and IANA URL; private.networks canonical RFC URL (data files)
+[Fix] vnetgen.def: "defined"→"define", "iptable"→"iptables", invalid IP→
+      RFC 5737 192.0.2.1 (vnet/vnetgen.def)
+[New] Inline comments added to sysctl.rules (conntrack timeouts, port range,
+      tcp_tw_recycle note), log.rules (LOG_IA purpose), bt.rules (INVALID
+      states, p2p ports) (sysctl.rules, log.rules, bt.rules)
+[Change] help() output: added --ipset-update/--gre-*/--gre-status; -a/-d
+         show IP/IPv6/CIDR/FQDN; error messages mention IPv6 (functions.apf)
+[Change] Subsystem file naming: gre.conf→gre.rules; ipset.rules/gre.rules
+         cross-reference conf.apf sections
+[Change] conf.apf GA_URL/GD_URL example URLs updated to HTTPS (conf.apf)
+
+  -- Install, Init & Upgrade --
+
+[Fix] install.sh: copies files before sed to prevent source tree corruption;
+      sed only runs when INSTALL_PATH != /etc/apf; mkdir -p with backup
+      validation; rotates apf_log instead of deleting; sed-replaces cron.daily
+      and init/systemd paths for custom INSTALL_PATH (install.sh)
+[Fix] importconf: preserves glob_allow/deny.rules, ipset.rules, and gre.rules
+      during upgrade; copy destinations use $INSTALL_PATH; paths quoted
       (importconf)
-[Fix] install.sh copies files before sed to prevent source tree corruption
-      on repeated installs; sed only runs when INSTALL_PATH != /etc/apf
-[Fix] install.sh uses mkdir -p and validates backup before rm -rf
-[Fix] .ca.def hardcoded values (SET_TRIM, TOS_DEF_RANGE, TCR_PORTS,
-      SYSCTL_ROUTE, DLIST_RESERVED) converted to $variable imports
-[Fix] .ca.def date typo "2109" corrected to "2019"
-[New] .ca.def: SYSCTL_CONNTRACK_ADAPTIVE, SYSCTL_CONNTRACK_INCREMENT,
-      SYSCTL_CONNTRACK_HIGH, SYSCTL_CONNTRACK_BUCKETS variable imports added
-[Change] install.sh rotates apf_log instead of deleting on upgrade
-[Change] logrotate.d.apf given proper weekly rotation, compression, and
-         postrotate directive
-[Fix] valid_ip_cidr() now validates octet ranges (0-255) and CIDR mask
-      limit (0-32); previously accepted 999.999.999.999 (functions.apf)
-[Fix] valid_host() FQDN regex requires at least one dot; single-label names
-      like "localhost" no longer accepted (functions.apf)
-[Fix] private.networks updated with RFC 6598 100.64.0.0/10 Carrier-Grade
-      NAT range (private.networks)
-[Fix] wget exit code checked in all 7 download functions; partial downloads
-      no longer processed (functions.apf)
-[New] IPv6 sysctl hardening when USE_IPV6=1: disables accept_source_route,
-      accept_redirects, accept_ra; disables forwarding when SYSCTL_ROUTE=1
-      (sysctl.rules)
+[Change] logrotate.d.apf: weekly rotation with compression; removed stale
+         postrotate (killall rsyslogd irrelevant — APF writes log via eout())
+         (logrotate.d.apf)
+[Change] apf.init modernized: removed RHEL-specific init.d/functions
+         dependency, uses $INSTALL_PATH, added status command (apf.init)
+
+  -- Test Suite --
+
+[New] BATS smoke test suite: 261 tests across 20 files with Docker
+      (--privileged) and network namespace support (veth-pub, veth-priv);
+      cross-distro netcat portability; backend-portable iptables assertions
+      via iptables -S (tests/)
+[New] CI matrix: Debian 12, CentOS 7, Rocky 8/9, Ubuntu 20.04/22.04/24.04
+      via GitHub Actions with buildx layer caching; deep legacy manual
+      targets: CentOS 6, Ubuntu 12.04 (.github/workflows/, tests/Dockerfile.*)
+[New] Test coverage: install/CLI, chains, ports, trust, interfaces, IPv6,
+      packet sanity, fast load, flush, validation, advanced trust, sysctl,
+      refresh/expiry, install paths, RAB, dependency checks, ipset, GRE,
+      DLIST, Docker compat (tests/01-20)
+[New] Parallel test targets: make -C tests test-all-parallel (tests/Makefile)
+[Change] Test performance: APF pre-installed during Docker build; fast
+         reset-apf.sh helper; consolidated flush+start cycles; per-test
+         teardown prevents dirty state leaks (tests/)
+[Fix] Cross-OS test compatibility: IPv6 skip guards for missing ip6tables;
+      packet sanity patterns widened for 3 output formats (SYN,FIN / flags:
+      0x03 / tcpflags: 0x03); portable ipset v6.x member counting; timeout
+      for apf -l when vi present; GRE protocol 47 pattern widened (tests/)
+[Change] Removed dead Ubuntu 16.04/18.04 Dockerfiles (tests/)
