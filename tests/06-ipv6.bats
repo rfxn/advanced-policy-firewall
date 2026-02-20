@@ -118,7 +118,7 @@ teardown() {
 }
 
 @test "MCAST6 exempts NDP ICMPv6 from multicast block" {
-    assert_rule_exists_ip6s MCAST6 "ipv6-icmp.*RETURN"
+    assert_rule_exists_ip6s MCAST6 "(ipv6-icmp|icmpv6).*RETURN"
 }
 
 @test "IPv6 trust add goes to ip6tables only" {
