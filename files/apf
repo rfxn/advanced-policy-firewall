@@ -56,7 +56,6 @@ fi
 
 # has our configuration changed since full load?
 # if so full we go
-MD5_FILES="$ADR $INSTALL_PATH/*.rules $INSTALL_PATH/internals/*.networks $INSTALL_PATH/vnet/*.rules"
 if [ ! -f "$INSTALL_PATH/internals/.md5.cores" ]; then
         SKIP_FASTLOAD_VARS=1
 	MD5_FIRSTRUN=1

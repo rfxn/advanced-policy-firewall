@@ -1,4 +1,11 @@
-- 2.0.1 | Feb 19 2026:
+- 2.0.1 | Feb 20 2026:
+[Fix] Dead $ADR variable removed; referenced non-existent ad/ad.rules
+      directory, removed from MD5_FILES glob (internals.conf)
+[Fix] Duplicate MD5_FILES definition removed from apf; clobbered the
+      correct definition in internals.conf which includes $RABP (apf)
+[Fix] logrotate.d.apf postrotate removed; killall -HUP rsyslogd is
+      irrelevant since APF writes its log directly via eout(), not
+      through syslog (logrotate.d.apf)
 [Fix] bt.rules: "Block Traffic With Invalid Flags" comment corrected to
       "Block INVALID connection states and unusual TCP options" (bt.rules)
 [Fix] bt.rules: "p2p networks" comment corrected to "p2p ports"; dead
