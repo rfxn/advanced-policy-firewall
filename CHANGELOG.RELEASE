@@ -34,3 +34,10 @@
       into a shell variable at function entry; replaces 7 cat|grep subprocess
       chains (2 forks each) with zero-fork string comparison in
       cli_trust/allow_hosts/deny_hosts (functions.apf)
+[New] trust_parse_fields() splits advanced trust entries on ':=' using IFS
+      into positional _TF1-_TF6 variables; replaces ~42 echo|tr|tr|awk
+      subprocess chains (3 forks each) with single zero-fork IFS split in
+      6 advanced trust loops across allow_hosts/deny_hosts (functions.apf)
+[Change] PPORT expansion in advanced trust loops replaced echo|grep/echo|tr|
+      awk chains with expand_port(); eliminates 3-7 additional forks per
+      entry with port range syntax (functions.apf)

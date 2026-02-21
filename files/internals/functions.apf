@@ -109,6 +109,16 @@ trust_restore_ipv6() {
 	_TRV6_RESULT="${1//@/:}"
 }
 
+trust_parse_fields() {
+	# Split advanced trust entry on ':' and '=' into positional fields
+	# Input: "d=22:s=10.0.0.1" → _TF1=d _TF2=22 _TF3=s _TF4=10.0.0.1
+	local IFS=':='
+	set -- $1
+	_TF_COUNT=$#
+	_TF1="${1:-}"; _TF2="${2:-}"; _TF3="${3:-}"
+	_TF4="${4:-}"; _TF5="${5:-}"; _TF6="${6:-}"
+}
+
 expand_port() {
 	# Convert underscore port ranges to colon format for iptables
 	# Input: "6881_6889" → _PORT="6881:6889"; "22" → _PORT="22"
@@ -784,8 +794,9 @@ if [ ! "$(cat $file | grep -v "#")" == "" ]; then
         while IFS= read -r i; do
                 if [ -n "$i" ] && [ -f "$file" ]; then
                         trust_protect_ipv6 "$i"; i="$_TPV6_RESULT"
+                        trust_parse_fields "$i"
 
-                        PFLOW=$(echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$1}')
+                        PFLOW="$_TF1"
                 if [ "$PFLOW" == "s" ]; then
                                 PFLOW="sport"
                                 PFLOW_T="from"
@@ -793,14 +804,10 @@ if [ ! "$(cat $file | grep -v "#")" == "" ]; then
                                 PFLOW="dport"
                                 PFLOW_T="to"
                         fi
-                        PPORT=$(echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$2}')
-                        if [ ! "$(echo $PPORT | grep _)" == "" ]; then
-                                PPORT_BEG=$(echo $PPORT | tr '_' ' ' | awk '{print$1}')
-                                PPORT_END=$(echo $PPORT | tr '_' ' ' | awk '{print$2}')
-                                PPORT="$PPORT_BEG:$PPORT_END"
-                        fi
+                        PPORT="$_TF2"
+                        expand_port "$PPORT"; PPORT="$_PORT"
 
-                        IPFLOW=$(echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$3}')
+                        IPFLOW="$_TF3"
                         if [ "$IPFLOW" == "s" ]; then
                                 IPFLOW="s"
                         elif [ "$IPFLOW" == "d" ]; then
@@ -808,7 +815,7 @@ if [ ! "$(cat $file | grep -v "#")" == "" ]; then
                         else
                                 continue
                         fi
-                        trust_restore_ipv6 "$(echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$4}')"; PIP="$_TRV6_RESULT"
+                        trust_restore_ipv6 "$_TF4"; PIP="$_TRV6_RESULT"
 
                         if [ ! "$IPFLOW" == "" ] && [ ! "$PIP" == "" ] && [ ! "$PFLOW" == "" ] && [ ! "$PPORT" == "" ]; then
                          if ipt_for_host "$PIP"; then
@@ -825,7 +832,9 @@ if [ ! "$(cat $file | grep -v "#")" == "" ]; then
                 if [ -n "$i" ] && [ -f "$file" ]; then
                         trust_protect_ipv6 "$i"; i="$_TPV6_RESULT"
 
-                        NFLOW=$(echo $i | tr ':' ' ' | tr '=' ' '| awk '{print$1}')
+                        trust_parse_fields "$i"
+
+                        NFLOW="$_TF1"
                         if [ "$NFLOW" == "in" ]; then
                                 NFLOW="INPUT"
                                 NFLOW_T="inbound"
@@ -836,7 +845,7 @@ if [ ! "$(cat $file | grep -v "#")" == "" ]; then
                                 continue
                         fi
 
-                        PFLOW=$(echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$2}')
+                        PFLOW="$_TF2"
                         if [ "$PFLOW" == "s" ]; then
                                 PFLOW="sport"
                                 PFLOW_T="from"
@@ -847,14 +856,10 @@ if [ ! "$(cat $file | grep -v "#")" == "" ]; then
                                 continue
                         fi
 
-                        PPORT=$(echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$3}')
-                        if [ ! "$(echo $PPORT | grep _)" == "" ]; then
-                                PPORT_BEG=$(echo $PPORT | tr '_' ' ' | awk '{print$1}')
-                                PPORT_END=$(echo $PPORT | tr '_' ' ' | awk '{print$2}')
-                                PPORT="$PPORT_BEG:$PPORT_END"
-                        fi
+                        PPORT="$_TF3"
+                        expand_port "$PPORT"; PPORT="$_PORT"
 
-                        IPFLOW=$(echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$4}')
+                        IPFLOW="$_TF4"
                         if [ "$IPFLOW" == "s" ]; then
                                 IPFLOW="s"
                         elif [ "$IPFLOW" == "d" ]; then
@@ -862,7 +867,7 @@ if [ ! "$(cat $file | grep -v "#")" == "" ]; then
                         else
                                 continue
                         fi
-                        trust_restore_ipv6 "$(echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$5}')"; PIP="$_TRV6_RESULT"
+                        trust_restore_ipv6 "$_TF5"; PIP="$_TRV6_RESULT"
 
                         if [ ! "$NFLOW" == "" ] && [ ! "$IPFLOW" == "" ] && [ ! "$PIP" == "" ] && [ ! "$PFLOW" == "" ] && [ ! "$PPORT" == "" ]; then
                          if [ "$IPFLOW" == "s" ] && [ "$NFLOW" == "INPUT" ] && is_local_addr "$PIP"; then
@@ -883,7 +888,9 @@ if [ ! "$(cat $file | grep -v "#")" == "" ]; then
                 if [ -n "$i" ] && [ -f "$file" ]; then
                         trust_protect_ipv6 "$i"; i="$_TPV6_RESULT"
 
-                        PTYPE=$(echo $i | tr ':' ' ' | tr '=' ' '| awk '{print$1}')
+                        trust_parse_fields "$i"
+
+                        PTYPE="$_TF1"
                         if [ "$PTYPE" == "tcp" ]; then
                                 PTYPE="tcp"
                         elif [ "$PTYPE" == "udp" ]; then
@@ -892,7 +899,7 @@ if [ ! "$(cat $file | grep -v "#")" == "" ]; then
                                 continue
                         fi
 
-                        NFLOW=$(echo $i | tr ':' ' ' | tr '=' ' '| awk '{print$2}')
+                        NFLOW="$_TF2"
                         if [ "$NFLOW" == "in" ]; then
                                 NFLOW="INPUT"
                                 NFLOW_T="inbound"
@@ -903,7 +910,7 @@ if [ ! "$(cat $file | grep -v "#")" == "" ]; then
                                 continue
                         fi
 
-                        PFLOW=$(echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$3}')
+                        PFLOW="$_TF3"
                         if [ "$PFLOW" == "s" ]; then
                                 PFLOW="sport"
                                 PFLOW_T="from"
@@ -914,14 +921,10 @@ if [ ! "$(cat $file | grep -v "#")" == "" ]; then
                                 continue
                         fi
 
-                        PPORT=$(echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$4}')
-                        if [ ! "$(echo $PPORT | grep _)" == "" ]; then
-                                PPORT_BEG=$(echo $PPORT | tr '_' ' ' | awk '{print$1}')
-                                PPORT_END=$(echo $PPORT | tr '_' ' ' | awk '{print$2}')
-                                PPORT="$PPORT_BEG:$PPORT_END"
-                        fi
+                        PPORT="$_TF4"
+                        expand_port "$PPORT"; PPORT="$_PORT"
 
-                        IPFLOW=$(echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$5}')
+                        IPFLOW="$_TF5"
                         if [ "$IPFLOW" == "s" ]; then
                                 IPFLOW="s"
                         elif [ "$IPFLOW" == "d" ]; then
@@ -929,7 +932,7 @@ if [ ! "$(cat $file | grep -v "#")" == "" ]; then
                         else
                                 continue
                         fi
-                        trust_restore_ipv6 "$(echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$6}')"; PIP="$_TRV6_RESULT"
+                        trust_restore_ipv6 "$_TF6"; PIP="$_TRV6_RESULT"
 
                         if [ ! "$PTYPE" == "" ] && [ ! "$NFLOW" == "" ] && [ ! "$IPFLOW" == "" ] && [ ! "$PIP" == "" ] && [ ! "$PFLOW" == "" ] && [ ! "$PPORT" == "" ]; then
                          if [ "$IPFLOW" == "s" ] && [ "$NFLOW" == "INPUT" ] && is_local_addr "$PIP"; then
@@ -988,8 +991,9 @@ if [ ! "$(cat $file | grep -v "#")" == "" ]; then
 	while IFS= read -r i; do
                 if [ -n "$i" ] && [ -f "$file" ]; then
                         trust_protect_ipv6 "$i"; i="$_TPV6_RESULT"
+                        trust_parse_fields "$i"
 
-                        PFLOW=$(echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$1}')
+                        PFLOW="$_TF1"
                         if [ "$PFLOW" == "s" ]; then
                                 PFLOW="sport"
                                 PFLOW_T="from"
@@ -997,14 +1001,10 @@ if [ ! "$(cat $file | grep -v "#")" == "" ]; then
                                 PFLOW="dport"
                                 PFLOW_T="to"
                         fi
-                        PPORT=$(echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$2}')
-                        if [ ! "$(echo $PPORT | grep _)" == "" ]; then
-                                PPORT_BEG=$(echo $PPORT | tr '_' ' ' | awk '{print$1}')
-                                PPORT_END=$(echo $PPORT | tr '_' ' ' | awk '{print$2}')
-                                PPORT="$PPORT_BEG:$PPORT_END"
-                        fi
+                        PPORT="$_TF2"
+                        expand_port "$PPORT"; PPORT="$_PORT"
 
-                        IPFLOW=$(echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$3}')
+                        IPFLOW="$_TF3"
                         if [ "$IPFLOW" == "s" ]; then
                                 IPFLOW="s"
                         elif [ "$IPFLOW" == "d" ]; then
@@ -1012,7 +1012,7 @@ if [ ! "$(cat $file | grep -v "#")" == "" ]; then
                         else
                                 continue
                         fi
-                        trust_restore_ipv6 "$(echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$4}')"; PIP="$_TRV6_RESULT"
+                        trust_restore_ipv6 "$_TF4"; PIP="$_TRV6_RESULT"
 
                         if [ ! "$IPFLOW" == "" ] && [ ! "$PIP" == "" ] && [ ! "$PFLOW" == "" ] && [ ! "$PPORT" == "" ]; then
                          if ipt_for_host "$PIP"; then
@@ -1029,7 +1029,9 @@ if [ ! "$(cat $file | grep -v "#")" == "" ]; then
                 if [ -n "$i" ] && [ -f "$file" ]; then
                         trust_protect_ipv6 "$i"; i="$_TPV6_RESULT"
 
-                        NFLOW=$(echo $i | tr ':' ' ' | tr '=' ' '| awk '{print$1}')
+                        trust_parse_fields "$i"
+
+                        NFLOW="$_TF1"
                         if [ "$NFLOW" == "in" ]; then
                                 NFLOW="INPUT"
                                 NFLOW_T="inbound"
@@ -1040,7 +1042,7 @@ if [ ! "$(cat $file | grep -v "#")" == "" ]; then
                                 continue
                         fi
 
-                        PFLOW=$(echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$2}')
+                        PFLOW="$_TF2"
                         if [ "$PFLOW" == "s" ]; then
                                 PFLOW="sport"
                                 PFLOW_T="from"
@@ -1051,14 +1053,10 @@ if [ ! "$(cat $file | grep -v "#")" == "" ]; then
                                 continue
                         fi
 
-                        PPORT=$(echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$3}')
-                        if [ ! "$(echo $PPORT | grep _)" == "" ]; then
-                                PPORT_BEG=$(echo $PPORT | tr '_' ' ' | awk '{print$1}')
-                                PPORT_END=$(echo $PPORT | tr '_' ' ' | awk '{print$2}')
-                                PPORT="$PPORT_BEG:$PPORT_END"
-                        fi
+                        PPORT="$_TF3"
+                        expand_port "$PPORT"; PPORT="$_PORT"
 
-                        IPFLOW=$(echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$4}')
+                        IPFLOW="$_TF4"
                         if [ "$IPFLOW" == "s" ]; then
                                 IPFLOW="s"
                         elif [ "$IPFLOW" == "d" ]; then
@@ -1066,7 +1064,7 @@ if [ ! "$(cat $file | grep -v "#")" == "" ]; then
                         else
                                 continue
                         fi
-                        trust_restore_ipv6 "$(echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$5}')"; PIP="$_TRV6_RESULT"
+                        trust_restore_ipv6 "$_TF5"; PIP="$_TRV6_RESULT"
 
                         if [ ! "$NFLOW" == "" ] && [ ! "$IPFLOW" == "" ] && [ ! "$PIP" == "" ] && [ ! "$PFLOW" == "" ] && [ ! "$PPORT" == "" ]; then
                          if ipt_for_host "$PIP"; then
@@ -1083,7 +1081,9 @@ if [ ! "$(cat $file | grep -v "#")" == "" ]; then
                 if [ -n "$i" ] && [ -f "$file" ]; then
                         trust_protect_ipv6 "$i"; i="$_TPV6_RESULT"
 
-                        PTYPE=$(echo $i | tr ':' ' ' | tr '=' ' '| awk '{print$1}')
+                        trust_parse_fields "$i"
+
+                        PTYPE="$_TF1"
                         if [ "$PTYPE" == "tcp" ]; then
                                 PTYPE="tcp"
                         elif [ "$PTYPE" == "udp" ]; then
@@ -1092,7 +1092,7 @@ if [ ! "$(cat $file | grep -v "#")" == "" ]; then
                                 continue
                         fi
 
-                        NFLOW=$(echo $i | tr ':' ' ' | tr '=' ' '| awk '{print$2}')
+                        NFLOW="$_TF2"
                         if [ "$NFLOW" == "in" ]; then
                                 NFLOW="INPUT"
                                 NFLOW_T="inbound"
@@ -1103,7 +1103,7 @@ if [ ! "$(cat $file | grep -v "#")" == "" ]; then
                                 continue
                         fi
 
-                        PFLOW=$(echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$3}')
+                        PFLOW="$_TF3"
                         if [ "$PFLOW" == "s" ]; then
                                 PFLOW="sport"
                                 PFLOW_T="from"
@@ -1114,14 +1114,10 @@ if [ ! "$(cat $file | grep -v "#")" == "" ]; then
                                 continue
                         fi
 
-                        PPORT=$(echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$4}')
-                        if [ ! "$(echo $PPORT | grep _)" == "" ]; then
-                                PPORT_BEG=$(echo $PPORT | tr '_' ' ' | awk '{print$1}')
-                                PPORT_END=$(echo $PPORT | tr '_' ' ' | awk '{print$2}')
-                                PPORT="$PPORT_BEG:$PPORT_END"
-                        fi
+                        PPORT="$_TF4"
+                        expand_port "$PPORT"; PPORT="$_PORT"
 
-                        IPFLOW=$(echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$5}')
+                        IPFLOW="$_TF5"
                         if [ "$IPFLOW" == "s" ]; then
                                 IPFLOW="s"
                         elif [ "$IPFLOW" == "d" ]; then
@@ -1129,7 +1125,7 @@ if [ ! "$(cat $file | grep -v "#")" == "" ]; then
                         else
                                 continue
                         fi
-                        trust_restore_ipv6 "$(echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$6}')"; PIP="$_TRV6_RESULT"
+                        trust_restore_ipv6 "$_TF6"; PIP="$_TRV6_RESULT"
 
                         if [ ! "$PTYPE" == "" ] && [ ! "$NFLOW" == "" ] && [ ! "$IPFLOW" == "" ] && [ ! "$PIP" == "" ] && [ ! "$PFLOW" == "" ] && [ ! "$PPORT" == "" ]; then
                          if ipt_for_host "$PIP"; then
