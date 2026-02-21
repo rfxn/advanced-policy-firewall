@@ -28,8 +28,8 @@ fi
 
 # Adaptive conntrack scaling
 if [ "$SYSCTL_CONNTRACK_ADAPTIVE" == "1" ] && [ -f "/proc/sys/net/nf_conntrack_count" ]; then
-	ct_current=$(cat /proc/sys/net/nf_conntrack_count 2>/dev/null)
-	ct_max=$(cat /proc/sys/net/nf_conntrack_max 2>/dev/null)
+	read ct_current < /proc/sys/net/nf_conntrack_count 2>/dev/null
+	read ct_max < /proc/sys/net/nf_conntrack_max 2>/dev/null
 	if [ -n "$ct_current" ] && [ -n "$ct_max" ]; then
 		ct_threshold=$((ct_max * 80 / 100))
 		if [ "$ct_current" -ge "$ct_threshold" ] && [ "$ct_max" -lt "$SYSCTL_CONNTRACK_HIGH" ]; then

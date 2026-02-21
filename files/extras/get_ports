@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 ##
-# Advanced Policy Firewall (APF) v2.0.1
+# Advanced Policy Firewall (APF) v2.0.2
 #             (C) 2002-2026, R-fx Networks <proj@rfxn.com>
 #             (C) 2026, Ryan MacDonald <ryan@rfxn.com>
 # This program may be freely redistributed under the terms of the GNU GPL v2

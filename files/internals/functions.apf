@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 ##
-# Advanced Policy Firewall (APF) v2.0.1
+# Advanced Policy Firewall (APF) v2.0.2
 #             (C) 2002-2026, R-fx Networks <proj@rfxn.com>
 #             (C) 2026, Ryan MacDonald <ryan@rfxn.com>
 # This program may be freely redistributed under the terms of the GNU GPL v2
@@ -1553,7 +1553,7 @@ refresh() {
 	 glob_deny_download
 	 trusts_md5=$($MD5 $DENY_HOSTS $GDENY_HOSTS $ALLOW_HOSTS $GALLOW_HOSTS | $MD5 | awk '{print$1}')
 	 if [ -f "$INSTALL_PATH/internals/.trusts.md5" ]; then
-		last_trusts_md5=$(cat $INSTALL_PATH/internals/.trusts.md5)
+		read last_trusts_md5 < "$INSTALL_PATH/internals/.trusts.md5"
 		if [ "$trusts_md5" == "$last_trusts_md5" ]; then
 		        eout "{glob} trust rules unchanged since last refresh, doing nothing."
 	                echo "$trusts_md5" > $INSTALL_PATH/internals/.trusts.md5

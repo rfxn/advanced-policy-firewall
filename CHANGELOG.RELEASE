@@ -1,4 +1,4 @@
-- 2.0.2 | Feb 20 2026:
+- 2.0.2 | Feb 21 2026:
 
 [Change] ipset batch loading via ipset restore; replaces per-entry $IPSET add
       loop (31K+ fork+exec calls) with single awk pre-filter piped to
@@ -97,3 +97,11 @@
       cat|grep|awk → awk in install.sh VERSION parsing; eliminates 1 fork+exec
       per invocation (install.sh, firewall, functions.apf)
 [Change] Remove redundant $(echo $var) wrappers in DNS for-loops (firewall)
+[New] 21-refactor-regression.bats: 23 targeted regression tests validating
+      Phase 1-7 refactoring behavioral correctness; covers _icmp_filter()
+      'all' keyword, rate limiting, empty types, uppercase handling; port
+      list delimiter edge cases (trailing/leading/double comma); expand_port()
+      range conversion; NDP type collision with user ICMPv6 types; advanced
+      trust port range and protocol parsing; GRE linkid validation boundaries;
+      dlist invalid CIDR rejection and comment skipping
+      (tests/21-refactor-regression.bats)

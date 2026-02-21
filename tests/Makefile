@@ -4,7 +4,7 @@
        test-all test-modern test-legacy test-deep-legacy \
        test-modern-parallel test-legacy-parallel test-deep-legacy-parallel test-all-parallel
 
-HALF_CORES := $(shell echo $$(( $$(nproc) / 2 )) | awk '{ print ($$1 < 1) ? 1 : $$1 }')
+PARALLEL_JOBS := $(shell echo $$(( $$(nproc) * 2 )) | awk '{ print ($$1 < 1) ? 1 : $$1 }')
 
 # Default: Debian 12
 test:
@@ -73,19 +73,19 @@ test-all:
 	./run-tests.sh --os ubuntu2204
 	./run-tests.sh --os ubuntu2404
 
-# Parallel targets — run multiple OS tests concurrently
+# Parallel targets — run multiple OS tests concurrently (2× available cores)
 test-modern-parallel:
 	printf '%s\n' debian12 rocky9 ubuntu2204 ubuntu2404 | \
-	  xargs -P $(HALF_CORES) -I{} ./run-tests.sh --os {}
+	  xargs -P $(PARALLEL_JOBS) -I{} ./run-tests.sh --os {}
 
 test-legacy-parallel:
 	printf '%s\n' centos7 rocky8 ubuntu2004 | \
-	  xargs -P $(HALF_CORES) -I{} ./run-tests.sh --os {}
+	  xargs -P $(PARALLEL_JOBS) -I{} ./run-tests.sh --os {}
 
 test-deep-legacy-parallel:
 	printf '%s\n' centos6 ubuntu1204 | \
-	  xargs -P $(HALF_CORES) -I{} ./run-tests.sh --os {}
+	  xargs -P $(PARALLEL_JOBS) -I{} ./run-tests.sh --os {}
 
 test-all-parallel:
 	printf '%s\n' debian12 centos6 centos7 rocky8 rocky9 ubuntu1204 ubuntu2004 ubuntu2204 ubuntu2404 | \
-	  xargs -P $(HALF_CORES) -I{} ./run-tests.sh --os {}
+	  xargs -P $(PARALLEL_JOBS) -I{} ./run-tests.sh --os {}

@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 ##
-# Advanced Policy Firewall (APF) v2.0.1
+# Advanced Policy Firewall (APF) v2.0.2
 #             (C) 2002-2026, R-fx Networks <proj@rfxn.com>
 #             (C) 2026, Ryan MacDonald <ryan@rfxn.com>
 # This program may be freely redistributed under the terms of the GNU GPL v2
@@ -11,20 +11,24 @@ INSTALL_PATH="/etc/apf"
 DEF=".ca.def"
 DOUT=".conf.apf"
 
-if [ -d "/etc/apf.bk.last" ]; then
+if [ -d "$INSTALL_PATH.bk.last" ]; then
 # get all the vars from current release
-. /etc/apf/conf.apf
+. "$INSTALL_PATH/conf.apf"
 # replace with any vars old release had
-. /etc/apf.bk.last/conf.apf
+. "$INSTALL_PATH.bk.last/conf.apf"
 # generate new conf
-. $DEF
+. "$DEF"
 
-cp -f $INSTALL_PATH/conf.apf $INSTALL_PATH/conf.apf.orig
-cp -f $DOUT $INSTALL_PATH/conf.apf
-cp -f /etc/apf.bk.last/*_hosts.rules /etc/apf/
-cp -f /etc/apf.bk.last/vnet/*.rules /etc/apf/vnet/
+cp -f "$INSTALL_PATH/conf.apf" "$INSTALL_PATH/conf.apf.orig"
+cp -f "$DOUT" "$INSTALL_PATH/conf.apf"
+cp -f "$INSTALL_PATH.bk.last"/*_hosts.rules "$INSTALL_PATH/"
+cp -f "$INSTALL_PATH.bk.last"/glob_allow.rules "$INSTALL_PATH/" 2>/dev/null || true
+cp -f "$INSTALL_PATH.bk.last"/glob_deny.rules "$INSTALL_PATH/" 2>/dev/null || true
+cp -f "$INSTALL_PATH.bk.last"/vnet/*.rules "$INSTALL_PATH/vnet/"
+cp -f "$INSTALL_PATH.bk.last"/ipset.rules "$INSTALL_PATH/" 2>/dev/null || true
+cp -f "$INSTALL_PATH.bk.last"/gre.rules "$INSTALL_PATH/" 2>/dev/null || true
 
-OV=$(cat /etc/apf.bk.last/VERSION | awk '{print$2}')
-NV=$(cat /etc/apf/VERSION | awk '{print$2}')
+OV=$(awk '{print$2}' "$INSTALL_PATH.bk.last/VERSION")
+NV=$(awk '{print$2}' "$INSTALL_PATH/VERSION")
         echo "  Imported options from $OV to $NV."
 fi
