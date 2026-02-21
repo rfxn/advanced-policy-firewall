@@ -24,7 +24,7 @@ ipset_load
 cdports
 
 # Filter all traffic not from local gateway
-if [ ! "$VF_LGATE" == "" ]; then
+if [ -n "$VF_LGATE" ]; then
  lgate_mac
 fi
 
@@ -273,8 +273,7 @@ if [ "$PKT_SANITY" == "1" ] && [ "$USE_IPV6" == "1" ]; then
 	for flags in "ALL NONE" "SYN,FIN SYN,FIN" "SYN,RST SYN,RST" "FIN,RST FIN,RST" \
 		     "ACK,FIN FIN" "ACK,URG URG" "ACK,PSH PSH" "ALL FIN,URG,PSH" \
 		     "ALL SYN,RST,ACK,FIN,URG" "ALL ALL" "ALL FIN"; do
-		mask=$(echo $flags | awk '{print$1}')
-		comp=$(echo $flags | awk '{print$2}')
+		read mask comp <<< "$flags"
 		if [ "$LOG_DROP" == "1" ]; then
 			ipt6 -A IN_SANITY6 -p tcp --tcp-flags $mask $comp -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** SANITY6 ** "
 		fi
@@ -288,8 +287,7 @@ if [ "$PKT_SANITY" == "1" ] && [ "$USE_IPV6" == "1" ]; then
 	for flags in "ALL NONE" "SYN,FIN SYN,FIN" "SYN,RST SYN,RST" "FIN,RST FIN,RST" \
 		     "ACK,FIN FIN" "ACK,PSH PSH" "ACK,URG URG" "ALL FIN,URG,PSH" \
 		     "ALL SYN,RST,ACK,FIN,URG" "ALL ALL" "ALL FIN"; do
-		mask=$(echo $flags | awk '{print$1}')
-		comp=$(echo $flags | awk '{print$2}')
+		read mask comp <<< "$flags"
 		if [ "$LOG_DROP" == "1" ]; then
 			ipt6 -A OUT_SANITY6 -p tcp --tcp-flags $mask $comp -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** SANITY6 ** "
 		fi
@@ -337,7 +335,7 @@ fi
 if [ "$BLK_IDENT" = "1" ]; then
 	eout "{blk_ident} set active BLK_IDENT"
 	# Reject ident request if not defined in IG_TCP_CPORTS
-	if [ "$(echo "$IG_TCP_CPORTS" | tr ',' '\n' | grep -w 113)" == "" ]; then
+	if [[ ",$IG_TCP_CPORTS," != *,113,* ]]; then
 		eout "{blk_ident} reject all to/from tcp port 113"
 		ipt -N IDENT
                 if [ "$LOG_DROP" == "1" ]; then
@@ -403,14 +401,13 @@ if [ "$BLK_MCATNET" == "1" ]; then
 	fi
 fi
 
-if [ ! "$BLK_P2P_PORTS" == "" ]; then
+if [ -n "$BLK_P2P_PORTS" ]; then
         eout "{blk_p2p} set active BLK_P2P"
         # Drop traffic to/from common p2p ports
         ipt -N P2P
-        for i in $(echo $BLK_P2P_PORTS | tr ',' ' '); do
-                MVAL=$(echo $i | grep "_")
+        for i in ${BLK_P2P_PORTS//,/ }; do
                 PORT=$i
-                if [ "$MVAL" == "" ]; then
+                if [[ "$i" != *_* ]]; then
                         eout "{blk_p2p} deny all to/from tcp port $i"
                         eout "{blk_p2p} deny all to/from udp port $i"
                         if [ "$LOG_DROP" == "1" ]; then
@@ -430,9 +427,7 @@ if [ ! "$BLK_P2P_PORTS" == "" ]; then
                         fi
                         ipt -A P2P -p udp --dport 1024:65534 --sport $PORT -j REJECT
                 else
-                        PORT_BEG=$(echo $i | tr '_' ' ' | awk '{print$1}')
-                        PORT_END=$(echo $i | tr '_' ' ' | awk '{print$2}')
-                        PORTST="$PORT_BEG:$PORT_END"
+                        expand_port "$i"; PORTST="$_PORT"
                         eout "{blk_p2p} deny all to/from tcp port $PORTST"
                         eout "{blk_p2p} deny all to/from udp port $PORTST"
                         if [ "$LOG_DROP" == "1" ]; then
@@ -457,7 +452,7 @@ if [ ! "$BLK_P2P_PORTS" == "" ]; then
         ipt -A OUTPUT -j P2P
 fi
 
-if [ "$BLK_TCP_SACK_PANIC" == "1" ] && [ ! "$SYSCTL_TCP_NOSACK" == "1" ]; then
+if [ "$BLK_TCP_SACK_PANIC" == "1" ] && [ "$SYSCTL_TCP_NOSACK" != "1" ]; then
 	eout "{blk_tcp_sack_panic} applying mitigation for TCP SACK Panic CVE-2019-11477, CVE-2019-11478, CVE-2019-11479 https://access.redhat.com/security/vulnerabilities/tcpsack"
 	eout "{blk_tcp_sack_panic} deny inbound tcp-flags SYN with MSS size 1 to 500 bytes "
 	ipt -I INPUT -p tcp --tcp-flags SYN SYN -m tcpmss --mss 1:500 -j $TCP_STOP

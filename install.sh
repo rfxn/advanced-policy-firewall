@@ -60,7 +60,7 @@ install() {
 	else
 		if [ -f "/etc/rc.local" ]; then
 			val=$(grep -i apf /etc/rc.local)
-			if [ "$val" == "" ]; then
+			if [ -z "$val" ]; then
 				echo "$INSTALL_PATH/apf -s >> /dev/null 2>&1" >> /etc/rc.local
 			fi
 		fi
@@ -89,7 +89,7 @@ install() {
 	chmod 750 "$INSTALL_PATH"
 }
 
-VER=$(cat files/VERSION | grep version | awk '{print$2}')
+VER=$(awk '/version/ {print$2}' files/VERSION)
 if [ -d "$INSTALL_PATH" ]; then
 	DVAL=$(date +"%d%m%Y-%s")
 	cp -R "$INSTALL_PATH" "$INSTALL_PATH.bk$DVAL" || { echo "Backup failed, aborting."; exit 1; }

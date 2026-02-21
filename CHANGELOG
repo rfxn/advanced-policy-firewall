@@ -1,3 +1,103 @@
+- 2.0.2 | Feb 20 2026:
+
+[Change] ipset batch loading via ipset restore; replaces per-entry $IPSET add
+      loop (31K+ fork+exec calls) with single awk pre-filter piped to
+      ipset restore -exist, reducing load time from minutes to seconds
+      (functions.apf)
+[Change] ipset_load() and ipset_update() now log per-set "loading/updating
+      set $name from $source" before processing begins, providing visibility
+      into which set is being loaded during long ipset operations
+      (functions.apf)
+[Change] valid_ip_cidr(), valid_host(), ipt_for_host() replaced echo|grep
+      subprocess calls with bash builtins ([[ =~ ]] and [[ == *pattern* ]]);
+      eliminates 2-6 fork+exec calls per invocation in hot validation paths
+      (functions.apf)
+[Change] trust_protect_ipv6() and trust_restore_ipv6() converted from echo
+      return to variable-return (_TPV6_RESULT, _TRV6_RESULT); eliminates 1
+      subshell fork per advanced trust entry across 12 call sites in
+      allow_hosts/deny_hosts (functions.apf)
+[New] expand_port() helper converts underscore port ranges to colon format
+      using bash parameter expansion; replaces echo|grep/echo|tr subprocess
+      chains across 10 call sites (functions.apf)
+[Change] cports.common port filtering blocks simplified from 12-line if/else
+      per block to 3-line expand_port call; eliminates 4 fork+exec calls per
+      port entry across 4 inbound/outbound TCP/UDP blocks and 2 UID blocks
+      (cports.common)
+[Change] bt.rules P2P port block replaced echo|grep/echo|tr|awk subprocess
+      chains with expand_port and bash builtins (bt.rules)
+[Change] cdports() simplified from 20-line if/else to 7-line expand_port
+      loop (functions.apf)
+[Change] tosroute() consolidated from 6 identical TOS blocks (~48 lines) to
+      single loop with indirect variable expansion (~18 lines); replaces 6
+      echo|tr subprocess calls with expand_port (functions.apf)
+[New] load_local_addrs() and is_local_addr() cache .localaddrs/.localaddrs6
+      into a shell variable at function entry; replaces 7 cat|grep subprocess
+      chains (2 forks each) with zero-fork string comparison in
+      cli_trust/allow_hosts/deny_hosts (functions.apf)
+[New] trust_parse_fields() splits advanced trust entries on ':=' using IFS
+      into positional _TF1-_TF6 variables; replaces ~42 echo|tr|tr|awk
+      subprocess chains (3 forks each) with single zero-fork IFS split in
+      6 advanced trust loops across allow_hosts/deny_hosts (functions.apf)
+[Change] PPORT expansion in advanced trust loops replaced echo|grep/echo|tr|
+      awk chains with expand_port(); eliminates 3-7 additional forks per
+      entry with port range syntax (functions.apf)
+[Change] allow_hosts() and deny_hosts() unified into parameterized
+      trust_hosts() with action target and verb arguments; eliminates ~185
+      lines of duplicated trust parsing logic across 4 while-loops
+      (functions.apf)
+[New] dlist_download() consolidates dlist_php/dlist_dshield/dlist_spamhaus/
+      dlist_ecnshame download logic into single parameterized helper with
+      backup/restore, mktemp, wget, and valid_ip_cidr validation; eliminates
+      ~115 lines of duplicated download/parse code (functions.apf)
+[Change] Modernize string tests: replace [ "$x" == "" ] with [ -z "$x" ] and
+      [ ! "$x" == "" ] with [ -n "$x" ] across all files; POSIX-compliant
+      idiom, zero behavioral change (apf, firewall, functions.apf,
+      cports.common, bt.rules, sysctl.rules, vnetgen, main.vnet, get_ports,
+      install.sh)
+[Change] Replace echo|tr subprocess chains with bash parameter expansion:
+      comma-split $(echo $x | tr ',' ' ') → ${x//,/ }, lowercase
+      $(echo $x | tr '[:upper:]' '[:lower:]') → ${x,,}, uppercase
+      $(echo $x | tr '[:lower:]' '[:upper:]') → ${x^^}; eliminates 2
+      fork+exec calls per invocation across ~27 sites (cports.common,
+      functions.apf, firewall, bt.rules, internals.conf, vnetgen)
+[Change] ICMP_LIM rate parsing $(echo $x | tr '/' ' ' | awk '{print$1}')
+      → ${x%%/*} in 4 ICMP filter blocks; eliminates 3 fork+exec calls each
+      (cports.common)
+[Change] dlist_resnet URL_FILE extraction: echo|tr|grep|tail pipe replaced
+      with ${url##*/} parameter expansion (functions.apf)
+[Change] vnetgen trusted interface lookup: echo|tr|grep pipe replaced with
+      [[ ",$list," == *,"$item",* ]] bash builtin test (vnetgen)
+[Change] bt.rules IDENT port check: echo|tr|grep pipe replaced with
+      [[ ",$list," == *,113,* ]] bash builtin test (bt.rules)
+[Change] Remove unnecessary $(echo $var) wrappers in for loops; redundant
+      when variable is already space-separated (cports.common, functions.apf,
+      firewall)
+[Change] Replace echo|awk/cut field parsing with bash builtins: UID:PORT
+      parsing echo|tr|awk → ${var%%:*}/${var#*:}, ipset field parsing
+      echo|cut → IFS=: read, TCP flag parsing echo|awk → read, GRE keepalive
+      echo|awk → read; eliminates 2-5 fork+exec calls per invocation across
+      ~20 sites (cports.common, functions.apf, bt.rules, gretunnel.sh)
+[Change] dlist_download() parse loop: echo|grep|awk|tr pipeline replaced
+      with case/read/bash-test builtins; eliminates 4-6 forks per blocklist
+      entry (functions.apf)
+[Change] EG_DROP_CMD prefix: echo|cut → ${i:0:6} substring (cports.common)
+[New] _icmp_filter() helper consolidates 4 nearly-identical ICMP/ICMPv6
+      filtering blocks (~96 lines) into single parameterized function (~22
+      lines); handles ipt4/ipt6, INPUT/OUTPUT, icmp/ipv6-icmp, rate limiting,
+      and VNET address binding via arguments (cports.common)
+[Change] NDP types 133-136 inbound/outbound blocks consolidated from 8
+      individual ipt6 calls to 2 for-loops (cports.common)
+[Change] Replace remaining echo|grep subprocess calls with bash builtins:
+      IPv6 nameserver detection echo|grep ':' → [[ == *:* ]], GRE linkid/key
+      integer validation echo|grep '^[0-9]+$' → [[ =~ ^[0-9]+$ ]], ipset
+      URL detection echo|grep '^https?://' → [[ =~ ^https?:// ]]; eliminates
+      1-2 fork+exec calls per invocation across 5 sites (firewall,
+      gretunnel.sh, functions.apf)
+[Change] Remove useless cat: cat file | grep → grep file across 10 sites;
+      cat|grep|awk → awk in install.sh VERSION parsing; eliminates 1 fork+exec
+      per invocation (install.sh, firewall, functions.apf)
+[Change] Remove redundant $(echo $var) wrappers in DNS for-loops (firewall)
+
 - 2.0.1 | Feb 20 2026:
 
   -- New Subsystems --

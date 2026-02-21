@@ -18,7 +18,7 @@ for i in $(ls $INSTALL_PATH/vnet/ | grep .rules); do
         else
                 IFVALIP=""
         fi
-        if [ ! "$IFVALIP" == "" ]; then
+        if [ -n "$IFVALIP" ]; then
                 source $INSTALL_PATH/conf.apf
                 source $INSTALL_PATH/vnet/$i
         else
