@@ -16,3 +16,17 @@
       return to variable-return (_TPV6_RESULT, _TRV6_RESULT); eliminates 1
       subshell fork per advanced trust entry across 12 call sites in
       allow_hosts/deny_hosts (functions.apf)
+[New] expand_port() helper converts underscore port ranges to colon format
+      using bash parameter expansion; replaces echo|grep/echo|tr subprocess
+      chains across 10 call sites (functions.apf)
+[Change] cports.common port filtering blocks simplified from 12-line if/else
+      per block to 3-line expand_port call; eliminates 4 fork+exec calls per
+      port entry across 4 inbound/outbound TCP/UDP blocks and 2 UID blocks
+      (cports.common)
+[Change] bt.rules P2P port block replaced echo|grep/echo|tr|awk subprocess
+      chains with expand_port and bash builtins (bt.rules)
+[Change] cdports() simplified from 20-line if/else to 7-line expand_port
+      loop (functions.apf)
+[Change] tosroute() consolidated from 6 identical TOS blocks (~48 lines) to
+      single loop with indirect variable expansion (~18 lines); replaces 6
+      echo|tr subprocess calls with expand_port (functions.apf)
