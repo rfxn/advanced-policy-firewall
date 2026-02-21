@@ -74,7 +74,7 @@ ipt_src() {
 # Sets IPT_H (binary) and ANY_ADDR (0/0 or ::/0) for the caller.
 # Returns 1 if IPv6 host but USE_IPV6 is not enabled.
 ipt_for_host() {
-	if echo "$1" | grep -q ':'; then
+	if [[ "$1" == *:* ]]; then
 		if [ "$USE_IPV6" != "1" ]; then return 1; fi
 		IPT_H="$IP6T"
 		ANY_ADDR="::/0"
@@ -322,7 +322,7 @@ trim() {
 }
 
 valid_ip_cidr() {
-	echo "$1" | grep -qE '^([0-9]{1,3}\.){3}[0-9]{1,3}(/[0-9]{1,2})?$' || return 1
+	[[ "$1" =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}(/[0-9]{1,2})?$ ]] || return 1
 	local IFS='./'; set -- $1
 	[ "$1" -le 255 ] && [ "$2" -le 255 ] && [ "$3" -le 255 ] && [ "$4" -le 255 ] || return 1
 	[ -n "$5" ] && { [ "$5" -le 32 ] || return 1; }
@@ -332,12 +332,12 @@ valid_ip_cidr() {
 valid_host() {
 	local h="$1"
 	# IPv4 address or CIDR — delegate to valid_ip_cidr for octet/mask range checking
-	if echo "$h" | grep -qE '^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}(/[0-9]{1,2})?$'; then
+	if [[ "$h" =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}(/[0-9]{1,2})?$ ]]; then
 		valid_ip_cidr "$h"
 		return $?
 	fi
 	# IPv6 address or CIDR
-	if echo "$h" | grep -qE '^[0-9a-fA-F]{0,4}(:[0-9a-fA-F]{0,4}){2,7}(/[0-9]{1,3})?$'; then
+	if [[ "$h" =~ ^[0-9a-fA-F]{0,4}(:[0-9a-fA-F]{0,4}){2,7}(/[0-9]{1,3})?$ ]]; then
 		if [[ "$h" == */* ]]; then
 			local mask="${h##*/}"
 			[ "$mask" -le 128 ] || return 1
@@ -345,7 +345,7 @@ valid_host() {
 		return 0
 	fi
 	# FQDN: requires at least one dot, alphanumeric labels, TLD 2+ chars
-	if echo "$h" | grep -qE '^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?)+$'; then
+	if [[ "$h" =~ ^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?)+$ ]]; then
 		return 0
 	fi
 	return 1

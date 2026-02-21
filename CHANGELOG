@@ -8,6 +8,10 @@
       set $name from $source" before processing begins, providing visibility
       into which set is being loaded during long ipset operations
       (functions.apf)
+[Change] valid_ip_cidr(), valid_host(), ipt_for_host() replaced echo|grep
+      subprocess calls with bash builtins ([[ =~ ]] and [[ == *pattern* ]]);
+      eliminates 2-6 fork+exec calls per invocation in hot validation paths
+      (functions.apf)
 
 - 2.0.1 | Feb 20 2026:
 
