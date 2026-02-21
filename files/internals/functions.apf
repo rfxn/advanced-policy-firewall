@@ -758,12 +758,14 @@ ovars() {
 	done
 }
 
-allow_hosts() {
+
+trust_hosts() {
 file="$1"
 chain="$2"
+local action_all="$3" action_tcp="$4" action_udp="$5" verb="$6"
 load_local_addrs
 if [ -z "$file" ] || [ -z "$chain" ]; then
-        eout "could not process allow_hosts $file $chain, fatal error, aborting!"
+        eout "could not process trust_hosts $file $chain, fatal error, aborting!"
         $INSTALL_PATH/apf -f
         mutex_unlock
         exit 1
@@ -782,9 +784,9 @@ if [ ! "$(cat $file | grep -v "#")" == "" ]; then
                 if ! is_local_addr "$i"; then
                  if [ -f "$file" ]; then
                   if ipt_for_host "$i"; then
-                        eout "{trust} allow all to/from $i"
-                        $IPT_H $IPT_FLAGS -A $chain -s $i -d $ANY_ADDR -j ACCEPT
-                        $IPT_H $IPT_FLAGS -A $chain -d $i -s $ANY_ADDR -j ACCEPT
+                        eout "{trust} $verb all to/from $i"
+                        $IPT_H $IPT_FLAGS -A $chain -s $i -d $ANY_ADDR -j $action_all
+                        $IPT_H $IPT_FLAGS -A $chain -d $i -s $ANY_ADDR -j $action_all
                   fi
                  fi
 		fi
@@ -819,9 +821,9 @@ if [ ! "$(cat $file | grep -v "#")" == "" ]; then
 
                         if [ ! "$IPFLOW" == "" ] && [ ! "$PIP" == "" ] && [ ! "$PFLOW" == "" ] && [ ! "$PPORT" == "" ]; then
                          if ipt_for_host "$PIP"; then
-                                eout "{trust} allow $PIP $PFLOW_T port $PPORT"
-                                $IPT_H $IPT_FLAGS -A $chain -p tcp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j ACCEPT
-                                $IPT_H $IPT_FLAGS -A $chain -p udp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j ACCEPT
+                                eout "{trust} $verb $PIP $PFLOW_T port $PPORT"
+                                $IPT_H $IPT_FLAGS -A $chain -p tcp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j $action_tcp
+                                $IPT_H $IPT_FLAGS -A $chain -p udp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j $action_udp
                          fi
                         fi
                 fi
@@ -870,14 +872,14 @@ if [ ! "$(cat $file | grep -v "#")" == "" ]; then
                         trust_restore_ipv6 "$_TF5"; PIP="$_TRV6_RESULT"
 
                         if [ ! "$NFLOW" == "" ] && [ ! "$IPFLOW" == "" ] && [ ! "$PIP" == "" ] && [ ! "$PFLOW" == "" ] && [ ! "$PPORT" == "" ]; then
-                         if [ "$IPFLOW" == "s" ] && [ "$NFLOW" == "INPUT" ] && is_local_addr "$PIP"; then
-                                eout "{trust} ignored local ip allow rule '$NFLOW_T $PIP $PFLOW_T port $PPORT'"
-                         elif [ "$IPFLOW" == "d" ] && [ "$NFLOW" == "OUTPUT" ] && is_local_addr "$PIP"; then
-                                eout "{trust} ignored local ip allow rule '$NFLOW_T $PIP $PFLOW_T port $PPORT'"
+                         if [ "$verb" == "allow" ] && [ "$IPFLOW" == "s" ] && [ "$NFLOW" == "INPUT" ] && is_local_addr "$PIP"; then
+                                eout "{trust} ignored local ip $verb rule '$NFLOW_T $PIP $PFLOW_T port $PPORT'"
+                         elif [ "$verb" == "allow" ] && [ "$IPFLOW" == "d" ] && [ "$NFLOW" == "OUTPUT" ] && is_local_addr "$PIP"; then
+                                eout "{trust} ignored local ip $verb rule '$NFLOW_T $PIP $PFLOW_T port $PPORT'"
                          elif ipt_for_host "$PIP"; then
-                                eout "{trust} allow $NFLOW_T $PIP $PFLOW_T port $PPORT"
-                                $IPT_H $IPT_FLAGS -A $chain -p tcp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j ACCEPT
-                                $IPT_H $IPT_FLAGS -A $chain -p udp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j ACCEPT
+                                eout "{trust} $verb $NFLOW_T $PIP $PFLOW_T port $PPORT"
+                                $IPT_H $IPT_FLAGS -A $chain -p tcp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j $action_tcp
+                                $IPT_H $IPT_FLAGS -A $chain -p udp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j $action_udp
                          fi
                         fi
                 fi
@@ -935,17 +937,17 @@ if [ ! "$(cat $file | grep -v "#")" == "" ]; then
                         trust_restore_ipv6 "$_TF6"; PIP="$_TRV6_RESULT"
 
                         if [ ! "$PTYPE" == "" ] && [ ! "$NFLOW" == "" ] && [ ! "$IPFLOW" == "" ] && [ ! "$PIP" == "" ] && [ ! "$PFLOW" == "" ] && [ ! "$PPORT" == "" ]; then
-                         if [ "$IPFLOW" == "s" ] && [ "$NFLOW" == "INPUT" ] && is_local_addr "$PIP"; then
-                                eout "{trust} ignored local ip allow rule '$NFLOW_T $PIP $PFLOW_T port $PPORT'"
-                         elif [ "$IPFLOW" == "d" ] && [ "$NFLOW" == "OUTPUT" ] && is_local_addr "$PIP"; then
-                                eout "{trust} ignored local ip allow rule '$NFLOW_T $PIP $PFLOW_T port $PPORT'"
+                         if [ "$verb" == "allow" ] && [ "$IPFLOW" == "s" ] && [ "$NFLOW" == "INPUT" ] && is_local_addr "$PIP"; then
+                                eout "{trust} ignored local ip $verb rule '$NFLOW_T $PIP $PFLOW_T port $PPORT'"
+                         elif [ "$verb" == "allow" ] && [ "$IPFLOW" == "d" ] && [ "$NFLOW" == "OUTPUT" ] && is_local_addr "$PIP"; then
+                                eout "{trust} ignored local ip $verb rule '$NFLOW_T $PIP $PFLOW_T port $PPORT'"
                          elif ipt_for_host "$PIP"; then
                                 if [ "$PTYPE" == "tcp" ]; then
-	                                eout "{trust} allow $NFLOW_T $PTYPE $PIP $PFLOW_T port $PPORT"
-	                                $IPT_H $IPT_FLAGS -A $chain -p $PTYPE -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j ACCEPT
+                                        eout "{trust} $verb $NFLOW_T $PTYPE $PIP $PFLOW_T port $PPORT"
+                                        $IPT_H $IPT_FLAGS -A $chain -p $PTYPE -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j $action_tcp
                                 elif [ "$PTYPE" == "udp" ]; then
-                                        eout "{trust} allow $NFLOW_T $PTYPE $PIP $PFLOW_T port $PPORT"
-		                        $IPT_H $IPT_FLAGS -A $chain -p $PTYPE -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j ACCEPT
+                                        eout "{trust} $verb $NFLOW_T $PTYPE $PIP $PFLOW_T port $PPORT"
+                                        $IPT_H $IPT_FLAGS -A $chain -p $PTYPE -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j $action_udp
                                 fi
                          fi
                         fi
@@ -954,194 +956,9 @@ if [ ! "$(cat $file | grep -v "#")" == "" ]; then
 fi
 }
 
+allow_hosts() { trust_hosts "$1" "$2" ACCEPT ACCEPT ACCEPT "allow"; }
 
-deny_hosts() {
-file=$1
-chain=$2
-load_local_addrs
-if [ -z "$file" ] || [ -z "$chain" ]; then
-	eout "could not process deny_hosts $file $chain, fatal error, aborting!"
-	$INSTALL_PATH/apf -f
-        mutex_unlock
-	exit 1
-fi
-
-if [ ! "$(cat $file | grep -v "#")" == "" ]; then
-        eout "{glob} loading $file"
-        #
-        #
-        while IFS= read -r i; do
-                [ -z "$i" ] && continue
-                if ! valid_host "$i"; then
-                        eout "{trust} skipping invalid entry in $file: $i"
-                        continue
-                fi
-                if ! is_local_addr "$i"; then
-                 if [ -f "$file" ]; then
-                  if ipt_for_host "$i"; then
-                        eout "{trust} deny all to/from $i"
-                        $IPT_H $IPT_FLAGS -A $chain -s $i -d $ANY_ADDR -j $ALL_STOP
-                        $IPT_H $IPT_FLAGS -A $chain -d $i -s $ANY_ADDR -j $ALL_STOP
-                  fi
-                 fi
-		fi
-        done < <(grep -v '#' "$file" | grep -v '=')
-        #
-        #
-	while IFS= read -r i; do
-                if [ -n "$i" ] && [ -f "$file" ]; then
-                        trust_protect_ipv6 "$i"; i="$_TPV6_RESULT"
-                        trust_parse_fields "$i"
-
-                        PFLOW="$_TF1"
-                        if [ "$PFLOW" == "s" ]; then
-                                PFLOW="sport"
-                                PFLOW_T="from"
-                        elif [ "$PFLOW" == "d" ]; then
-                                PFLOW="dport"
-                                PFLOW_T="to"
-                        fi
-                        PPORT="$_TF2"
-                        expand_port "$PPORT"; PPORT="$_PORT"
-
-                        IPFLOW="$_TF3"
-                        if [ "$IPFLOW" == "s" ]; then
-                                IPFLOW="s"
-                        elif [ "$IPFLOW" == "d" ]; then
-                                IPFLOW="d"
-                        else
-                                continue
-                        fi
-                        trust_restore_ipv6 "$_TF4"; PIP="$_TRV6_RESULT"
-
-                        if [ ! "$IPFLOW" == "" ] && [ ! "$PIP" == "" ] && [ ! "$PFLOW" == "" ] && [ ! "$PPORT" == "" ]; then
-                         if ipt_for_host "$PIP"; then
-                                eout "{trust} deny $PIP $PFLOW_T port $PPORT"
-                                $IPT_H $IPT_FLAGS -A $chain -p tcp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j $TCP_STOP
-				$IPT_H $IPT_FLAGS -A $chain -p udp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j $UDP_STOP
-                         fi
-                        fi
-                fi
-        done < <(grep -v '#' "$file" | grep '=' | grep -vw in | grep -vw out | grep -v tcp | grep -v udp)
-        #
-        #
-        while IFS= read -r i; do
-                if [ -n "$i" ] && [ -f "$file" ]; then
-                        trust_protect_ipv6 "$i"; i="$_TPV6_RESULT"
-
-                        trust_parse_fields "$i"
-
-                        NFLOW="$_TF1"
-                        if [ "$NFLOW" == "in" ]; then
-                                NFLOW="INPUT"
-                                NFLOW_T="inbound"
-                        elif [ "$NFLOW" == "out" ]; then
-                                NFLOW="OUTPUT"
-                                NFLOW_T="outbound"
-                        else
-                                continue
-                        fi
-
-                        PFLOW="$_TF2"
-                        if [ "$PFLOW" == "s" ]; then
-                                PFLOW="sport"
-                                PFLOW_T="from"
-                        elif [ "$PFLOW" == "d" ]; then
-                                PFLOW="dport"
-                                PFLOW_T="to"
-                        else
-                                continue
-                        fi
-
-                        PPORT="$_TF3"
-                        expand_port "$PPORT"; PPORT="$_PORT"
-
-                        IPFLOW="$_TF4"
-                        if [ "$IPFLOW" == "s" ]; then
-                                IPFLOW="s"
-                        elif [ "$IPFLOW" == "d" ]; then
-                                IPFLOW="d"
-                        else
-                                continue
-                        fi
-                        trust_restore_ipv6 "$_TF5"; PIP="$_TRV6_RESULT"
-
-                        if [ ! "$NFLOW" == "" ] && [ ! "$IPFLOW" == "" ] && [ ! "$PIP" == "" ] && [ ! "$PFLOW" == "" ] && [ ! "$PPORT" == "" ]; then
-                         if ipt_for_host "$PIP"; then
-                                eout "{trust} deny ($NFLOW_T) $PIP $PFLOW_T port $PPORT"
-                                $IPT_H $IPT_FLAGS -A $chain -p tcp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j $TCP_STOP
-				$IPT_H $IPT_FLAGS -A $chain -p udp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j $UDP_STOP
-                         fi
-                        fi
-                fi
-        done < <(grep -v '#' "$file" | grep '=' | grep -v tcp | grep -v udp)
-        #
-        #
-        while IFS= read -r i; do
-                if [ -n "$i" ] && [ -f "$file" ]; then
-                        trust_protect_ipv6 "$i"; i="$_TPV6_RESULT"
-
-                        trust_parse_fields "$i"
-
-                        PTYPE="$_TF1"
-                        if [ "$PTYPE" == "tcp" ]; then
-                                PTYPE="tcp"
-                        elif [ "$PTYPE" == "udp" ]; then
-                                PTYPE="udp"
-                        else
-                                continue
-                        fi
-
-                        NFLOW="$_TF2"
-                        if [ "$NFLOW" == "in" ]; then
-                                NFLOW="INPUT"
-                                NFLOW_T="inbound"
-                        elif [ "$NFLOW" == "out" ]; then
-                                NFLOW="OUTPUT"
-                                NFLOW_T="outbound"
-                        else
-                                continue
-                        fi
-
-                        PFLOW="$_TF3"
-                        if [ "$PFLOW" == "s" ]; then
-                                PFLOW="sport"
-                                PFLOW_T="from"
-                        elif [ "$PFLOW" == "d" ]; then
-                                PFLOW="dport"
-                                PFLOW_T="to"
-                        else
-                                continue
-                        fi
-
-                        PPORT="$_TF4"
-                        expand_port "$PPORT"; PPORT="$_PORT"
-
-                        IPFLOW="$_TF5"
-                        if [ "$IPFLOW" == "s" ]; then
-                                IPFLOW="s"
-                        elif [ "$IPFLOW" == "d" ]; then
-                                IPFLOW="d"
-                        else
-                                continue
-                        fi
-                        trust_restore_ipv6 "$_TF6"; PIP="$_TRV6_RESULT"
-
-                        if [ ! "$PTYPE" == "" ] && [ ! "$NFLOW" == "" ] && [ ! "$IPFLOW" == "" ] && [ ! "$PIP" == "" ] && [ ! "$PFLOW" == "" ] && [ ! "$PPORT" == "" ]; then
-                         if ipt_for_host "$PIP"; then
-				if [ "$PTYPE" == "tcp" ]; then
-        	                        eout "{trust} deny $NFLOW_T $PTYPE $PIP $PFLOW_T port $PPORT"
-	                                $IPT_H $IPT_FLAGS -A $chain -p $PTYPE -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j $TCP_STOP
-				elif [ "$PTYPE" == "udp" ]; then
-	                                eout "{trust} deny $NFLOW_T $PTYPE $PIP $PFLOW_T port $PPORT"
-					$IPT_H $IPT_FLAGS -A $chain -p $PTYPE -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j $UDP_STOP
-				fi
-                         fi
-                        fi
-                fi
-        done < <(grep -v '#' "$file" | grep '=')
-fi
-}
+deny_hosts() { trust_hosts "$1" "$2" "$ALL_STOP" "$TCP_STOP" "$UDP_STOP" "deny"; }
 
 
 dlist_resnet() {

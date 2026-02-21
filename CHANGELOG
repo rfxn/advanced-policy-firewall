@@ -41,6 +41,10 @@
 [Change] PPORT expansion in advanced trust loops replaced echo|grep/echo|tr|
       awk chains with expand_port(); eliminates 3-7 additional forks per
       entry with port range syntax (functions.apf)
+[Change] allow_hosts() and deny_hosts() unified into parameterized
+      trust_hosts() with action target and verb arguments; eliminates ~185
+      lines of duplicated trust parsing logic across 4 while-loops
+      (functions.apf)
 
 - 2.0.1 | Feb 20 2026:
 
