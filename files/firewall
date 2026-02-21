@@ -42,7 +42,7 @@ if [ -n "$IF" ] && [ "$VF_ROUTE" == "1" ]; then
  done
 fi
 if [ -n "$IFACE_TRUSTED" ] && [ "$VF_ROUTE" == "1" ]; then
- for i in $(echo $IFACE_TRUSTED | tr ',' ' '); do
+ for i in ${IFACE_TRUSTED//,/ }; do
   if [ -n "$ip" ]; then
 	VAL_IFACE_TRUSTED=$($ip route show dev $i 2>/dev/null)
   elif command -v route > /dev/null 2>&1; then
@@ -83,7 +83,7 @@ ipt -A OUTPUT -o lo -j ACCEPT
 
 # Allow all traffic on trusted interfaces
 if [ -n "$IFACE_TRUSTED" ]; then
- for i in $(echo $IFACE_TRUSTED | tr ',' ' '); do
+ for i in ${IFACE_TRUSTED//,/ }; do
  VAL_IF=$($ip addr list | grep -w "$i")
  if [ -z "$VAL_IF" ]; then
         eout "{glob} unable to verify status of interface $i; assuming untrusted"
@@ -196,7 +196,7 @@ if [ "$RAB" == "1" ]; then
 		fi
 	done
   fi
-  for i in $(echo $RAB_PSCAN_PORTS | tr ',' ' '); do
+  for i in ${RAB_PSCAN_PORTS//,/ }; do
    if [ "$LOG_DROP" == "1" ] || [ "$RAB_LOG_HIT" == "1" ]; then
 	   ipt -A RABPSCAN -p tcp --dport $i -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** RABHIT ** "
 	   ipt -A RABPSCAN -p udp --dport $i -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** RABHIT ** "

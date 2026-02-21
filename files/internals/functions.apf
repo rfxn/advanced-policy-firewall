@@ -735,7 +735,7 @@ for tos_val in 0 2 4 8 16; do
 	tos_var="TOS_$tos_val"
 	ports="${!tos_var}"
 	if [ -n "$ports" ]; then
-		for i in $(echo $ports | tr ',' ' '); do
+		for i in ${ports//,/ }; do
 			expand_port "$i"; i="$_PORT"
 			$IPT $IPT_FLAGS -t mangle -A $TYPE -p tcp --dport $i -j TOS --set-tos $tos_val
 			$IPT $IPT_FLAGS -t mangle -A $TYPE -p udp --dport $i -j TOS --set-tos $tos_val
@@ -744,7 +744,7 @@ for tos_val in 0 2 4 8 16; do
 done
 
 if [ -n "$TOS_DEF_RANGE" ]; then
-	for i in $(echo $TOS_DEF_RANGE | tr ',' ' '); do
+	for i in ${TOS_DEF_RANGE//,/ }; do
 		expand_port "$i"; i="$_PORT"
 		$IPT $IPT_FLAGS -t mangle -A $TYPE -p tcp --dport $i -j TOS --set-tos $TOS_DEF
 		$IPT $IPT_FLAGS -t mangle -A $TYPE -p udp --dport $i -j TOS --set-tos $TOS_DEF
@@ -968,7 +968,7 @@ dlist_resnet() {
  fi
 if [ -f "$WGET" ] && [ -f "$RESNET" ]; then
    URL_TMP=$(mktemp -d "$INSTALL_PATH/.apf-XXXXXX")
-   URL_FILE=$(echo $DLIST_RESERVED_URL | tr '/' '\n' | grep "." | tail -n 1)
+   URL_FILE="${DLIST_RESERVED_URL##*/}"
    cd "$URL_TMP"
    eout "{resnet} downloading $DLIST_RESERVED_URL"
    $WGET -t 1 -T 4 "$DLIST_RESERVED_URL" >> /dev/null 2>&1
@@ -1463,7 +1463,7 @@ fi
 cdports() {
 if [ -n "$BLK_PORTS" ]; then
 	eout "{glob} loading common drop ports"
-for i in $(echo $BLK_PORTS | tr ',' ' '); do
+for i in ${BLK_PORTS//,/ }; do
 	expand_port "$i"; i="$_PORT"
 	ipt -A INPUT  -p tcp --dport $i -j $TCP_STOP
 	ipt -A INPUT  -p udp --dport $i -j $UDP_STOP
@@ -1477,7 +1477,7 @@ fi
 
 lgate_mac() {
 ipt4 -N LMAC
-for mac in $(echo $LGATE_MAC | tr ',' ' '); do
+for mac in ${LGATE_MAC//,/ }; do
 MAC=$mac
 if [ -n "$MAC" ]; then
   ipt4 -A INPUT  -m mac ! --mac-source "$MAC" -j LMAC

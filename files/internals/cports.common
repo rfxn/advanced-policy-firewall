@@ -1,7 +1,6 @@
 if [ -n "$IG_TCP_CPORTS" ]; then
-IG_TCP_CPORTS=$(echo "$IG_TCP_CPORTS" | tr ',' ' ')
 PROTO="tcp"
-for i in $(echo $IG_TCP_CPORTS); do
+for i in ${IG_TCP_CPORTS//,/ }; do
         expand_port "$i"; i="$_PORT"
         ipt_dst -A INPUT -p $PROTO --dport $i -j ACCEPT
         eout "{glob} opening inbound $PROTO port $i on $VNET"
@@ -9,9 +8,8 @@ done
 fi
 
 if [ -n "$IG_UDP_CPORTS" ]; then
-IG_UDP_CPORTS=$(echo "$IG_UDP_CPORTS" | tr ',' ' ')
 PROTO="udp"
-for i in $(echo $IG_UDP_CPORTS); do
+for i in ${IG_UDP_CPORTS//,/ }; do
         expand_port "$i"; i="$_PORT"
         ipt_dst -A INPUT -p $PROTO --dport $i -j ACCEPT
         eout "{glob} opening inbound $PROTO port $i on $VNET"
@@ -20,9 +18,8 @@ fi
 
 if [ "$EGF" == "1" ]; then
 if [ -n "$EG_TCP_CPORTS" ]; then
-EG_TCP_CPORTS=$(echo "$EG_TCP_CPORTS" | tr ',' ' ')
 PROTO="tcp"
-for i in $(echo $EG_TCP_CPORTS); do
+for i in ${EG_TCP_CPORTS//,/ }; do
         expand_port "$i"; i="$_PORT"
         ipt_src -A OUTPUT -p $PROTO --dport $i -j ACCEPT
         eout "{glob} opening outbound $PROTO port $i on $VNET"
@@ -32,9 +29,8 @@ fi
 
 if [ "$EGF" == "1" ]; then
 if [ -n "$EG_UDP_CPORTS" ]; then
-EG_UDP_CPORTS=$(echo "$EG_UDP_CPORTS" | tr ',' ' ')
 PROTO="udp"
-for i in $(echo $EG_UDP_CPORTS); do
+for i in ${EG_UDP_CPORTS//,/ }; do
         expand_port "$i"; i="$_PORT"
         ipt_src -A OUTPUT -p $PROTO --dport $i -j ACCEPT
         eout "{glob} opening outbound $PROTO port $i on $VNET"
@@ -47,15 +43,14 @@ PROTO="icmp"
 if [ -z "$ICMP_LIM" ]; then
 	ICMP_LIM=0
 fi
-if [ "$(echo $ICMP_LIM | tr '/' ' ' | awk '{print$1}')" -gt "0" ]; then
+if [ "${ICMP_LIM%%/*}" -gt "0" ]; then
 	ICMP_EARGS="-m limit --limit $ICMP_LIM"
 else
 	ICMP_EARGS=""
 fi
-IG_ICMP_TYPES=$(echo $IG_ICMP_TYPES | tr ',' ' ')
-	for i in $(echo $IG_ICMP_TYPES); do
+	for i in ${IG_ICMP_TYPES//,/ }; do
          if [ -n "$i" ]; then
-                i=$(echo $i | tr '[:upper:]' '[:lower:]')
+                i="${i,,}"
                 if [ "$i" == "all" ]; then
                   ipt4 -A INPUT -p icmp -d $VNET $ICMP_EARGS -j ACCEPT
                   eout "{glob} opening inbound $PROTO all on $VNET"
@@ -80,15 +75,14 @@ PROTO="ipv6-icmp"
 if [ -z "$ICMP_LIM" ]; then
 	ICMP_LIM=0
 fi
-if [ "$(echo $ICMP_LIM | tr '/' ' ' | awk '{print$1}')" -gt "0" ]; then
+if [ "${ICMP_LIM%%/*}" -gt "0" ]; then
 	ICMP_EARGS="-m limit --limit $ICMP_LIM"
 else
 	ICMP_EARGS=""
 fi
-IG_ICMPV6_TYPES=$(echo $IG_ICMPV6_TYPES | tr ',' ' ')
-	for i in $(echo $IG_ICMPV6_TYPES); do
+	for i in ${IG_ICMPV6_TYPES//,/ }; do
          if [ -n "$i" ]; then
-                i=$(echo $i | tr '[:upper:]' '[:lower:]')
+                i="${i,,}"
                 if [ "$i" == "all" ]; then
                   ipt6 -A INPUT -p ipv6-icmp $ICMP_EARGS -j ACCEPT
                   eout "{glob} opening inbound $PROTO all"
@@ -107,15 +101,14 @@ PROTO="icmp"
 if [ -z "$ICMP_LIM" ]; then
         ICMP_LIM=0
 fi
-if [ "$(echo $ICMP_LIM | tr '/' ' ' | awk '{print$1}')" -gt "0" ]; then
+if [ "${ICMP_LIM%%/*}" -gt "0" ]; then
         ICMP_EARGS="-m limit --limit $ICMP_LIM"
 else
         ICMP_EARGS=""
 fi
-EG_ICMP_TYPES=$(echo $EG_ICMP_TYPES | tr ',' ' ')
-        for i in $(echo $EG_ICMP_TYPES); do
+        for i in ${EG_ICMP_TYPES//,/ }; do
          if [ -n "$i" ]; then
-		i=$(echo $i | tr '[:upper:]' '[:lower:]')
+		i="${i,,}"
 		if [ "$i" == "all" ]; then
                   ipt4 -A OUTPUT -p icmp -s $VNET $ICMP_EARGS -j ACCEPT
                   eout "{glob} opening outbound $PROTO all on $VNET"
@@ -141,15 +134,14 @@ PROTO="ipv6-icmp"
 if [ -z "$ICMP_LIM" ]; then
         ICMP_LIM=0
 fi
-if [ "$(echo $ICMP_LIM | tr '/' ' ' | awk '{print$1}')" -gt "0" ]; then
+if [ "${ICMP_LIM%%/*}" -gt "0" ]; then
         ICMP_EARGS="-m limit --limit $ICMP_LIM"
 else
         ICMP_EARGS=""
 fi
-EG_ICMPV6_TYPES=$(echo $EG_ICMPV6_TYPES | tr ',' ' ')
-        for i in $(echo $EG_ICMPV6_TYPES); do
+        for i in ${EG_ICMPV6_TYPES//,/ }; do
          if [ -n "$i" ]; then
-		i=$(echo $i | tr '[:upper:]' '[:lower:]')
+		i="${i,,}"
 		if [ "$i" == "all" ]; then
                   ipt6 -A OUTPUT -p ipv6-icmp $ICMP_EARGS -j ACCEPT
                   eout "{glob} opening outbound $PROTO all"
@@ -164,9 +156,8 @@ fi
 
 if [ "$EGF" == "1" ]; then
 if [ -n "$EG_TCP_UID" ]; then
-EG_TCP_UID=$(echo "$EG_TCP_UID" | tr ',' ' ')
 PROTO="tcp"
-for i in $(echo $EG_TCP_UID); do
+for i in ${EG_TCP_UID//,/ }; do
 uid=$(echo $i | tr ':' ' ' | awk '{print$1}')
 port=$(echo $i | tr ':' ' ' | awk '{print$2}')
         expand_port "$port"; port="$_PORT"
@@ -178,9 +169,8 @@ fi
 
 if [ "$EGF" == "1" ]; then
 if [ -n "$EG_UDP_UID" ]; then
-EG_UDP_UID=$(echo "$EG_UDP_UID" | tr ',' ' ')
 PROTO="udp"
-for i in $(echo $EG_UDP_UID); do
+for i in ${EG_UDP_UID//,/ }; do
 uid=$(echo $i | tr ':' ' ' | awk '{print$1}')
 port=$(echo $i | tr ':' ' ' | awk '{print$2}')
         expand_port "$port"; port="$_PORT"
@@ -198,7 +188,7 @@ if [ "$EGF" == "1" ]; then
 		ipt4 -F _DEG_TEST >> /dev/null 2>&1
 		ipt4 -X _DEG_TEST >> /dev/null 2>&1
 		ipt4 -N DEG
-		for i in $(echo $EG_DROP_CMD | tr ',' ' '); do
+		for i in ${EG_DROP_CMD//,/ }; do
 			si=$(echo $i | cut -c 1-6)
 			if [ "$LOG_DROP" == "1" ]; then
 			  ipt4 -A DEG -m owner --cmd-owner=$i -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** DEG_$si ** "

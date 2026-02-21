@@ -54,6 +54,24 @@
       idiom, zero behavioral change (apf, firewall, functions.apf,
       cports.common, bt.rules, sysctl.rules, vnetgen, main.vnet, get_ports,
       install.sh)
+[Change] Replace echo|tr subprocess chains with bash parameter expansion:
+      comma-split $(echo $x | tr ',' ' ') → ${x//,/ }, lowercase
+      $(echo $x | tr '[:upper:]' '[:lower:]') → ${x,,}, uppercase
+      $(echo $x | tr '[:lower:]' '[:upper:]') → ${x^^}; eliminates 2
+      fork+exec calls per invocation across ~27 sites (cports.common,
+      functions.apf, firewall, bt.rules, internals.conf, vnetgen)
+[Change] ICMP_LIM rate parsing $(echo $x | tr '/' ' ' | awk '{print$1}')
+      → ${x%%/*} in 4 ICMP filter blocks; eliminates 3 fork+exec calls each
+      (cports.common)
+[Change] dlist_resnet URL_FILE extraction: echo|tr|grep|tail pipe replaced
+      with ${url##*/} parameter expansion (functions.apf)
+[Change] vnetgen trusted interface lookup: echo|tr|grep pipe replaced with
+      [[ ",$list," == *,"$item",* ]] bash builtin test (vnetgen)
+[Change] bt.rules IDENT port check: echo|tr|grep pipe replaced with
+      [[ ",$list," == *,113,* ]] bash builtin test (bt.rules)
+[Change] Remove unnecessary $(echo $var) wrappers in for loops; redundant
+      when variable is already space-separated (cports.common, functions.apf,
+      firewall)
 
 - 2.0.1 | Feb 20 2026:
 

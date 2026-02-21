@@ -337,7 +337,7 @@ fi
 if [ "$BLK_IDENT" = "1" ]; then
 	eout "{blk_ident} set active BLK_IDENT"
 	# Reject ident request if not defined in IG_TCP_CPORTS
-	if [ "$(echo "$IG_TCP_CPORTS" | tr ',' '\n' | grep -w 113)" == "" ]; then
+	if [[ ",$IG_TCP_CPORTS," != *,113,* ]]; then
 		eout "{blk_ident} reject all to/from tcp port 113"
 		ipt -N IDENT
                 if [ "$LOG_DROP" == "1" ]; then
@@ -407,7 +407,7 @@ if [ -n "$BLK_P2P_PORTS" ]; then
         eout "{blk_p2p} set active BLK_P2P"
         # Drop traffic to/from common p2p ports
         ipt -N P2P
-        for i in $(echo $BLK_P2P_PORTS | tr ',' ' '); do
+        for i in ${BLK_P2P_PORTS//,/ }; do
                 PORT=$i
                 if [[ "$i" != *_* ]]; then
                         eout "{blk_p2p} deny all to/from tcp port $i"
