@@ -119,6 +119,23 @@ expand_port() {
 	fi
 }
 
+load_local_addrs() {
+	# Cache local address files into _LOCAL_ADDRS for is_local_addr() lookups
+	_LOCAL_ADDRS=""
+	[ -f "$INSTALL_PATH/internals/.localaddrs" ] && \
+		_LOCAL_ADDRS=$(< "$INSTALL_PATH/internals/.localaddrs")
+	[ -f "$INSTALL_PATH/internals/.localaddrs6" ] && \
+		_LOCAL_ADDRS="$_LOCAL_ADDRS"$'\n'"$(< "$INSTALL_PATH/internals/.localaddrs6")"
+}
+
+is_local_addr() {
+	local line
+	while IFS= read -r line; do
+		[ "$line" = "$1" ] && return 0
+	done <<< "$_LOCAL_ADDRS"
+	return 1
+}
+
 ml() {
  FATAL="$2"
  MEXT="ko"
@@ -437,10 +454,10 @@ cli_trust() {
             fi
         done
 	valtrust="$tlist"
-        valip=$(cat "$INSTALL_PATH/internals/.localaddrs" "$INSTALL_PATH/internals/.localaddrs6" 2>/dev/null | grep -w "$HOST")
+        load_local_addrs
         if [ "$valtrust" ]; then
                 echo "$HOST already exists in $tlist"
-        elif [ "$valip" ]; then
+        elif is_local_addr "$HOST"; then
                 echo "$HOST is a local address and can not be added to the trust system"
         elif ! ipt_for_host "$HOST"; then
                 echo "$HOST appears to be IPv6 but USE_IPV6 is not enabled"
@@ -734,6 +751,7 @@ ovars() {
 allow_hosts() {
 file="$1"
 chain="$2"
+load_local_addrs
 if [ -z "$file" ] || [ -z "$chain" ]; then
         eout "could not process allow_hosts $file $chain, fatal error, aborting!"
         $INSTALL_PATH/apf -f
@@ -751,8 +769,7 @@ if [ ! "$(cat $file | grep -v "#")" == "" ]; then
                         eout "{trust} skipping invalid entry in $file: $i"
                         continue
                 fi
-                val=$(cat "$INSTALL_PATH/internals/.localaddrs" "$INSTALL_PATH/internals/.localaddrs6" 2>/dev/null | grep -w "$i")
-                if [ ! "$val" ]; then
+                if ! is_local_addr "$i"; then
                  if [ -f "$file" ]; then
                   if ipt_for_host "$i"; then
                         eout "{trust} allow all to/from $i"
@@ -848,9 +865,9 @@ if [ ! "$(cat $file | grep -v "#")" == "" ]; then
                         trust_restore_ipv6 "$(echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$5}')"; PIP="$_TRV6_RESULT"
 
                         if [ ! "$NFLOW" == "" ] && [ ! "$IPFLOW" == "" ] && [ ! "$PIP" == "" ] && [ ! "$PFLOW" == "" ] && [ ! "$PPORT" == "" ]; then
-                         if [ "$IPFLOW" == "s" ] && [ "$NFLOW" == "INPUT" ] && [ "$(cat "$INSTALL_PATH/internals/.localaddrs" "$INSTALL_PATH/internals/.localaddrs6" 2>/dev/null | grep -w "$PIP")" ]; then
+                         if [ "$IPFLOW" == "s" ] && [ "$NFLOW" == "INPUT" ] && is_local_addr "$PIP"; then
                                 eout "{trust} ignored local ip allow rule '$NFLOW_T $PIP $PFLOW_T port $PPORT'"
-                         elif [ "$IPFLOW" == "d" ] && [ "$NFLOW" == "OUTPUT" ] && [ "$(cat "$INSTALL_PATH/internals/.localaddrs" "$INSTALL_PATH/internals/.localaddrs6" 2>/dev/null | grep -w "$PIP")" ]; then
+                         elif [ "$IPFLOW" == "d" ] && [ "$NFLOW" == "OUTPUT" ] && is_local_addr "$PIP"; then
                                 eout "{trust} ignored local ip allow rule '$NFLOW_T $PIP $PFLOW_T port $PPORT'"
                          elif ipt_for_host "$PIP"; then
                                 eout "{trust} allow $NFLOW_T $PIP $PFLOW_T port $PPORT"
@@ -915,9 +932,9 @@ if [ ! "$(cat $file | grep -v "#")" == "" ]; then
                         trust_restore_ipv6 "$(echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$6}')"; PIP="$_TRV6_RESULT"
 
                         if [ ! "$PTYPE" == "" ] && [ ! "$NFLOW" == "" ] && [ ! "$IPFLOW" == "" ] && [ ! "$PIP" == "" ] && [ ! "$PFLOW" == "" ] && [ ! "$PPORT" == "" ]; then
-                         if [ "$IPFLOW" == "s" ] && [ "$NFLOW" == "INPUT" ] && [ "$(cat "$INSTALL_PATH/internals/.localaddrs" "$INSTALL_PATH/internals/.localaddrs6" 2>/dev/null | grep -w "$PIP")" ]; then
+                         if [ "$IPFLOW" == "s" ] && [ "$NFLOW" == "INPUT" ] && is_local_addr "$PIP"; then
                                 eout "{trust} ignored local ip allow rule '$NFLOW_T $PIP $PFLOW_T port $PPORT'"
-                         elif [ "$IPFLOW" == "d" ] && [ "$NFLOW" == "OUTPUT" ] && [ "$(cat "$INSTALL_PATH/internals/.localaddrs" "$INSTALL_PATH/internals/.localaddrs6" 2>/dev/null | grep -w "$PIP")" ]; then
+                         elif [ "$IPFLOW" == "d" ] && [ "$NFLOW" == "OUTPUT" ] && is_local_addr "$PIP"; then
                                 eout "{trust} ignored local ip allow rule '$NFLOW_T $PIP $PFLOW_T port $PPORT'"
                          elif ipt_for_host "$PIP"; then
                                 if [ "$PTYPE" == "tcp" ]; then
@@ -938,6 +955,7 @@ fi
 deny_hosts() {
 file=$1
 chain=$2
+load_local_addrs
 if [ -z "$file" ] || [ -z "$chain" ]; then
 	eout "could not process deny_hosts $file $chain, fatal error, aborting!"
 	$INSTALL_PATH/apf -f
@@ -955,8 +973,7 @@ if [ ! "$(cat $file | grep -v "#")" == "" ]; then
                         eout "{trust} skipping invalid entry in $file: $i"
                         continue
                 fi
-                val="$(cat "$INSTALL_PATH/internals/.localaddrs" "$INSTALL_PATH/internals/.localaddrs6" 2>/dev/null | grep -w "$i")"
-                if [ ! "$val" ]; then
+                if ! is_local_addr "$i"; then
                  if [ -f "$file" ]; then
                   if ipt_for_host "$i"; then
                         eout "{trust} deny all to/from $i"

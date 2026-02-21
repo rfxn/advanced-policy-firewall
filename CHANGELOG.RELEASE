@@ -30,3 +30,7 @@
 [Change] tosroute() consolidated from 6 identical TOS blocks (~48 lines) to
       single loop with indirect variable expansion (~18 lines); replaces 6
       echo|tr subprocess calls with expand_port (functions.apf)
+[New] load_local_addrs() and is_local_addr() cache .localaddrs/.localaddrs6
+      into a shell variable at function entry; replaces 7 cat|grep subprocess
+      chains (2 forks each) with zero-fork string comparison in
+      cli_trust/allow_hosts/deny_hosts (functions.apf)
