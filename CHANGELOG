@@ -12,6 +12,10 @@
       subprocess calls with bash builtins ([[ =~ ]] and [[ == *pattern* ]]);
       eliminates 2-6 fork+exec calls per invocation in hot validation paths
       (functions.apf)
+[Change] trust_protect_ipv6() and trust_restore_ipv6() converted from echo
+      return to variable-return (_TPV6_RESULT, _TRV6_RESULT); eliminates 1
+      subshell fork per advanced trust entry across 12 call sites in
+      allow_hosts/deny_hosts (functions.apf)
 
 - 2.0.1 | Feb 20 2026:
 

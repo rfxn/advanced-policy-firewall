@@ -88,23 +88,25 @@ ipt_for_host() {
 trust_protect_ipv6() {
 	# Protect bracketed IPv6 in advanced trust entries from colon-splitting
 	# Input:  "d=22:s=[2001:db8::1]"  Output: "d=22:s=2001@db8@@1"
+	# Result in _TPV6_RESULT (variable-return, no subshell)
 	local entry="$1"
 	case "$entry" in
 		*\[*\]*)
 			local ipv6="${entry#*\[}"
 			ipv6="${ipv6%%\]*}"
 			local safe="${ipv6//:/@}"
-			echo "${entry/\[$ipv6\]/$safe}"
+			_TPV6_RESULT="${entry/\[$ipv6\]/$safe}"
 			;;
 		*)
-			echo "$entry"
+			_TPV6_RESULT="$entry"
 			;;
 	esac
 }
 
 trust_restore_ipv6() {
 	# Restore @ placeholders back to colons after awk field extraction
-	echo "${1//@/:}"
+	# Result in _TRV6_RESULT (variable-return, no subshell)
+	_TRV6_RESULT="${1//@/:}"
 }
 
 ml() {
@@ -781,7 +783,7 @@ if [ ! "$(cat $file | grep -v "#")" == "" ]; then
         #
         while IFS= read -r i; do
                 if [ -n "$i" ] && [ -f "$file" ]; then
-                        i=$(trust_protect_ipv6 "$i")
+                        trust_protect_ipv6 "$i"; i="$_TPV6_RESULT"
 
                         PFLOW=$(echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$1}')
                 if [ "$PFLOW" == "s" ]; then
@@ -806,7 +808,7 @@ if [ ! "$(cat $file | grep -v "#")" == "" ]; then
                         else
                                 continue
                         fi
-                        PIP=$(trust_restore_ipv6 "$(echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$4}')")
+                        trust_restore_ipv6 "$(echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$4}')"; PIP="$_TRV6_RESULT"
 
                         if [ ! "$IPFLOW" == "" ] && [ ! "$PIP" == "" ] && [ ! "$PFLOW" == "" ] && [ ! "$PPORT" == "" ]; then
                          if ipt_for_host "$PIP"; then
@@ -821,7 +823,7 @@ if [ ! "$(cat $file | grep -v "#")" == "" ]; then
         #
         while IFS= read -r i; do
                 if [ -n "$i" ] && [ -f "$file" ]; then
-                        i=$(trust_protect_ipv6 "$i")
+                        trust_protect_ipv6 "$i"; i="$_TPV6_RESULT"
 
                         NFLOW=$(echo $i | tr ':' ' ' | tr '=' ' '| awk '{print$1}')
                         if [ "$NFLOW" == "in" ]; then
@@ -860,7 +862,7 @@ if [ ! "$(cat $file | grep -v "#")" == "" ]; then
                         else
                                 continue
                         fi
-                        PIP=$(trust_restore_ipv6 "$(echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$5}')")
+                        trust_restore_ipv6 "$(echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$5}')"; PIP="$_TRV6_RESULT"
 
                         if [ ! "$NFLOW" == "" ] && [ ! "$IPFLOW" == "" ] && [ ! "$PIP" == "" ] && [ ! "$PFLOW" == "" ] && [ ! "$PPORT" == "" ]; then
                          if [ "$IPFLOW" == "s" ] && [ "$NFLOW" == "INPUT" ] && [ "$(cat "$INSTALL_PATH/internals/.localaddrs" "$INSTALL_PATH/internals/.localaddrs6" 2>/dev/null | grep -w "$PIP")" ]; then
@@ -879,7 +881,7 @@ if [ ! "$(cat $file | grep -v "#")" == "" ]; then
         #
         while IFS= read -r i; do
                 if [ -n "$i" ] && [ -f "$file" ]; then
-                        i=$(trust_protect_ipv6 "$i")
+                        trust_protect_ipv6 "$i"; i="$_TPV6_RESULT"
 
                         PTYPE=$(echo $i | tr ':' ' ' | tr '=' ' '| awk '{print$1}')
                         if [ "$PTYPE" == "tcp" ]; then
@@ -927,7 +929,7 @@ if [ ! "$(cat $file | grep -v "#")" == "" ]; then
                         else
                                 continue
                         fi
-                        PIP=$(trust_restore_ipv6 "$(echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$6}')")
+                        trust_restore_ipv6 "$(echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$6}')"; PIP="$_TRV6_RESULT"
 
                         if [ ! "$PTYPE" == "" ] && [ ! "$NFLOW" == "" ] && [ ! "$IPFLOW" == "" ] && [ ! "$PIP" == "" ] && [ ! "$PFLOW" == "" ] && [ ! "$PPORT" == "" ]; then
                          if [ "$IPFLOW" == "s" ] && [ "$NFLOW" == "INPUT" ] && [ "$(cat "$INSTALL_PATH/internals/.localaddrs" "$INSTALL_PATH/internals/.localaddrs6" 2>/dev/null | grep -w "$PIP")" ]; then
@@ -985,7 +987,7 @@ if [ ! "$(cat $file | grep -v "#")" == "" ]; then
         #
 	while IFS= read -r i; do
                 if [ -n "$i" ] && [ -f "$file" ]; then
-                        i=$(trust_protect_ipv6 "$i")
+                        trust_protect_ipv6 "$i"; i="$_TPV6_RESULT"
 
                         PFLOW=$(echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$1}')
                         if [ "$PFLOW" == "s" ]; then
@@ -1010,7 +1012,7 @@ if [ ! "$(cat $file | grep -v "#")" == "" ]; then
                         else
                                 continue
                         fi
-                        PIP=$(trust_restore_ipv6 "$(echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$4}')")
+                        trust_restore_ipv6 "$(echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$4}')"; PIP="$_TRV6_RESULT"
 
                         if [ ! "$IPFLOW" == "" ] && [ ! "$PIP" == "" ] && [ ! "$PFLOW" == "" ] && [ ! "$PPORT" == "" ]; then
                          if ipt_for_host "$PIP"; then
@@ -1025,7 +1027,7 @@ if [ ! "$(cat $file | grep -v "#")" == "" ]; then
         #
         while IFS= read -r i; do
                 if [ -n "$i" ] && [ -f "$file" ]; then
-                        i=$(trust_protect_ipv6 "$i")
+                        trust_protect_ipv6 "$i"; i="$_TPV6_RESULT"
 
                         NFLOW=$(echo $i | tr ':' ' ' | tr '=' ' '| awk '{print$1}')
                         if [ "$NFLOW" == "in" ]; then
@@ -1064,7 +1066,7 @@ if [ ! "$(cat $file | grep -v "#")" == "" ]; then
                         else
                                 continue
                         fi
-                        PIP=$(trust_restore_ipv6 "$(echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$5}')")
+                        trust_restore_ipv6 "$(echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$5}')"; PIP="$_TRV6_RESULT"
 
                         if [ ! "$NFLOW" == "" ] && [ ! "$IPFLOW" == "" ] && [ ! "$PIP" == "" ] && [ ! "$PFLOW" == "" ] && [ ! "$PPORT" == "" ]; then
                          if ipt_for_host "$PIP"; then
@@ -1079,7 +1081,7 @@ if [ ! "$(cat $file | grep -v "#")" == "" ]; then
         #
         while IFS= read -r i; do
                 if [ -n "$i" ] && [ -f "$file" ]; then
-                        i=$(trust_protect_ipv6 "$i")
+                        trust_protect_ipv6 "$i"; i="$_TPV6_RESULT"
 
                         PTYPE=$(echo $i | tr ':' ' ' | tr '=' ' '| awk '{print$1}')
                         if [ "$PTYPE" == "tcp" ]; then
@@ -1127,7 +1129,7 @@ if [ ! "$(cat $file | grep -v "#")" == "" ]; then
                         else
                                 continue
                         fi
-                        PIP=$(trust_restore_ipv6 "$(echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$6}')")
+                        trust_restore_ipv6 "$(echo $i | tr ':' ' ' | tr '=' ' ' | awk '{print$6}')"; PIP="$_TRV6_RESULT"
 
                         if [ ! "$PTYPE" == "" ] && [ ! "$NFLOW" == "" ] && [ ! "$IPFLOW" == "" ] && [ ! "$PIP" == "" ] && [ ! "$PFLOW" == "" ] && [ ! "$PPORT" == "" ]; then
                          if ipt_for_host "$PIP"; then
