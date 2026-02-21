@@ -10,7 +10,7 @@
 
 eout() {
 arg=$1
-        if [ ! "$arg" == "" ]; then
+        if [ -n "$arg" ]; then
                 echo "$(date +"%b %d %H:%M:%S") $(hostname -s) $APPN($$): $arg" >> "$LOG_APF"
                 if [ "$SET_VERBOSE" == "1" ] || [ "$2" == "1" ]; then
                         echo "$APPN($$): $arg"
@@ -22,7 +22,7 @@ devm() {
  cron_file="/etc/cron.d/apf_develmode"
  if [ "$DEVEL_MODE" == "1" ]; then
         DEVEL_ON=1
-        if [ ! "$SET_VERBOSE" == "1" ]; then
+        if [ "$SET_VERBOSE" != "1" ]; then
                 eout "{glob} !!DEVELOPMENT MODE ENABLED!! - firewall will flush every 5 minutes." 1
         fi
         echo "*/5 * * * * root $INSTALL_PATH/apf -f >> /dev/null 2>&1" > "$cron_file"
@@ -169,7 +169,7 @@ ml() {
 
  # Module not found
  if [ "$FATAL" == "1" ]; then
-        if [ ! "$SET_VERBOSE" == "1" ]; then
+        if [ "$SET_VERBOSE" != "1" ]; then
                 echo "Unable to load iptables module ($1), aborting."
                 echo "  On RHEL/Alma/Rocky 10, try: dnf install kernel-modules-extra"
         fi
@@ -183,11 +183,11 @@ modinit() {
  # Remove ipchains module if loaded (kernel 2.4 only)
  if [ "$KREL" == "2.4" ]; then
   IPC_VAL=$($LSM | grep ipchains)
-  if [ ! "$IPC_VAL" == "" ]; then
+  if [ -n "$IPC_VAL" ]; then
         $RMM ipchains
   fi
  fi
- if [ ! "$SET_MONOKERN" == "1" ]; then
+ if [ "$SET_MONOKERN" != "1" ]; then
         # Loading Kernel Modules
         ml ip_tables 1
  fi
@@ -341,17 +341,17 @@ trim() {
  FILE=$1
  MAXLINES=$2
 
- if [ "$MAXLINES" == "" ]; then
+ if [ -z "$MAXLINES" ]; then
 	MAXLINES=0
  fi
- if [ ! "$MAXLINES" == "0" ] && [ -f "$FILE" ]; then
+ if [ "$MAXLINES" != "0" ] && [ -f "$FILE" ]; then
 	LINES=$(cat "$FILE" | grep -v "#" | grep -c "")
         if [ "$LINES" -gt "$MAXLINES" ]; then
                 eout "{glob} trimming $FILE to $MAXLINES lines"
                 CHK_CMT=$(tail -n "$MAXLINES" "$FILE" | grep -c "#")
                 MAXLINES=$(($CHK_CMT+$MAXLINES))
                 CHK_SCMT=$(tail -n "$MAXLINES" "$FILE" | tac | tail -n 1 | grep "#")
-                if [ "$CHK_SCMT" == "" ]; then
+                if [ -z "$CHK_SCMT" ]; then
                         MAXLINES=$((1+$MAXLINES))
                 fi
                 tail -n "$MAXLINES" "$FILE" > "$FILE.new"
@@ -452,7 +452,7 @@ cli_trust() {
  FILE="$3"
  HOST="$4"
  CMT="$5"
- if [ ! "$HOST" == "" ]; then
+ if [ -n "$HOST" ]; then
 	if ! valid_host "$HOST"; then
 		echo "Invalid host '$HOST': must be a valid IP/IPv6 address, CIDR block, or FQDN"
 		return 1
@@ -487,7 +487,7 @@ cli_trust() {
 	        $IPT_H $IPT_FLAGS -I $CHAIN -s $HOST -j $JACTION
 	       	$IPT_H $IPT_FLAGS -I $CHAIN -d $HOST -j $JACTION
 	        eout "(trust) added $ACTION all to/from $HOST"
-	        if [ ! "$SET_VERBOSE" == "1" ]; then
+	        if [ "$SET_VERBOSE" != "1" ]; then
 		        echo "Inserted into firewall: $ACTION all to/from $HOST"
 		fi
         fi
@@ -609,7 +609,7 @@ flush_apf_chains() {
 
 flush() {
 firewall_on=$($IPT $IPT_FLAGS -L --numeric | grep -vE "Chain|destination")
-if [ "$SET_FASTLOAD" == "1" ] && [ "$DOCKER_COMPAT" != "1" ] && [ ! "$1" == "1" ] && [ ! "$DEVEL_ON" == "1" ] && [ ! "$firewall_on" == "" ]; then
+if [ "$SET_FASTLOAD" == "1" ] && [ "$DOCKER_COMPAT" != "1" ] && [ "$1" != "1" ] && [ "$DEVEL_ON" != "1" ] && [ -n "$firewall_on" ]; then
 	$IPTS > $INSTALL_PATH/internals/.apf.restore
 	if [ "$USE_IPV6" == "1" ] && [ -n "$IP6TS" ]; then
 		$IP6TS > $INSTALL_PATH/internals/.apf6.restore
@@ -771,7 +771,7 @@ if [ -z "$file" ] || [ -z "$chain" ]; then
         exit 1
 fi
 
-if [ ! "$(cat $file | grep -v "#")" == "" ]; then
+if [ -n "$(cat $file | grep -v "#")" ]; then
         eout "{glob} loading $file"
         #
         #
@@ -819,7 +819,7 @@ if [ ! "$(cat $file | grep -v "#")" == "" ]; then
                         fi
                         trust_restore_ipv6 "$_TF4"; PIP="$_TRV6_RESULT"
 
-                        if [ ! "$IPFLOW" == "" ] && [ ! "$PIP" == "" ] && [ ! "$PFLOW" == "" ] && [ ! "$PPORT" == "" ]; then
+                        if [ -n "$IPFLOW" ] && [ -n "$PIP" ] && [ -n "$PFLOW" ] && [ -n "$PPORT" ]; then
                          if ipt_for_host "$PIP"; then
                                 eout "{trust} $verb $PIP $PFLOW_T port $PPORT"
                                 $IPT_H $IPT_FLAGS -A $chain -p tcp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j $action_tcp
@@ -871,7 +871,7 @@ if [ ! "$(cat $file | grep -v "#")" == "" ]; then
                         fi
                         trust_restore_ipv6 "$_TF5"; PIP="$_TRV6_RESULT"
 
-                        if [ ! "$NFLOW" == "" ] && [ ! "$IPFLOW" == "" ] && [ ! "$PIP" == "" ] && [ ! "$PFLOW" == "" ] && [ ! "$PPORT" == "" ]; then
+                        if [ -n "$NFLOW" ] && [ -n "$IPFLOW" ] && [ -n "$PIP" ] && [ -n "$PFLOW" ] && [ -n "$PPORT" ]; then
                          if [ "$verb" == "allow" ] && [ "$IPFLOW" == "s" ] && [ "$NFLOW" == "INPUT" ] && is_local_addr "$PIP"; then
                                 eout "{trust} ignored local ip $verb rule '$NFLOW_T $PIP $PFLOW_T port $PPORT'"
                          elif [ "$verb" == "allow" ] && [ "$IPFLOW" == "d" ] && [ "$NFLOW" == "OUTPUT" ] && is_local_addr "$PIP"; then
@@ -936,7 +936,7 @@ if [ ! "$(cat $file | grep -v "#")" == "" ]; then
                         fi
                         trust_restore_ipv6 "$_TF6"; PIP="$_TRV6_RESULT"
 
-                        if [ ! "$PTYPE" == "" ] && [ ! "$NFLOW" == "" ] && [ ! "$IPFLOW" == "" ] && [ ! "$PIP" == "" ] && [ ! "$PFLOW" == "" ] && [ ! "$PPORT" == "" ]; then
+                        if [ -n "$PTYPE" ] && [ -n "$NFLOW" ] && [ -n "$IPFLOW" ] && [ -n "$PIP" ] && [ -n "$PFLOW" ] && [ -n "$PPORT" ]; then
                          if [ "$verb" == "allow" ] && [ "$IPFLOW" == "s" ] && [ "$NFLOW" == "INPUT" ] && is_local_addr "$PIP"; then
                                 eout "{trust} ignored local ip $verb rule '$NFLOW_T $PIP $PFLOW_T port $PPORT'"
                          elif [ "$verb" == "allow" ] && [ "$IPFLOW" == "d" ] && [ "$NFLOW" == "OUTPUT" ] && is_local_addr "$PIP"; then
@@ -1032,7 +1032,7 @@ cd "$INSTALL_PATH"
 }
 
 dlist_php() {
-if [ ! "$DLIST_PHP_URL" == "" ] && [ "$DLIST_PHP" == "1" ] && [ -f "$WGET" ]; then
+if [ -n "$DLIST_PHP_URL" ] && [ "$DLIST_PHP" == "1" ] && [ -f "$WGET" ]; then
    dlist_download "php" "$DLIST_PHP_URL" "$PHP_HOSTS"
 else
    rm -f "$PHP_HOSTS"; touch "$PHP_HOSTS"; chmod 600 "$PHP_HOSTS"
@@ -1040,7 +1040,7 @@ fi
 }
 
 dlist_php_hosts() {
-if [ ! "$(cat $PHP_HOSTS | grep -v "#")" == "" ]; then
+if [ -n "$(cat $PHP_HOSTS | grep -v "#")" ]; then
         eout "{php} loading php_hosts.rules"
         ipt -N PHP
         while IFS= read -r i; do
@@ -1064,7 +1064,7 @@ fi
 }
 
 dlist_dshield() {
-if [ ! "$DLIST_DSHIELD_URL" == "" ] && [ "$DLIST_DSHIELD" == "1" ] && [ -f "$WGET" ]; then
+if [ -n "$DLIST_DSHIELD_URL" ] && [ "$DLIST_DSHIELD" == "1" ] && [ -f "$WGET" ]; then
    dlist_download "dshield" "$DLIST_DSHIELD_URL" "$DS_HOSTS"
 else
    rm -f "$DS_HOSTS"; touch "$DS_HOSTS"; chmod 600 "$DS_HOSTS"
@@ -1072,7 +1072,7 @@ fi
 }
 
 dlist_dshield_hosts() {
-if [ ! "$(cat $DS_HOSTS | grep -v "#")" == "" ]; then
+if [ -n "$(cat $DS_HOSTS | grep -v "#")" ]; then
         eout "{dshield} loading ds_hosts.rules"
         ipt -N DSHIELD
         while IFS= read -r i; do
@@ -1096,7 +1096,7 @@ fi
 }
 
 dlist_spamhaus() {
-if [ ! "$DLIST_SPAMHAUS_URL" == "" ] && [ "$DLIST_SPAMHAUS" == "1" ] && [ -f "$WGET" ]; then
+if [ -n "$DLIST_SPAMHAUS_URL" ] && [ "$DLIST_SPAMHAUS" == "1" ] && [ -f "$WGET" ]; then
    dlist_download "sdrop" "$DLIST_SPAMHAUS_URL" "$DROP_HOSTS" "spamhaus"
 else
    rm -f "$DROP_HOSTS"; touch "$DROP_HOSTS"; chmod 600 "$DROP_HOSTS"
@@ -1105,7 +1105,7 @@ fi
 
 
 dlist_spamhaus_hosts() {
-if [ ! "$(cat $DROP_HOSTS | grep -v "#")" == "" ]; then
+if [ -n "$(cat $DROP_HOSTS | grep -v "#")" ]; then
         eout "{sdrop} loading sdrop_hosts.rules"
         ipt -N SDROP
         while IFS= read -r i; do
@@ -1129,7 +1129,7 @@ fi
 }
 
 dlist_ecnshame() {
-if [ ! "$DLIST_ECNSHAME_URL" == "" ] && [ "$DLIST_ECNSHAME" == "1" ] && [ -f "$WGET" ]; then
+if [ -n "$DLIST_ECNSHAME_URL" ] && [ "$DLIST_ECNSHAME" == "1" ] && [ -f "$WGET" ]; then
    dlist_download "ecnshame" "$DLIST_ECNSHAME_URL" "$ECNSHAME_HOSTS"
 else
    rm -f "$ECNSHAME_HOSTS"; touch "$ECNSHAME_HOSTS"; chmod 600 "$ECNSHAME_HOSTS"
@@ -1137,7 +1137,7 @@ fi
 }
 
 dlist_ecnshame_hosts() {
-if [ ! "$(cat $ECNSHAME_HOSTS | grep -v "#")" == "" ]; then
+if [ -n "$(cat $ECNSHAME_HOSTS | grep -v "#")" ]; then
         eout "{ecnshame} loading ecnshame_hosts.rules"
         while IFS= read -r i; do
                 [[ "$i" == \#* || -z "$i" ]] && continue
@@ -1395,7 +1395,7 @@ done < "$ipset_rules"
 }
 
 glob_allow_download() {
-if [ ! "$GA_URL" == "" ] && [ "$USE_RGT" == "1" ] && [ -f "$WGET" ]; then
+if [ -n "$GA_URL" ] && [ "$USE_RGT" == "1" ] && [ -f "$WGET" ]; then
    URL_TMP=$(mktemp -d "$INSTALL_PATH/.apf-XXXXXX")
    URL_FILE="${GA_URL##*/}"
    cd "$URL_TMP"
@@ -1417,7 +1417,7 @@ fi
 }
 
 glob_deny_download() {
-if [ ! "$GD_URL" == "" ] && [ "$USE_RGT" == "1" ] && [ -f "$WGET" ]; then
+if [ -n "$GD_URL" ] && [ "$USE_RGT" == "1" ] && [ -f "$WGET" ]; then
    URL_TMP=$(mktemp -d "$INSTALL_PATH/.apf-XXXXXX")
    URL_FILE="${GD_URL##*/}"
    cd "$URL_TMP"
@@ -1461,7 +1461,7 @@ fi
 }
 
 cdports() {
-if [ ! "$BLK_PORTS" == "" ]; then
+if [ -n "$BLK_PORTS" ]; then
 	eout "{glob} loading common drop ports"
 for i in $(echo $BLK_PORTS | tr ',' ' '); do
 	expand_port "$i"; i="$_PORT"
@@ -1479,7 +1479,7 @@ lgate_mac() {
 ipt4 -N LMAC
 for mac in $(echo $LGATE_MAC | tr ',' ' '); do
 MAC=$mac
-if [ ! "$MAC" == "" ]; then
+if [ -n "$MAC" ]; then
   ipt4 -A INPUT  -m mac ! --mac-source "$MAC" -j LMAC
   eout "{glob} gateway ($MAC) route verification enabled"
 fi
@@ -1616,7 +1616,7 @@ refresh() {
 }
 
 cron_refresh() {
-if [ ! "$SET_REFRESH" == "0" ] && [ ! "$SET_REFRESH" == "" ]; then
+if [ "$SET_REFRESH" != "0" ] && [ -n "$SET_REFRESH" ]; then
 cat<<EOF > $INSTALL_PATH/internals/cron.refresh
 */$SET_REFRESH * * * * root $INSTALL_PATH/apf --refresh >> /dev/null 2>&1 &
 EOF

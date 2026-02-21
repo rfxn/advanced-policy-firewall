@@ -9,7 +9,7 @@
 #
 CNF="/etc/apf/conf.apf"
 
-if [ -f "$CNF" ] && [ ! "$CNF" == "" ]; then
+if [ -f "$CNF" ] && [ -n "$CNF" ]; then
    source $CNF
 else
    echo "\$CNF not found; aborting"
@@ -22,7 +22,7 @@ modinit
 # Delete user made chains. Flush and zero the chains.
 flush 1
 
-if [ ! "$IF" == "" ] && [ "$VF_ROUTE" == "1" ]; then
+if [ -n "$IF" ] && [ "$VF_ROUTE" == "1" ]; then
  for i in $(echo $IF); do
   if [ -n "$ip" ]; then
 	VAL_IF=$($ip route show dev $i 2>/dev/null)
@@ -32,16 +32,16 @@ if [ ! "$IF" == "" ] && [ "$VF_ROUTE" == "1" ]; then
 	eout "{glob} neither ip nor route found; cannot verify interface $i"
 	exit 1
   fi
-	if [ "$VAL_IF" == "" ]; then
+	if [ -z "$VAL_IF" ]; then
 		eout "{glob} could not verify that interface $i is routed to a network, aborting."
-	        if [ ! "$SET_VERBOSE" == "1" ]; then
+	        if [ "$SET_VERBOSE" != "1" ]; then
 			echo "could not verify that interface $i is routed to a network, aborting."
 		fi
 		exit 1
 	fi
  done
 fi
-if [ ! "$IFACE_TRUSTED" == "" ] && [ "$VF_ROUTE" == "1" ]; then
+if [ -n "$IFACE_TRUSTED" ] && [ "$VF_ROUTE" == "1" ]; then
  for i in $(echo $IFACE_TRUSTED | tr ',' ' '); do
   if [ -n "$ip" ]; then
 	VAL_IFACE_TRUSTED=$($ip route show dev $i 2>/dev/null)
@@ -51,9 +51,9 @@ if [ ! "$IFACE_TRUSTED" == "" ] && [ "$VF_ROUTE" == "1" ]; then
 	eout "{glob} neither ip nor route found; cannot verify interface $i"
 	exit 1
   fi
-        if [ "$VAL_IFACE_TRUSTED" == "" ]; then
+        if [ -z "$VAL_IFACE_TRUSTED" ]; then
                 eout "{glob} could not verify that interface $i is routed to a network, aborting."
-	        if [ ! "$SET_VERBOSE" == "1" ]; then
+	        if [ "$SET_VERBOSE" != "1" ]; then
 			echo "could not verify that interface $i is routed to a network, aborting."
 		fi
                 exit 1
@@ -82,10 +82,10 @@ ipt -A OUTPUT -o lo -j ACCEPT
 
 
 # Allow all traffic on trusted interfaces
-if [ ! "$IFACE_TRUSTED" == "" ]; then
+if [ -n "$IFACE_TRUSTED" ]; then
  for i in $(echo $IFACE_TRUSTED | tr ',' ' '); do
  VAL_IF=$($ip addr list | grep -w "$i")
- if [ "$VAL_IF" == "" ]; then
+ if [ -z "$VAL_IF" ]; then
         eout "{glob} unable to verify status of interface $i; assuming untrusted"
  else
         eout "{glob} allow all to/from trusted interface $i"
@@ -174,7 +174,7 @@ if [ "$RAB" == "1" ]; then
  ipt -A INPUT -p all -m recent $RAB_TRIP_FLAGS --hitcount $RAB_HITCOUNT --seconds $RAB_TIMER -j $ALL_STOP
 
  # RAB portscan rules
- if [ ! "$RAB_PSCAN_LEVEL" == "0" ] && [ ! "$RAB_PSCAN_LEVEL" == "" ]; then
+ if [ "$RAB_PSCAN_LEVEL" != "0" ] && [ -n "$RAB_PSCAN_LEVEL" ]; then
   eout "{rab} set active RAB_PSCAN"
   case "$RAB_PSCAN_LEVEL" in
   1)
@@ -239,7 +239,7 @@ ipt -A OUTPUT  -p udp --dport 1024:65535 -m state --state ESTABLISHED,RELATED -j
 # DNS
 if [ -f "/etc/resolv.conf" ] && [ "$RESV_DNS" == "1" ]; then
 LDNS=$(cat /etc/resolv.conf  | grep -v "#" | grep -w nameserver | awk '{print$2}' | grep -v 127.0.0.1)
-  if [ ! "$LDNS" == "" ]; then
+  if [ -n "$LDNS" ]; then
         for i in $(echo $LDNS); do
         eout "{glob} resolv dns discovery for $i"
         if echo "$i" | grep -q ':'; then
@@ -320,7 +320,7 @@ tosroute POSTROUTING
 . $POSTRT
 
 # Default Output Policies
-if [ ! "$EGF" == "1" ] || [ "$EGF" == "" ]; then
+if [ "$EGF" != "1" ] || [ -z "$EGF" ]; then
         ipt -A OUTPUT -j ACCEPT
         eout "{glob} default (egress) output accept"
 elif [ "$EGF" == "1" ]; then

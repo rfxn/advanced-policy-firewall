@@ -60,7 +60,7 @@ install() {
 	else
 		if [ -f "/etc/rc.local" ]; then
 			val=$(grep -i apf /etc/rc.local)
-			if [ "$val" == "" ]; then
+			if [ -z "$val" ]; then
 				echo "$INSTALL_PATH/apf -s >> /dev/null 2>&1" >> /etc/rc.local
 			fi
 		fi

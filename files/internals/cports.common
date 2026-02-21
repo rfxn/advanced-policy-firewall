@@ -1,4 +1,4 @@
-if [ ! "$IG_TCP_CPORTS" == "" ]; then
+if [ -n "$IG_TCP_CPORTS" ]; then
 IG_TCP_CPORTS=$(echo "$IG_TCP_CPORTS" | tr ',' ' ')
 PROTO="tcp"
 for i in $(echo $IG_TCP_CPORTS); do
@@ -8,7 +8,7 @@ for i in $(echo $IG_TCP_CPORTS); do
 done
 fi
 
-if [ ! "$IG_UDP_CPORTS" == "" ]; then
+if [ -n "$IG_UDP_CPORTS" ]; then
 IG_UDP_CPORTS=$(echo "$IG_UDP_CPORTS" | tr ',' ' ')
 PROTO="udp"
 for i in $(echo $IG_UDP_CPORTS); do
@@ -19,7 +19,7 @@ done
 fi
 
 if [ "$EGF" == "1" ]; then
-if [ ! "$EG_TCP_CPORTS" == "" ]; then
+if [ -n "$EG_TCP_CPORTS" ]; then
 EG_TCP_CPORTS=$(echo "$EG_TCP_CPORTS" | tr ',' ' ')
 PROTO="tcp"
 for i in $(echo $EG_TCP_CPORTS); do
@@ -31,7 +31,7 @@ fi
 fi
 
 if [ "$EGF" == "1" ]; then
-if [ ! "$EG_UDP_CPORTS" == "" ]; then
+if [ -n "$EG_UDP_CPORTS" ]; then
 EG_UDP_CPORTS=$(echo "$EG_UDP_CPORTS" | tr ',' ' ')
 PROTO="udp"
 for i in $(echo $EG_UDP_CPORTS); do
@@ -42,9 +42,9 @@ done
 fi
 fi
 
-if [ ! "$IG_ICMP_TYPES" == "" ]; then
+if [ -n "$IG_ICMP_TYPES" ]; then
 PROTO="icmp"
-if [ "$ICMP_LIM" == "" ]; then
+if [ -z "$ICMP_LIM" ]; then
 	ICMP_LIM=0
 fi
 if [ "$(echo $ICMP_LIM | tr '/' ' ' | awk '{print$1}')" -gt "0" ]; then
@@ -54,7 +54,7 @@ else
 fi
 IG_ICMP_TYPES=$(echo $IG_ICMP_TYPES | tr ',' ' ')
 	for i in $(echo $IG_ICMP_TYPES); do
-         if [ ! "$i" == "" ]; then
+         if [ -n "$i" ]; then
                 i=$(echo $i | tr '[:upper:]' '[:lower:]')
                 if [ "$i" == "all" ]; then
                   ipt4 -A INPUT -p icmp -d $VNET $ICMP_EARGS -j ACCEPT
@@ -75,9 +75,9 @@ ipt6 -A INPUT -p ipv6-icmp --icmpv6-type 135 -j ACCEPT
 ipt6 -A INPUT -p ipv6-icmp --icmpv6-type 136 -j ACCEPT
 eout "{glob} opening inbound ipv6-icmp NDP types 133-136"
 
-if [ ! "$IG_ICMPV6_TYPES" == "" ]; then
+if [ -n "$IG_ICMPV6_TYPES" ]; then
 PROTO="ipv6-icmp"
-if [ "$ICMP_LIM" == "" ]; then
+if [ -z "$ICMP_LIM" ]; then
 	ICMP_LIM=0
 fi
 if [ "$(echo $ICMP_LIM | tr '/' ' ' | awk '{print$1}')" -gt "0" ]; then
@@ -87,7 +87,7 @@ else
 fi
 IG_ICMPV6_TYPES=$(echo $IG_ICMPV6_TYPES | tr ',' ' ')
 	for i in $(echo $IG_ICMPV6_TYPES); do
-         if [ ! "$i" == "" ]; then
+         if [ -n "$i" ]; then
                 i=$(echo $i | tr '[:upper:]' '[:lower:]')
                 if [ "$i" == "all" ]; then
                   ipt6 -A INPUT -p ipv6-icmp $ICMP_EARGS -j ACCEPT
@@ -102,9 +102,9 @@ fi
 fi
 
 if [ "$EGF" == "1" ]; then
-if [ ! "$EG_ICMP_TYPES" == "" ]; then
+if [ -n "$EG_ICMP_TYPES" ]; then
 PROTO="icmp"
-if [ "$ICMP_LIM" == "" ]; then
+if [ -z "$ICMP_LIM" ]; then
         ICMP_LIM=0
 fi
 if [ "$(echo $ICMP_LIM | tr '/' ' ' | awk '{print$1}')" -gt "0" ]; then
@@ -114,7 +114,7 @@ else
 fi
 EG_ICMP_TYPES=$(echo $EG_ICMP_TYPES | tr ',' ' ')
         for i in $(echo $EG_ICMP_TYPES); do
-         if [ ! "$i" == "" ]; then
+         if [ -n "$i" ]; then
 		i=$(echo $i | tr '[:upper:]' '[:lower:]')
 		if [ "$i" == "all" ]; then
                   ipt4 -A OUTPUT -p icmp -s $VNET $ICMP_EARGS -j ACCEPT
@@ -136,9 +136,9 @@ ipt6 -A OUTPUT -p ipv6-icmp --icmpv6-type 135 -j ACCEPT
 ipt6 -A OUTPUT -p ipv6-icmp --icmpv6-type 136 -j ACCEPT
 eout "{glob} opening outbound ipv6-icmp NDP types 133-136"
 
-if [ ! "$EG_ICMPV6_TYPES" == "" ]; then
+if [ -n "$EG_ICMPV6_TYPES" ]; then
 PROTO="ipv6-icmp"
-if [ "$ICMP_LIM" == "" ]; then
+if [ -z "$ICMP_LIM" ]; then
         ICMP_LIM=0
 fi
 if [ "$(echo $ICMP_LIM | tr '/' ' ' | awk '{print$1}')" -gt "0" ]; then
@@ -148,7 +148,7 @@ else
 fi
 EG_ICMPV6_TYPES=$(echo $EG_ICMPV6_TYPES | tr ',' ' ')
         for i in $(echo $EG_ICMPV6_TYPES); do
-         if [ ! "$i" == "" ]; then
+         if [ -n "$i" ]; then
 		i=$(echo $i | tr '[:upper:]' '[:lower:]')
 		if [ "$i" == "all" ]; then
                   ipt6 -A OUTPUT -p ipv6-icmp $ICMP_EARGS -j ACCEPT
@@ -163,7 +163,7 @@ fi
 fi
 
 if [ "$EGF" == "1" ]; then
-if [ ! "$EG_TCP_UID" == "" ]; then
+if [ -n "$EG_TCP_UID" ]; then
 EG_TCP_UID=$(echo "$EG_TCP_UID" | tr ',' ' ')
 PROTO="tcp"
 for i in $(echo $EG_TCP_UID); do
@@ -177,7 +177,7 @@ fi
 fi
 
 if [ "$EGF" == "1" ]; then
-if [ ! "$EG_UDP_UID" == "" ]; then
+if [ -n "$EG_UDP_UID" ]; then
 EG_UDP_UID=$(echo "$EG_UDP_UID" | tr ',' ' ')
 PROTO="udp"
 for i in $(echo $EG_UDP_UID); do
@@ -191,7 +191,7 @@ fi
 fi
 
 if [ "$EGF" == "1" ]; then
- if [ ! "$EG_DROP_CMD" == "" ]; then
+ if [ -n "$EG_DROP_CMD" ]; then
 	# --cmd-owner was removed from iptables in kernel 3.x; detect support
 	if ipt4 -N _DEG_TEST >> /dev/null 2>&1 && \
 	   ipt4 -A _DEG_TEST -m owner --cmd-owner=_test -j DROP >> /dev/null 2>&1; then

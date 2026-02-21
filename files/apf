@@ -18,7 +18,7 @@ head() {
 	echo ""
 }
 
-if [ -f "$CNF" ] && [ ! "$CNF" == "" ]; then
+if [ -f "$CNF" ] && [ -n "$CNF" ]; then
    source $CNF
 else
    head
@@ -61,12 +61,12 @@ if [ ! -f "$INSTALL_PATH/internals/.md5.cores" ]; then
 	MD5_FIRSTRUN=1
 else
         EMPTY_MD5=$(cat $INSTALL_PATH/internals/.md5.cores)
-        if [ "$EMPTY_MD5" == "" ]; then
+        if [ -z "$EMPTY_MD5" ]; then
                 $MD5 $MD5_FILES > $INSTALL_PATH/internals/.md5.cores 2> /dev/null
         fi
 	$MD5 $MD5_FILES > $INSTALL_PATH/internals/.md5.cores.new 2> /dev/null 
         VARS_DIFF=$($DIFF $INSTALL_PATH/internals/.md5.cores.new $INSTALL_PATH/internals/.md5.cores)
-        if [ ! "$VARS_DIFF" == "" ]; then
+        if [ -n "$VARS_DIFF" ]; then
 		$MD5 $MD5_FILES > $INSTALL_PATH/internals/.md5.cores 2> /dev/null
                 SKIP_FASTLOAD_VARS=1
         fi
@@ -84,7 +84,7 @@ if [ ! -f "$INSTALL_PATH/internals/.last.vars" ]; then
 else
 	$INSTALL_PATH/apf -o > $INSTALL_PATH/internals/.last.vars.new
 	VARS_DIFF=$($DIFF $INSTALL_PATH/internals/.last.vars.new $INSTALL_PATH/internals/.last.vars)
-	if [ ! "$VARS_DIFF" == "" ]; then
+	if [ -n "$VARS_DIFF" ]; then
 	        $INSTALL_PATH/apf -o > $INSTALL_PATH/internals/.last.vars
 		SKIP_FASTLOAD_VARS=1
 	fi
@@ -97,7 +97,7 @@ fi
  fi
 
 # check if we are flagged to skip fast load, otherwise off we go
-if [ "$SKIP_FASTLOAD_FIRSTRUN" == "" ] && [ "$SKIP_FASTLOAD_EXPIRED" == "" ] && [ "$SKIP_FASTLOAD_VARS" == "" ] && [ "$SET_FASTLOAD_UPSEC" == "" ]; then
+if [ -z "$SKIP_FASTLOAD_FIRSTRUN" ] && [ -z "$SKIP_FASTLOAD_EXPIRED" ] && [ -z "$SKIP_FASTLOAD_VARS" ] && [ -z "$SET_FASTLOAD_UPSEC" ]; then
 	# Verify snapshot backend matches current iptables backend
 	IPT_BACKEND_CURRENT="legacy"
 	if $IPT --version 2>&1 | grep -q nf_tables; then
@@ -109,7 +109,7 @@ if [ "$SKIP_FASTLOAD_FIRSTRUN" == "" ] && [ "$SKIP_FASTLOAD_EXPIRED" == "" ] && 
 			SKIP_FASTLOAD_BACKEND=1
 		fi
 	fi
-	if [ ! "$SKIP_FASTLOAD_BACKEND" == "1" ]; then
+	if [ "$SKIP_FASTLOAD_BACKEND" != "1" ]; then
 		devm
 		eout "{glob} activating firewall, fast load ($IPT_BACKEND_CURRENT)"
 		if ! $IPTR $IPT_FLAGS $INSTALL_PATH/internals/.apf.restore 2>/dev/null; then
@@ -189,7 +189,7 @@ if [ "$MD5_FIRSTRUN" == "1" ]; then
 fi
 
 firewall_on=$($IPT $IPT_FLAGS -L --numeric | grep -vE "Chain|destination")
-if [ ! "$DEVEL_ON" == "1" ] && [ "$DOCKER_COMPAT" != "1" ] && [ ! "$firewall_on" == "" ]; then
+if [ "$DEVEL_ON" != "1" ] && [ "$DOCKER_COMPAT" != "1" ] && [ -n "$firewall_on" ]; then
 	$IPTS > $INSTALL_PATH/internals/.apf.restore
 	if [ "$USE_IPV6" == "1" ] && [ -n "$IP6TS" ]; then
 		$IP6TS > $INSTALL_PATH/internals/.apf6.restore

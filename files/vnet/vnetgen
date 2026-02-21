@@ -54,7 +54,7 @@ if [ "$SET_ADDIFACE" == "1" ]; then
  if [ -n "$ip" ]; then
   for anet in $($ip -o link show 2>/dev/null | awk -F': ' '{print $2}' | grep -vwE "lo|$IFACE_UNTRUSTED"); do
    valtif=$(echo "$IFACE_TRUSTED" | tr ',' ' ' | grep -w "$anet")
-   if [ "$valtif" == "" ]; then
+   if [ -z "$valtif" ]; then
     for addr in $($ip addr list "$anet" 2>/dev/null | tr '/' ' ' | grep -w inet | grep -v 127.0.0.1 | grep -vw "$NET" | awk '{print$2}'); do
      if [ ! -f "$INSTALL_PATH/vnet/$addr.rules" ]; then
         touch "$INSTALL_PATH/vnet/$addr.rules"
@@ -68,7 +68,7 @@ if [ "$SET_ADDIFACE" == "1" ]; then
   for anet in $($ifconfig | grep -E '^[a-zA-Z0-9]' | awk '{print$1}' | tr -d ':' | grep -vwE "lo|$IFACE_UNTRUSTED"); do
    for iface in $($ifconfig | grep -w "$anet" | awk '{print$1}'); do
     valtif=$(echo "$IFACE_TRUSTED" | tr ',' ' ' | grep -w "$anet")
-    if [ "$valtif" == "" ]; then
+    if [ -z "$valtif" ]; then
      for addr in $($ifconfig "$iface" | grep -w inet | tr ':' ' ' | grep -vw "$NET" | awk '{print$3}'); do
       if [ ! -f "$INSTALL_PATH/vnet/$addr.rules" ]; then
         touch "$INSTALL_PATH/vnet/$addr.rules"

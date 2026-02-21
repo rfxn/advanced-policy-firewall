@@ -49,6 +49,11 @@
       dlist_ecnshame download logic into single parameterized helper with
       backup/restore, mktemp, wget, and valid_ip_cidr validation; eliminates
       ~115 lines of duplicated download/parse code (functions.apf)
+[Change] Modernize string tests: replace [ "$x" == "" ] with [ -z "$x" ] and
+      [ ! "$x" == "" ] with [ -n "$x" ] across all files; POSIX-compliant
+      idiom, zero behavioral change (apf, firewall, functions.apf,
+      cports.common, bt.rules, sysctl.rules, vnetgen, main.vnet, get_ports,
+      install.sh)
 
 - 2.0.1 | Feb 20 2026:
 
