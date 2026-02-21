@@ -1199,7 +1199,7 @@ while IFS= read -r line; do
 	eout "{ipset} loading set $name from $file_or_url"
 
 	# Resolve file_or_url to a local file
-	if echo "$file_or_url" | grep -qE '^https?://'; then
+	if [[ "$file_or_url" =~ ^https?:// ]]; then
 		# Download to temp dir
 		local url_tmp
 		url_tmp=$(mktemp -d "$INSTALL_PATH/.apf-XXXXXX")
@@ -1310,7 +1310,7 @@ while IFS= read -r line; do
 
 	eout "{ipset} updating set $name from $file_or_url"
 
-	if echo "$file_or_url" | grep -qE '^https?://'; then
+	if [[ "$file_or_url" =~ ^https?:// ]]; then
 		url_tmp=$(mktemp -d "$INSTALL_PATH/.apf-XXXXXX")
 		local dl_ok=0
 		if [ -n "$CURL" ]; then

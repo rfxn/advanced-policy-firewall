@@ -242,7 +242,7 @@ LDNS=$(cat /etc/resolv.conf  | grep -v "#" | grep -w nameserver | awk '{print$2}
   if [ -n "$LDNS" ]; then
         for i in $(echo $LDNS); do
         eout "{glob} resolv dns discovery for $i"
-        if echo "$i" | grep -q ':'; then
+        if [[ "$i" == *:* ]]; then
                 # IPv6 nameserver
                 if [ "$USE_IPV6" == "1" ]; then
                 ipt6 -A INPUT -p udp -s $i --sport 53 --dport 1024:65535 -m state --state ESTABLISHED,RELATED -j ACCEPT
