@@ -93,3 +93,7 @@
       URL detection echo|grep '^https?://' → [[ =~ ^https?:// ]]; eliminates
       1-2 fork+exec calls per invocation across 5 sites (firewall,
       gretunnel.sh, functions.apf)
+[Change] Remove useless cat: cat file | grep → grep file across 10 sites;
+      cat|grep|awk → awk in install.sh VERSION parsing; eliminates 1 fork+exec
+      per invocation (install.sh, firewall, functions.apf)
+[Change] Remove redundant $(echo $var) wrappers in DNS for-loops (firewall)

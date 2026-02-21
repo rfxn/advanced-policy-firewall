@@ -188,9 +188,9 @@ if [ "$RAB" == "1" ]; then
   esac
   eout "{rab} RAB_PSCAN monitored ports $RAB_PSCAN_PORTS"
   ipt -N RABPSCAN
-  LDNS=$(cat /etc/resolv.conf  | grep -v "#" | grep -w nameserver | awk '{print$2}' | grep -v 127.0.0.1)
+  LDNS=$(grep -v "#" /etc/resolv.conf | grep -w nameserver | awk '{print$2}' | grep -v 127.0.0.1)
   if [ "$LDNS" ]; then
-	for i in $(echo $LDNS); do
+	for i in $LDNS; do
 		if ipt_for_host "$i"; then
 			$IPT_H $IPT_FLAGS -I RABPSCAN -s $i -j RETURN
 		fi
@@ -238,9 +238,9 @@ ipt -A OUTPUT  -p udp --dport 1024:65535 -m state --state ESTABLISHED,RELATED -j
 
 # DNS
 if [ -f "/etc/resolv.conf" ] && [ "$RESV_DNS" == "1" ]; then
-LDNS=$(cat /etc/resolv.conf  | grep -v "#" | grep -w nameserver | awk '{print$2}' | grep -v 127.0.0.1)
+LDNS=$(grep -v "#" /etc/resolv.conf | grep -w nameserver | awk '{print$2}' | grep -v 127.0.0.1)
   if [ -n "$LDNS" ]; then
-        for i in $(echo $LDNS); do
+        for i in $LDNS; do
         eout "{glob} resolv dns discovery for $i"
         if [[ "$i" == *:* ]]; then
                 # IPv6 nameserver

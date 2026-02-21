@@ -345,7 +345,7 @@ trim() {
 	MAXLINES=0
  fi
  if [ "$MAXLINES" != "0" ] && [ -f "$FILE" ]; then
-	LINES=$(cat "$FILE" | grep -v "#" | grep -c "")
+	LINES=$(grep -vc "#" "$FILE")
         if [ "$LINES" -gt "$MAXLINES" ]; then
                 eout "{glob} trimming $FILE to $MAXLINES lines"
                 CHK_CMT=$(tail -n "$MAXLINES" "$FILE" | grep -c "#")
@@ -753,7 +753,7 @@ fi
 }
 
 ovars() {
-	for var in $(nice -n 16 cat $INSTALL_PATH/conf.apf $INSTALL_PATH/internals/internals.conf | grep -v "^#" | grep "=" | awk -F'=' '{print $1}' | tr -d ' '); do
+	for var in $(nice -n 16 grep -hv "^#" "$INSTALL_PATH/conf.apf" "$INSTALL_PATH/internals/internals.conf" | grep "=" | awk -F'=' '{print $1}' | tr -d ' '); do
 		echo "$var=${!var}"
 	done
 }
@@ -771,7 +771,7 @@ if [ -z "$file" ] || [ -z "$chain" ]; then
         exit 1
 fi
 
-if [ -n "$(cat $file | grep -v "#")" ]; then
+if [ -n "$(grep -v "#" "$file")" ]; then
         eout "{glob} loading $file"
         #
         #
@@ -1041,7 +1041,7 @@ fi
 }
 
 dlist_php_hosts() {
-if [ -n "$(cat $PHP_HOSTS | grep -v "#")" ]; then
+if [ -n "$(grep -v "#" "$PHP_HOSTS")" ]; then
         eout "{php} loading php_hosts.rules"
         ipt -N PHP
         while IFS= read -r i; do
@@ -1073,7 +1073,7 @@ fi
 }
 
 dlist_dshield_hosts() {
-if [ -n "$(cat $DS_HOSTS | grep -v "#")" ]; then
+if [ -n "$(grep -v "#" "$DS_HOSTS")" ]; then
         eout "{dshield} loading ds_hosts.rules"
         ipt -N DSHIELD
         while IFS= read -r i; do
@@ -1106,7 +1106,7 @@ fi
 
 
 dlist_spamhaus_hosts() {
-if [ -n "$(cat $DROP_HOSTS | grep -v "#")" ]; then
+if [ -n "$(grep -v "#" "$DROP_HOSTS")" ]; then
         eout "{sdrop} loading sdrop_hosts.rules"
         ipt -N SDROP
         while IFS= read -r i; do
@@ -1138,7 +1138,7 @@ fi
 }
 
 dlist_ecnshame_hosts() {
-if [ -n "$(cat $ECNSHAME_HOSTS | grep -v "#")" ]; then
+if [ -n "$(grep -v "#" "$ECNSHAME_HOSTS")" ]; then
         eout "{ecnshame} loading ecnshame_hosts.rules"
         while IFS= read -r i; do
                 [[ "$i" == \#* || -z "$i" ]] && continue

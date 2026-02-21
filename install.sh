@@ -89,7 +89,7 @@ install() {
 	chmod 750 "$INSTALL_PATH"
 }
 
-VER=$(cat files/VERSION | grep version | awk '{print$2}')
+VER=$(awk '/version/ {print$2}' files/VERSION)
 if [ -d "$INSTALL_PATH" ]; then
 	DVAL=$(date +"%d%m%Y-%s")
 	cp -R "$INSTALL_PATH" "$INSTALL_PATH.bk$DVAL" || { echo "Backup failed, aborting."; exit 1; }
