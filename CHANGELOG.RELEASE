@@ -1,4 +1,4 @@
-- 2.0.2 | Feb 20 2026:
+- 2.0.2 | Feb 21 2026:
 
 [Change] ipset batch loading via ipset restore; replaces per-entry $IPSET add
       loop (31K+ fork+exec calls) with single awk pre-filter piped to

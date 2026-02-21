@@ -51,13 +51,13 @@ teardown_file() {
 @test "apf --version outputs version" {
     run "$APF" --version
     assert_success
-    assert_output "2.0.1"
+    assert_output "2.0.2"
 }
 
 @test "apf -v outputs version" {
     run "$APF" -v
     assert_success
-    assert_output "2.0.1"
+    assert_output "2.0.2"
 }
 
 @test "apf with no args shows help" {
