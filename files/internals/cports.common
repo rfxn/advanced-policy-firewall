@@ -38,120 +38,53 @@ done
 fi
 fi
 
-if [ -n "$IG_ICMP_TYPES" ]; then
-PROTO="icmp"
-if [ -z "$ICMP_LIM" ]; then
-	ICMP_LIM=0
-fi
-if [ "${ICMP_LIM%%/*}" -gt "0" ]; then
-	ICMP_EARGS="-m limit --limit $ICMP_LIM"
-else
-	ICMP_EARGS=""
-fi
-	for i in ${IG_ICMP_TYPES//,/ }; do
-         if [ -n "$i" ]; then
-                i="${i,,}"
-                if [ "$i" == "all" ]; then
-                  ipt4 -A INPUT -p icmp -d $VNET $ICMP_EARGS -j ACCEPT
-                  eout "{glob} opening inbound $PROTO all on $VNET"
-                else
-                  ipt4 -A INPUT -p icmp --icmp-type $i -d $VNET $ICMP_EARGS -j ACCEPT
-                  eout "{glob} opening inbound $PROTO type $i on $VNET"
-                fi
-	 fi
+# Helper: apply ICMP/ICMPv6 type filtering rules
+# Args: types ipt_fn chain proto type_flag direction [addr_arg]
+_icmp_filter() {
+	local types="$1" ipt_fn="$2" chain="$3" proto="$4" type_flag="$5" direction="$6" addr_arg="$7"
+	[ -z "$types" ] && return
+	if [ -z "$ICMP_LIM" ]; then ICMP_LIM=0; fi
+	local eargs=""
+	if [ "${ICMP_LIM%%/*}" -gt "0" ]; then
+		eargs="-m limit --limit $ICMP_LIM"
+	fi
+	local suffix=""
+	[ -n "$addr_arg" ] && suffix=" on $VNET"
+	for i in ${types//,/ }; do
+		[ -z "$i" ] && continue
+		i="${i,,}"
+		if [ "$i" == "all" ]; then
+			$ipt_fn -A $chain -p $proto $addr_arg $eargs -j ACCEPT
+			eout "{glob} opening $direction $proto all$suffix"
+		else
+			$ipt_fn -A $chain -p $proto $type_flag $i $addr_arg $eargs -j ACCEPT
+			eout "{glob} opening $direction $proto type $i$suffix"
+		fi
 	done
-fi
+}
+
+_icmp_filter "$IG_ICMP_TYPES" ipt4 INPUT icmp --icmp-type inbound "-d $VNET"
 
 if [ "$USE_IPV6" == "1" ]; then
 # NDP types 133-136 must always be permitted for IPv6 connectivity
-ipt6 -A INPUT -p ipv6-icmp --icmpv6-type 133 -j ACCEPT
-ipt6 -A INPUT -p ipv6-icmp --icmpv6-type 134 -j ACCEPT
-ipt6 -A INPUT -p ipv6-icmp --icmpv6-type 135 -j ACCEPT
-ipt6 -A INPUT -p ipv6-icmp --icmpv6-type 136 -j ACCEPT
+for t in 133 134 135 136; do
+	ipt6 -A INPUT -p ipv6-icmp --icmpv6-type $t -j ACCEPT
+done
 eout "{glob} opening inbound ipv6-icmp NDP types 133-136"
-
-if [ -n "$IG_ICMPV6_TYPES" ]; then
-PROTO="ipv6-icmp"
-if [ -z "$ICMP_LIM" ]; then
-	ICMP_LIM=0
-fi
-if [ "${ICMP_LIM%%/*}" -gt "0" ]; then
-	ICMP_EARGS="-m limit --limit $ICMP_LIM"
-else
-	ICMP_EARGS=""
-fi
-	for i in ${IG_ICMPV6_TYPES//,/ }; do
-         if [ -n "$i" ]; then
-                i="${i,,}"
-                if [ "$i" == "all" ]; then
-                  ipt6 -A INPUT -p ipv6-icmp $ICMP_EARGS -j ACCEPT
-                  eout "{glob} opening inbound $PROTO all"
-                else
-                  ipt6 -A INPUT -p ipv6-icmp --icmpv6-type $i $ICMP_EARGS -j ACCEPT
-                  eout "{glob} opening inbound $PROTO type $i"
-                fi
-	 fi
-	done
-fi
+_icmp_filter "$IG_ICMPV6_TYPES" ipt6 INPUT ipv6-icmp --icmpv6-type inbound
 fi
 
 if [ "$EGF" == "1" ]; then
-if [ -n "$EG_ICMP_TYPES" ]; then
-PROTO="icmp"
-if [ -z "$ICMP_LIM" ]; then
-        ICMP_LIM=0
-fi
-if [ "${ICMP_LIM%%/*}" -gt "0" ]; then
-        ICMP_EARGS="-m limit --limit $ICMP_LIM"
-else
-        ICMP_EARGS=""
-fi
-        for i in ${EG_ICMP_TYPES//,/ }; do
-         if [ -n "$i" ]; then
-		i="${i,,}"
-		if [ "$i" == "all" ]; then
-                  ipt4 -A OUTPUT -p icmp -s $VNET $ICMP_EARGS -j ACCEPT
-                  eout "{glob} opening outbound $PROTO all on $VNET"
-		else
-                  ipt4 -A OUTPUT -p icmp --icmp-type $i -s $VNET $ICMP_EARGS -j ACCEPT
-                  eout "{glob} opening outbound $PROTO type $i on $VNET"
-		fi
-         fi
-        done
-fi
+_icmp_filter "$EG_ICMP_TYPES" ipt4 OUTPUT icmp --icmp-type outbound "-s $VNET"
 fi
 
 if [ "$USE_IPV6" == "1" ] && [ "$EGF" == "1" ]; then
 # NDP types 133-136 must always be permitted for IPv6 connectivity
-ipt6 -A OUTPUT -p ipv6-icmp --icmpv6-type 133 -j ACCEPT
-ipt6 -A OUTPUT -p ipv6-icmp --icmpv6-type 134 -j ACCEPT
-ipt6 -A OUTPUT -p ipv6-icmp --icmpv6-type 135 -j ACCEPT
-ipt6 -A OUTPUT -p ipv6-icmp --icmpv6-type 136 -j ACCEPT
+for t in 133 134 135 136; do
+	ipt6 -A OUTPUT -p ipv6-icmp --icmpv6-type $t -j ACCEPT
+done
 eout "{glob} opening outbound ipv6-icmp NDP types 133-136"
-
-if [ -n "$EG_ICMPV6_TYPES" ]; then
-PROTO="ipv6-icmp"
-if [ -z "$ICMP_LIM" ]; then
-        ICMP_LIM=0
-fi
-if [ "${ICMP_LIM%%/*}" -gt "0" ]; then
-        ICMP_EARGS="-m limit --limit $ICMP_LIM"
-else
-        ICMP_EARGS=""
-fi
-        for i in ${EG_ICMPV6_TYPES//,/ }; do
-         if [ -n "$i" ]; then
-		i="${i,,}"
-		if [ "$i" == "all" ]; then
-                  ipt6 -A OUTPUT -p ipv6-icmp $ICMP_EARGS -j ACCEPT
-                  eout "{glob} opening outbound $PROTO all"
-		else
-                  ipt6 -A OUTPUT -p ipv6-icmp --icmpv6-type $i $ICMP_EARGS -j ACCEPT
-                  eout "{glob} opening outbound $PROTO type $i"
-		fi
-         fi
-        done
-fi
+_icmp_filter "$EG_ICMPV6_TYPES" ipt6 OUTPUT ipv6-icmp --icmpv6-type outbound
 fi
 
 if [ "$EGF" == "1" ]; then

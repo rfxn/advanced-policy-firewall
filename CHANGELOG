@@ -81,6 +81,12 @@
       with case/read/bash-test builtins; eliminates 4-6 forks per blocklist
       entry (functions.apf)
 [Change] EG_DROP_CMD prefix: echo|cut → ${i:0:6} substring (cports.common)
+[New] _icmp_filter() helper consolidates 4 nearly-identical ICMP/ICMPv6
+      filtering blocks (~96 lines) into single parameterized function (~22
+      lines); handles ipt4/ipt6, INPUT/OUTPUT, icmp/ipv6-icmp, rate limiting,
+      and VNET address binding via arguments (cports.common)
+[Change] NDP types 133-136 inbound/outbound blocks consolidated from 8
+      individual ipt6 calls to 2 for-loops (cports.common)
 
 - 2.0.1 | Feb 20 2026:
 
