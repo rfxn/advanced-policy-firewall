@@ -1458,6 +1458,8 @@ while IFS= read -r line; do
 	local hash_type="hash:$iptype"
 	local data_file=""
 
+	eout "{ipset} loading set $name from $file_or_url"
+
 	# Resolve file_or_url to a local file
 	if echo "$file_or_url" | grep -qE '^https?://'; then
 		# Download to temp dir
@@ -1491,21 +1493,26 @@ while IFS= read -r line; do
 	$IPSET create "${name}-tmp" "$hash_type" maxelem 1048576 2>/dev/null || true
 	$IPSET flush "${name}-tmp"
 
-	local count=0
-	while IFS= read -r entry; do
-		# Skip comments and blank lines
-		case "$entry" in
-			\#*|""|";;"*) continue ;;
-		esac
-		# Extract first field (handles formats with trailing comments/semicolons)
-		entry=$(echo "$entry" | awk '{print $1}' | tr -d ';')
-		[ -z "$entry" ] && continue
-		# IPv4 only filter
-		if ! echo "$entry" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+\.'; then
-			continue
-		fi
-		$IPSET add "${name}-tmp" "$entry" 2>/dev/null && count=$((count + 1))
-	done < "$data_file"
+	# Pre-filter data into ipset restore format for batch loading
+	local restore_file
+	restore_file=$(mktemp "$INSTALL_PATH/.apf-XXXXXX")
+	awk '
+		/^[[:space:]]*#/ || /^[[:space:]]*$/ || /^;;/ { next }
+		{
+			entry = $1
+			gsub(/;/, "", entry)
+			if (entry ~ /^[0-9]+\.[0-9]+\.[0-9]+\./)
+				print "add '"${name}"'-tmp " entry
+		}
+	' "$data_file" > "$restore_file"
+
+	local count
+	count=$(wc -l < "$restore_file")
+
+	if [ "$count" -gt 0 ]; then
+		$IPSET restore -exist < "$restore_file" 2>/dev/null
+	fi
+	rm -f "$restore_file"
 
 	[ -n "$url_tmp" ] && rm -rf "$url_tmp"
 
@@ -1566,6 +1573,8 @@ while IFS= read -r line; do
 	local data_file=""
 	local url_tmp=""
 
+	eout "{ipset} updating set $name from $file_or_url"
+
 	if echo "$file_or_url" | grep -qE '^https?://'; then
 		url_tmp=$(mktemp -d "$INSTALL_PATH/.apf-XXXXXX")
 		local dl_ok=0
@@ -1593,18 +1602,26 @@ while IFS= read -r line; do
 	$IPSET create "${name}-tmp" "$hash_type" maxelem 1048576 2>/dev/null || true
 	$IPSET flush "${name}-tmp"
 
-	local count=0
-	while IFS= read -r entry; do
-		case "$entry" in
-			\#*|""|";;"*) continue ;;
-		esac
-		entry=$(echo "$entry" | awk '{print $1}' | tr -d ';')
-		[ -z "$entry" ] && continue
-		if ! echo "$entry" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+\.'; then
-			continue
-		fi
-		$IPSET add "${name}-tmp" "$entry" 2>/dev/null && count=$((count + 1))
-	done < "$data_file"
+	# Pre-filter data into ipset restore format for batch loading
+	local restore_file
+	restore_file=$(mktemp "$INSTALL_PATH/.apf-XXXXXX")
+	awk '
+		/^[[:space:]]*#/ || /^[[:space:]]*$/ || /^;;/ { next }
+		{
+			entry = $1
+			gsub(/;/, "", entry)
+			if (entry ~ /^[0-9]+\.[0-9]+\.[0-9]+\./)
+				print "add '"${name}"'-tmp " entry
+		}
+	' "$data_file" > "$restore_file"
+
+	local count
+	count=$(wc -l < "$restore_file")
+
+	if [ "$count" -gt 0 ]; then
+		$IPSET restore -exist < "$restore_file" 2>/dev/null
+	fi
+	rm -f "$restore_file"
 
 	[ -n "$url_tmp" ] && rm -rf "$url_tmp"
 

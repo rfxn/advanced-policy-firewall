@@ -1,3 +1,14 @@
+- 2.0.2 | Feb 20 2026:
+
+[Change] ipset batch loading via ipset restore; replaces per-entry $IPSET add
+      loop (31K+ fork+exec calls) with single awk pre-filter piped to
+      ipset restore -exist, reducing load time from minutes to seconds
+      (functions.apf)
+[Change] ipset_load() and ipset_update() now log per-set "loading/updating
+      set $name from $source" before processing begins, providing visibility
+      into which set is being loaded during long ipset operations
+      (functions.apf)
+
 - 2.0.1 | Feb 20 2026:
 
   -- New Subsystems --
