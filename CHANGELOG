@@ -45,6 +45,10 @@
       trust_hosts() with action target and verb arguments; eliminates ~185
       lines of duplicated trust parsing logic across 4 while-loops
       (functions.apf)
+[New] dlist_download() consolidates dlist_php/dlist_dshield/dlist_spamhaus/
+      dlist_ecnshame download logic into single parameterized helper with
+      backup/restore, mktemp, wget, and valid_ip_cidr validation; eliminates
+      ~115 lines of duplicated download/parse code (functions.apf)
 
 - 2.0.1 | Feb 20 2026:
 

@@ -992,41 +992,50 @@ else
 fi
 }
 
-dlist_php() {
-if [ -f "$PHP_HOSTS" ]; then
-   cp "$PHP_HOSTS" "$PHP_HOSTS.bk"
-   chmod 600 "$PHP_HOSTS" "$PHP_HOSTS.bk"
+dlist_download() {
+local tag="$1" url="$2" hosts_file="$3" parse_mode="${4:-standard}"
+# Backup existing file
+if [ -f "$hosts_file" ]; then
+   cp "$hosts_file" "$hosts_file.bk"
+   chmod 600 "$hosts_file" "$hosts_file.bk"
 fi
-if [ ! "$DLIST_PHP_URL" == "" ] && [ "$DLIST_PHP" == "1" ] && [ -f "$WGET" ]; then
-   URL_TMP=$(mktemp -d "$INSTALL_PATH/.apf-XXXXXX")
-   URL_FILE="${DLIST_PHP_URL##*/}"
-   cd "$URL_TMP"
-   eout "{php} downloading $DLIST_PHP_URL"
-   $WGET -t 1 -T 4 "$DLIST_PHP_URL" >> /dev/null 2>&1
-   if [ $? -eq 0 ] && [ -f "$URL_TMP/$URL_FILE" ]; then
-        eout "{php} parsing $URL_FILE into $PHP_HOSTS"
-        :> "$PHP_HOSTS"
+local url_tmp url_file
+url_tmp=$(mktemp -d "$INSTALL_PATH/.apf-XXXXXX")
+url_file="${url##*/}"
+cd "$url_tmp"
+eout "{$tag} downloading $url"
+$WGET -t 1 -T 4 "$url" >> /dev/null 2>&1
+if [ $? -eq 0 ] && [ -f "$url_tmp/$url_file" ]; then
+        eout "{$tag} parsing $url_file into $hosts_file"
+        :> "$hosts_file"
         while IFS= read -r str; do
-                str=$(echo "$str" | grep -v "#" | grep -e '[0-9]' | awk '{print $1}')
+                if [ "$parse_mode" == "spamhaus" ]; then
+                        str=$(echo "$str" | grep -v "#" | grep "/" | awk '{print $1}' | tr -d ';')
+                else
+                        str=$(echo "$str" | grep -v "#" | grep -e '[0-9]' | awk '{print $1}')
+                fi
                 if [ -n "$str" ]; then
                     if valid_ip_cidr "$str"; then
-                        echo "$str" >> "$PHP_HOSTS"
+                        echo "$str" >> "$hosts_file"
                     fi
                 fi
-        done < "$URL_TMP/$URL_FILE"
-   else
-        eout "{php} download of $DLIST_PHP_URL failed"
-        if [ -f "$PHP_HOSTS.bk" ]; then
-            cp "$PHP_HOSTS.bk" "$PHP_HOSTS"
-            chmod 600 "$PHP_HOSTS" "$PHP_HOSTS.bk"
-        fi
-   fi
-   rm -rf "$URL_TMP"
-   cd "$INSTALL_PATH"
+        done < "$url_tmp/$url_file"
 else
-   rm -f "$PHP_HOSTS"
-   touch "$PHP_HOSTS"
-   chmod 600 "$PHP_HOSTS"
+        eout "{$tag} download of $url failed"
+        if [ -f "$hosts_file.bk" ]; then
+            cp "$hosts_file.bk" "$hosts_file"
+            chmod 600 "$hosts_file" "$hosts_file.bk"
+        fi
+fi
+rm -rf "$url_tmp"
+cd "$INSTALL_PATH"
+}
+
+dlist_php() {
+if [ ! "$DLIST_PHP_URL" == "" ] && [ "$DLIST_PHP" == "1" ] && [ -f "$WGET" ]; then
+   dlist_download "php" "$DLIST_PHP_URL" "$PHP_HOSTS"
+else
+   rm -f "$PHP_HOSTS"; touch "$PHP_HOSTS"; chmod 600 "$PHP_HOSTS"
 fi
 }
 
@@ -1055,40 +1064,10 @@ fi
 }
 
 dlist_dshield() {
-if [ -f "$DS_HOSTS" ]; then
-   cp "$DS_HOSTS" "$DS_HOSTS.bk"
-   chmod 600 "$DS_HOSTS" "$DS_HOSTS.bk"
-fi
 if [ ! "$DLIST_DSHIELD_URL" == "" ] && [ "$DLIST_DSHIELD" == "1" ] && [ -f "$WGET" ]; then
-   URL_TMP=$(mktemp -d "$INSTALL_PATH/.apf-XXXXXX")
-   URL_FILE="${DLIST_DSHIELD_URL##*/}"
-   cd "$URL_TMP"
-   eout "{dshield} downloading $DLIST_DSHIELD_URL"
-   $WGET -t 1 -T 4 "$DLIST_DSHIELD_URL" >> /dev/null 2>&1
-   if [ $? -eq 0 ] && [ -f "$URL_TMP/$URL_FILE" ]; then
-        eout "{dshield} parsing $URL_FILE into $DS_HOSTS"
-        :> "$DS_HOSTS"
-        while IFS= read -r str; do
-                str=$(echo "$str" | grep -v "#" | grep -e '[0-9]' | awk '{print $1}')
-                if [ -n "$str" ]; then
-                    if valid_ip_cidr "$str"; then
-                        echo "$str" >> "$DS_HOSTS"
-                    fi
-                fi
-        done < "$URL_TMP/$URL_FILE"
-   else
-        eout "{dshield} download of $DLIST_DSHIELD_URL failed"
-        if [ -f "$DS_HOSTS.bk" ]; then
-            cp "$DS_HOSTS.bk" "$DS_HOSTS"
-            chmod 600 "$DS_HOSTS" "$DS_HOSTS.bk"
-        fi
-   fi
-   rm -rf "$URL_TMP"
-   cd "$INSTALL_PATH"
+   dlist_download "dshield" "$DLIST_DSHIELD_URL" "$DS_HOSTS"
 else
-   rm -f "$DS_HOSTS"
-   touch "$DS_HOSTS"
-   chmod 600 "$DS_HOSTS"
+   rm -f "$DS_HOSTS"; touch "$DS_HOSTS"; chmod 600 "$DS_HOSTS"
 fi
 }
 
@@ -1117,40 +1096,10 @@ fi
 }
 
 dlist_spamhaus() {
-if [ -f "$DROP_HOSTS" ]; then
-   cp "$DROP_HOSTS" "$DROP_HOSTS.bk"
-   chmod 600 "$DROP_HOSTS" "$DROP_HOSTS.bk"
-fi
 if [ ! "$DLIST_SPAMHAUS_URL" == "" ] && [ "$DLIST_SPAMHAUS" == "1" ] && [ -f "$WGET" ]; then
-   URL_TMP=$(mktemp -d "$INSTALL_PATH/.apf-XXXXXX")
-   URL_FILE="${DLIST_SPAMHAUS_URL##*/}"
-   cd "$URL_TMP"
-   eout "{sdrop} downloading $DLIST_SPAMHAUS_URL"
-   $WGET -t 1 -T 4 "$DLIST_SPAMHAUS_URL" >> /dev/null 2>&1
-   if [ $? -eq 0 ] && [ -f "$URL_TMP/$URL_FILE" ]; then
-        eout "{sdrop} parsing $URL_FILE into $DROP_HOSTS"
-        :> "$DROP_HOSTS"
-        while IFS= read -r str; do
-                str=$(echo "$str" | grep -v "#" | grep "/" | awk '{print $1}' | tr -d ';')
-                if [ -n "$str" ]; then
-                    if valid_ip_cidr "$str"; then
-                        echo "$str" >> "$DROP_HOSTS"
-                    fi
-                fi
-        done < "$URL_TMP/$URL_FILE"
-   else
-        eout "{sdrop} download of $DLIST_SPAMHAUS_URL failed"
-        if [ -f "$DROP_HOSTS.bk" ]; then
-            cp "$DROP_HOSTS.bk" "$DROP_HOSTS"
-            chmod 600 "$DROP_HOSTS" "$DROP_HOSTS.bk"
-        fi
-   fi
-   rm -rf "$URL_TMP"
-   cd "$INSTALL_PATH"
+   dlist_download "sdrop" "$DLIST_SPAMHAUS_URL" "$DROP_HOSTS" "spamhaus"
 else
-   rm -f "$DROP_HOSTS"
-   touch "$DROP_HOSTS"
-   chmod 600 "$DROP_HOSTS"
+   rm -f "$DROP_HOSTS"; touch "$DROP_HOSTS"; chmod 600 "$DROP_HOSTS"
 fi
 }
 
@@ -1181,33 +1130,9 @@ fi
 
 dlist_ecnshame() {
 if [ ! "$DLIST_ECNSHAME_URL" == "" ] && [ "$DLIST_ECNSHAME" == "1" ] && [ -f "$WGET" ]; then
-   URL_TMP=$(mktemp -d "$INSTALL_PATH/.apf-XXXXXX")
-   URL_FILE="${DLIST_ECNSHAME_URL##*/}"
-   cd "$URL_TMP"
-   eout "{ecnshame} downloading $DLIST_ECNSHAME_URL"
-   $WGET -t 1 -T 4 "$DLIST_ECNSHAME_URL" >> /dev/null 2>&1
-   if [ $? -eq 0 ] && [ -f "$URL_TMP/$URL_FILE" ]; then
-        eout "{ecnshame} parsing $URL_FILE into $ECNSHAME_HOSTS"
-        if [ -f "$ECNSHAME_HOSTS" ]; then
-                :> "$ECNSHAME_HOSTS"
-        fi
-        while IFS= read -r str; do
-                str=$(echo "$str" | grep -v "#" | grep -e '[0-9]' | awk '{print $1}')
-                if [ -n "$str" ]; then
-                    if valid_ip_cidr "$str"; then
-                        echo "$str" >> "$ECNSHAME_HOSTS"
-                    fi
-                fi
-        done < "$URL_TMP/$URL_FILE"
-   else
-        eout "{ecnshame} download of $DLIST_ECNSHAME_URL failed"
-   fi
-   rm -rf "$URL_TMP"
-   cd "$INSTALL_PATH"
+   dlist_download "ecnshame" "$DLIST_ECNSHAME_URL" "$ECNSHAME_HOSTS"
 else
-   rm -f "$ECNSHAME_HOSTS"
-   touch "$ECNSHAME_HOSTS"
-   chmod 600 "$ECNSHAME_HOSTS"
+   rm -f "$ECNSHAME_HOSTS"; touch "$ECNSHAME_HOSTS"; chmod 600 "$ECNSHAME_HOSTS"
 fi
 }
 
