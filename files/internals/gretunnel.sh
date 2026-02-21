@@ -127,8 +127,7 @@ create_gretun() {
 
 	# Keepalive
 	local ka_int ka_ret
-	ka_int=$(echo "$ka" | awk '{print $1}')
-	ka_ret=$(echo "$ka" | awk '{print $2}')
+	read -r ka_int ka_ret <<< "$ka"
 	if [ "$ka_int" != "0" ] || [ "$ka_ret" != "0" ]; then
 		$ip tunnel change "$linkname" keepalive "$ka_int" "$ka_ret" 2>/dev/null || true
 		eout "{gre} tunnel $linkname keepalive set to ${ka_int}s ${ka_ret} retries"

@@ -158,8 +158,8 @@ if [ "$EGF" == "1" ]; then
 if [ -n "$EG_TCP_UID" ]; then
 PROTO="tcp"
 for i in ${EG_TCP_UID//,/ }; do
-uid=$(echo $i | tr ':' ' ' | awk '{print$1}')
-port=$(echo $i | tr ':' ' ' | awk '{print$2}')
+uid="${i%%:*}"
+port="${i#*:}"
         expand_port "$port"; port="$_PORT"
         ipt_src -A OUTPUT -p $PROTO --dport $port --match owner --uid-owner $uid -j ACCEPT
         eout "{glob} opening outbound $PROTO port $port for uid $uid from $VNET"
@@ -171,8 +171,8 @@ if [ "$EGF" == "1" ]; then
 if [ -n "$EG_UDP_UID" ]; then
 PROTO="udp"
 for i in ${EG_UDP_UID//,/ }; do
-uid=$(echo $i | tr ':' ' ' | awk '{print$1}')
-port=$(echo $i | tr ':' ' ' | awk '{print$2}')
+uid="${i%%:*}"
+port="${i#*:}"
         expand_port "$port"; port="$_PORT"
         ipt_src -A OUTPUT -p $PROTO --dport $port --match owner --uid-owner $uid -j ACCEPT
         eout "{glob} opening outbound $PROTO port $port for uid $uid from $VNET"
@@ -189,7 +189,7 @@ if [ "$EGF" == "1" ]; then
 		ipt4 -X _DEG_TEST >> /dev/null 2>&1
 		ipt4 -N DEG
 		for i in ${EG_DROP_CMD//,/ }; do
-			si=$(echo $i | cut -c 1-6)
+			si="${i:0:6}"
 			if [ "$LOG_DROP" == "1" ]; then
 			  ipt4 -A DEG -m owner --cmd-owner=$i -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** DEG_$si ** "
 			fi

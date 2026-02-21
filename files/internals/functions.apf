@@ -573,7 +573,7 @@ flush_apf_chains() {
 		while IFS= read -r line; do
 			case "$line" in \#*|"") continue ;; esac
 			local name
-			name=$(echo "$line" | cut -d: -f1)
+			name="${line%%:*}"
 			[ -z "$name" ] && continue
 			if $IPT $IPT_FLAGS -L "IPSET_${name}" -n >/dev/null 2>&1; then
 				ipt4 -F "IPSET_${name}"
@@ -1009,15 +1009,16 @@ if [ $? -eq 0 ] && [ -f "$url_tmp/$url_file" ]; then
         eout "{$tag} parsing $url_file into $hosts_file"
         :> "$hosts_file"
         while IFS= read -r str; do
+                case "$str" in \#*|"") continue ;; esac
+                read -r str _ <<< "$str"
                 if [ "$parse_mode" == "spamhaus" ]; then
-                        str=$(echo "$str" | grep -v "#" | grep "/" | awk '{print $1}' | tr -d ';')
+                        [[ "$str" != */* ]] && continue
+                        str="${str//;/}"
                 else
-                        str=$(echo "$str" | grep -v "#" | grep -e '[0-9]' | awk '{print $1}')
+                        [[ "$str" != *[0-9]* ]] && continue
                 fi
-                if [ -n "$str" ]; then
-                    if valid_ip_cidr "$str"; then
+                if [ -n "$str" ] && valid_ip_cidr "$str"; then
                         echo "$str" >> "$hosts_file"
-                    fi
                 fi
         done < "$url_tmp/$url_file"
 else
@@ -1169,13 +1170,10 @@ while IFS= read -r line; do
 		\#*|"") continue ;;
 	esac
 
-	local name flow iptype logflag file_or_url
-	name=$(echo "$line" | cut -d: -f1)
-	flow=$(echo "$line" | cut -d: -f2)
-	iptype=$(echo "$line" | cut -d: -f3)
-	logflag=$(echo "$line" | cut -d: -f4)
-	# Field 5+ (handles URLs containing colons)
-	file_or_url=$(echo "$line" | sed 's%://%@PROTO@%' | cut -d: -f5- | sed 's%@PROTO@%://%')
+	local name flow iptype logflag file_or_url _rest
+	IFS=: read -r name flow iptype logflag _rest <<< "$line"
+	# _rest contains field 5+ (may include colons in URLs)
+	file_or_url="$_rest"
 
 	# Validate fields
 	if [ -z "$name" ] || [ -z "$flow" ] || [ -z "$iptype" ] || [ -z "$logflag" ] || [ -z "$file_or_url" ]; then
@@ -1293,12 +1291,9 @@ while IFS= read -r line; do
 		\#*|"") continue ;;
 	esac
 
-	local name flow iptype logflag file_or_url
-	name=$(echo "$line" | cut -d: -f1)
-	flow=$(echo "$line" | cut -d: -f2)
-	iptype=$(echo "$line" | cut -d: -f3)
-	logflag=$(echo "$line" | cut -d: -f4)
-	file_or_url=$(echo "$line" | sed 's%://%@PROTO@%' | cut -d: -f5- | sed 's%@PROTO@%://%')
+	local name flow iptype logflag file_or_url _rest
+	IFS=: read -r name flow iptype logflag _rest <<< "$line"
+	file_or_url="$_rest"
 
 	if [ -z "$name" ] || [ -z "$file_or_url" ]; then
 		continue
@@ -1387,7 +1382,7 @@ while IFS= read -r line; do
 		\#*|"") continue ;;
 	esac
 	local name
-	name=$(echo "$line" | cut -d: -f1)
+	name="${line%%:*}"
 	[ -z "$name" ] && continue
 	$IPSET destroy "$name" 2>/dev/null || true
 	$IPSET destroy "${name}-tmp" 2>/dev/null || true

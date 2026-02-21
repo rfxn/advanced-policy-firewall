@@ -72,3 +72,12 @@
 [Change] Remove unnecessary $(echo $var) wrappers in for loops; redundant
       when variable is already space-separated (cports.common, functions.apf,
       firewall)
+[Change] Replace echo|awk/cut field parsing with bash builtins: UID:PORT
+      parsing echo|tr|awk → ${var%%:*}/${var#*:}, ipset field parsing
+      echo|cut → IFS=: read, TCP flag parsing echo|awk → read, GRE keepalive
+      echo|awk → read; eliminates 2-5 fork+exec calls per invocation across
+      ~20 sites (cports.common, functions.apf, bt.rules, gretunnel.sh)
+[Change] dlist_download() parse loop: echo|grep|awk|tr pipeline replaced
+      with case/read/bash-test builtins; eliminates 4-6 forks per blocklist
+      entry (functions.apf)
+[Change] EG_DROP_CMD prefix: echo|cut → ${i:0:6} substring (cports.common)
