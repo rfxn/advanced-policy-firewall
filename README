@@ -18,13 +18,15 @@ Contents:
 3.3 ........... Configuration: Reactive Address Blocking
 3.4 ........... Configuration: Virtual Network Files
 3.5 ........... Configuration: Global Variables & Custom Rules
-3.6 ........... Configuration: Docker/Container Compatibility
-3.7 ........... Configuration: ipset Block Lists
-3.8 ........... Configuration: GRE Tunnels
-3.9 ........... Configuration: Remote Block Lists
-3.10 .......... Configuration: Logging & Control
-3.11 .......... Configuration: Implicit Blocking
-3.12 .......... Configuration: Firewall Order of Operations
+3.6 ........... Configuration: Hook Scripts
+3.7 ........... Configuration: Silent IP Blocking
+3.8 ........... Configuration: Docker/Container Compatibility
+3.9 ........... Configuration: ipset Block Lists
+3.10 .......... Configuration: GRE Tunnels
+3.11 .......... Configuration: Remote Block Lists
+3.12 .......... Configuration: Logging & Control
+3.13 .......... Configuration: Implicit Blocking
+3.14 .......... Configuration: Firewall Order of Operations
 4 ............. General Usage
 4.1 ........... General Usage: Trust System
 4.2 ........... General Usage: Global Trust System
@@ -108,6 +110,8 @@ Blocking & Prevention:
 Infrastructure:
 - virtual network (VNET) per-IP policies
 - GRE tunnel management with dedicated chains
+- custom hook scripts (pre/post firewall rules)
+- silent IP blocking (silent drop for server addresses)
 - Docker/container compatibility mode
 - fast load snapshots with nft backend detection
 - kernel tuning via sysctl (conntrack, syn-flood, routing)
@@ -433,7 +437,32 @@ directly to the preroute.rules file which is loaded early in the firewall
 chain. Any valid iptables syntax can be used in these files, as they are
 sourced directly into the firewall's bash execution environment.
 
-3.6) Configuration: Docker/Container Compatibility
+3.6) Configuration: Hook Scripts
+APF supports custom pre- and post-configuration hook scripts that are sourced
+during firewall startup:
+
+  hook_pre.sh  -- sourced after flush/module init but before any iptables rules.
+                  Use for custom chains, NAT rules, or early ACCEPT/DROP overrides.
+  hook_post.sh -- sourced after all rules including default DROP policies. Use for
+                  Docker chain restoration, custom logging, or rules that must be
+                  applied last.
+
+Both scripts ship as permission 640 (inactive). To activate, make executable:
+chmod 750 /etc/apf/hook_pre.sh. All APF variables and helpers (ipt/ipt4/ipt6,
+eout, etc.) are available. Scripts are preserved across upgrades via importconf.
+
+3.7) Configuration: Silent IP Blocking
+The silent_ips.rules file lists server IP addresses that should receive no
+traffic at all. Traffic to and from these addresses is silently dropped (no
+logging) in both INPUT and OUTPUT chains. One IP or CIDR per line, # comments
+supported, both IPv4 and IPv6.
+
+Positioned after loopback and trusted interface acceptance -- loopback and
+trusted interfaces still work. All other traffic is blocked before trust
+chains, block lists, or port filtering. An empty or comment-only file is a
+no-op. Preserved across upgrades via importconf.
+
+3.8) Configuration: Docker/Container Compatibility
 When running APF alongside Docker, Podman, Kubernetes, or other container
 runtimes, the default flush behavior (which wipes all iptables rules and chains)
 will destroy the container runtime's networking rules. The DOCKER_COMPAT option
@@ -459,7 +488,7 @@ designed to protect. Snapshot saving is also skipped in compat mode.
 Enable this option if you see Docker containers losing network connectivity
 after running 'apf -s' or 'apf -r'.
 
-3.7) Configuration: ipset Block Lists
+3.9) Configuration: ipset Block Lists
 The ipset subsystem uses kernel-level hash tables for high-performance IP
 matching. Instead of creating one iptables rule per blocked IP address (which
 scales linearly), ipset creates a single iptables rule per block list that
@@ -493,7 +522,7 @@ CLI: Run 'apf --ipset-update' to hot-reload all ipset block lists without
 restarting the firewall. A cron job (cron.d.apf_ipset) is installed
 automatically to perform periodic updates.
 
-3.8) Configuration: GRE Tunnels
+3.10) Configuration: GRE Tunnels
 APF can manage GRE (Generic Routing Encapsulation) point-to-point tunnels
 with dedicated firewall chains and protocol 47 rules. This is useful for
 servers that need encapsulated point-to-point links to remote endpoints.
@@ -546,7 +575,7 @@ CLI commands:
   apf --gre-down     - tear down all tunnels and remove firewall rules
   apf --gre-status   - show current tunnel interface status
 
-3.9) Configuration: Remote Block Lists
+3.11) Configuration: Remote Block Lists
 APF can automatically download and apply IP block lists from external sources.
 Each list is loaded into a dedicated iptables chain on full firewall start.
 The following DLIST_* variables in conf.apf control these lists:
@@ -564,7 +593,7 @@ backup to prevent data loss. Note that DLIST_RESERVED interacts with
 BLK_RESNET — when both are enabled, the downloaded reserved.networks list
 supplements the built-in private.networks blocking.
 
-3.10) Configuration: Logging & Control
+3.12) Configuration: Logging & Control
 APF provides configurable logging of filtered packets through the LOG_*
 variables in conf.apf:
 
@@ -581,7 +610,7 @@ For iptables concurrency control, IPT_LOCK_SUPPORT and IPT_LOCK_TIMEOUT
 configure the -w lock flag behavior for iptables >= 1.4.20. This prevents
 concurrent iptables modifications from corrupting rule state.
 
-3.11) Configuration: Implicit Blocking
+3.13) Configuration: Implicit Blocking
 The BLK_* variables in conf.apf control implicit blocking of specific traffic
 patterns without explicit port rules. These apply globally to all interfaces:
 
@@ -597,7 +626,7 @@ patterns without explicit port rules. These apply globally to all interfaces:
   BLK_IDENT          - REJECT ident (TCP 113) requests instead of silently
                         dropping; some services stall without ident response
 
-3.12) Configuration: Firewall Order of Operations
+3.14) Configuration: Firewall Order of Operations
 When APF starts ('apf -s'), rules are loaded in a specific order that
 determines how packets are evaluated. Understanding this order is essential
 for troubleshooting and for knowing which features take precedence.
@@ -609,34 +638,38 @@ INPUT chain evaluation order (first match wins):
    1  TCP SACK Panic (MSS 1-500)               DROP
    2  Loopback interface                        ACCEPT
    3  Trusted interfaces (IFACE_TRUSTED)        ACCEPT
-   4  GRE tunnel chains                         per-tunnel
-   5  TALLOW (local allow list)                 ACCEPT
-   6  TGALLOW (global allow list)               ACCEPT
-   7  TDENY (local deny list)                   DROP
-   8  TGDENY (global deny list)                 DROP
-   9  Remote block lists (PHP, DShield, etc.)   DROP
-  10  ipset block lists                         DROP
-  11  Common drop ports (BLK_PORTS)             DROP
-  12  Packet sanity checks                      DROP
-  13  IDENT / Multicast / P2P blocking          REJECT/DROP
-  14  RAB trip and portscan rules               DROP
-  15  State tracking (ESTABLISHED,RELATED)      ACCEPT
-  16  VNET per-IP port rules                    ACCEPT
-  17  Connlimit (per-port connection limits)    REJECT
-  18  Inbound TCP/UDP port ACCEPT               ACCEPT
-  19  ICMP / ICMPv6 / NDP                       ACCEPT
-  20  Non-SYN NEW tcp DROP                      DROP
-  21  DNS, FTP, SSH, Traceroute helpers         ACCEPT
-  22  Log (rate-limited)                        LOG
-  23  Default DROP (tcp, udp, all)              DROP
+   4  Silent IPs (silent_ips.rules)             DROP
+   5  GRE tunnel chains                         per-tunnel
+   6  TALLOW (local allow list)                 ACCEPT
+   7  TGALLOW (global allow list)               ACCEPT
+   8  TDENY (local deny list)                   DROP
+   9  TGDENY (global deny list)                 DROP
+  10  Remote block lists (PHP, DShield, etc.)   DROP
+  11  ipset block lists                         DROP
+  12  Common drop ports (BLK_PORTS)             DROP
+  13  Packet sanity checks                      DROP
+  14  IDENT / Multicast / P2P blocking          REJECT/DROP
+  15  RAB trip and portscan rules               DROP
+  16  State tracking (ESTABLISHED,RELATED)      ACCEPT
+  17  VNET per-IP port rules                    ACCEPT
+  18  Connlimit (per-port connection limits)    REJECT
+  19  Inbound TCP/UDP port ACCEPT               ACCEPT
+  20  ICMP / ICMPv6 / NDP                       ACCEPT
+  21  Non-SYN NEW tcp DROP                      DROP
+  22  DNS, FTP, SSH, Traceroute helpers         ACCEPT
+  23  Log (rate-limited)                        LOG
+  24  Default DROP (tcp, udp, all)              DROP
 
 Key precedence rules:
   - Trusted interfaces bypass all filtering
+  - Silent IPs are dropped immediately after trusted interfaces, before all other filtering
   - Allow lists are evaluated before deny lists
   - Block lists, sanity checks, and RAB are evaluated before state tracking
   - State tracking fast-paths established connections; deny lists and blocklists still block
   - Connlimit REJECT runs before port ACCEPT
   - VNET per-IP rules override global port configuration
+  - Hook scripts (hook_pre.sh / hook_post.sh) run outside the normal chain;
+    pre-hook before any rules, post-hook after default policies
 
 For the complete step-by-step initialization flow with source file
 references, see the FLOW document.
@@ -664,6 +697,7 @@ usage apf [OPTION]
 -v|--version ....................... output version number
 --ipset-update ..................... hot-reload ipset block lists from ipset.rules
 --gre-up ........................... bring up GRE tunnels from gre.rules
+-g|--search PATTERN ................ search iptables rules and trust files
 --gre-down ......................... tear down GRE tunnels
 --gre-status ....................... show GRE tunnel status
 
@@ -677,6 +711,11 @@ The -a|--allow and -d|--deny options add entries to the trust system immediately
 without a firewall restart. Both accept an optional comment string. The
 -u|--remove option removes an address from all trust files. See section 4.1
 for details.
+
+The -g|--search option searches all iptables rules (IPv4 + IPv6), ipset sets,
+and trust files for a pattern match. Case-insensitive, with line-numbered output.
+Useful for quickly finding which rules or trust entries match a given IP, port,
+or chain name.
 
 The -o|--ovars option outputs all configured variables and their values — useful
 for troubleshooting or when reporting problems (see section 6).
