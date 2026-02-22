@@ -98,6 +98,7 @@ For a detailed description of all APF features, review `conf.apf` (under your in
 - **GRE tunnel management** with dedicated chains, protocol 47 rules, lifecycle controls (`--gre-up`/`--gre-down`/`--gre-status`), and persist-across-flush support
 - **Automatic dependency checking** at startup with OS-aware install hints for missing packages (apt-get, yum, dnf)
 - **ICMPv6 type filtering** (`IG_ICMPV6_TYPES`/`EG_ICMPV6_TYPES`) with automatic NDP protection for types 133-136
+- **Per-port concurrent connection limiting** via `xt_connlimit` module; configurable `port:limit` pairs for TCP and UDP with VNET per-IP override support
 - **Adaptive connection tracking scaling** that auto-grows conntrack_max when usage exceeds 80%, with configurable ceiling and hash table sizing
 - **IPv6 sysctl hardening**: disables accept_source_route, accept_redirects, and accept_ra when `USE_IPV6=1`
 - systemd service unit for modern init management
@@ -247,10 +248,12 @@ This section will cover some of the basic configuration options found inside of 
 | `IG_TCP_CPORTS` | Inbound TCP ports ("server" ports, e.g., `22,80,443`) |
 | `IG_UDP_CPORTS` | Inbound UDP ports (e.g., `53` for DNS) |
 | `IG_ICMP_TYPES` | Inbound ICMP types (see `internals/icmp.types`) |
+| `IG_ICMPV6_TYPES` | Inbound ICMPv6 types (requires `USE_IPV6="1"`); NDP types 133-136 always permitted |
 | `EGF` | Top level toggle for outbound (egress) filtering; recommended to enable |
 | `EG_TCP_CPORTS` | Outbound TCP ports ("client" ports, e.g., `80,443`) |
 | `EG_UDP_CPORTS` | Outbound UDP ports (e.g., `53,873`) |
 | `EG_ICMP_TYPES` | Outbound ICMP types (see `internals/icmp.types`) |
+| `EG_ICMPV6_TYPES` | Outbound ICMPv6 types (requires `USE_IPV6="1"`); NDP types 133-136 always permitted |
 
 **Per-port connection limiting** (via `xt_connlimit` module):
 
@@ -290,7 +293,7 @@ The advanced options, although not required, are those which afford the firewall
 | `REJECT` | ICMP error reply | Port appears closed, not firewalled |
 | `PROHIBIT` | ICMP-only reply | Lighter than RESET; default expected behavior for UDP |
 
-**`PKT_SANITY`** - Top level toggle for packet sanity checks. Ensures all packets conform to strict TCP/IP standards. Sub-options (`PKT_SANITY_INV`, `PKT_SANITY_FUDP`, `PKT_SANITY_PZERO`, `PKT_SANITY_STUFFED`) are preconfigured to suit most situations. See `conf.apf` for details.
+**`PKT_SANITY`** - Top level toggle for packet sanity checks. Ensures all packets conform to strict TCP/IP standards. Sub-options (`PKT_SANITY_INV`, `PKT_SANITY_FUDP`, `PKT_SANITY_PZERO`) are preconfigured to suit most situations. See `conf.apf` for details.
 
 **Type of Service (`TOS_*`)** - Classify traffic priority based on port numbers. Default settings improve throughput and reliability for FTP, HTTP, SMTP, POP3 and IMAP. Review `conf.apf` for detailed TOS options.
 

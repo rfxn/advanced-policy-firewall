@@ -153,3 +153,13 @@
       (conf.apf)
 [Fix] functions.apf: fix (trust) eout prefix to {trust} for consistency
       with all other eout calls (functions.apf)
+[Fix] functions.apf: add missing {trust} prefix to trust_hosts() fatal
+      error eout call (functions.apf)
+[New] README/README.md: add documentation for IG_TCP_CLIMIT/IG_UDP_CLIMIT
+      per-port connection limiting, EG_TCP_UID/EG_UDP_UID uid-based
+      outbound filtering, IG_ICMPV6_TYPES/EG_ICMPV6_TYPES; add connlimit
+      to feature list; remove phantom PKT_SANITY_STUFFED reference
+      (README, README.md)
+[Change] .ca.def: add missing preamble defaults for DOCKER_COMPAT,
+      IG_ICMPV6_TYPES, EG_ICMPV6_TYPES to ensure correct values during
+      importconf upgrades from pre-2.0.1 versions (.ca.def)

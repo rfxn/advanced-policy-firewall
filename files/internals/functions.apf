@@ -765,7 +765,7 @@ chain="$2"
 local action_all="$3" action_tcp="$4" action_udp="$5" verb="$6"
 load_local_addrs
 if [ -z "$file" ] || [ -z "$chain" ]; then
-        eout "could not process trust_hosts $file $chain, fatal error, aborting!"
+        eout "{trust} could not process trust_hosts $file $chain, fatal error, aborting!"
         $INSTALL_PATH/apf -f
         mutex_unlock
         exit 1
