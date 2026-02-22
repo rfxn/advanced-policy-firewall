@@ -25,13 +25,15 @@ trust-based host management, reactive address blocking, and per-IP virtual netwo
   - [3.3 Reactive Address Blocking](#33-reactive-address-blocking)
   - [3.4 Virtual Network Files](#34-virtual-network-files)
   - [3.5 Global Variables & Custom Rules](#35-global-variables--custom-rules)
-  - [3.6 Docker/Container Compatibility](#36-dockercontainer-compatibility)
-  - [3.7 ipset Block Lists](#37-ipset-block-lists)
-  - [3.8 GRE Tunnels](#38-gre-tunnels)
-  - [3.9 Remote Block Lists](#39-remote-block-lists)
-  - [3.10 Logging & Control](#310-logging--control)
-  - [3.11 Implicit Blocking](#311-implicit-blocking)
-  - [3.12 Firewall Order of Operations](#312-firewall-order-of-operations)
+  - [3.6 Hook Scripts](#36-hook-scripts)
+  - [3.7 Silent IP Blocking](#37-silent-ip-blocking)
+  - [3.8 Docker/Container Compatibility](#38-dockercontainer-compatibility)
+  - [3.9 ipset Block Lists](#39-ipset-block-lists)
+  - [3.10 GRE Tunnels](#310-gre-tunnels)
+  - [3.11 Remote Block Lists](#311-remote-block-lists)
+  - [3.12 Logging & Control](#312-logging--control)
+  - [3.13 Implicit Blocking](#313-implicit-blocking)
+  - [3.14 Firewall Order of Operations](#314-firewall-order-of-operations)
 - [4. General Usage](#4-general-usage)
   - [4.1 Trust System](#41-trust-system)
   - [4.2 Global Trust System](#42-global-trust-system)
@@ -105,6 +107,8 @@ For a detailed description of all APF features, review `conf.apf` (under your in
 **Infrastructure**
 - Virtual network (VNET) per-IP policies
 - GRE tunnel management with dedicated chains
+- Custom hook scripts (pre/post firewall rules)
+- Silent IP blocking (silent drop for server addresses)
 - Docker/container compatibility mode
 - Fast load snapshots with nft backend detection
 - Kernel tuning via sysctl (conntrack, syn-flood, routing)
@@ -352,7 +356,22 @@ When `SET_VNET=1`, APF generates per-IP policy files under the `vnet/` directory
 
 All variables defined in `conf.apf` are available for use in VNET per-IP rule files, allowing you to import global settings and selectively override them. For custom iptables rules beyond what `conf.apf` provides, you can add rules directly to the `preroute.rules` file which is loaded early in the firewall chain. Any valid iptables syntax can be used in these files, as they are sourced directly into the firewall's bash execution environment.
 
-### 3.6 Docker/Container Compatibility
+### 3.6 Hook Scripts
+
+APF supports custom pre- and post-configuration hook scripts that are sourced during firewall startup:
+
+- **`hook_pre.sh`** — sourced after flush/module init but before any iptables rules. Use for custom chains, NAT rules, or early ACCEPT/DROP overrides.
+- **`hook_post.sh`** — sourced after all rules including default DROP policies. Use for Docker chain restoration, custom logging, or rules that must be applied last.
+
+Both scripts ship as permission 640 (inactive). To activate, make executable: `chmod 750 /etc/apf/hook_pre.sh`. All APF variables and helpers (`ipt`/`ipt4`/`ipt6`, `eout`, etc.) are available. Scripts are preserved across upgrades via `importconf`.
+
+### 3.7 Silent IP Blocking
+
+The `silent_ips.rules` file lists server IP addresses that should receive no traffic at all. Traffic to and from these addresses is silently dropped (no logging) in both INPUT and OUTPUT chains. One IP or CIDR per line, `#` comments supported, both IPv4 and IPv6.
+
+Positioned after loopback and trusted interface acceptance — loopback and trusted interfaces still work. All other traffic is blocked before trust chains, block lists, or port filtering. An empty or comment-only file is a no-op. Preserved across upgrades via `importconf`.
+
+### 3.8 Docker/Container Compatibility
 
 When running APF alongside Docker, Podman, Kubernetes, or other container runtimes, the default flush behavior (which wipes all iptables rules and chains) will destroy the container runtime's networking rules. The `DOCKER_COMPAT` option solves this by switching APF to a surgical flush mode.
 
@@ -369,7 +388,7 @@ When `DOCKER_COMPAT` is enabled, `SET_FASTLOAD` is automatically disabled becaus
 
 Enable this option if you see Docker containers losing network connectivity after running `apf -s` or `apf -r`.
 
-### 3.7 ipset Block Lists
+### 3.9 ipset Block Lists
 
 The ipset subsystem uses kernel-level hash tables for high-performance IP matching. Instead of creating one iptables rule per blocked IP address (which scales linearly), ipset creates a single iptables rule per block list that references a kernel hash set, providing O(1) lookup performance regardless of list size.
 
@@ -377,10 +396,12 @@ The ipset subsystem uses kernel-level hash tables for high-performance IP matchi
 
 **`IPSET_LOG_RATE`** - Default log rate limit (per minute) for ipset blocklist matches. Individual lists can control their own logging via the log field in `ipset.rules`.
 
+**`IPSET_REFRESH`** - Default refresh interval (seconds) for ipset lists during `--ipset-update`. Lists with `interval=0` in `ipset.rules` use this value. Default: `21600` (6 hours). Minimum effective interval is 1 hour since the cron runs hourly.
+
 The block lists are defined in the `ipset.rules` file. Each line defines a set with the format:
 
 ```
-name:flow:ipset_type:log:file_or_url
+name:flow:ipset_type:log:interval:maxelem:file_or_url
 ```
 
 Where:
@@ -388,17 +409,18 @@ Where:
 - `flow` - `src` or `dst` (match source or destination address)
 - `ipset_type` - `ip` or `net` (`hash:ip` for single addresses, `hash:net` for CIDR blocks)
 - `log` - `0` or `1` (per-list logging, rate governed by `IPSET_LOG_RATE`)
+- `interval` - refresh interval in seconds for `--ipset-update` (`0` = use `IPSET_REFRESH`; minimum effective is 1 hour)
+- `maxelem` - max entries to load (`0` = unlimited, capped at 1048576)
 - `file_or_url` - local file path or URL (`https://` for remote download)
 
-Examples:
+Example:
 ```
-firehol_level2:src:net:1:https://iplists.firehol.org/files/firehol_level2.netset
-my_blacklist:src:ip:0:/etc/apf/my_blacklist.txt
+firehol_level2:src:net:1:0:0:https://iplists.firehol.org/files/firehol_level2.netset
 ```
 
-Run `apf --ipset-update` to hot-reload all ipset block lists without restarting the firewall. A cron job (`cron.d.apf_ipset`) is installed automatically to perform periodic updates.
+Run `apf --ipset-update` to hot-reload all ipset block lists without restarting the firewall. A cron job (`cron.d.apf_ipset`) runs hourly; actual refresh timing is governed by per-list intervals and `IPSET_REFRESH`.
 
-### 3.8 GRE Tunnels
+### 3.10 GRE Tunnels
 
 APF can manage GRE (Generic Routing Encapsulation) point-to-point tunnels with dedicated firewall chains and protocol 47 rules. This is useful for servers that need encapsulated point-to-point links to remote endpoints.
 
@@ -443,7 +465,7 @@ apf --gre-down     # tear down all tunnels and remove firewall rules
 apf --gre-status   # show current tunnel interface status
 ```
 
-### 3.9 Remote Block Lists
+### 3.11 Remote Block Lists
 
 APF can automatically download and apply IP block lists from external sources. Each list is loaded into a dedicated iptables chain on full firewall start. The following `DLIST_*` variables in `conf.apf` control these lists:
 
@@ -457,7 +479,7 @@ APF can automatically download and apply IP block lists from external sources. E
 
 Each has a companion `_URL` variable (e.g., `DLIST_PHP_URL`) for the download source. Set the toggle to `"1"` to enable a list. Lists are validated during parsing and backed up before each download. Failed downloads restore from backup to prevent data loss. Note that `DLIST_RESERVED` interacts with `BLK_RESNET` — when both are enabled, the downloaded reserved.networks list supplements the built-in private.networks blocking.
 
-### 3.10 Logging & Control
+### 3.12 Logging & Control
 
 APF provides configurable logging of filtered packets through the `LOG_*` variables in `conf.apf`:
 
@@ -474,7 +496,7 @@ APF provides configurable logging of filtered packets through the `LOG_*` variab
 
 For iptables concurrency control, `IPT_LOCK_SUPPORT` and `IPT_LOCK_TIMEOUT` configure the `-w` lock flag behavior for iptables >= 1.4.20. This prevents concurrent iptables modifications from corrupting rule state.
 
-### 3.11 Implicit Blocking
+### 3.13 Implicit Blocking
 
 The `BLK_*` variables in `conf.apf` control implicit blocking of specific traffic patterns without explicit port rules. These apply globally to all interfaces:
 
@@ -488,7 +510,7 @@ The `BLK_*` variables in `conf.apf` control implicit blocking of specific traffi
 | `BLK_TCP_SACK_PANIC` | Block low-MSS TCP SACK exploit packets (CVE-2019-11477) |
 | `BLK_IDENT` | REJECT ident (TCP 113) requests instead of silently dropping; some services stall without ident response |
 
-### 3.12 Firewall Order of Operations
+### 3.14 Firewall Order of Operations
 
 When APF starts (`apf -s`), rules are loaded in a specific order that determines how packets are evaluated. Understanding this order is essential for troubleshooting and for knowing which features take precedence.
 
@@ -499,34 +521,37 @@ When APF starts (`apf -s`), rules are loaded in a specific order that determines
 | 1 | TCP SACK Panic (MSS 1-500) | DROP |
 | 2 | Loopback interface | ACCEPT |
 | 3 | Trusted interfaces (`IFACE_TRUSTED`) | ACCEPT |
-| 4 | GRE tunnel chains | per-tunnel |
-| 5 | TALLOW (local allow list) | ACCEPT |
-| 6 | TGALLOW (global allow list) | ACCEPT |
-| 7 | TDENY (local deny list) | DROP |
-| 8 | TGDENY (global deny list) | DROP |
-| 9 | Remote block lists (PHP, DShield, Spamhaus) | DROP |
-| 10 | ipset block lists | DROP |
-| 11 | Common drop ports (`BLK_PORTS`) | DROP |
-| 12 | Packet sanity checks | DROP |
-| 13 | IDENT / Multicast / P2P blocking | REJECT/DROP |
-| 14 | RAB trip and portscan rules | DROP |
-| 15 | State tracking (ESTABLISHED,RELATED) | ACCEPT |
-| 16 | VNET per-IP port rules | ACCEPT |
-| 17 | Connlimit (per-port connection limits) | REJECT |
-| 18 | Inbound TCP/UDP port ACCEPT | ACCEPT |
-| 19 | ICMP / ICMPv6 / NDP | ACCEPT |
-| 20 | Non-SYN NEW tcp DROP | DROP |
-| 21 | DNS, FTP, SSH, Traceroute helpers | ACCEPT |
-| 22 | Log (rate-limited) | LOG |
-| 23 | Default DROP (tcp, udp, all) | DROP |
+| 4 | Silent IPs (`silent_ips.rules`) | DROP |
+| 5 | GRE tunnel chains | per-tunnel |
+| 6 | TALLOW (local allow list) | ACCEPT |
+| 7 | TGALLOW (global allow list) | ACCEPT |
+| 8 | TDENY (local deny list) | DROP |
+| 9 | TGDENY (global deny list) | DROP |
+| 10 | Remote block lists (PHP, DShield, Spamhaus) | DROP |
+| 11 | ipset block lists | DROP |
+| 12 | Common drop ports (`BLK_PORTS`) | DROP |
+| 13 | Packet sanity checks | DROP |
+| 14 | IDENT / Multicast / P2P blocking | REJECT/DROP |
+| 15 | RAB trip and portscan rules | DROP |
+| 16 | State tracking (ESTABLISHED,RELATED) | ACCEPT |
+| 17 | VNET per-IP port rules | ACCEPT |
+| 18 | Connlimit (per-port connection limits) | REJECT |
+| 19 | Inbound TCP/UDP port ACCEPT | ACCEPT |
+| 20 | ICMP / ICMPv6 / NDP | ACCEPT |
+| 21 | Non-SYN NEW tcp DROP | DROP |
+| 22 | DNS, FTP, SSH, Traceroute helpers | ACCEPT |
+| 23 | Log (rate-limited) | LOG |
+| 24 | Default DROP (tcp, udp, all) | DROP |
 
 **Key precedence rules:**
 - Trusted interfaces bypass all filtering
+- Silent IPs are dropped immediately after trusted interfaces, before all other filtering
 - Allow lists are evaluated before deny lists
 - Block lists, sanity checks, and RAB are evaluated before state tracking
 - State tracking fast-paths established connections; deny lists and blocklists still block
 - Connlimit REJECT runs before port ACCEPT
 - VNET per-IP rules override global port configuration
+- Hook scripts (`hook_pre.sh` / `hook_post.sh`) run outside the normal chain; pre-hook before any rules, post-hook after default policies
 
 For the complete step-by-step initialization flow with source file references, see [FLOW.md](FLOW.md).
 
@@ -556,6 +581,7 @@ usage apf [OPTION]
 -v|--version ....................... output version number
 --ipset-update ..................... hot-reload ipset block lists from ipset.rules
 --gre-up ........................... bring up GRE tunnels from gre.rules
+-g|--search PATTERN ................ search iptables rules and trust files
 --gre-down ......................... tear down GRE tunnels
 --gre-status ....................... show GRE tunnel status
 ```
@@ -565,6 +591,8 @@ The **`-l|--list`** option shows all loaded iptables rules. The **`-t|--status`*
 The **`-e|--refresh`** option flushes trust chains and reloads them from rule files, re-resolving any DNS names. Useful for dynamic DNS entries in the trust system.
 
 The **`-a|--allow`** and **`-d|--deny`** options add entries to the trust system immediately without a firewall restart. Both accept an optional comment string. The **`-u|--remove`** option removes an address from all trust files. See [section 4.1](#41-trust-system) for details.
+
+The **`-g|--search`** option searches all iptables rules (IPv4 + IPv6), ipset sets, and trust files for a pattern match. Case-insensitive, with line-numbered output. Useful for quickly finding which rules or trust entries match a given IP, port, or chain name.
 
 The **`-o|--ovars`** option outputs all configured variables and their values — useful for troubleshooting or when reporting problems (see [section 6](#6-support-information)).
 

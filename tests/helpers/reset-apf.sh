@@ -15,7 +15,14 @@ reset_apf() {
           "$APF_INSTALL/internals/.last.full" \
           "$APF_INSTALL/internals/.apf.restore.backend" \
           "$APF_INSTALL/internals/.localaddrs" \
-          "$APF_INSTALL/internals/.localaddrs6"
+          "$APF_INSTALL/internals/.localaddrs6" \
+          "$APF_INSTALL/internals/.ipset.timestamps"
+    # Reset hook scripts and silent IPs to pristine state
+    cp "$APF_INSTALL/hook_pre.sh.clean" "$APF_INSTALL/hook_pre.sh" 2>/dev/null || true
+    chmod 640 "$APF_INSTALL/hook_pre.sh" 2>/dev/null || true
+    cp "$APF_INSTALL/hook_post.sh.clean" "$APF_INSTALL/hook_post.sh" 2>/dev/null || true
+    chmod 640 "$APF_INSTALL/hook_post.sh" 2>/dev/null || true
+    cp "$APF_INSTALL/silent_ips.rules.clean" "$APF_INSTALL/silent_ips.rules" 2>/dev/null || true
     touch /var/log/apf_log
     chmod 600 /var/log/apf_log
 }

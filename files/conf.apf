@@ -563,6 +563,11 @@ USE_IPSET="0"
 # Requires LOG_DROP="1" to be globally enabled.
 IPSET_LOG_RATE="30"
 
+# Default refresh interval (seconds) for ipset lists during --ipset-update.
+# Lists with interval=0 in ipset.rules use this value. Default: 21600 (6 hours).
+# The ipset cron job runs hourly; minimum effective interval is 1 hour (3600s).
+IPSET_REFRESH="21600"
+
 ##
 # [GRE Tunnels]
 ##
