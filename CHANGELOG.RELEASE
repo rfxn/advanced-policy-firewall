@@ -1,5 +1,12 @@
 - 2.0.2 | Feb 22 2026:
 
+[New] FLOW.md and FLOW: standalone order-of-operations document covering
+      full load sequence, INPUT chain rule order with precedence table,
+      key "what beats what" rules, and fast load vs full load conditions
+      (FLOW.md, FLOW)
+[New] README/README.md: add section 3.12 Firewall Order of Operations with
+      condensed INPUT chain evaluation order table, key precedence rules,
+      and link to FLOW.md; update Table of Contents (README, README.md)
 [New] ipset_migrate_rules() auto-detects legacy 4-field ipset.rules entries
       (missing log field) and rewrites them to 5-field format with log=0;
       handles both local paths and URLs with embedded colons; runs idempotently

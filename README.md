@@ -31,6 +31,7 @@ trust-based host management, reactive address blocking, and per-IP virtual netwo
   - [3.9 Remote Block Lists](#39-remote-block-lists)
   - [3.10 Logging & Control](#310-logging--control)
   - [3.11 Implicit Blocking](#311-implicit-blocking)
+  - [3.12 Firewall Order of Operations](#312-firewall-order-of-operations)
 - [4. General Usage](#4-general-usage)
   - [4.1 Trust System](#41-trust-system)
   - [4.2 Global Trust System](#42-global-trust-system)
@@ -486,6 +487,46 @@ The `BLK_*` variables in `conf.apf` control implicit blocking of specific traffi
 | `BLK_RESNET` | Block reserved/unassigned IPv4 space |
 | `BLK_TCP_SACK_PANIC` | Block low-MSS TCP SACK exploit packets (CVE-2019-11477) |
 | `BLK_IDENT` | REJECT ident (TCP 113) requests instead of silently dropping; some services stall without ident response |
+
+### 3.12 Firewall Order of Operations
+
+When APF starts (`apf -s`), rules are loaded in a specific order that determines how packets are evaluated. Understanding this order is essential for troubleshooting and for knowing which features take precedence.
+
+**INPUT chain evaluation order** (first match wins):
+
+| # | Rule | Action |
+|---|------|--------|
+| 1 | TCP SACK Panic (MSS 1-500) | DROP |
+| 2 | Loopback interface | ACCEPT |
+| 3 | Trusted interfaces (`IFACE_TRUSTED`) | ACCEPT |
+| 4 | GRE tunnel chains | per-tunnel |
+| 5 | TALLOW (local allow list) | ACCEPT |
+| 6 | TGALLOW (global allow list) | ACCEPT |
+| 7 | TDENY (local deny list) | DROP |
+| 8 | TGDENY (global deny list) | DROP |
+| 9 | Remote block lists (PHP, DShield, Spamhaus) | DROP |
+| 10 | ipset block lists | DROP |
+| 11 | Common drop ports (`BLK_PORTS`) | DROP |
+| 12 | Packet sanity checks | DROP |
+| 13 | IDENT / Multicast / P2P blocking | REJECT/DROP |
+| 14 | RAB trip and portscan rules | DROP |
+| 15 | VNET per-IP port rules | ACCEPT |
+| 16 | Connlimit (per-port connection limits) | REJECT |
+| 17 | Inbound TCP/UDP port ACCEPT | ACCEPT |
+| 18 | ICMP / ICMPv6 / NDP | ACCEPT |
+| 19 | State tracking (ESTABLISHED,RELATED) | ACCEPT |
+| 20 | DNS, FTP, SSH, Traceroute helpers | ACCEPT |
+| 21 | Log (rate-limited) | LOG |
+| 22 | Default DROP (tcp, udp, all) | DROP |
+
+**Key precedence rules:**
+- Trusted interfaces bypass all filtering
+- Allow lists are evaluated before deny lists
+- Block lists and deny lists are evaluated before port ACCEPT rules
+- Connlimit REJECT runs before port ACCEPT
+- VNET per-IP rules override global port configuration
+
+For the complete step-by-step initialization flow with source file references, see [FLOW.md](FLOW.md).
 
 ---
 
