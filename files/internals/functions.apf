@@ -1231,13 +1231,15 @@ while IFS= read -r line; do
 			continue
 			;;
 	esac
-	local f1 f2 f3 f4 f5
-	IFS=: read -r f1 f2 f3 f4 f5 <<< "$line"
+	local f1 f2 f3 f4 f5 f6 f7
+	IFS=: read -r f1 f2 f3 f4 f5 f6 f7 <<< "$line"
 	if [ -n "$f4" ] && [ "$f4" != "0" ] && [ "$f4" != "1" ]; then
-		# Old 4-field format — reconstruct file_or_url and insert log=0
+		# Old 4-field format — f4 starts file_or_url; insert log=0:interval=0:maxelem=0
 		local orig_path="$f4"
-		[ -n "$f5" ] && orig_path="${f4}:${f5}"
-		printf '%s\n' "${f1}:${f2}:${f3}:0:${orig_path}" >> "$tmp"
+		[ -n "$f5" ] && orig_path="${orig_path}:${f5}"
+		[ -n "$f6" ] && orig_path="${orig_path}:${f6}"
+		[ -n "$f7" ] && orig_path="${orig_path}:${f7}"
+		printf '%s\n' "${f1}:${f2}:${f3}:0:0:0:${orig_path}" >> "$tmp"
 		migrated=$((migrated + 1))
 	else
 		printf '%s\n' "$line" >> "$tmp"
@@ -1245,7 +1247,7 @@ while IFS= read -r line; do
 done < "$ipset_rules"
 if [ "$migrated" -gt 0 ]; then
 	cp "$tmp" "$ipset_rules"
-	eout "{ipset} migrated $migrated legacy entries in ipset.rules (added log field)"
+	eout "{ipset} migrated $migrated entries in ipset.rules to 7-field format"
 fi
 rm -f "$tmp"
 }
@@ -1266,10 +1268,13 @@ while IFS= read -r line; do
 		\#*|"") continue ;;
 	esac
 
-	local name flow iptype logflag file_or_url _rest
-	IFS=: read -r name flow iptype logflag _rest <<< "$line"
-	# _rest contains field 5+ (may include colons in URLs)
+	local name flow iptype logflag interval maxelem file_or_url _rest
+	IFS=: read -r name flow iptype logflag interval maxelem _rest <<< "$line"
+	# _rest contains field 7+ (may include colons in URLs)
 	file_or_url="$_rest"
+	# Default non-numeric interval/maxelem to 0
+	[[ "$interval" =~ ^[0-9]+$ ]] || interval=0
+	[[ "$maxelem" =~ ^[0-9]+$ ]] || maxelem=0
 
 	# Validate fields
 	if [ -z "$name" ] || [ -z "$flow" ] || [ -z "$iptype" ] || [ -z "$logflag" ] || [ -z "$file_or_url" ]; then
@@ -1322,21 +1327,32 @@ while IFS= read -r line; do
 		continue
 	fi
 
+	# Determine effective maxelem
+	local ipset_maxelem=1048576
+	if [ "$maxelem" -gt 0 ]; then
+		ipset_maxelem="$maxelem"
+		[ "$ipset_maxelem" -gt 1048576 ] && ipset_maxelem=1048576
+	fi
+
 	# Create sets and populate with atomic swap
-	$IPSET create "$name" "$hash_type" maxelem 1048576 2>/dev/null || true
-	$IPSET create "${name}-tmp" "$hash_type" maxelem 1048576 2>/dev/null || true
+	$IPSET create "$name" "$hash_type" maxelem "$ipset_maxelem" 2>/dev/null || true
+	$IPSET create "${name}-tmp" "$hash_type" maxelem "$ipset_maxelem" 2>/dev/null || true
 	$IPSET flush "${name}-tmp"
 
 	# Pre-filter data into ipset restore format for batch loading
 	local restore_file
 	restore_file=$(mktemp "$INSTALL_PATH/.apf-XXXXXX")
-	awk '
+	awk -v max="$ipset_maxelem" '
+		BEGIN { count = 0 }
 		/^[[:space:]]*#/ || /^[[:space:]]*$/ || /^;;/ { next }
 		{
 			entry = $1
 			gsub(/;/, "", entry)
-			if (entry ~ /^[0-9]+\.[0-9]+\.[0-9]+\./)
+			if (entry ~ /^[0-9]+\.[0-9]+\.[0-9]+\./) {
+				count++
+				if (count > max) next
 				print "add '"${name}"'-tmp " entry
+			}
 		}
 	' "$data_file" > "$restore_file"
 
@@ -1361,6 +1377,7 @@ while IFS= read -r line; do
 	$IPSET flush "${name}-tmp"
 	$IPSET destroy "${name}-tmp" 2>/dev/null
 	eout "{ipset} loaded $count entries into $name ($hash_type)"
+	ipset_update_timestamp "$name" "$(date +%s)"
 
 	# Create iptables chain (IPv4 only — ipset entries are IPv4-filtered)
 	ipt4 -N "IPSET_${name}" 2>/dev/null
@@ -1371,6 +1388,21 @@ while IFS= read -r line; do
 	ipt4 -A INPUT -j "IPSET_${name}"
 	ipt4 -A OUTPUT -j "IPSET_${name}"
 done < "$ipset_rules"
+}
+
+ipset_update_timestamp() {
+local ts_name="$1"
+local ts_epoch="$2"
+local ts_file="$INSTALL_PATH/internals/.ipset.timestamps"
+local ts_tmp
+ts_tmp=$(mktemp "$INSTALL_PATH/.apf-XXXXXX")
+if [ -f "$ts_file" ]; then
+	grep -v "^${ts_name}:" "$ts_file" > "$ts_tmp" 2>/dev/null || true
+fi
+printf '%s\n' "${ts_name}:${ts_epoch}" >> "$ts_tmp"
+cp "$ts_tmp" "$ts_file"
+chmod 600 "$ts_file"
+rm -f "$ts_tmp"
 }
 
 ipset_update() {
@@ -1387,9 +1419,12 @@ while IFS= read -r line; do
 		\#*|"") continue ;;
 	esac
 
-	local name flow iptype logflag file_or_url _rest
-	IFS=: read -r name flow iptype logflag _rest <<< "$line"
+	local name flow iptype logflag interval maxelem file_or_url _rest
+	IFS=: read -r name flow iptype logflag interval maxelem _rest <<< "$line"
 	file_or_url="$_rest"
+	# Default non-numeric interval/maxelem to 0
+	[[ "$interval" =~ ^[0-9]+$ ]] || interval=0
+	[[ "$maxelem" =~ ^[0-9]+$ ]] || maxelem=0
 
 	if [ -z "$name" ] || [ -z "$file_or_url" ]; then
 		continue
@@ -1398,6 +1433,25 @@ while IFS= read -r line; do
 	# Only update sets that already exist (created during full load)
 	if ! $IPSET list "$name" > /dev/null 2>&1; then
 		continue
+	fi
+
+	# Check per-list interval before downloading
+	local eff_interval="$interval"
+	[ "$eff_interval" -eq 0 ] && eff_interval="${IPSET_REFRESH:-21600}"
+	local ts_file="$INSTALL_PATH/internals/.ipset.timestamps"
+	if [ -f "$ts_file" ]; then
+		local last_ts
+		last_ts=$(grep "^${name}:" "$ts_file" 2>/dev/null | tail -1)
+		if [ -n "$last_ts" ]; then
+			local last_epoch="${last_ts#*:}"
+			local now_epoch
+			now_epoch=$(date +%s)
+			local elapsed=$((now_epoch - last_epoch))
+			if [ "$elapsed" -lt "$eff_interval" ]; then
+				eout "{ipset} skipping $name (refreshes in $((eff_interval - elapsed))s)"
+				continue
+			fi
+		fi
 	fi
 
 	local hash_type="hash:$iptype"
@@ -1430,19 +1484,30 @@ while IFS= read -r line; do
 		continue
 	fi
 
-	$IPSET create "${name}-tmp" "$hash_type" maxelem 1048576 2>/dev/null || true
+	# Determine effective maxelem
+	local ipset_maxelem=1048576
+	if [ "$maxelem" -gt 0 ]; then
+		ipset_maxelem="$maxelem"
+		[ "$ipset_maxelem" -gt 1048576 ] && ipset_maxelem=1048576
+	fi
+
+	$IPSET create "${name}-tmp" "$hash_type" maxelem "$ipset_maxelem" 2>/dev/null || true
 	$IPSET flush "${name}-tmp"
 
 	# Pre-filter data into ipset restore format for batch loading
 	local restore_file
 	restore_file=$(mktemp "$INSTALL_PATH/.apf-XXXXXX")
-	awk '
+	awk -v max="$ipset_maxelem" '
+		BEGIN { count = 0 }
 		/^[[:space:]]*#/ || /^[[:space:]]*$/ || /^;;/ { next }
 		{
 			entry = $1
 			gsub(/;/, "", entry)
-			if (entry ~ /^[0-9]+\.[0-9]+\.[0-9]+\./)
+			if (entry ~ /^[0-9]+\.[0-9]+\.[0-9]+\./) {
+				count++
+				if (count > max) next
 				print "add '"${name}"'-tmp " entry
+			}
 		}
 	' "$data_file" > "$restore_file"
 
@@ -1459,6 +1524,7 @@ while IFS= read -r line; do
 	if [ "$count" -gt 0 ]; then
 		$IPSET swap "${name}-tmp" "$name"
 		eout "{ipset} updated $name with $count entries"
+		ipset_update_timestamp "$name" "$(date +%s)"
 	fi
 	$IPSET flush "${name}-tmp" 2>/dev/null
 	$IPSET destroy "${name}-tmp" 2>/dev/null
@@ -1483,6 +1549,7 @@ while IFS= read -r line; do
 	$IPSET destroy "$name" 2>/dev/null || true
 	$IPSET destroy "${name}-tmp" 2>/dev/null || true
 done < "$ipset_rules"
+rm -f "$INSTALL_PATH/internals/.ipset.timestamps"
 }
 
 glob_allow_download() {

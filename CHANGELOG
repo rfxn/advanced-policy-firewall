@@ -1,5 +1,15 @@
 - 2.0.2 | Feb 22 2026:
 
+[New] ipset.rules 7-field format: per-list refresh interval and max entry
+      count fields; backward-compatible migration from legacy 4-field format
+      (functions.apf, ipset.rules)
+[New] IPSET_REFRESH config variable: global default refresh interval for
+      ipset block lists during --ipset-update; minimum effective interval
+      is 1 hour since the cron runs hourly (conf.apf, .ca.def)
+[New] Per-list interval tracking via .ipset.timestamps; --ipset-update
+      skips lists that haven't reached their refresh interval (functions.apf)
+[Change] cron.d.apf_ipset: run hourly instead of every 6 hours; actual
+      refresh timing governed by per-list intervals (cron.d.apf_ipset)
 [New] Custom hook scripts: hook_pre.sh sourced after flush/modinit but before
       any iptables rules; hook_post.sh sourced after all rules including default
       DROP policies; activated by chmod 750 (ships as 640 = inactive); all APF
@@ -35,9 +45,9 @@
       minutes (600s); ensures full rule generation on recently booted systems
       where network state may still be settling (apf, conf.apf)
 [New] ipset_migrate_rules() auto-detects legacy 4-field ipset.rules entries
-      (missing log field) and rewrites them to 5-field format with log=0;
-      handles both local paths and URLs with embedded colons; runs idempotently
-      at each firewall start before ipset_load() parsing (functions.apf)
+      and rewrites them to 7-field format with defaults; handles both local
+      paths and URLs with embedded colons; runs idempotently at each firewall
+      start before ipset_load() parsing (functions.apf)
 [Change] README: modernize header with tagline and condensed copyright;
       collapse GPL boilerplate to single-line reference (README)
 [New] README: add Quick Start section with install, configure, start,

@@ -5,6 +5,7 @@ IG_ICMPV6_TYPES="${IG_ICMPV6_TYPES:-1,2,3,4,128,129}"
 EG_ICMPV6_TYPES="${EG_ICMPV6_TYPES:-all}"
 USE_IPSET="${USE_IPSET:-0}"
 IPSET_LOG_RATE="${IPSET_LOG_RATE:-30}"
+IPSET_REFRESH="${IPSET_REFRESH:-21600}"
 USE_GRE="${USE_GRE:-0}"
 GRE_PERSIST="${GRE_PERSIST:-1}"
 GRE_KEEPALIVE="${GRE_KEEPALIVE:-10 3}"
@@ -581,6 +582,11 @@ USE_IPSET="$USE_IPSET"
 # Individual lists control logging via the log field in ipset.rules (0=off, 1=on).
 # Requires LOG_DROP="1" to be globally enabled.
 IPSET_LOG_RATE="$IPSET_LOG_RATE"
+
+# Default refresh interval (seconds) for ipset lists during --ipset-update.
+# Lists with interval=0 in ipset.rules use this value. Default: 21600 (6 hours).
+# The ipset cron job runs hourly; minimum effective interval is 1 hour (3600s).
+IPSET_REFRESH="$IPSET_REFRESH"
 
 ##
 # [GRE Tunnels]

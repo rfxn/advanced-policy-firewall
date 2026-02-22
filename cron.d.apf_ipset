@@ -1,3 +1,4 @@
 # APF ipset block list refresh — hot-reloads lists without firewall restart
+# Runs hourly; actual refresh timing governed by per-list intervals in ipset.rules
 SHELL=/bin/bash
-15 */6 * * * root [ -x /etc/apf/apf ] && /etc/apf/apf --ipset-update >> /dev/null 2>&1
+15 * * * * root [ -x /etc/apf/apf ] && /etc/apf/apf --ipset-update >> /dev/null 2>&1

@@ -1,14 +1,16 @@
 ## ipset block list definitions
-## See conf.apf [ipset Block Lists] for USE_IPSET and IPSET_LOG_RATE settings.
-## Format: name:flow:ipset_type:log:file_or_url
+## See conf.apf [ipset Block Lists] for USE_IPSET, IPSET_LOG_RATE, IPSET_REFRESH.
+##
+## Format: name:flow:ipset_type:log:interval:maxelem:file_or_url
+##
 ##   name       — unique list name (used for ipset set and iptables chain naming)
 ##   flow       — src or dst (match source or destination address)
-##   ipset_type — ip or net (hash:ip or hash:net)
+##   ipset_type — ip or net (hash:ip for single IPs, hash:net for CIDR blocks)
 ##   log        — 0 or 1 (enable per-list logging; rate governed by IPSET_LOG_RATE)
-##   file       — local file path or URL (https:// for remote download)
+##   interval   — refresh interval in seconds for --ipset-update (0 = use IPSET_REFRESH;
+##                 minimum effective interval is 1 hour since the cron runs hourly)
+##   maxelem    — max entries to load (0 = unlimited, capped at 1048576)
+##   file_or_url — local file path or URL (https:// for remote download)
 ##
-## Examples:
-## firehol_level2:src:net:1:https://iplists.firehol.org/files/firehol_level2.netset
-## my_blacklist:src:ip:0:/etc/apf/my_blacklist.txt
-##
-#nexcess_atf:src:net:1:https://cdn.rfxn.com/downloads/rfxn_nxatf.netset
+## Example:
+#firehol_level2:src:net:1:0:0:https://iplists.firehol.org/files/firehol_level2.netset

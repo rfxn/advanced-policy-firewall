@@ -396,10 +396,12 @@ The ipset subsystem uses kernel-level hash tables for high-performance IP matchi
 
 **`IPSET_LOG_RATE`** - Default log rate limit (per minute) for ipset blocklist matches. Individual lists can control their own logging via the log field in `ipset.rules`.
 
+**`IPSET_REFRESH`** - Default refresh interval (seconds) for ipset lists during `--ipset-update`. Lists with `interval=0` in `ipset.rules` use this value. Default: `21600` (6 hours). Minimum effective interval is 1 hour since the cron runs hourly.
+
 The block lists are defined in the `ipset.rules` file. Each line defines a set with the format:
 
 ```
-name:flow:ipset_type:log:file_or_url
+name:flow:ipset_type:log:interval:maxelem:file_or_url
 ```
 
 Where:
@@ -407,15 +409,16 @@ Where:
 - `flow` - `src` or `dst` (match source or destination address)
 - `ipset_type` - `ip` or `net` (`hash:ip` for single addresses, `hash:net` for CIDR blocks)
 - `log` - `0` or `1` (per-list logging, rate governed by `IPSET_LOG_RATE`)
+- `interval` - refresh interval in seconds for `--ipset-update` (`0` = use `IPSET_REFRESH`; minimum effective is 1 hour)
+- `maxelem` - max entries to load (`0` = unlimited, capped at 1048576)
 - `file_or_url` - local file path or URL (`https://` for remote download)
 
-Examples:
+Example:
 ```
-firehol_level2:src:net:1:https://iplists.firehol.org/files/firehol_level2.netset
-my_blacklist:src:ip:0:/etc/apf/my_blacklist.txt
+firehol_level2:src:net:1:0:0:https://iplists.firehol.org/files/firehol_level2.netset
 ```
 
-Run `apf --ipset-update` to hot-reload all ipset block lists without restarting the firewall. A cron job (`cron.d.apf_ipset`) is installed automatically to perform periodic updates.
+Run `apf --ipset-update` to hot-reload all ipset block lists without restarting the firewall. A cron job (`cron.d.apf_ipset`) runs hourly; actual refresh timing is governed by per-list intervals and `IPSET_REFRESH`.
 
 ### 3.10 GRE Tunnels
 
