@@ -1,5 +1,25 @@
 - 2.0.2 | Feb 22 2026:
 
+[New] README/README.md: add section 4.4 Temporary Trust Entries documenting
+      -ta, -td, --templ, --tempf CLI options, TTL syntax formats, automatic
+      expiry behavior, and cron configuration; add temp trust commands to
+      section 4 CLI reference; update Table of Contents (README, README.md)
+[New] Temporary allow/deny with per-entry TTL: apf -ta HOST TTL [comment]
+      and apf -td HOST TTL [comment]; TTL supports seconds (300), minutes
+      (5m), hours (1h), and days (7d); entries stored in allow_hosts.rules /
+      deny_hosts.rules with ttl= and expire= markers; automatic expiry via
+      consolidated cron (every minute); list with --templ, flush with --tempf
+      (apf, functions.apf, install.sh)
+[Change] expirebans() skips ttl= entries; temporary entries use their own
+      per-entry TTL instead of global SET_EXPIRE timer (functions.apf)
+[New] 27-temp-trust.bats: tests for temporary trust entries covering CLI
+      add/deny, TTL parsing, automatic expiry, listing, flushing, IPv6,
+      duplicate prevention, and expirebans interaction
+      (tests/27-temp-trust.bats)
+[Change] Consolidate 3 cron files (cron.daily, cron.d.apf_ipset,
+      cron.d.apf_temp) into single cron.d.apf with daily restart, hourly
+      ipset refresh, and per-minute temp expiry; install.sh cleans up legacy
+      cron files during upgrade (cron.d.apf, install.sh)
 [New] ipset.rules 7-field format: per-list refresh interval and max entry
       count fields; backward-compatible migration from legacy 4-field format
       (functions.apf, ipset.rules)

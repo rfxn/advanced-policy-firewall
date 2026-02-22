@@ -31,6 +31,7 @@ Contents:
 4.1 ........... General Usage: Trust System
 4.2 ........... General Usage: Global Trust System
 4.3 ........... General Usage: Advanced Trust Syntax
+4.4 ........... General Usage: Temporary Trust Entries
 5 ............. License
 6 ............. Support Information
 
@@ -526,7 +527,7 @@ Example:
   firehol_level2:src:net:1:0:0:https://iplists.firehol.org/files/firehol_level2.netset
 
 CLI: Run 'apf --ipset-update' to hot-reload all ipset block lists without
-restarting the firewall. A cron job (cron.d.apf_ipset) runs hourly; actual
+restarting the firewall. A cron job (cron.d/apf) runs hourly; actual
 refresh timing is governed by per-list intervals and IPSET_REFRESH.
 
 3.10) Configuration: GRE Tunnels
@@ -705,6 +706,11 @@ usage apf [OPTION]
 --ipset-update ..................... hot-reload ipset block lists from ipset.rules
 --gre-up ........................... bring up GRE tunnels from gre.rules
 -g|--search PATTERN ................ search iptables rules and trust files
+-ta HOST TTL [CMT]|--temp-allow .... temporarily allow host with TTL
+                                     (TTL: seconds, or 5m, 1h, 7d)
+-td HOST TTL [CMT]|--temp-deny ..... temporarily deny host with TTL
+--templ|--temp-list ................. list temp entries with remaining TTL
+--tempf|--temp-flush ................ remove all temporary entries
 --gre-down ......................... tear down GRE tunnels
 --gre-status ....................... show GRE tunnel status
 
@@ -790,6 +796,31 @@ The trust system has several operational controls in conf.apf:
                      re-resolution (default: 10)
   SET_REFRESH_MD5  - skip refresh if trust files are unchanged (1 to enable)
   SET_TRIM         - max deny entries before oldest are purged (default: 250)
+
+Temporary Trust Entries:
+
+In addition to permanent trust entries, APF supports temporary allow/deny with
+per-entry TTL (time-to-live). Temporary entries are stored in the same trust
+files with ttl= and expire= metadata markers and are automatically removed
+when their TTL expires. The TTL value supports several formats:
+
+  300     (bare seconds)
+  300s    (seconds with suffix)
+  5m      (minutes)
+  1h      (hours)
+  7d      (days)
+
+Examples:
+  apf -ta 10.0.0.5 1h "temp maintenance access"
+  apf -td 192.168.3.111 7d "temp block"
+  apf --templ                       (list all temp entries with remaining TTL)
+  apf --tempf                       (flush all temp entries immediately)
+  apf -u 10.0.0.5                   (remove a temp entry manually)
+
+Expiry is handled automatically by a cron job that runs every minute
+(/etc/cron.d/apf). Temporary entries use their own per-entry TTL and are
+not affected by the global SET_EXPIRE timer. To reset a temp entry's timer,
+remove it first (apf -u HOST) then re-add it with a new TTL.
 
 4.2) General Usage: Global Trust System
 The global trust system extends the local trust files with centrally managed

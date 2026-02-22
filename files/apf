@@ -286,6 +286,25 @@ case "$1" in
 -g|--search)
 	search "$2"
 	;;
+-ta|--temp-allow)
+	cli_trust_temp "TALLOW" "ALLOW" "$ALLOW_HOSTS" "$2" "$3" "$4"
+	;;
+-td|--temp-deny)
+	cli_trust_temp "TDENY" "DENY" "$DENY_HOSTS" "$2" "$3" "$4"
+	;;
+--templ|--temp-list)
+	list_temp_entries
+	;;
+--tempf|--temp-flush)
+	mutex_lock
+	flush_temp_entries
+	;;
+--temp-expire)
+	if grep -q 'ttl=' "$ALLOW_HOSTS" "$DENY_HOSTS" 2>/dev/null; then
+		mutex_lock
+		expire_temp_entries
+	fi
+	;;
 *)
 	head
 	help

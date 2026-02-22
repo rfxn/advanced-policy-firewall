@@ -85,6 +85,27 @@ ipt_for_host() {
 	return 0
 }
 
+# Parse human-readable TTL string into seconds.
+# Sets _TTL_SECONDS (variable-return, no subshell).
+# Accepts: bare seconds (300), or suffix: s/m/h/d (300s, 5m, 1h, 7d).
+# Returns 1 on invalid or zero input.
+parse_ttl() {
+	local val="$1"
+	local num factor=1
+	case "$val" in
+		*d) num="${val%d}" ; factor=86400 ;;
+		*h) num="${val%h}" ; factor=3600 ;;
+		*m) num="${val%m}" ; factor=60 ;;
+		*s) num="${val%s}" ;;
+		*)  num="$val" ;;
+	esac
+	if ! [[ "$num" =~ ^[0-9]+$ ]] || [ "$num" -eq 0 ]; then
+		return 1
+	fi
+	_TTL_SECONDS=$(($num * $factor))
+	return 0
+}
+
 trust_protect_ipv6() {
 	# Protect bracketed IPv6 in advanced trust entries from colon-splitting
 	# Input:  "d=22:s=[2001:db8::1]"  Output: "d=22:s=2001@db8@@1"
@@ -496,6 +517,67 @@ cli_trust() {
  fi
 }
 
+cli_trust_temp() {
+ CHAIN="$1"
+ ACTION="$2"
+ FILE="$3"
+ HOST="$4"
+ TTL_STR="$5"
+ CMT="$6"
+ if [ -z "$HOST" ]; then
+	echo "an FQDN or IP address is required for this option"
+	return 1
+ fi
+ if ! valid_host "$HOST"; then
+	echo "Invalid host '$HOST': must be a valid IP/IPv6 address, CIDR block, or FQDN"
+	return 1
+ fi
+ if [ -z "$TTL_STR" ]; then
+	echo "a TTL value is required (e.g., 300, 5m, 1h, 7d)"
+	return 1
+ fi
+ if ! parse_ttl "$TTL_STR"; then
+	echo "Invalid TTL '$TTL_STR': must be a positive number with optional suffix (s/m/h/d)"
+	return 1
+ fi
+ tlist=""
+ for f in $DENY_HOSTS $ALLOW_HOSTS $GALLOW_HOSTS $GDENY_HOSTS; do
+	if [ -f "$f" ] && grep -v '^#' "$f" | grep -Fwq "$HOST"; then
+		tlist="$tlist$f "
+	fi
+ done
+ valtrust="$tlist"
+ load_local_addrs
+ if [ "$valtrust" ]; then
+	echo "$HOST already exists in $tlist"
+ elif is_local_addr "$HOST"; then
+	echo "$HOST is a local address and can not be added to the trust system"
+ elif ! ipt_for_host "$HOST"; then
+	echo "$HOST appears to be IPv6 but USE_IPV6 is not enabled"
+ else
+	TIME=$(date +"%D %H:%M:%S")
+	EXPIRE_EPOCH=$(($(date +%s) + _TTL_SECONDS))
+	if [ -n "$CMT" ]; then
+		echo "# added $HOST on $TIME ttl=$_TTL_SECONDS expire=$EXPIRE_EPOCH with comment: $CMT" >> "$FILE"
+	else
+		echo "# added $HOST on $TIME ttl=$_TTL_SECONDS expire=$EXPIRE_EPOCH" >> "$FILE"
+	fi
+	echo "$HOST" >> "$FILE"
+	if [ "$ACTION" == "DENY" ]; then
+		JACTION="$ALL_STOP"
+	elif [ "$ACTION" == "ALLOW" ]; then
+		JACTION="ACCEPT"
+	fi
+	$IPT_H $IPT_FLAGS -I $CHAIN -s $HOST -j $JACTION
+	$IPT_H $IPT_FLAGS -I $CHAIN -d $HOST -j $JACTION
+	EXPIRE_DISP=$(date -d "@$EXPIRE_EPOCH" +"%D %H:%M:%S")
+	eout "{trust} added temporary $ACTION all to/from $HOST (ttl=${_TTL_SECONDS}s, expires $EXPIRE_DISP)"
+	if [ "$SET_VERBOSE" != "1" ]; then
+		echo "Inserted into firewall: temporary $ACTION all to/from $HOST (ttl=${_TTL_SECONDS}s, expires $EXPIRE_DISP)"
+	fi
+ fi
+}
+
 save_external_baseline() {
 	local bdir="$INSTALL_PATH/internals"
 	# Only save when APF is not running — INPUT/OUTPUT has only external rules
@@ -709,6 +791,12 @@ help() {
 	echo "-u|--remove|--unban HOST ........... remove host from [glob]*_hosts.rules"
 	echo "                                     and immediately remove rule from firewall"
 	echo "-g|--search PATTERN ................ search iptables rules and trust files"
+	echo "-ta HOST TTL [CMT]|--temp-allow .... temporarily allow host with TTL"
+	echo "                                     (TTL: seconds, or 5m, 1h, 7d)"
+	echo "-td HOST TTL [CMT]|--temp-deny ..... temporarily deny host with TTL"
+	echo "--templ|--temp-list ................ list temp entries with remaining TTL"
+	echo "--tempf|--temp-flush ............... remove all temporary entries"
+	echo "--temp-expire ..................... expire temporary entries (runs from cron)"
 	echo "-o|--ovars ......................... output all configuration options"
 	echo "-v|--version ....................... output version number"
 	echo "--ipset-update ..................... hot-reload ipset block lists from ipset.rules"
@@ -1687,9 +1775,96 @@ if [ "$SET_EXPIRE" -ge "60" ]; then
                         sed -i "\%^$ip\b%d" "$INSTALL_PATH/deny_hosts.rules"
                         cli_trust_remove "$ip" >> /dev/null 2>&1
                 fi
-         done < <(grep -vE "static|noexpire" "$INSTALL_PATH/deny_hosts.rules" | grep -iE "# added.*on.*" | awk '{print$3"|"$5"|"$6}')
+         done < <(grep -vE "static|noexpire|ttl=" "$INSTALL_PATH/deny_hosts.rules" | grep -iE "# added.*on.*" | awk '{print$3"|"$5"|"$6}')
  fi
 fi
+}
+
+expire_temp_entries() {
+	local current_time file ip epoch line count=0
+	current_time=$(date +%s)
+	for file in "$ALLOW_HOSTS" "$DENY_HOSTS"; do
+		[ -f "$file" ] || continue
+		while IFS= read -r line; do
+			ip="${line#\# added }"
+			ip="${ip%% *}"
+			epoch="${line#*expire=}"
+			epoch="${epoch%% *}"
+			if [ "$current_time" -ge "$epoch" ] 2>/dev/null; then
+				sed -i "\%${ip}.*ttl=.*expire=%d" "$file"
+				cli_trust_remove "$ip" >> /dev/null 2>&1
+				eout "{trust} removed expired temp entry for $ip"
+				count=$(($count + 1))
+			fi
+		done < <(grep "ttl=.*expire=" "$file")
+	done
+	if [ "$count" -gt 0 ]; then
+		eout "{trust} expired $count temporary trust entries"
+	fi
+}
+
+list_temp_entries() {
+	local current_time file type ip ttl epoch cmt remaining line found=0
+	current_time=$(date +%s)
+	for file in "$ALLOW_HOSTS" "$DENY_HOSTS"; do
+		[ -f "$file" ] || continue
+		if [ "$file" == "$ALLOW_HOSTS" ]; then
+			type="ALLOW"
+		else
+			type="DENY"
+		fi
+		while IFS= read -r line; do
+			ip="${line#\# added }"
+			ip="${ip%% *}"
+			ttl="${line#*ttl=}"
+			ttl="${ttl%% *}"
+			epoch="${line#*expire=}"
+			epoch="${epoch%% *}"
+			if [[ "$line" == *"with comment: "* ]]; then
+				cmt="${line#*with comment: }"
+			else
+				cmt=""
+			fi
+			remaining=$(($epoch - $current_time))
+			if [ "$remaining" -lt 0 ]; then
+				remaining=0
+			fi
+			local disp
+			if [ "$remaining" -ge 86400 ]; then
+				disp="$((remaining / 86400))d $((remaining % 86400 / 3600))h"
+			elif [ "$remaining" -ge 3600 ]; then
+				disp="$((remaining / 3600))h $((remaining % 3600 / 60))m"
+			elif [ "$remaining" -ge 60 ]; then
+				disp="$((remaining / 60))m $((remaining % 60))s"
+			else
+				disp="${remaining}s"
+			fi
+			echo "$type $ip ttl=${ttl}s remains=${disp} $cmt"
+			found=1
+		done < <(grep "ttl=.*expire=" "$file")
+	done
+	if [ "$found" -eq 0 ]; then
+		echo "No temporary entries."
+	fi
+}
+
+flush_temp_entries() {
+	local file ip line count=0
+	for file in "$ALLOW_HOSTS" "$DENY_HOSTS"; do
+		[ -f "$file" ] || continue
+		while IFS= read -r line; do
+			ip="${line#\# added }"
+			ip="${ip%% *}"
+			cli_trust_remove "$ip" >> /dev/null 2>&1
+			count=$(($count + 1))
+		done < <(grep "ttl=.*expire=" "$file")
+		# Remove orphaned ttl= comment lines
+		sed -i '/ttl=.*expire=/d' "$file"
+	done
+	eout "{trust} flushed $count temporary trust entries"
+	if [ "$SET_VERBOSE" != "1" ]; then
+		echo "Flushed $count temporary trust entries."
+	fi
 }
 
 refresh() {

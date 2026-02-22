@@ -56,12 +56,29 @@ teardown_file() {
     [ "$perms" = "750" ]
 }
 
-@test "cron.daily installed" {
-    if [ ! -d "/etc/cron.daily" ]; then
-        skip "cron.daily not available"
+@test "cron.d/apf installed" {
+    if [ ! -d "/etc/cron.d" ]; then
+        skip "cron.d not available"
     fi
-    [ -f "/etc/cron.daily/apf" ]
-    [ -x "/etc/cron.daily/apf" ]
+    [ -f "/etc/cron.d/apf" ]
+}
+
+@test "cron.d/apf contains daily restart and ipset and temp-expire" {
+    if [ ! -f "/etc/cron.d/apf" ]; then
+        skip "cron.d/apf not installed"
+    fi
+    run grep "apf -r" /etc/cron.d/apf
+    assert_success
+    run grep -- "--ipset-update" /etc/cron.d/apf
+    assert_success
+    run grep -- "--temp-expire" /etc/cron.d/apf
+    assert_success
+}
+
+@test "legacy cron files removed during install" {
+    [ ! -f "/etc/cron.daily/apf" ]
+    [ ! -f "/etc/cron.d/apf_ipset" ]
+    [ ! -f "/etc/cron.d/apf_temp" ]
 }
 
 @test "log rotation config installed" {

@@ -29,11 +29,15 @@ install() {
         ln -fs "$INSTALL_PATH/apf" "$BINPATH"
         ln -fs "$INSTALL_PATH/apf" "$COMPAT_BINPATH"
 	rm -f /etc/cron.hourly/fw /etc/cron.daily/fw /etc/cron.d/fwdev "$INSTALL_PATH/cron.fwdev"
-        rm -f /etc/cron.daily/apf
-        cp cron.daily /etc/cron.daily/apf
-        chmod 755 /etc/cron.daily/apf
-	if [ "$INSTALL_PATH" != "/etc/apf" ]; then
-		sed -i "s:/etc/apf:$INSTALL_PATH:g" /etc/cron.daily/apf
+	# Clean up legacy cron entries (pre-2.0.2 used separate files)
+	rm -f /etc/cron.daily/apf /etc/cron.d/apf_ipset /etc/cron.d/apf_temp
+	# Consolidated cron: daily restart, hourly ipset refresh, per-minute temp expiry
+	if [ -d "/etc/cron.d" ] && [ -f "cron.d.apf" ]; then
+		cp cron.d.apf /etc/cron.d/apf
+		chmod 644 /etc/cron.d/apf
+		if [ "$INSTALL_PATH" != "/etc/apf" ]; then
+			sed -i "s:/etc/apf:$INSTALL_PATH:g" /etc/cron.d/apf
+		fi
 	fi
 	# Service installation: prefer systemd, then SysV init, then rc.local
 	if [ -d "/run/systemd/system" ]; then
@@ -63,13 +67,6 @@ install() {
 			if [ -z "$val" ]; then
 				echo "$INSTALL_PATH/apf -s >> /dev/null 2>&1" >> /etc/rc.local
 			fi
-		fi
-	fi
-	if [ -d "/etc/cron.d" ] && [ -f "cron.d.apf_ipset" ]; then
-		cp cron.d.apf_ipset /etc/cron.d/apf_ipset
-		chmod 644 /etc/cron.d/apf_ipset
-		if [ "$INSTALL_PATH" != "/etc/apf" ]; then
-			sed -i "s:/etc/apf:$INSTALL_PATH:g" /etc/cron.d/apf_ipset
 		fi
 	fi
 	if [ -f "/var/log/apf_log" ]; then
