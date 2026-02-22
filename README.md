@@ -418,7 +418,7 @@ Example:
 firehol_level2:src:net:1:0:0:https://iplists.firehol.org/files/firehol_level2.netset
 ```
 
-Run `apf --ipset-update` to hot-reload all ipset block lists without restarting the firewall. A cron job (`cron.d.apf_ipset`) runs hourly; actual refresh timing is governed by per-list intervals and `IPSET_REFRESH`.
+Run `apf --ipset-update` to hot-reload all ipset block lists without restarting the firewall. A cron job (`cron.d/apf`) runs hourly; actual refresh timing is governed by per-list intervals and `IPSET_REFRESH`.
 
 ### 3.10 GRE Tunnels
 
