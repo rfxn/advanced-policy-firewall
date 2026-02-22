@@ -620,19 +620,21 @@ INPUT chain evaluation order (first match wins):
   12  Packet sanity checks                      DROP
   13  IDENT / Multicast / P2P blocking          REJECT/DROP
   14  RAB trip and portscan rules               DROP
-  15  VNET per-IP port rules                    ACCEPT
-  16  Connlimit (per-port connection limits)    REJECT
-  17  Inbound TCP/UDP port ACCEPT               ACCEPT
-  18  ICMP / ICMPv6 / NDP                       ACCEPT
-  19  State tracking (ESTABLISHED,RELATED)      ACCEPT
-  20  DNS, FTP, SSH, Traceroute helpers         ACCEPT
-  21  Log (rate-limited)                        LOG
-  22  Default DROP (tcp, udp, all)              DROP
+  15  State tracking (ESTABLISHED,RELATED)      ACCEPT
+  16  VNET per-IP port rules                    ACCEPT
+  17  Connlimit (per-port connection limits)    REJECT
+  18  Inbound TCP/UDP port ACCEPT               ACCEPT
+  19  ICMP / ICMPv6 / NDP                       ACCEPT
+  20  Non-SYN NEW tcp DROP                      DROP
+  21  DNS, FTP, SSH, Traceroute helpers         ACCEPT
+  22  Log (rate-limited)                        LOG
+  23  Default DROP (tcp, udp, all)              DROP
 
 Key precedence rules:
   - Trusted interfaces bypass all filtering
   - Allow lists are evaluated before deny lists
-  - Block lists and deny lists are evaluated before port ACCEPT rules
+  - Block lists, sanity checks, and RAB are evaluated before state tracking
+  - State tracking fast-paths established connections; deny lists and blocklists still block
   - Connlimit REJECT runs before port ACCEPT
   - VNET per-IP rules override global port configuration
 
