@@ -36,18 +36,19 @@ apf -s
       14.  Blocked Traffic         bt.rules (see detail below)
       15.  Allow Lists             glob_allow → TGALLOW, allow_hosts → TALLOW
       16.  RAB                     Trip rules, RABPSCAN chain
-      17.  Log Rules               log.rules (SSH_LOG, TELNET_LOG)
-      18.  VNET Per-IP Policies    main.vnet → per-IP rule files
-      19.  Port Filtering          cports.common (see detail below)
-      20.  State Tracking          ESTABLISHED,RELATED rules
-      21.  DNS Rules               Per-nameserver INPUT/OUTPUT
-      22.  Service Helpers         FTP, SSH, Traceroute
-      23.  Drop Logging            Rate-limited INPUT/OUTPUT log chains
-      24.  ECN Shame List          SYSCTL_ECN hosts
-      25.  Postroute Rules         ToS POSTROUTING + postroute.rules
-      26.  Default OUTPUT Policy   ACCEPT (EGF=0) or DROP (EGF=1)
-      27.  Default INPUT Policy    DROP (tcp, udp, all)
-      28.  Save Snapshot           iptables-save for next fast load
+      17.  State Tracking          ESTABLISHED,RELATED fast-path (after trust/block/RAB)
+      18.  Log Rules               log.rules (SSH_LOG, TELNET_LOG)
+      19.  VNET Per-IP Policies    main.vnet → per-IP rule files
+      20.  Port Filtering          cports.common (see detail below)
+      21.  Non-SYN NEW DROP        Drop invalid NEW tcp after port rules
+      22.  DNS Rules               Per-nameserver INPUT/OUTPUT
+      23.  Service Helpers         FTP, SSH, Traceroute
+      24.  Drop Logging            Rate-limited INPUT/OUTPUT log chains
+      25.  ECN Shame List          SYSCTL_ECN hosts
+      26.  Postroute Rules         ToS POSTROUTING + postroute.rules
+      27.  Default OUTPUT Policy   ACCEPT (EGF=0) or DROP (EGF=1)
+      28.  Default INPUT Policy    DROP (tcp, udp, all)
+      29.  Save Snapshot           iptables-save for next fast load
 ```
 
 ---
@@ -306,7 +307,27 @@ ports. DNS nameservers are exempted from portscan detection.
 - **Config:** `RAB`, `RAB_*` variables
 - **Chains:** INPUT, RABPSCAN
 
-### Step 17: Log Rules — `log.rules`
+### Step 17: State Tracking (Fast-Path)
+
+Adds ESTABLISHED,RELATED ACCEPT rules for TCP and UDP on INPUT, and for
+high-port (1024-65535) replies on OUTPUT. Positioned after trust chains,
+blocklists, sanity checks, and RAB so that denied, malformed, and attack
+traffic is blocked regardless of connection state, but before VNET and
+port filtering so that established packets skip per-IP rules, port ACCEPTs,
+and logging chains.
+
+Conntrack validates TCP flags for ESTABLISHED packets: invalid flag
+combinations cause conntrack to mark packets as INVALID (not ESTABLISHED),
+so they fall through to the sanity checks as before.
+
+- **Source:** `firewall:219-222`
+- **Chains:** INPUT, OUTPUT
+- **Scope:** Dual-stack
+- **Precedence:** Trust deny lists, blocklists, sanity checks, and RAB all
+  run before state tracking; only non-blocked established packets are
+  fast-pathed
+
+### Step 18: Log Rules — `log.rules`
 
 When `LOG_DROP=1` and `LOG_IA=1`, creates SSH_LOG and TELNET_LOG chains
 to log new interactive access attempts.
@@ -315,7 +336,7 @@ to log new interactive access attempts.
 - **Config:** `LOG_DROP`, `LOG_IA`, `HELPER_SSH_PORT`
 - **Chains:** INPUT
 
-### Step 18: VNET Per-IP Policies — `main.vnet`
+### Step 19: VNET Per-IP Policies — `main.vnet`
 
 When `SET_VNET=1`, loads per-IP rule files from the `vnet/` directory. Each
 file can override global port filtering variables for a specific IP address,
@@ -326,11 +347,11 @@ then sources `cports.common` with the overridden values.
 - **Scope:** IPv4 only
 - **Precedence:** Per-IP rules are appended before global port rules
 
-### Step 19: Port Filtering — `cports.common`
+### Step 20: Port Filtering — `cports.common`
 
 The main port filtering engine, loaded via `main.rules`:
 
-#### 19a. Connection Limits (connlimit)
+#### 20a. Connection Limits (connlimit)
 
 When `IG_TCP_CLIMIT` or `IG_UDP_CLIMIT` is set, adds per-port concurrent
 connection limits using `xt_connlimit`. REJECT action for immediate client
@@ -338,20 +359,20 @@ feedback. **Inserted before ACCEPT rules.**
 
 **Config:** `IG_TCP_CLIMIT`, `IG_UDP_CLIMIT`
 
-#### 19b. Inbound TCP/UDP Ports
+#### 20b. Inbound TCP/UDP Ports
 
 Opens ports listed in `IG_TCP_CPORTS` and `IG_UDP_CPORTS` with ACCEPT rules.
 
 **Config:** `IG_TCP_CPORTS`, `IG_UDP_CPORTS`
 
-#### 19c. Outbound TCP/UDP Ports (EGF=1)
+#### 20c. Outbound TCP/UDP Ports (EGF=1)
 
 When egress filtering is enabled, opens ports listed in `EG_TCP_CPORTS` and
 `EG_UDP_CPORTS` with ACCEPT rules.
 
 **Config:** `EGF`, `EG_TCP_CPORTS`, `EG_UDP_CPORTS`
 
-#### 19d. ICMP / ICMPv6
+#### 20d. ICMP / ICMPv6
 
 Opens ICMP types listed in `IG_ICMP_TYPES` (inbound) and `EG_ICMP_TYPES`
 (outbound). IPv6 NDP types 133-136 are always permitted regardless of
@@ -360,14 +381,14 @@ configuration. ICMPv6 types controlled by `IG_ICMPV6_TYPES` and
 
 **Config:** `IG_ICMP_TYPES`, `IG_ICMPV6_TYPES`, `EG_ICMP_TYPES`, `EG_ICMPV6_TYPES`
 
-#### 19e. UID-based Egress (EGF=1)
+#### 20e. UID-based Egress (EGF=1)
 
 When `EG_TCP_UID` or `EG_UDP_UID` is set, adds per-UID outbound ACCEPT
 rules using `--uid-owner` match.
 
 **Config:** `EG_TCP_UID`, `EG_UDP_UID`
 
-#### 19f. Command-based Egress (EGF=1)
+#### 20f. Command-based Egress (EGF=1)
 
 When `EG_DROP_CMD` is set, creates the DEG chain to block specific
 executables from network access using `--cmd-owner` match. Runtime detection
@@ -379,18 +400,18 @@ skips gracefully if unsupported.
 - **Chains:** INPUT, OUTPUT
 - **Scope:** Dual-stack via `ipt_dst()` / `ipt_src()`
 
-### Step 20: State Tracking
+### Step 21: Non-SYN NEW DROP
 
-Adds connection state rules:
+Drops TCP packets with the NEW state that do not have the SYN flag set.
+Guards against invalid state transitions after port filtering. The
+ESTABLISHED,RELATED fast-path is at Step 14; this rule catches only
+malformed NEW packets that slip past port rules.
 
-- INPUT: Drop non-SYN NEW TCP, ACCEPT ESTABLISHED/RELATED TCP and UDP
-- OUTPUT: ACCEPT ESTABLISHED/RELATED TCP and UDP (ports 1024-65535)
-
-- **Source:** `firewall:233-237`
-- **Chains:** INPUT, OUTPUT
+- **Source:** `firewall:243`
+- **Chains:** INPUT
 - **Scope:** Dual-stack
 
-### Step 21: DNS Rules
+### Step 22: DNS Rules
 
 For each nameserver in `/etc/resolv.conf`:
 
@@ -404,7 +425,7 @@ For each nameserver in `/etc/resolv.conf`:
 - **Chains:** INPUT, OUTPUT
 - **Scope:** IPv4 + IPv6
 
-### Step 22: Service Helpers
+### Step 23: Service Helpers
 
 Optional protocol-specific rules:
 
@@ -417,7 +438,7 @@ Optional protocol-specific rules:
 - **Chains:** INPUT, OUTPUT
 - **Scope:** Dual-stack
 
-### Step 23: Drop Logging
+### Step 24: Drop Logging
 
 When `LOG_DROP=1`, adds rate-limited log rules for packets reaching the end
 of INPUT and OUTPUT chains (about to be dropped by default policy).
@@ -427,7 +448,7 @@ of INPUT and OUTPUT chains (about to be dropped by default policy).
 - **Chains:** INPUT, OUTPUT
 - **Scope:** Dual-stack
 
-### Step 24: ECN Shame List
+### Step 25: ECN Shame List
 
 When `SYSCTL_ECN=1`, loads the ECN shame list of hosts that break with
 Explicit Congestion Notification enabled.
@@ -435,7 +456,7 @@ Explicit Congestion Notification enabled.
 - **Source:** `firewall:313-316`
 - **Config:** `SYSCTL_ECN`, `DLIST_ECNSHAME`
 
-### Step 25: Postroute Rules
+### Step 26: Postroute Rules
 
 Loads ToS POSTROUTING classifications and custom `postroute.rules`.
 
@@ -443,7 +464,7 @@ Loads ToS POSTROUTING classifications and custom `postroute.rules`.
 - **Config:** `TOS_*` variables
 - **Chains:** mangle POSTROUTING
 
-### Step 26: Default OUTPUT Policy
+### Step 27: Default OUTPUT Policy
 
 - **EGF disabled** (default): `OUTPUT -j ACCEPT` — all outbound traffic allowed
 - **EGF enabled**: `OUTPUT -j DROP` for tcp, udp, and all — only explicitly
@@ -454,7 +475,7 @@ Loads ToS POSTROUTING classifications and custom `postroute.rules`.
 - **Chains:** OUTPUT
 - **Scope:** Dual-stack
 
-### Step 27: Default INPUT Policy
+### Step 28: Default INPUT Policy
 
 Appends final DROP rules for tcp, udp, and all protocols. Any packet that
 has not matched a previous ACCEPT rule is dropped here.
@@ -463,7 +484,7 @@ has not matched a previous ACCEPT rule is dropped here.
 - **Chains:** INPUT
 - **Scope:** Dual-stack
 
-### Step 28: Save Snapshot
+### Step 29: Save Snapshot
 
 When `DEVEL_MODE=0` and `DOCKER_COMPAT=0` and rules are active, saves
 `iptables-save` snapshot for next fast load. Records iptables backend
@@ -508,17 +529,17 @@ Packets are evaluated top-to-bottom; the first matching rule wins.
  25  P2P (P2P ports)               bt.rules        REJECT
  26  RAB trip (recent match)       firewall        DROP
  27  RABPSCAN chain                firewall        DROP
- 28  SSH_LOG / TELNET_LOG          log.rules       LOG (cont.)
- 29  VNET per-IP port rules        main.vnet       ACCEPT
- 30  Connlimit REJECT              cports.common   REJECT
- 31  Inbound TCP port ACCEPT       cports.common   ACCEPT
- 32  Inbound UDP port ACCEPT       cports.common   ACCEPT
- 33  ICMP type ACCEPT              cports.common   ACCEPT
- 34  NDP 133-136 ACCEPT            cports.common   ACCEPT
- 35  ICMPv6 type ACCEPT            cports.common   ACCEPT
- 36  Non-SYN NEW tcp DROP          firewall        DROP
- 37  ESTABLISHED,RELATED tcp       firewall        ACCEPT
- 38  ESTABLISHED,RELATED udp       firewall        ACCEPT
+ 28  ESTABLISHED,RELATED tcp       firewall        ACCEPT **
+ 29  ESTABLISHED,RELATED udp       firewall        ACCEPT **
+ 30  SSH_LOG / TELNET_LOG          log.rules       LOG (cont.)
+ 31  VNET per-IP port rules        main.vnet       ACCEPT
+ 32  Connlimit REJECT              cports.common   REJECT
+ 33  Inbound TCP port ACCEPT       cports.common   ACCEPT
+ 34  Inbound UDP port ACCEPT       cports.common   ACCEPT
+ 35  ICMP type ACCEPT              cports.common   ACCEPT
+ 36  NDP 133-136 ACCEPT            cports.common   ACCEPT
+ 37  ICMPv6 type ACCEPT            cports.common   ACCEPT
+ 38  Non-SYN NEW tcp DROP          firewall        DROP
  39  DNS (per-nameserver)          firewall        ACCEPT
  40  FTP helper                    firewall        ACCEPT
  41  SSH helper                    firewall        ACCEPT
@@ -528,8 +549,12 @@ Packets are evaluated top-to-bottom; the first matching rule wins.
  45  Default DROP udp              firewall        DROP
  46  Default DROP all              firewall        DROP
 
- * BLK_TCP_SACK_PANIC uses -I (INSERT), placing it at position 1
-   regardless of when it is loaded during the script.
+ *  BLK_TCP_SACK_PANIC uses -I (INSERT), placing it at position 1
+    regardless of when it is loaded during the script.
+ ** ESTABLISHED,RELATED runs after trust chains, blocklists, sanity
+    checks, and RAB, so deny lists and all blocking subsystems still
+    apply to established connections. Established packets skip only
+    VNET, port filtering, and logging traversal.
 ```
 
 > **Note:** Rules marked "LOG (cont.)" log the packet but do not terminate
@@ -570,9 +595,12 @@ These are the most important "what beats what" relationships:
    per-IP `cports.common` rules are loaded first (via `main.vnet`), followed
    by the global `cports.common` with the primary IP's context.
 
-9. **State tracking comes after port rules.** ESTABLISHED/RELATED packets
-   for connections that were allowed by port rules are accepted. Packets
-   that don't match any port rule fall through to state tracking.
+9. **State tracking runs after trust chains, blocklists, sanity checks, and
+   RAB.** ESTABLISHED/RELATED packets are fast-pathed after all blocking
+   subsystems, skipping only VNET per-IP rules, port filtering, and logging.
+   Deny lists, blocklists, sanity checks, and RAB all still apply to
+   established connections. The non-SYN NEW DROP guard stays after port
+   rules.
 
 10. **RAB portscan tagging** happens in the sanity checks (via
     `RAB_SANITY_FLAGS`), but the RAB trip/block rules are evaluated in the
@@ -600,7 +628,7 @@ every rule from scratch.
 - Snapshot is less than 12 hours old
 - Configuration files have not changed (MD5 check)
 - `DEVEL_MODE=0`
-- System uptime is greater than 5 minutes
+- System uptime is greater than 10 minutes
 - Snapshot backend (legacy/nft) matches current iptables backend
 
 **Fast load is skipped (full load used instead) when ANY condition fails:**
@@ -611,7 +639,7 @@ every rule from scratch.
 | Snapshot > 12h old | `fast load snapshot more than 12h old` |
 | Config changed | `config. or .rule file has changed since last full load` |
 | DEVEL_MODE=1 | (triggers config change detection) |
-| Uptime < 5 min | `uptime less than 5 minutes` |
+| Uptime <= 10 min | `uptime less than 10 minutes` |
 | Backend mismatch | `fast load snapshot backend mismatch` |
 | Restore fails | `fast load failed (iptables-restore error)` |
 | IPv6 incomplete | `fast load incomplete (IPv6 enabled but no IPv6 snapshot)` |

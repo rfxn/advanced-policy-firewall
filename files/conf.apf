@@ -44,7 +44,7 @@ SET_VERBOSE="1"
 # instructed to start again it will restore the snapshot. This feature allows
 # APF to load hundreds of rules back into the firewall without the need to
 # regenerate every firewall entry. 
-# Note: a) if system uptime is below 5 minutes, the snapshot is expired
+# Note: a) if system uptime is 10 minutes or less, the snapshot is expired
 #       b) if snapshot age exceeds 12 hours, the snapshot is expired
 #       c) if conf or a .rule has changed since last load, snapshot is expired
 #       d) if it is your first run of APF since install, snapshot is generated

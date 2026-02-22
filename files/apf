@@ -90,9 +90,9 @@ else
 	fi
 fi
 
-# check uptime is greater than 5 minutes (300s)
+# check uptime is greater than 10 minutes (600s)
  read UPSEC _ < /proc/uptime; UPSEC="${UPSEC%%.*}"
- if [ "$UPSEC" -lt "300" ]; then
+ if [ "$UPSEC" -lt "601" ]; then
 	SET_FASTLOAD_UPSEC=1
  fi
 
@@ -150,7 +150,7 @@ if [ -z "$SKIP_FASTLOAD_FIRSTRUN" ] && [ -z "$SKIP_FASTLOAD_EXPIRED" ] && [ -z "
  elif [ "$SKIP_FASTLOAD_VARS" == "1" ]; then
 	eout "{glob} config. or .rule file has changed since last full load, going full load"
  elif [ "$SET_FASTLOAD_UPSEC" == "1" ]; then
-	eout "{glob} uptime less than 5 minutes, going full load"
+	eout "{glob} uptime less than 10 minutes, going full load"
 fi
 
 fi
