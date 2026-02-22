@@ -1,3 +1,5 @@
+IG_TCP_CLIMIT="${IG_TCP_CLIMIT:-}"
+IG_UDP_CLIMIT="${IG_UDP_CLIMIT:-}"
 USE_IPSET="${USE_IPSET:-0}"
 IPSET_LOG_RATE="${IPSET_LOG_RATE:-30}"
 USE_GRE="${USE_GRE:-0}"
@@ -262,6 +264,16 @@ TCR_PORTS="$TCR_PORTS"
 # pkt/s (packets/seconds), pkt/m (packets/minutes)
 # Set value to 0 for unlimited, anything above is enabled.
 ICMP_LIM="$ICMP_LIM"
+
+# Per-port concurrent connection limit using the connlimit module. Connections
+# exceeding the limit from a single source IP are rejected. Format is
+# port:limit pairs, comma separated. Port ranges use underscore notation.
+# Example: IG_TCP_CLIMIT="80:50,443:100,8080_8090:25"
+# Set empty to disable (default).
+IG_TCP_CLIMIT="$IG_TCP_CLIMIT"
+
+# Per-port concurrent connection limit for inbound UDP
+IG_UDP_CLIMIT="$IG_UDP_CLIMIT"
 
 # Creates firewall rules based on the local name servers as defined in the
 # /etc/resolv.conf file. This is the preferred secure method for client side

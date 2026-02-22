@@ -1,5 +1,12 @@
 - 2.0.2 | Feb 21 2026:
 
+[New] Per-port concurrent connection limiting via xt_connlimit module;
+      IG_TCP_CLIMIT and IG_UDP_CLIMIT config variables with port:limit pairs,
+      port range support, VNET per-IP binding, and REJECT action for immediate
+      client feedback (conf.apf, cports.common, functions.apf)
+[New] 25-connlimit.bats: tests for connlimit feature covering empty config,
+      single/multiple port:limit pairs, port ranges, UDP, chain ordering, and
+      VNET per-IP binding (tests/25-connlimit.bats)
 [Change] ipset batch loading via ipset restore; replaces per-entry $IPSET add
       loop (31K+ fork+exec calls) with single awk pre-filter piped to
       ipset restore -exist, reducing load time from minutes to seconds
