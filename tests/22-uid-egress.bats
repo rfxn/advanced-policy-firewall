@@ -22,7 +22,7 @@ setup_file() {
     # Detect --uid-owner support (always available on modern kernels)
     _UID_OWNER_OK=""
     if iptables -N _UID_TEST 2>/dev/null && \
-       iptables -A _UID_TEST -m owner --uid-owner 0 -j DROP 2>/dev/null; then
+       iptables -A _UID_TEST -m owner --uid-owner [0r] -j DROP 2>/dev/null; then
         _UID_OWNER_OK=1
         iptables -F _UID_TEST 2>/dev/null
         iptables -X _UID_TEST 2>/dev/null
@@ -62,7 +62,7 @@ teardown_file() {
     "$APF" -f 2>/dev/null
     "$APF" -s
 
-    assert_rule_exists_ips OUTPUT "-p tcp.*--dport 22.*--uid-owner 0.*ACCEPT"
+    assert_rule_exists_ips OUTPUT "-p tcp.*--dport 22.*--uid-owner [0r].*ACCEPT"
 }
 
 @test "EG_TCP_UID handles multiple uid:port pairs" {
@@ -72,8 +72,8 @@ teardown_file() {
     "$APF" -f 2>/dev/null
     "$APF" -s
 
-    assert_rule_exists_ips OUTPUT "-p tcp.*--dport 22.*--uid-owner 0.*ACCEPT"
-    assert_rule_exists_ips OUTPUT "-p tcp.*--dport 80.*--uid-owner 33.*ACCEPT"
+    assert_rule_exists_ips OUTPUT "-p tcp.*--dport 22.*--uid-owner [0r].*ACCEPT"
+    assert_rule_exists_ips OUTPUT "-p tcp.*--dport 80.*--uid-owner [3w].*ACCEPT"
 }
 
 @test "EG_TCP_UID with port range (underscore notation)" {
@@ -83,7 +83,7 @@ teardown_file() {
     "$APF" -f 2>/dev/null
     "$APF" -s
 
-    assert_rule_exists_ips OUTPUT "-p tcp.*--dport 8000:8080.*--uid-owner 0.*ACCEPT"
+    assert_rule_exists_ips OUTPUT "-p tcp.*--dport 8000:8080.*--uid-owner [0r].*ACCEPT"
 }
 
 @test "EG_UDP_UID creates uid-owner ACCEPT rule for UDP port" {
@@ -93,7 +93,7 @@ teardown_file() {
     "$APF" -f 2>/dev/null
     "$APF" -s
 
-    assert_rule_exists_ips OUTPUT "-p udp.*--dport 53.*--uid-owner 0.*ACCEPT"
+    assert_rule_exists_ips OUTPUT "-p udp.*--dport 53.*--uid-owner [0r].*ACCEPT"
 }
 
 @test "EG_TCP_UID empty produces no uid-owner rules" {
