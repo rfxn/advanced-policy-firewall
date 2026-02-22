@@ -24,26 +24,31 @@ if [ ! -f "$INSTALL_PATH/vnet/vnetgen.def" ]; then
         exit 1
 fi
 
+# _vnet_create_rule: create a .rules file for an IP if it doesn't exist
+_vnet_create_rule() {
+        local addr="$1"
+        if [ ! -f "$INSTALL_PATH/vnet/$addr.rules" ]; then
+                touch "$INSTALL_PATH/vnet/$addr.rules"
+                chmod 600 "$INSTALL_PATH/vnet/$addr.rules"
+                . "$INSTALL_PATH/vnet/vnetgen.def"
+        fi
+}
+
 if [ -z "$ip" ] && [ -z "$ifconfig" ]; then
         eout "{glob} ip and ifconfig not found; aborting"
 	echo "ip and ifconfig not found; aborting"
         exit 1
 elif [ -n "$ip" ]; then
- for addr in $($ip addr list | tr '/' ' ' | grep -w inet | grep -w "$IF" | grep -v 127.0.0.1 | grep -vw "$NET" | awk '{print$2}'); do
-  if [ ! -f "$INSTALL_PATH/vnet/$addr.rules" ]; then
-        touch "$INSTALL_PATH/vnet/$addr.rules"
-        chmod 600 "$INSTALL_PATH/vnet/$addr.rules"
-        . "$INSTALL_PATH/vnet/vnetgen.def"
-  fi
- done
+ while IFS=' ' read -r _ _ _ addr _; do
+  addr="${addr%%/*}"
+  [ "$addr" == "127.0.0.1" ] && continue
+  [ "$addr" == "$NET" ] && continue
+  _vnet_create_rule "$addr"
+ done < <($ip -o addr show "$IF" 2>/dev/null | grep -w inet)
 elif [ -n "$ifconfig" ]; then
 for iface in $($ifconfig | grep -w "$IF" | awk '{print$1}'); do
-  for addr in $($ifconfig $iface | grep -w inet | tr ':' ' ' | grep -vw "$NET" | awk '{print$3}'); do
-    if [ ! -f "$INSTALL_PATH/vnet/$addr.rules" ]; then
-        touch "$INSTALL_PATH/vnet/$addr.rules"
-        chmod 600 "$INSTALL_PATH/vnet/$addr.rules"
-        . "$INSTALL_PATH/vnet/vnetgen.def"
-    fi
+  for addr in $($ifconfig "$iface" | grep -w inet | tr ':' ' ' | grep -vw "$NET" | awk '{print$3}'); do
+    _vnet_create_rule "$addr"
   done
 done
 fi
@@ -55,13 +60,12 @@ if [ "$SET_ADDIFACE" == "1" ]; then
   for anet in $($ip -o link show 2>/dev/null | awk -F': ' '{print $2}' | grep -vwE "lo|$IFACE_UNTRUSTED"); do
    valtif=""; [[ ",$IFACE_TRUSTED," == *,"$anet",* ]] && valtif="$anet"
    if [ -z "$valtif" ]; then
-    for addr in $($ip addr list "$anet" 2>/dev/null | tr '/' ' ' | grep -w inet | grep -v 127.0.0.1 | grep -vw "$NET" | awk '{print$2}'); do
-     if [ ! -f "$INSTALL_PATH/vnet/$addr.rules" ]; then
-        touch "$INSTALL_PATH/vnet/$addr.rules"
-        chmod 600 "$INSTALL_PATH/vnet/$addr.rules"
-        . "$INSTALL_PATH/vnet/vnetgen.def"
-     fi
-    done
+    while IFS=' ' read -r _ _ _ addr _; do
+     addr="${addr%%/*}"
+     [ "$addr" == "127.0.0.1" ] && continue
+     [ "$addr" == "$NET" ] && continue
+     _vnet_create_rule "$addr"
+    done < <($ip -o addr show "$anet" 2>/dev/null | grep -w inet)
    fi
   done
  elif [ -n "$ifconfig" ]; then
@@ -70,11 +74,7 @@ if [ "$SET_ADDIFACE" == "1" ]; then
     valtif=""; [[ ",$IFACE_TRUSTED," == *,"$anet",* ]] && valtif="$anet"
     if [ -z "$valtif" ]; then
      for addr in $($ifconfig "$iface" | grep -w inet | tr ':' ' ' | grep -vw "$NET" | awk '{print$3}'); do
-      if [ ! -f "$INSTALL_PATH/vnet/$addr.rules" ]; then
-        touch "$INSTALL_PATH/vnet/$addr.rules"
-        chmod 600 "$INSTALL_PATH/vnet/$addr.rules"
-        . "$INSTALL_PATH/vnet/vnetgen.def"
-      fi
+      _vnet_create_rule "$addr"
      done
     fi
    done
