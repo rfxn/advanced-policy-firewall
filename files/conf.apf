@@ -77,7 +77,7 @@ SET_MONOKERN="0"
 # Docker/container compatibility mode. When enabled, APF will only flush its
 # own chains during start/restart/stop, preserving chains and rules created
 # by Docker, containerd, Kubernetes, Podman, or other software that manages
-# iptables. External rules in INPUT, OUTPUT, FORWARD, and nat are preserved.
+# the FORWARD chain and nat table.
 # This also disables fast load, since iptables-restore would overwrite
 # external chains.
 DOCKER_COMPAT="0"

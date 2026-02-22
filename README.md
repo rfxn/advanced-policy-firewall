@@ -252,7 +252,22 @@ This section will cover some of the basic configuration options found inside of 
 | `EG_UDP_CPORTS` | Outbound UDP ports (e.g., `53,873`) |
 | `EG_ICMP_TYPES` | Outbound ICMP types (see `internals/icmp.types`) |
 
-**`EG_DROP_CMD`** - Comma-separated executable names blocked from outbound network access (e.g., `"eggdrop,psybnc,bitchx"`). Uses iptables `--cmd-owner` match. Requires `EGF="1"`. Depends on kernel xt_owner command support, detected at runtime and skipped gracefully if unavailable.
+**Per-port connection limiting** (via `xt_connlimit` module):
+
+| Variable | Purpose |
+|----------|---------|
+| `IG_TCP_CLIMIT` | Per-port concurrent connection limit for inbound TCP; format is `port:limit` pairs (e.g., `"80:50,443:100,8080_8090:25"`) |
+| `IG_UDP_CLIMIT` | Per-port concurrent connection limit for inbound UDP; same format |
+
+Connections exceeding the limit from a single source IP are rejected. Port ranges use underscore notation. Set empty to disable (default). Connlimit rules are inserted before ACCEPT rules to ensure they take effect. Overridable via VNET per-IP rules.
+
+**User/application-based outbound filtering** (requires `EGF="1"`):
+
+| Variable | Purpose |
+|----------|---------|
+| `EG_TCP_UID` | UID-based outbound TCP filtering; format is `uid:port` pairs (e.g., `"0:22,33:80"`) |
+| `EG_UDP_UID` | UID-based outbound UDP filtering; same format |
+| `EG_DROP_CMD` | Comma-separated executable names blocked from outbound network access (e.g., `"eggdrop,psybnc,bitchx"`). Uses iptables `--cmd-owner` match. Depends on kernel xt_owner command support, detected at runtime and skipped gracefully if unavailable |
 
 **`LOG_DROP`** - Enable detailed firewall packet logging. Typically left disabled on production systems due to log volume and disk I/O impact.
 

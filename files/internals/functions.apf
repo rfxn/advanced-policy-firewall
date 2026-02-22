@@ -486,7 +486,7 @@ cli_trust() {
 		fi
 	        $IPT_H $IPT_FLAGS -I $CHAIN -s $HOST -j $JACTION
 	       	$IPT_H $IPT_FLAGS -I $CHAIN -d $HOST -j $JACTION
-	        eout "(trust) added $ACTION all to/from $HOST"
+	        eout "{trust} added $ACTION all to/from $HOST"
 	        if [ "$SET_VERBOSE" != "1" ]; then
 		        echo "Inserted into firewall: $ACTION all to/from $HOST"
 		fi

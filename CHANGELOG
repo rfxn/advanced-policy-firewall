@@ -7,6 +7,9 @@
 [New] 25-connlimit.bats: tests for connlimit feature covering empty config,
       single/multiple port:limit pairs, port ranges, UDP, chain ordering, and
       VNET per-IP binding (tests/25-connlimit.bats)
+[Change] vnetgen.def: add IG_TCP_CLIMIT and IG_UDP_CLIMIT to commented
+      examples so VNET per-IP rule files document the available connlimit
+      overrides (vnetgen.def)
 [Change] ipset batch loading via ipset restore; replaces per-entry $IPSET add
       loop (31K+ fork+exec calls) with single awk pre-filter piped to
       ipset restore -exist, reducing load time from minutes to seconds
@@ -140,6 +143,16 @@
 [New] 24-vnet.bats: tests for VNET subsystem: disabled message, vnetgen
       rule file creation, per-IP rule loading, unbound IP skip, per-IP
       port overrides (tests/24-vnet.bats)
+[Fix] 22-uid-egress.bats: legacy iptables resolves numeric UIDs to
+      usernames in -S output; patterns now use character class to match
+      both numeric and name forms (tests/22-uid-egress.bats)
+[Change] Drop Ubuntu 22.04 from CI matrix; redundant coverage between
+      Ubuntu 20.04 and 24.04 (smoke-test.yml, tests/Makefile)
+[Fix] conf.apf: correct DOCKER_COMPAT comment to match actual behavior;
+      only FORWARD chain and nat table are preserved, not INPUT/OUTPUT
+      (conf.apf)
+[Fix] functions.apf: fix (trust) eout prefix to {trust} for consistency
+      with all other eout calls (functions.apf)
 
 - 2.0.1 | Feb 20 2026:
 

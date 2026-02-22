@@ -340,6 +340,25 @@ Port filtering variables (global context, overridable via VNET per-IP rules):
   EG_UDP_CPORTS   - outbound UDP ports (e.g., 53,873)
   EG_ICMP_TYPES   - outbound ICMP types (see internals/icmp.types)
 
+Per-port connection limiting variables:
+
+  IG_TCP_CLIMIT   - per-port concurrent connection limit for inbound TCP;
+                    format is port:limit pairs, comma separated
+                    (e.g., "80:50,443:100,8080_8090:25")
+  IG_UDP_CLIMIT   - per-port concurrent connection limit for inbound UDP;
+                    same format as IG_TCP_CLIMIT
+
+Connections exceeding the limit from a single source IP are rejected via
+the xt_connlimit module. Port ranges use underscore notation. Set empty to
+disable (default). Connlimit rules are inserted before ACCEPT rules to
+ensure they take effect.
+
+User/application-based outbound filtering (requires EGF="1"):
+
+  EG_TCP_UID      - UID-based outbound TCP filtering; format is uid:port
+                    pairs, comma separated (e.g., "0:22,33:80")
+  EG_UDP_UID      - UID-based outbound UDP filtering; same format
+
 EG_DROP_CMD - Comma-separated executable names blocked from outbound network
 access (e.g., "eggdrop,psybnc,bitchx"). Uses iptables --cmd-owner match.
 Requires EGF="1". Depends on kernel xt_owner command support, detected at
