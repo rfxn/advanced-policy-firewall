@@ -1,0 +1,7 @@
+# Silent IPs — server addresses that should receive no traffic.
+# One IP or CIDR per line. Both IPv4 and IPv6 supported.
+# Traffic to/from these addresses is silently dropped.
+#
+# Example:
+# 192.168.1.200
+# 2001:db8::dead

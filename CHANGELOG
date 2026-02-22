@@ -1,5 +1,23 @@
 - 2.0.2 | Feb 22 2026:
 
+[New] Custom hook scripts: hook_pre.sh sourced after flush/modinit but before
+      any iptables rules; hook_post.sh sourced after all rules including default
+      DROP policies; activated by chmod 750 (ships as 640 = inactive); all APF
+      variables and helpers available; preserved across upgrades via importconf
+      (firewall, hook_pre.sh, hook_post.sh, importconf)
+[New] Silent IP blocking: silent_ips.rules drops all traffic to/from listed
+      server addresses with no logging; one IP/CIDR per line, IPv4 and IPv6
+      supported via ipt_for_host(); loaded after loopback/trusted interface
+      acceptance, before GRE/trust/bt.rules; empty file is no-op; preserved
+      across upgrades via importconf (firewall, silent_ips.rules, importconf)
+[New] Search/grep CLI: apf -g PATTERN / apf --search PATTERN searches all
+      iptables rules (IPv4 + IPv6 via -S format), ipset sets, and trust files
+      for a pattern match; case-insensitive, line-numbered output; no mutex
+      required (read-only operation) (apf, functions.apf)
+[New] 26-hook-search-silent.bats: tests for hook scripts (inactive/active,
+      pre/post ordering), silent IP blocking (inbound/outbound, IPv6, empty
+      no-op), and search CLI (rule match, trust file match, no match, empty
+      pattern) (tests/26-hook-search-silent.bats)
 [Change] Move ESTABLISHED,RELATED state tracking from after port filtering
       to after trust chains, blocklists, sanity checks, and RAB; established
       connections now fast-path through the INPUT chain, skipping VNET per-IP

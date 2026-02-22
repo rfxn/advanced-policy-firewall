@@ -283,6 +283,9 @@ case "$1" in
 --gre-status)
 	gre_status
 	;;
+-g|--search)
+	search "$2"
+	;;
 *)
 	head
 	help

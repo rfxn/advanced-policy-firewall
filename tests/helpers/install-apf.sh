@@ -69,6 +69,9 @@ install_apf() {
         sed '/^[^#]/d' "$rf" > "$rf.clean"
     done
     cp "$APF_INSTALL/conf.apf" "$APF_INSTALL/conf.apf.clean"
+    cp "$APF_INSTALL/hook_pre.sh" "$APF_INSTALL/hook_pre.sh.clean"
+    cp "$APF_INSTALL/hook_post.sh" "$APF_INSTALL/hook_post.sh.clean"
+    cp "$APF_INSTALL/silent_ips.rules" "$APF_INSTALL/silent_ips.rules.clean"
 }
 
 install_apf

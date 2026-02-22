@@ -22,6 +22,12 @@ modinit
 # Delete user made chains. Flush and zero the chains.
 flush 1
 
+# Pre-configuration hook — runs before any iptables rules
+if [ -x "$INSTALL_PATH/hook_pre.sh" ]; then
+	eout "{glob} executing pre-configuration hook"
+	. "$INSTALL_PATH/hook_pre.sh"
+fi
+
 if [ -n "$IF" ] && [ "$VF_ROUTE" == "1" ]; then
  for i in $(echo $IF); do
   if [ -n "$ip" ]; then
@@ -93,6 +99,21 @@ if [ -n "$IFACE_TRUSTED" ]; then
         ipt -A OUTPUT -o $i -j ACCEPT
  fi
  done
+fi
+
+# Silent IPs — server addresses that should receive no traffic
+if [ -f "$INSTALL_PATH/silent_ips.rules" ]; then
+ while IFS= read -r line || [ -n "$line" ]; do
+  line="${line%%#*}"
+  line="${line// /}"
+  if [ -n "$line" ]; then
+   if ipt_for_host "$line"; then
+    $IPT_H $IPT_FLAGS -A INPUT -d "$line" -j DROP
+    $IPT_H $IPT_FLAGS -A OUTPUT -s "$line" -j DROP
+    eout "{glob} silent drop for $line"
+   fi
+  fi
+ done < "$INSTALL_PATH/silent_ips.rules"
 fi
 
 # Create GRE tunnels and firewall rules
@@ -341,3 +362,9 @@ eout "{glob} default (ingress) input drop"
 ipt -A INPUT -p tcp -j $TCP_STOP
 ipt -A INPUT -p udp -j $UDP_STOP
 ipt -A INPUT -p all -j $ALL_STOP
+
+# Post-configuration hook — runs after all rules including default policies
+if [ -x "$INSTALL_PATH/hook_post.sh" ]; then
+	eout "{glob} executing post-configuration hook"
+	. "$INSTALL_PATH/hook_post.sh"
+fi

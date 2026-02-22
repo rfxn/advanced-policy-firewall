@@ -708,6 +708,7 @@ help() {
 	echo "                                     load new rule into firewall"
 	echo "-u|--remove|--unban HOST ........... remove host from [glob]*_hosts.rules"
 	echo "                                     and immediately remove rule from firewall"
+	echo "-g|--search PATTERN ................ search iptables rules and trust files"
 	echo "-o|--ovars ......................... output all configuration options"
 	echo "-v|--version ....................... output version number"
 	echo "--ipset-update ..................... hot-reload ipset block lists from ipset.rules"
@@ -758,6 +759,68 @@ ovars() {
 	done
 }
 
+search() {
+ local pattern="$1"
+ if [ -z "$pattern" ]; then
+  echo "usage: apf -g PATTERN"
+  return 1
+ fi
+ local found=0
+ echo "Searching for: $pattern"
+ echo ""
+
+ # IPv4 rules (iptables -S for consistent cross-backend output)
+ local ipv4_matches
+ ipv4_matches=$($IPT $IPT_FLAGS -S 2>/dev/null | grep -in -- "$pattern")
+ if [ -n "$ipv4_matches" ]; then
+  echo "=== IPv4 (iptables -S) ==="
+  echo "$ipv4_matches"
+  echo ""
+  found=1
+ fi
+
+ # IPv6 rules
+ if [ "$USE_IPV6" == "1" ] && [ -n "$IP6T" ]; then
+  local ipv6_matches
+  ipv6_matches=$($IP6T $IPT_FLAGS -S 2>/dev/null | grep -in -- "$pattern")
+  if [ -n "$ipv6_matches" ]; then
+   echo "=== IPv6 (ip6tables -S) ==="
+   echo "$ipv6_matches"
+   echo ""
+   found=1
+  fi
+ fi
+
+ # ipset sets
+ if [ "$USE_IPSET" == "1" ] && command -v ipset > /dev/null 2>&1; then
+  local ipset_matches
+  ipset_matches=$(ipset list 2>/dev/null | grep -in -- "$pattern")
+  if [ -n "$ipset_matches" ]; then
+   echo "=== ipset ==="
+   echo "$ipset_matches"
+   echo ""
+   found=1
+  fi
+ fi
+
+ # Trust files
+ for tf in $ALLOW_HOSTS $DENY_HOSTS $GALLOW_HOSTS $GDENY_HOSTS; do
+  if [ -f "$tf" ]; then
+   local tf_matches
+   tf_matches=$(grep -in -- "$pattern" "$tf" 2>/dev/null)
+   if [ -n "$tf_matches" ]; then
+    echo "=== ${tf##*/} ==="
+    echo "$tf_matches"
+    echo ""
+    found=1
+   fi
+  fi
+ done
+
+ if [ "$found" == "0" ]; then
+  echo "No matches found."
+ fi
+}
 
 trust_hosts() {
 file="$1"
