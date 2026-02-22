@@ -20,6 +20,19 @@ setup_file() {
     source /opt/tests/helpers/apf-config.sh
     apf_set_interface "veth-pub" ""
     apf_set_ports "22,80,443" "53" "" ""
+
+    # Detect xt_connlimit support (not available on CentOS 6 / kernel 2.6.32)
+    _CONNLIMIT_OK=""
+    if iptables -N _CL_TEST 2>/dev/null && \
+       iptables -A _CL_TEST -p tcp -m connlimit --connlimit-above 1 -j DROP 2>/dev/null; then
+        _CONNLIMIT_OK=1
+        iptables -F _CL_TEST 2>/dev/null
+        iptables -X _CL_TEST 2>/dev/null
+    else
+        iptables -F _CL_TEST 2>/dev/null
+        iptables -X _CL_TEST 2>/dev/null
+    fi
+    export _CONNLIMIT_OK
 }
 
 teardown_file() {
@@ -48,6 +61,7 @@ teardown_file() {
 # =====================================================================
 
 @test "IG_TCP_CLIMIT creates connlimit REJECT rule with correct port and limit" {
+    [ -n "$_CONNLIMIT_OK" ] || skip "xt_connlimit not available on this kernel"
     source /opt/tests/helpers/apf-config.sh
     apf_set_config "IG_TCP_CLIMIT" "80:50"
     apf_set_config "IG_UDP_CLIMIT" ""
@@ -58,6 +72,7 @@ teardown_file() {
 }
 
 @test "IG_TCP_CLIMIT with multiple port:limit pairs" {
+    [ -n "$_CONNLIMIT_OK" ] || skip "xt_connlimit not available on this kernel"
     source /opt/tests/helpers/apf-config.sh
     apf_set_config "IG_TCP_CLIMIT" "80:50,443:100"
     apf_set_config "IG_UDP_CLIMIT" ""
@@ -69,6 +84,7 @@ teardown_file() {
 }
 
 @test "IG_TCP_CLIMIT with port range (underscore notation)" {
+    [ -n "$_CONNLIMIT_OK" ] || skip "xt_connlimit not available on this kernel"
     source /opt/tests/helpers/apf-config.sh
     apf_set_config "IG_TCP_CLIMIT" "8080_8090:25"
     apf_set_config "IG_UDP_CLIMIT" ""
@@ -83,6 +99,7 @@ teardown_file() {
 # =====================================================================
 
 @test "IG_UDP_CLIMIT creates connlimit rule without --syn" {
+    [ -n "$_CONNLIMIT_OK" ] || skip "xt_connlimit not available on this kernel"
     source /opt/tests/helpers/apf-config.sh
     apf_set_config "IG_TCP_CLIMIT" ""
     apf_set_config "IG_UDP_CLIMIT" "53:200"
@@ -105,6 +122,7 @@ teardown_file() {
 # =====================================================================
 
 @test "connlimit REJECT appears BEFORE ACCEPT in chain order" {
+    [ -n "$_CONNLIMIT_OK" ] || skip "xt_connlimit not available on this kernel"
     source /opt/tests/helpers/apf-config.sh
     apf_set_config "IG_TCP_CLIMIT" "80:50"
     apf_set_config "IG_UDP_CLIMIT" ""
@@ -133,6 +151,7 @@ teardown_file() {
 # =====================================================================
 
 @test "VNET per-IP connlimit binds to specific IP" {
+    [ -n "$_CONNLIMIT_OK" ] || skip "xt_connlimit not available on this kernel"
     source /opt/tests/helpers/apf-config.sh
 
     # Add secondary IP and enable VNET
