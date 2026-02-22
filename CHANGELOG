@@ -105,6 +105,34 @@
       trust port range and protocol parsing; GRE linkid validation boundaries;
       dlist invalid CIDR rejection and comment skipping
       (tests/21-refactor-regression.bats)
+[Change] VNET main.vnet: replace ls|grep with glob-based for loop;
+      replace echo|sed with parameter expansion; fix ifconfig detection
+      from [ -f "$ifconfig" ] to [ -n "$ifconfig" ]; quote all source/path
+      expansions (main.vnet)
+[Change] VNET vnetgen: replace $ip addr list|tr|grep|awk fork chains
+      with $ip -o addr show + while IFS read loop; consolidate repeated
+      touch/chmod/source blocks into _vnet_create_rule() helper (vnetgen)
+[Change] apf: replace cat|tr|awk /proc/uptime and /proc/loadavg with
+      read builtin + ${var%%.*} parameter expansion; replace cat .last.full,
+      .md5.cores, .apf.restore.backend with read/$(< ) builtins; quote
+      source, $DIFF, and cp path arguments (apf)
+[Change] firewall: quote source $CNF path argument (firewall)
+[Change] importconf: replace cat|awk VERSION parsing with awk direct
+      file read; installed copy uses $INSTALL_PATH consistently with
+      quoting; add glob/ipset/gre rule preservation (importconf)
+[Change] sysctl.rules: replace cat /proc/sys/net/nf_conntrack_count and
+      nf_conntrack_max with read builtin (sysctl.rules)
+[Change] functions.apf: replace cat .trusts.md5 with read builtin in
+      refresh path (functions.apf)
+[New] 22-uid-egress.bats: tests for EG_TCP_UID, EG_UDP_UID uid-owner
+      rules and EG_DROP_CMD cmd-owner rules with runtime capability
+      detection (tests/22-uid-egress.bats)
+[New] 23-devel-fastload.bats: tests for DEVEL_MODE warning/cron and
+      fast load edge cases: first run skip, config change detection,
+      backend mismatch, snapshot creation (tests/23-devel-fastload.bats)
+[New] 24-vnet.bats: tests for VNET subsystem: disabled message, vnetgen
+      rule file creation, per-IP rule loading, unbound IP skip, per-IP
+      port overrides (tests/24-vnet.bats)
 
 - 2.0.1 | Feb 20 2026:
 
