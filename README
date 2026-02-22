@@ -145,6 +145,8 @@ point form summary of most APF features:
   missing packages (apt-get, yum, dnf)
 - ICMPv6 type filtering (IG_ICMPV6_TYPES/EG_ICMPV6_TYPES) with automatic NDP
   protection for types 133-136
+- per-port concurrent connection limiting via xt_connlimit module; configurable
+  port:limit pairs for TCP and UDP with VNET per-IP override support
 - adaptive connection tracking scaling that auto-grows conntrack_max when usage
   exceeds 80%, with configurable ceiling and hash table sizing
 - IPv6 sysctl hardening: disables accept_source_route, accept_redirects, and
@@ -334,11 +336,34 @@ Port filtering variables (global context, overridable via VNET per-IP rules):
   IG_TCP_CPORTS   - inbound TCP ports ("server" ports, e.g., 22,80,443)
   IG_UDP_CPORTS   - inbound UDP ports (e.g., 53 for DNS)
   IG_ICMP_TYPES   - inbound ICMP types (see internals/icmp.types)
+  IG_ICMPV6_TYPES - inbound ICMPv6 types (requires USE_IPV6="1");
+                    NDP types 133-136 are always permitted regardless
   EGF             - top level toggle for outbound (egress) filtering;
                     recommended to enable for robust protection
   EG_TCP_CPORTS   - outbound TCP ports ("client" ports, e.g., 80,443)
   EG_UDP_CPORTS   - outbound UDP ports (e.g., 53,873)
   EG_ICMP_TYPES   - outbound ICMP types (see internals/icmp.types)
+  EG_ICMPV6_TYPES - outbound ICMPv6 types (requires USE_IPV6="1");
+                    NDP types 133-136 are always permitted regardless
+
+Per-port connection limiting variables:
+
+  IG_TCP_CLIMIT   - per-port concurrent connection limit for inbound TCP;
+                    format is port:limit pairs, comma separated
+                    (e.g., "80:50,443:100,8080_8090:25")
+  IG_UDP_CLIMIT   - per-port concurrent connection limit for inbound UDP;
+                    same format as IG_TCP_CLIMIT
+
+Connections exceeding the limit from a single source IP are rejected via
+the xt_connlimit module. Port ranges use underscore notation. Set empty to
+disable (default). Connlimit rules are inserted before ACCEPT rules to
+ensure they take effect.
+
+User/application-based outbound filtering (requires EGF="1"):
+
+  EG_TCP_UID      - UID-based outbound TCP filtering; format is uid:port
+                    pairs, comma separated (e.g., "0:22,33:80")
+  EG_UDP_UID      - UID-based outbound UDP filtering; same format
 
 EG_DROP_CMD - Comma-separated executable names blocked from outbound network
 access (e.g., "eggdrop,psybnc,bitchx"). Uses iptables --cmd-owner match.
@@ -377,7 +402,7 @@ TCP_STOP, UDP_STOP, ALL_STOP - Control how filtered packets are handled:
 PKT_SANITY - Top level toggle for packet sanity checks. Ensures all packets
 conform to strict TCP/IP standards, making it very difficult for attackers to
 inject raw/custom packets. Sub-options (PKT_SANITY_INV, PKT_SANITY_FUDP,
-PKT_SANITY_PZERO, PKT_SANITY_STUFFED) are preconfigured to suit most situations.
+PKT_SANITY_PZERO) are preconfigured to suit most situations.
 See conf.apf for details on each sub-option.
 
 Type of Service (TOS) - The TOS_* settings classify traffic priority based on

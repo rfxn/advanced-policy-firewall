@@ -77,7 +77,7 @@ SET_MONOKERN="0"
 # Docker/container compatibility mode. When enabled, APF will only flush its
 # own chains during start/restart/stop, preserving chains and rules created
 # by Docker, containerd, Kubernetes, Podman, or other software that manages
-# iptables. External rules in INPUT, OUTPUT, FORWARD, and nat are preserved.
+# the FORWARD chain and nat table.
 # This also disables fast load, since iptables-restore would overwrite
 # external chains.
 DOCKER_COMPAT="0"
@@ -245,6 +245,16 @@ TCR_PASS="1"		TCR_PORTS="33434:33534"
 # pkt/s (packets/seconds), pkt/m (packets/minutes)
 # Set value to 0 for unlimited, anything above is enabled.
 ICMP_LIM="30/s"
+
+# Per-port concurrent connection limit using the connlimit module. Connections
+# exceeding the limit from a single source IP are rejected. Format is
+# port:limit pairs, comma separated. Port ranges use underscore notation.
+# Example: IG_TCP_CLIMIT="80:50,443:100,8080_8090:25"
+# Set empty to disable (default).
+IG_TCP_CLIMIT=""
+
+# Per-port concurrent connection limit for inbound UDP
+IG_UDP_CLIMIT=""
 
 # Creates firewall rules based on the local name servers as defined in the
 # /etc/resolv.conf file. This is the preferred secure method for client side

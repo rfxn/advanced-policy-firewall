@@ -1,3 +1,24 @@
+# Per-port connection limiting (connlimit) — must precede ACCEPT rules
+if [ -n "$IG_TCP_CLIMIT" ]; then
+for i in ${IG_TCP_CLIMIT//,/ }; do
+	[ -z "$i" ] && continue
+	clport="${i%%:*}"; cllimit="${i#*:}"
+	expand_port "$clport"; clport="$_PORT"
+	ipt_dst -A INPUT -p tcp --syn --dport $clport -m connlimit --connlimit-above $cllimit -j REJECT
+	eout "{glob} connection limit $cllimit on inbound tcp port $clport on $VNET"
+done
+fi
+
+if [ -n "$IG_UDP_CLIMIT" ]; then
+for i in ${IG_UDP_CLIMIT//,/ }; do
+	[ -z "$i" ] && continue
+	clport="${i%%:*}"; cllimit="${i#*:}"
+	expand_port "$clport"; clport="$_PORT"
+	ipt_dst -A INPUT -p udp --dport $clport -m connlimit --connlimit-above $cllimit -j REJECT
+	eout "{glob} connection limit $cllimit on inbound udp port $clport on $VNET"
+done
+fi
+
 if [ -n "$IG_TCP_CPORTS" ]; then
 PROTO="tcp"
 for i in ${IG_TCP_CPORTS//,/ }; do
