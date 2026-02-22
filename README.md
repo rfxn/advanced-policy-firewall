@@ -1,11 +1,15 @@
-# Advanced Policy Firewall (APF) v2.0.2
+# Advanced Policy Firewall (APF)
 
-> (C) 2002-2026, R-fx Networks \<proj@rfxn.com\>
-> (C) 2026, Ryan MacDonald \<ryan@rfxn.com\>
+[![Version](https://img.shields.io/badge/version-2.0.2-blue.svg)](CHANGELOG)
+[![License: GPL v2](https://img.shields.io/badge/license-GPL_v2-green.svg)](COPYING.GPL)
+[![CI](https://github.com/rfxn/advanced-policy-firewall/actions/workflows/smoke-test.yml/badge.svg?branch=master)](https://github.com/rfxn/advanced-policy-firewall/actions/workflows/smoke-test.yml)
 
-*For a plain text version of this document, see [README](README).*
+**iptables/netfilter-based firewall management for Linux servers** — stateful packet filtering,
+trust-based host management, reactive address blocking, and per-IP virtual network policies.
 
-APF is licensed under the GNU General Public License v2. See [COPYING.GPL](COPYING.GPL) for details.
+> (C) 2002-2026, R-fx Networks &lt;proj@rfxn.com&gt;<br>
+> (C) 2026, Ryan MacDonald &lt;ryan@rfxn.com&gt;<br>
+> Licensed under [GNU GPL v2](COPYING.GPL)
 
 ---
 
@@ -36,6 +40,29 @@ APF is licensed under the GNU General Public License v2. See [COPYING.GPL](COPYI
 
 ---
 
+## Quick Start
+
+```bash
+# Install
+sh install.sh
+
+# Configure — edit ports, interfaces, options
+vi /etc/apf/conf.apf
+
+# Start (DEVEL_MODE auto-flushes every 5 min until disabled)
+apf -s
+
+# Trust/deny hosts on the fly
+apf -a 10.0.0.5 "office gateway"
+apf -d 192.168.3.111 "brute force attempts"
+
+# Disable dev mode for persistent operation
+sed -i 's/DEVEL_MODE="1"/DEVEL_MODE="0"/' /etc/apf/conf.apf
+apf -r
+```
+
+---
+
 ## 1. Introduction
 
 Advanced Policy Firewall (APF) is an iptables(netfilter) based firewall system designed around the essential needs of today's Internet deployed servers and the unique needs of custom deployed Linux installations. The configuration of APF is designed to be very informative and present the user with an easy to follow process, from top to bottom of the configuration file. The management of APF on a day-to-day basis is conducted from the command line with the `apf` command, which includes detailed usage information and all the features one would expect from a current and forward thinking firewall solution.
@@ -52,56 +79,36 @@ The technical side of APF is such that it embraces the latest stable features pu
 
 **Sanity based policies** matches traffic against known attack methods and Internet standards. Forged source addresses are discarded, malformed packets from broken routers are dropped or replied to with TCP Reset.
 
-For a detailed description of all APF features, review `conf.apf` (under your install path) which has well outlined captions above all options. Below is a point form summary of most APF features:
+For a detailed description of all APF features, review `conf.apf` (under your install path) which has well outlined captions above all options.
 
-- Detailed and well commented configuration file
-- Granular inbound and outbound network filtering
-- User id based outbound network filtering
-- Application based network filtering
-- Trust based rule files with an optional advanced syntax
-- Global trust system where rules can be downloaded from a central management server
-- **Reactive address blocking (RAB)**, in-line intrusion prevention with automatic address blocking on sanity violations and port scan detection
-- Debug mode provided for testing new features and configuration setups
-- **Fast load** feature that allows for 1000+ rules to load in under 1 second
-- Inbound and outbound network interfaces can be independently configured
-- Global TCP/UDP port & ICMP type filtering with multiple methods of executing filters (drop, reject, prohibit)
-- Configurable policies for each IP on the system with convenience variables to import settings
-- Packet flow rate limiting that prevents abuse on the most widely abused protocol, ICMP
-- Prerouting and postrouting rules for optimal network performance
-- DShield.org block list support to ban networks exhibiting suspicious activity
-- Spamhaus Don't Route Or Peer List support to ban known "hijacked zombie" IP blocks
-- Any number of additional interfaces may be configured as firewalled (untrusted) or trusted (not firewalled)
-- Additional firewalled interfaces can have their own unique firewall policies applied
-- Intelligent route verification to prevent embarrassing configuration errors
-- Advanced packet sanity checks to make sure traffic coming and going meets the strictest of standards
-- Filter attacks such as fragmented UDP, port zero floods, stuffed routing, ARP poisoning and more
-- Configurable type of service options to dictate the priority of different types of network traffic
-- Intelligent default settings to meet every day server setups
-- Dynamic configuration of your server's local DNS resolvers into the firewall
-- Optional filtering of common P2P applications
-- Optional filtering of private & reserved IP address space
-- Optional implicit blocks of the ident service
-- Configurable connection tracking settings to scale the firewall to the size of your network
-- Configurable kernel hooks (ties) to harden the system further to syn-flood attacks & routing abuses
-- Advanced network control such as explicit congestion notification and overflow control
-- Special chains that are aware of the state of FTP DATA and SSH connections to prevent client side issues
-- Control over the rate of logged events
-- Logging subsystem that allows for logging data to user space programs or standard syslog files
-- Logging that details every rule added and a comprehensive set of error checks to prevent config errors
-- If you are familiar with netfilter you can create your own rules in any of the policy files
-- Pluggable and ready advanced use of QoS algorithms provided by the Linux kernel
-- **IPv6 dual-stack support**: automatic ip6tables rules alongside iptables when `USE_IPV6` is enabled, including ICMPv6 filtering and NDP
-- Input validation on all trust system entries (IPv4, IPv6, CIDR, FQDN)
-- **nft backend detection** with safe fast load across iptables backend changes
-- **Docker/container compatibility mode** for coexistence with Docker, Podman, Kubernetes, and containerd without destroying external chains
-- **ipset block list support** for kernel-level high-performance IP matching with O(1) lookup; one iptables rule per list instead of one rule per IP
-- **GRE tunnel management** with dedicated chains, protocol 47 rules, lifecycle controls (`--gre-up`/`--gre-down`/`--gre-status`), and persist-across-flush support
-- **Automatic dependency checking** at startup with OS-aware install hints for missing packages (apt-get, yum, dnf)
-- **ICMPv6 type filtering** (`IG_ICMPV6_TYPES`/`EG_ICMPV6_TYPES`) with automatic NDP protection for types 133-136
-- **Per-port concurrent connection limiting** via `xt_connlimit` module; configurable `port:limit` pairs for TCP and UDP with VNET per-IP override support
-- **Adaptive connection tracking scaling** that auto-grows conntrack_max when usage exceeds 80%, with configurable ceiling and hash table sizing
-- **IPv6 sysctl hardening**: disables accept_source_route, accept_redirects, and accept_ra when `USE_IPV6=1`
-- systemd service unit for modern init management
+**Filtering & Rules**
+- Granular inbound/outbound TCP/UDP/ICMP/ICMPv6 port filtering
+- IPv6 dual-stack support with automatic ip6tables rules
+- Per-port concurrent connection limiting (connlimit)
+- User/application-based outbound filtering (uid-owner, cmd-owner)
+- Packet sanity checks (forged sources, malformed flags, fragments)
+- Type of Service (TOS) traffic prioritization
+
+**Trust System**
+- Allow/deny host management (IPv4, IPv6, CIDR, FQDN)
+- Advanced trust syntax (proto:flow:port:ip)
+- Global trust with central server download
+- Auto-expire and trim for deny lists
+
+**Blocking & Prevention**
+- Reactive address blocking (RAB) with port scan detection
+- Remote block lists (Spamhaus, DShield, Project Honey Pot)
+- ipset kernel-level block lists with O(1) lookup
+- Implicit blocking (P2P, private/reserved space, ident)
+
+**Infrastructure**
+- Virtual network (VNET) per-IP policies
+- GRE tunnel management with dedicated chains
+- Docker/container compatibility mode
+- Fast load snapshots with nft backend detection
+- Kernel tuning via sysctl (conntrack, syn-flood, routing)
+- systemd service unit and legacy init support
+- Automatic dependency checking with OS-aware install hints
 
 ### 1.1 Supported Systems & Requirements
 

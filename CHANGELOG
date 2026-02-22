@@ -1,5 +1,20 @@
 - 2.0.2 | Feb 21 2026:
 
+[Change] README: modernize header with tagline and condensed copyright;
+      collapse GPL boilerplate to single-line reference (README)
+[New] README: add Quick Start section with install, configure, start,
+      trust/deny, and dev-mode-disable examples (README)
+[Change] README: reorganize 48-bullet feature list into 4 categorized
+      groups (Filtering & Rules, Trust System, Blocking & Prevention,
+      Infrastructure) with ~20 concise items (README)
+[Change] README.md: modernize header with version/license/CI badges and
+      one-line project tagline; collapse copyright to single line; remove
+      plain-text-version link (README.md)
+[New] README.md: add Quick Start section with install, configure, start,
+      trust/deny, and dev-mode-disable examples (README.md)
+[Change] README.md: reorganize 48-bullet feature list into 4 categorized
+      groups (Filtering & Rules, Trust System, Blocking & Prevention,
+      Infrastructure) with ~20 concise items (README.md)
 [Change] help(): show all accepted CLI aliases (--flush, --unban), add
       "from ipset.rules" to --ipset-update, normalize dot-leader alignment
       and indentation; usage line changed from "$0" to "apf"
