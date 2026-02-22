@@ -487,10 +487,10 @@ The `BLK_*` variables in `conf.apf` control implicit blocking of specific traffi
 The `/usr/local/sbin/apf` command has a number of options that will ease the day-to-day use of your firewall:
 
 ```
-usage /usr/local/sbin/apf [OPTION]
+usage apf [OPTION]
 -s|--start ......................... load all firewall rules
 -r|--restart ....................... stop (flush) & reload firewall rules
--f|--stop .......................... stop (flush) all firewall rules
+-f|--stop|--flush .................. stop (flush) all firewall rules
 -l|--list .......................... list all firewall rules
 -t|--status ........................ output firewall status log
 -e|--refresh ....................... refresh & resolve dns names in trust rules
@@ -500,17 +500,15 @@ usage /usr/local/sbin/apf [OPTION]
 -d HOST CMT|--deny HOST COMMENT .... add host (IP/IPv6/CIDR/FQDN) to
                                      deny_hosts.rules and immediately
                                      load new rule into firewall
--u|--remove HOST ................... remove host from [glob]*_hosts.rules
+-u|--remove|--unban HOST ........... remove host from [glob]*_hosts.rules
                                      and immediately remove rule from firewall
 -o|--ovars ......................... output all configuration options
 -v|--version ....................... output version number
 --ipset-update ..................... hot-reload ipset block lists from ipset.rules
---gre-up .......................... bring up GRE tunnels from gre.rules
---gre-down ........................ tear down GRE tunnels
---gre-status ...................... show GRE tunnel status
+--gre-up ........................... bring up GRE tunnels from gre.rules
+--gre-down ......................... tear down GRE tunnels
+--gre-status ....................... show GRE tunnel status
 ```
-
-Note: `--unban` is accepted as an alias for `-u|--remove`.
 
 The **`-l|--list`** option shows all loaded iptables rules. The **`-t|--status`** option pages through the APF status log at `/var/log/apf_log`.
 

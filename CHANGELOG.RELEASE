@@ -1,5 +1,9 @@
 - 2.0.2 | Feb 21 2026:
 
+[Change] help(): show all accepted CLI aliases (--flush, --unban), add
+      "from ipset.rules" to --ipset-update, normalize dot-leader alignment
+      and indentation; usage line changed from "$0" to "apf"
+      (functions.apf, README, README.md)
 [New] Per-port concurrent connection limiting via xt_connlimit module;
       IG_TCP_CLIMIT and IG_UDP_CLIMIT config variables with port:limit pairs,
       port range support, VNET per-IP binding, and REJECT action for immediate
