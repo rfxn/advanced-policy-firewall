@@ -115,7 +115,8 @@ teardown_file() {
 
     # The IP should have per-IP rules (cports.common loaded for this VNET IP)
     # Default config should create INPUT ACCEPT rules for IG_TCP_CPORTS on this IP
-    assert_rule_exists INPUT "ACCEPT.*tcp.*$VNET_IP.*dpt:22"
+    # Use -S format (consistent across nft/legacy backends)
+    assert_rule_exists_ips INPUT "$VNET_IP.*-p tcp.*--dport 22.*ACCEPT"
 
     "$APF" -f 2>/dev/null
     apf_set_config "SET_VNET" "0"
@@ -162,9 +163,9 @@ VNETRULE
     "$APF" -f 2>/dev/null
     "$APF" -s
 
-    # Should have rules for port 8080 on the VNET IP
-    assert_rule_exists INPUT "ACCEPT.*tcp.*$VNET_IP.*dpt:8080"
-    assert_rule_exists INPUT "ACCEPT.*tcp.*$VNET_IP.*dpt:9090"
+    # Should have rules for port 8080 on the VNET IP (use -S format)
+    assert_rule_exists_ips INPUT "$VNET_IP.*-p tcp.*--dport 8080.*ACCEPT"
+    assert_rule_exists_ips INPUT "$VNET_IP.*-p tcp.*--dport 9090.*ACCEPT"
 
     "$APF" -f 2>/dev/null
     apf_set_config "SET_VNET" "0"

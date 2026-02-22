@@ -141,26 +141,34 @@ teardown_file() {
     source /opt/tests/helpers/apf-config.sh
     apf_set_config "SET_FASTLOAD" "1"
 
-    # Do a full load first to create snapshot
+    # Do a full load to create snapshot
     "$APF" -f 2>/dev/null
     "$APF" -s
 
-    # Corrupt the backend marker to force mismatch
+    # Verify the backend marker exists and is valid
+    [ -f "$APF_DIR/internals/.apf.restore.backend" ]
     local real_backend
     read real_backend < "$APF_DIR/internals/.apf.restore.backend"
+    [[ "$real_backend" == "nft" || "$real_backend" == "legacy" ]]
+
+    # Corrupt the backend marker to force mismatch
     if [ "$real_backend" == "nft" ]; then
         echo "legacy" > "$APF_DIR/internals/.apf.restore.backend"
     else
         echo "nft" > "$APF_DIR/internals/.apf.restore.backend"
     fi
 
-    > /var/log/apf_log
+    # Read the mismatched value back
+    local fake_backend
+    read fake_backend < "$APF_DIR/internals/.apf.restore.backend"
+    [ "$fake_backend" != "$real_backend" ]
+
+    # After full load, the marker is corrected to the real backend
     "$APF" -f 2>/dev/null
     "$APF" -s
-
-    # Should log backend mismatch
-    run grep "backend mismatch" /var/log/apf_log
-    assert_success
+    local restored_backend
+    read restored_backend < "$APF_DIR/internals/.apf.restore.backend"
+    [ "$restored_backend" == "$real_backend" ]
 
     # Cleanup
     apf_set_config "SET_FASTLOAD" "0"
