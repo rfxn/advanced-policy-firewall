@@ -262,3 +262,94 @@ ISEOF
     fi
     assert_rule_exists_ips INPUT "IPSET_test_block"
 }
+
+# --- Legacy 4-field format migration tests ---
+
+@test "legacy 4-field local path migrated and loaded" {
+    if ! ipset_available; then
+        skip "ipset not available"
+    fi
+    "$APF" -f 2>/dev/null || true
+    ipset destroy test_block 2>/dev/null || true
+
+    # Write old 4-field format (no log field)
+    cat > "$APF_DIR/ipset.rules" <<'ISEOF'
+test_block:src:ip:/opt/apf/test_blocklist.txt
+ISEOF
+
+    "$APF" -s
+
+    # Set should be created — migration inserted log=0
+    run ipset list test_block
+    assert_success
+    assert_ipset_entry_count test_block 3
+
+    # File should be rewritten in 5-field format
+    run cat "$APF_DIR/ipset.rules"
+    assert_output "test_block:src:ip:0:/opt/apf/test_blocklist.txt"
+
+    # Restore
+    "$APF" -f 2>/dev/null || true
+    ipset destroy test_block 2>/dev/null || true
+    cat > "$APF_DIR/ipset.rules" <<'ISEOF'
+test_block:src:ip:1:/opt/apf/test_blocklist.txt
+ISEOF
+    "$APF" -s
+}
+
+@test "legacy 4-field URL entry migrated correctly" {
+    if ! ipset_available; then
+        skip "ipset not available"
+    fi
+    "$APF" -f 2>/dev/null || true
+    ipset destroy test_block 2>/dev/null || true
+
+    # Write old 4-field format with URL (colon in https://)
+    cat > "$APF_DIR/ipset.rules" <<'ISEOF'
+test_url:src:net:https://example.com/blocklist.txt
+ISEOF
+
+    # Start will fail to download (fake URL) but migration should still rewrite
+    "$APF" -s 2>/dev/null || true
+
+    # File should be rewritten with log=0 inserted, URL intact
+    run cat "$APF_DIR/ipset.rules"
+    assert_output "test_url:src:net:0:https://example.com/blocklist.txt"
+
+    # Restore
+    "$APF" -f 2>/dev/null || true
+    ipset destroy test_url 2>/dev/null || true
+    cat > "$APF_DIR/ipset.rules" <<'ISEOF'
+test_block:src:ip:1:/opt/apf/test_blocklist.txt
+ISEOF
+    "$APF" -s
+}
+
+@test "5-field entry not modified by migration" {
+    if ! ipset_available; then
+        skip "ipset not available"
+    fi
+    "$APF" -f 2>/dev/null || true
+    ipset destroy test_block 2>/dev/null || true
+
+    # Write correct 5-field format
+    cat > "$APF_DIR/ipset.rules" <<'ISEOF'
+# comment line
+test_block:src:ip:1:/opt/apf/test_blocklist.txt
+ISEOF
+
+    "$APF" -s
+
+    # File should be unchanged
+    run cat "$APF_DIR/ipset.rules"
+    assert_line --index 0 "# comment line"
+    assert_line --index 1 "test_block:src:ip:1:/opt/apf/test_blocklist.txt"
+
+    # Restore
+    "$APF" -f 2>/dev/null || true
+    ipset destroy test_block 2>/dev/null || true
+    cat > "$APF_DIR/ipset.rules" <<'ISEOF'
+test_block:src:ip:1:/opt/apf/test_blocklist.txt
+ISEOF
+    "$APF" -s
+}

@@ -1155,6 +1155,38 @@ if [ -n "$(grep -v "#" "$ECNSHAME_HOSTS")" ]; then
 fi
 }
 
+ipset_migrate_rules() {
+local ipset_rules="$INSTALL_PATH/ipset.rules"
+[ -f "$ipset_rules" ] || return 0
+local migrated=0
+local tmp
+tmp=$(mktemp "$INSTALL_PATH/.apf-XXXXXX")
+while IFS= read -r line; do
+	case "$line" in
+		\#*|"")
+			printf '%s\n' "$line" >> "$tmp"
+			continue
+			;;
+	esac
+	local f1 f2 f3 f4 f5
+	IFS=: read -r f1 f2 f3 f4 f5 <<< "$line"
+	if [ -n "$f4" ] && [ "$f4" != "0" ] && [ "$f4" != "1" ]; then
+		# Old 4-field format — reconstruct file_or_url and insert log=0
+		local orig_path="$f4"
+		[ -n "$f5" ] && orig_path="${f4}:${f5}"
+		printf '%s\n' "${f1}:${f2}:${f3}:0:${orig_path}" >> "$tmp"
+		migrated=$((migrated + 1))
+	else
+		printf '%s\n' "$line" >> "$tmp"
+	fi
+done < "$ipset_rules"
+if [ "$migrated" -gt 0 ]; then
+	cp "$tmp" "$ipset_rules"
+	eout "{ipset} migrated $migrated legacy entries in ipset.rules (added log field)"
+fi
+rm -f "$tmp"
+}
+
 ipset_load() {
 if [ "$USE_IPSET" != "1" ] || [ -z "$IPSET" ]; then
 	return
@@ -1163,6 +1195,7 @@ local ipset_rules="$INSTALL_PATH/ipset.rules"
 if [ ! -f "$ipset_rules" ]; then
 	return
 fi
+ipset_migrate_rules
 eout "{ipset} loading ipset block lists"
 while IFS= read -r line; do
 	# Skip comments and blank lines

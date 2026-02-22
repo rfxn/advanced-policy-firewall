@@ -1,5 +1,9 @@
-- 2.0.2 | Feb 21 2026:
+- 2.0.2 | Feb 22 2026:
 
+[New] ipset_migrate_rules() auto-detects legacy 4-field ipset.rules entries
+      (missing log field) and rewrites them to 5-field format with log=0;
+      handles both local paths and URLs with embedded colons; runs idempotently
+      at each firewall start before ipset_load() parsing (functions.apf)
 [Change] README: modernize header with tagline and condensed copyright;
       collapse GPL boilerplate to single-line reference (README)
 [New] README: add Quick Start section with install, configure, start,
