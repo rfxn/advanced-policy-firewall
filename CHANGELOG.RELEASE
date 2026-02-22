@@ -7,6 +7,9 @@
 [New] README/README.md: add section 3.12 Firewall Order of Operations with
       condensed INPUT chain evaluation order table, key precedence rules,
       and link to FLOW.md; update Table of Contents (README, README.md)
+[Change] Fast load uptime threshold raised from 5 minutes (300s) to 10
+      minutes (600s); ensures full rule generation on recently booted systems
+      where network state may still be settling (apf, conf.apf)
 [New] ipset_migrate_rules() auto-detects legacy 4-field ipset.rules entries
       (missing log field) and rewrites them to 5-field format with log=0;
       handles both local paths and URLs with embedded colons; runs idempotently

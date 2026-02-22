@@ -600,7 +600,7 @@ every rule from scratch.
 - Snapshot is less than 12 hours old
 - Configuration files have not changed (MD5 check)
 - `DEVEL_MODE=0`
-- System uptime is greater than 5 minutes
+- System uptime is greater than 10 minutes
 - Snapshot backend (legacy/nft) matches current iptables backend
 
 **Fast load is skipped (full load used instead) when ANY condition fails:**
@@ -611,7 +611,7 @@ every rule from scratch.
 | Snapshot > 12h old | `fast load snapshot more than 12h old` |
 | Config changed | `config. or .rule file has changed since last full load` |
 | DEVEL_MODE=1 | (triggers config change detection) |
-| Uptime < 5 min | `uptime less than 5 minutes` |
+| Uptime <= 10 min | `uptime less than 10 minutes` |
 | Backend mismatch | `fast load snapshot backend mismatch` |
 | Restore fails | `fast load failed (iptables-restore error)` |
 | IPv6 incomplete | `fast load incomplete (IPv6 enabled but no IPv6 snapshot)` |

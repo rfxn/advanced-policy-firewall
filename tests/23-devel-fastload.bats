@@ -52,7 +52,7 @@ teardown_file() {
 
     # devm() should have created a cron entry (at or crontab)
     # Check via crontab -l or /var/spool/cron
-    # The cron entry flushes the firewall after 5 minutes
+    # The cron entry flushes the firewall periodically in dev mode
     run grep "DEVELOPMENT MODE ENABLED" /var/log/apf_log
     assert_success
 
