@@ -1,5 +1,35 @@
-- 2.0.2 | Feb 21 2026:
+- 2.0.2 | Feb 22 2026:
 
+[New] FLOW.md and FLOW: standalone order-of-operations document covering
+      full load sequence, INPUT chain rule order with precedence table,
+      key "what beats what" rules, and fast load vs full load conditions
+      (FLOW.md, FLOW)
+[New] README/README.md: add section 3.12 Firewall Order of Operations with
+      condensed INPUT chain evaluation order table, key precedence rules,
+      and link to FLOW.md; update Table of Contents (README, README.md)
+[New] ipset_migrate_rules() auto-detects legacy 4-field ipset.rules entries
+      (missing log field) and rewrites them to 5-field format with log=0;
+      handles both local paths and URLs with embedded colons; runs idempotently
+      at each firewall start before ipset_load() parsing (functions.apf)
+[Change] README: modernize header with tagline and condensed copyright;
+      collapse GPL boilerplate to single-line reference (README)
+[New] README: add Quick Start section with install, configure, start,
+      trust/deny, and dev-mode-disable examples (README)
+[Change] README: reorganize 48-bullet feature list into 4 categorized
+      groups (Filtering & Rules, Trust System, Blocking & Prevention,
+      Infrastructure) with ~20 concise items (README)
+[Change] README.md: modernize header with version/license/CI badges and
+      one-line project tagline; collapse copyright to single line; remove
+      plain-text-version link (README.md)
+[New] README.md: add Quick Start section with install, configure, start,
+      trust/deny, and dev-mode-disable examples (README.md)
+[Change] README.md: reorganize 48-bullet feature list into 4 categorized
+      groups (Filtering & Rules, Trust System, Blocking & Prevention,
+      Infrastructure) with ~20 concise items (README.md)
+[Change] help(): show all accepted CLI aliases (--flush, --unban), add
+      "from ipset.rules" to --ipset-update, normalize dot-leader alignment
+      and indentation; usage line changed from "$0" to "apf"
+      (functions.apf, README, README.md)
 [New] Per-port concurrent connection limiting via xt_connlimit module;
       IG_TCP_CLIMIT and IG_UDP_CLIMIT config variables with port:limit pairs,
       port range support, VNET per-IP binding, and REJECT action for immediate

@@ -693,27 +693,27 @@ tac "$LOG_APF" | more
 }
 
 help() {
-        echo "usage $0 [OPTION]"
-        echo "-s|--start ......................... load all firewall rules"
-        echo "-r|--restart ....................... stop (flush) & reload firewall rules"
-        echo "-f|--stop .......................... stop (flush) all firewall rules"
-        echo "-l|--list .......................... list all firewall rules"
-        echo "-t|--status ........................ output firewall status log"
+	echo "usage apf [OPTION]"
+	echo "-s|--start ......................... load all firewall rules"
+	echo "-r|--restart ....................... stop (flush) & reload firewall rules"
+	echo "-f|--stop|--flush .................. stop (flush) all firewall rules"
+	echo "-l|--list .......................... list all firewall rules"
+	echo "-t|--status ........................ output firewall status log"
 	echo "-e|--refresh ....................... refresh & resolve dns names in trust rules"
-        echo "-a HOST CMT|--allow HOST COMMENT ... add host (IP/IPv6/CIDR/FQDN) to"
-        echo "                                     allow_hosts.rules and immediately"
-        echo "                                     load new rule into firewall"
-        echo "-d HOST CMT|--deny HOST COMMENT .... add host (IP/IPv6/CIDR/FQDN) to"
-        echo "                                     deny_hosts.rules and immediately"
-        echo "                                     load new rule into firewall"
-	echo "-u|--remove HOST ................... remove host from [glob]*_hosts.rules"
+	echo "-a HOST CMT|--allow HOST COMMENT ... add host (IP/IPv6/CIDR/FQDN) to"
+	echo "                                     allow_hosts.rules and immediately"
+	echo "                                     load new rule into firewall"
+	echo "-d HOST CMT|--deny HOST COMMENT .... add host (IP/IPv6/CIDR/FQDN) to"
+	echo "                                     deny_hosts.rules and immediately"
+	echo "                                     load new rule into firewall"
+	echo "-u|--remove|--unban HOST ........... remove host from [glob]*_hosts.rules"
 	echo "                                     and immediately remove rule from firewall"
 	echo "-o|--ovars ......................... output all configuration options"
 	echo "-v|--version ....................... output version number"
-	echo "--ipset-update ..................... hot-reload ipset block lists"
-	echo "--gre-up .......................... bring up GRE tunnels from gre.rules"
-	echo "--gre-down ........................ tear down GRE tunnels"
-	echo "--gre-status ...................... show GRE tunnel status"
+	echo "--ipset-update ..................... hot-reload ipset block lists from ipset.rules"
+	echo "--gre-up ........................... bring up GRE tunnels from gre.rules"
+	echo "--gre-down ......................... tear down GRE tunnels"
+	echo "--gre-status ....................... show GRE tunnel status"
 }
 
 tosroute() {
@@ -1155,6 +1155,38 @@ if [ -n "$(grep -v "#" "$ECNSHAME_HOSTS")" ]; then
 fi
 }
 
+ipset_migrate_rules() {
+local ipset_rules="$INSTALL_PATH/ipset.rules"
+[ -f "$ipset_rules" ] || return 0
+local migrated=0
+local tmp
+tmp=$(mktemp "$INSTALL_PATH/.apf-XXXXXX")
+while IFS= read -r line; do
+	case "$line" in
+		\#*|"")
+			printf '%s\n' "$line" >> "$tmp"
+			continue
+			;;
+	esac
+	local f1 f2 f3 f4 f5
+	IFS=: read -r f1 f2 f3 f4 f5 <<< "$line"
+	if [ -n "$f4" ] && [ "$f4" != "0" ] && [ "$f4" != "1" ]; then
+		# Old 4-field format — reconstruct file_or_url and insert log=0
+		local orig_path="$f4"
+		[ -n "$f5" ] && orig_path="${f4}:${f5}"
+		printf '%s\n' "${f1}:${f2}:${f3}:0:${orig_path}" >> "$tmp"
+		migrated=$((migrated + 1))
+	else
+		printf '%s\n' "$line" >> "$tmp"
+	fi
+done < "$ipset_rules"
+if [ "$migrated" -gt 0 ]; then
+	cp "$tmp" "$ipset_rules"
+	eout "{ipset} migrated $migrated legacy entries in ipset.rules (added log field)"
+fi
+rm -f "$tmp"
+}
+
 ipset_load() {
 if [ "$USE_IPSET" != "1" ] || [ -z "$IPSET" ]; then
 	return
@@ -1163,6 +1195,7 @@ local ipset_rules="$INSTALL_PATH/ipset.rules"
 if [ ! -f "$ipset_rules" ]; then
 	return
 fi
+ipset_migrate_rules
 eout "{ipset} loading ipset block lists"
 while IFS= read -r line; do
 	# Skip comments and blank lines

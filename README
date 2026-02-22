@@ -1,20 +1,11 @@
 Advanced Policy Firewall (APF) v2.0.2
     (C) 2002-2026, R-fx Networks <proj@rfxn.com>
     (C) 2026, Ryan MacDonald <ryan@rfxn.com>
+    Licensed under GNU GPL v2 — see COPYING.GPL for details
 
-    This program is free software; you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation; either version 2 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program; if not, write to the Free Software
-    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+iptables/netfilter-based firewall management for Linux servers — stateful
+packet filtering, trust-based host management, reactive address blocking,
+and per-IP virtual network policies.
 
 Contents:
 1 ............. Introduction
@@ -33,12 +24,32 @@ Contents:
 3.9 ........... Configuration: Remote Block Lists
 3.10 .......... Configuration: Logging & Control
 3.11 .......... Configuration: Implicit Blocking
+3.12 .......... Configuration: Firewall Order of Operations
 4 ............. General Usage
 4.1 ........... General Usage: Trust System
 4.2 ........... General Usage: Global Trust System
 4.3 ........... General Usage: Advanced Trust Syntax
 5 ............. License
 6 ............. Support Information
+
+Quick Start:
+
+  # Install
+  sh install.sh
+
+  # Configure — edit ports, interfaces, options
+  vi /etc/apf/conf.apf
+
+  # Start (DEVEL_MODE auto-flushes every 5 min until disabled)
+  apf -s
+
+  # Trust/deny hosts on the fly
+  apf -a 10.0.0.5 "office gateway"
+  apf -d 192.168.3.111 "brute force attempts"
+
+  # Disable dev mode for persistent operation
+  sed -i 's/DEVEL_MODE="1"/DEVEL_MODE="0"/' /etc/apf/conf.apf
+  apf -r
 
 1) Introduction:
 Advanced Policy Firewall (APF) is an iptables(netfilter) based firewall system
@@ -72,86 +83,36 @@ and Internet standards. Forged source addresses are discarded, malformed packets
 from broken routers are dropped or replied to with TCP Reset.
 
 For a detailed description of all APF features, review conf.apf (under your
-install path) which has well outlined captions above all options. Below is a
-point form summary of most APF features:
+install path) which has well outlined captions above all options.
 
-- detailed and well commented configuration file
-- granular inbound and outbound network filtering
-- user id based outbound network filtering
-- application based network filtering
-- trust based rule files with an optional advanced syntax
-- global trust system where rules can be downloaded from a central management
-  server
-- reactive address blocking (RAB), in-line intrusion prevention with automatic
-  address blocking on sanity violations and port scan detection
-- debug mode provided for testing new features and configuration setups
-- fast load feature that allows for 1000+ rules to load in under 1 second
-- inbound and outbound network interfaces can be independently configured
-- global tcp/udp port & icmp type filtering with multiple methods of executing
-  filters (drop, reject, prohibit)
-- configurable policies for each ip on the system with convenience variables to
-  import settings
-- packet flow rate limiting that prevents abuse on the most widely abused
-  protocol, icmp
-- prerouting and postrouting rules for optimal network performance
-- dshield.org block list support to ban networks exhibiting suspicious activity
-- spamhaus Don't Route Or Peer List support to ban known "hijacked zombie" IP
-  blocks
-- any number of additional interfaces may be configured as firewalled
-  (untrusted) or trusted (not firewalled)
-- additional firewalled interfaces can have their own unique firewall policies
-  applied
-- intelligent route verification to prevent embarrassing configuration errors
-- advanced packet sanity checks to make sure traffic coming and going meets
-  the strictest of standards
-- filter attacks such as fragmented UDP, port zero floods, stuffed routing,
-  arp poisoning and more
-- configurable type of service options to dictate the priority of different types
-  of network traffic
-- intelligent default settings to meet every day server setups
-- dynamic configuration of your servers local DNS resolvers into the firewall
-- optional filtering of common p2p applications
-- optional filtering of private & reserved IP address space
-- optional implicit blocks of the ident service
-- configurable connection tracking settings to scale the firewall to the size of
-  your network
-- configurable kernel hooks (ties) to harden the system further to syn-flood
-  attacks & routing abuses
-- advanced network control such as explicit congestion notification and overflow
-  control
-- special chains that are aware of the state of FTP DATA and SSH connections to
-  prevent client side issues
-- control over the rate of logged events, want only 30 filter events a minute?
-  300 a minute? - you are the boss
-- logging subsystem that allows for logging data to user space programs or
-  standard syslog files
-- logging that details every rule added and a comprehensive set of error checks
-  to prevent config errors
-- if you are familiar with netfilter you can create your own rules in any of
-  the policy files
-- pluggable and ready advanced use of QoS algorithms provided by the Linux
-  kernel
-- IPv6 dual-stack support: automatic ip6tables rules alongside iptables when
-  USE_IPV6 is enabled, including ICMPv6 filtering and NDP
-- input validation on all trust system entries (IPv4, IPv6, CIDR, FQDN)
-- nft backend detection with safe fast load across iptables backend changes
-- Docker/container compatibility mode for coexistence with Docker, Podman,
-  Kubernetes, and containerd without destroying external chains
-- ipset block list support for kernel-level high-performance IP matching with
-  O(1) lookup; one iptables rule per list instead of one rule per IP
-- GRE tunnel management with dedicated chains, protocol 47 rules, lifecycle
-  controls (--gre-up/--gre-down/--gre-status), and persist-across-flush support
-- automatic dependency checking at startup with OS-aware install hints for
-  missing packages (apt-get, yum, dnf)
-- ICMPv6 type filtering (IG_ICMPV6_TYPES/EG_ICMPV6_TYPES) with automatic NDP
-  protection for types 133-136
-- per-port concurrent connection limiting via xt_connlimit module; configurable
-  port:limit pairs for TCP and UDP with VNET per-IP override support
-- adaptive connection tracking scaling that auto-grows conntrack_max when usage
-  exceeds 80%, with configurable ceiling and hash table sizing
-- IPv6 sysctl hardening: disables accept_source_route, accept_redirects, and
-  accept_ra when USE_IPV6=1
-- systemd service unit for modern init management
+Filtering & Rules:
+- granular inbound/outbound TCP/UDP/ICMP/ICMPv6 port filtering
+- IPv6 dual-stack support with automatic ip6tables rules
+- per-port concurrent connection limiting (connlimit)
+- user/application-based outbound filtering (uid-owner, cmd-owner)
+- packet sanity checks (forged sources, malformed flags, fragments)
+- Type of Service (TOS) traffic prioritization
+
+Trust System:
+- allow/deny host management (IPv4, IPv6, CIDR, FQDN)
+- advanced trust syntax (proto:flow:port:ip)
+- global trust with central server download
+- auto-expire and trim for deny lists
+
+Blocking & Prevention:
+- reactive address blocking (RAB) with port scan detection
+- remote block lists (Spamhaus, DShield, Project Honey Pot)
+- ipset kernel-level block lists with O(1) lookup
+- implicit blocking (P2P, private/reserved space, ident)
+
+Infrastructure:
+- virtual network (VNET) per-IP policies
+- GRE tunnel management with dedicated chains
+- Docker/container compatibility mode
+- fast load snapshots with nft backend detection
+- kernel tuning via sysctl (conntrack, syn-flood, routing)
+- systemd service unit and legacy init support
+- automatic dependency checking with OS-aware install hints
 
 1.1) Introduction: Supported Systems & Requirements
 The APF package is designed to run on Linux based operating systems that have
@@ -636,14 +597,56 @@ patterns without explicit port rules. These apply globally to all interfaces:
   BLK_IDENT          - REJECT ident (TCP 113) requests instead of silently
                         dropping; some services stall without ident response
 
+3.12) Configuration: Firewall Order of Operations
+When APF starts ('apf -s'), rules are loaded in a specific order that
+determines how packets are evaluated. Understanding this order is essential
+for troubleshooting and for knowing which features take precedence.
+
+INPUT chain evaluation order (first match wins):
+
+  #   Rule                                     Action
+  --- ---------------------------------------- ----------
+   1  TCP SACK Panic (MSS 1-500)               DROP
+   2  Loopback interface                        ACCEPT
+   3  Trusted interfaces (IFACE_TRUSTED)        ACCEPT
+   4  GRE tunnel chains                         per-tunnel
+   5  TALLOW (local allow list)                 ACCEPT
+   6  TGALLOW (global allow list)               ACCEPT
+   7  TDENY (local deny list)                   DROP
+   8  TGDENY (global deny list)                 DROP
+   9  Remote block lists (PHP, DShield, etc.)   DROP
+  10  ipset block lists                         DROP
+  11  Common drop ports (BLK_PORTS)             DROP
+  12  Packet sanity checks                      DROP
+  13  IDENT / Multicast / P2P blocking          REJECT/DROP
+  14  RAB trip and portscan rules               DROP
+  15  VNET per-IP port rules                    ACCEPT
+  16  Connlimit (per-port connection limits)    REJECT
+  17  Inbound TCP/UDP port ACCEPT               ACCEPT
+  18  ICMP / ICMPv6 / NDP                       ACCEPT
+  19  State tracking (ESTABLISHED,RELATED)      ACCEPT
+  20  DNS, FTP, SSH, Traceroute helpers         ACCEPT
+  21  Log (rate-limited)                        LOG
+  22  Default DROP (tcp, udp, all)              DROP
+
+Key precedence rules:
+  - Trusted interfaces bypass all filtering
+  - Allow lists are evaluated before deny lists
+  - Block lists and deny lists are evaluated before port ACCEPT rules
+  - Connlimit REJECT runs before port ACCEPT
+  - VNET per-IP rules override global port configuration
+
+For the complete step-by-step initialization flow with source file
+references, see the FLOW document.
+
 4) General Usage:
 The /usr/local/sbin/apf command has a number of options that will ease the
 day-to-day use of your firewall. Here is a quick snap-shot of the options:
 
-usage /usr/local/sbin/apf [OPTION]
+usage apf [OPTION]
 -s|--start ......................... load all firewall rules
 -r|--restart ....................... stop (flush) & reload firewall rules
--f|--stop .......................... stop (flush) all firewall rules
+-f|--stop|--flush .................. stop (flush) all firewall rules
 -l|--list .......................... list all firewall rules
 -t|--status ........................ output firewall status log
 -e|--refresh ....................... refresh & resolve dns names in trust rules
@@ -653,16 +656,14 @@ usage /usr/local/sbin/apf [OPTION]
 -d HOST CMT|--deny HOST COMMENT .... add host (IP/IPv6/CIDR/FQDN) to
                                      deny_hosts.rules and immediately
                                      load new rule into firewall
--u|--remove HOST ................... remove host from [glob]*_hosts.rules
+-u|--remove|--unban HOST ........... remove host from [glob]*_hosts.rules
                                      and immediately remove rule from firewall
 -o|--ovars ......................... output all configuration options
 -v|--version ....................... output version number
 --ipset-update ..................... hot-reload ipset block lists from ipset.rules
---gre-up .......................... bring up GRE tunnels from gre.rules
---gre-down ........................ tear down GRE tunnels
---gre-status ...................... show GRE tunnel status
-
-Note: --unban is accepted as an alias for -u|--remove.
+--gre-up ........................... bring up GRE tunnels from gre.rules
+--gre-down ......................... tear down GRE tunnels
+--gre-status ....................... show GRE tunnel status
 
 The -l|--list option shows all loaded iptables rules. The -t|--status option
 pages through the APF status log at /var/log/apf_log.
