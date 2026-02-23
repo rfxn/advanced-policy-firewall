@@ -1,5 +1,11 @@
 - 2.0.2 | Feb 22 2026:
 
+[New] SMTP outbound blocking: SMTP_BLOCK restricts outbound SMTP (ports
+      25, 465, 587) to whitelisted users and groups; root always allowed;
+      SMTP_ALLOWUSER for per-user exemptions, SMTP_ALLOWGROUP for per-group
+      exemptions via --gid-owner with runtime detection; works independently
+      of EGF outbound filtering toggle; includes panel-specific examples for
+      InterWorx, cPanel, and Plesk (conf.apf, cports.common, .ca.def)
 [New] README/README.md: add section 4.4 Temporary Trust Entries documenting
       -ta, -td, --templ, --tempf CLI options, TTL syntax formats, automatic
       expiry behavior, and cron configuration; add temp trust commands to

@@ -157,3 +157,53 @@ if [ "$EGF" == "1" ]; then
 	fi
  fi
 fi
+
+# SMTP outbound blocking — independent of EGF
+if [ "$SMTP_BLOCK" == "1" ]; then
+ if [ -n "$SMTP_PORTS" ]; then
+	ipt -N SMTP_BLK
+
+	# Root (UID 0) always allowed
+	ipt -A SMTP_BLK -p tcp -m multiport --dports $SMTP_PORTS \
+	    -m owner --uid-owner 0 -j ACCEPT
+	eout "{smtp_blk} allowing outbound SMTP for root"
+
+	# Allowed users
+	if [ -n "$SMTP_ALLOWUSER" ]; then
+	for u in ${SMTP_ALLOWUSER//,/ }; do
+		ipt -A SMTP_BLK -p tcp -m multiport --dports $SMTP_PORTS \
+		    -m owner --uid-owner $u -j ACCEPT
+		eout "{smtp_blk} allowing outbound SMTP for user $u"
+	done
+	fi
+
+	# Allowed groups (runtime detection)
+	if [ -n "$SMTP_ALLOWGROUP" ]; then
+	 if ipt4 -N _SGID_TEST >> /dev/null 2>&1 && \
+	    ipt4 -A _SGID_TEST -m owner --gid-owner 0 -j DROP >> /dev/null 2>&1; then
+		ipt4 -F _SGID_TEST >> /dev/null 2>&1
+		ipt4 -X _SGID_TEST >> /dev/null 2>&1
+		for g in ${SMTP_ALLOWGROUP//,/ }; do
+			ipt -A SMTP_BLK -p tcp -m multiport --dports $SMTP_PORTS \
+			    -m owner --gid-owner $g -j ACCEPT
+			eout "{smtp_blk} allowing outbound SMTP for group $g"
+		done
+	 else
+		ipt4 -F _SGID_TEST >> /dev/null 2>&1
+		ipt4 -X _SGID_TEST >> /dev/null 2>&1
+		eout "{smtp_blk} WARNING: SMTP_ALLOWGROUP set but --gid-owner not supported; skipping group rules"
+	 fi
+	fi
+
+	# Log + block everyone else
+	if [ "$LOG_DROP" == "1" ]; then
+		ipt -A SMTP_BLK -p tcp -m multiport --dports $SMTP_PORTS \
+		    -m limit --limit $LOG_RATE/minute \
+		    -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** SMTP_BLK ** "
+	fi
+	ipt -A SMTP_BLK -p tcp -m multiport --dports $SMTP_PORTS -j $TCP_STOP
+
+	ipt -A OUTPUT -j SMTP_BLK
+	eout "{smtp_blk} SMTP outbound blocking active on ports $SMTP_PORTS"
+ fi
+fi

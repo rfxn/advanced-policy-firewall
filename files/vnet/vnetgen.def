@@ -18,6 +18,9 @@ VNET="$addr"
 # EG_ICMP_TYPES="all"
 # EG_TCP_UID="0:22"
 # EG_UDP_UID="0:53"
+# SMTP_BLOCK="1"
+# SMTP_ALLOWUSER="cpanel"
+# SMTP_ALLOWGROUP="mail"
 #
 # Or you can define standard iptables rules such as:
 # \$IPT -A INPUT -p tcp -s 192.0.2.1 -d \$VNET --dport 10024 -j ACCEPT

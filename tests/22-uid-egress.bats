@@ -44,6 +44,16 @@ setup_file() {
         iptables -X _CMD_TEST 2>/dev/null
     fi
     export _CMD_OWNER_OK
+
+    # Detect --gid-owner support
+    _GID_OWNER_OK=""
+    if iptables -N _GID_TEST 2>/dev/null && \
+       iptables -A _GID_TEST -m owner --gid-owner 0 -j DROP 2>/dev/null; then
+        _GID_OWNER_OK=1
+    fi
+    iptables -F _GID_TEST 2>/dev/null
+    iptables -X _GID_TEST 2>/dev/null
+    export _GID_OWNER_OK
 }
 
 teardown_file() {
@@ -167,4 +177,102 @@ teardown_file() {
     "$APF" -s
 
     assert_chain_not_exists DEG
+}
+
+# =====================================================================
+# SMTP_BLOCK tests
+# =====================================================================
+
+@test "SMTP_BLOCK=0 produces no SMTP_BLK chain" {
+    source /opt/tests/helpers/apf-config.sh
+    apf_set_config "SMTP_BLOCK" "0"
+    "$APF" -f 2>/dev/null
+    "$APF" -s
+
+    assert_chain_not_exists SMTP_BLK
+}
+
+@test "SMTP_BLOCK=1 creates SMTP_BLK chain" {
+    [ -n "$_UID_OWNER_OK" ] || skip "--uid-owner not supported"
+    source /opt/tests/helpers/apf-config.sh
+    apf_set_config "SMTP_BLOCK" "1"
+    "$APF" -f 2>/dev/null
+    "$APF" -s
+
+    assert_chain_exists SMTP_BLK
+    # OUTPUT should jump to SMTP_BLK
+    assert_rule_exists_ips OUTPUT "-j SMTP_BLK"
+}
+
+@test "SMTP_BLK allows root (UID 0)" {
+    [ -n "$_UID_OWNER_OK" ] || skip "--uid-owner not supported"
+    source /opt/tests/helpers/apf-config.sh
+    apf_set_config "SMTP_BLOCK" "1"
+    "$APF" -f 2>/dev/null
+    "$APF" -s
+
+    assert_rule_exists_ips SMTP_BLK "-p tcp.*--dports 25,465,587.*--uid-owner [0r].*ACCEPT"
+}
+
+@test "SMTP_ALLOWUSER allows listed user" {
+    [ -n "$_UID_OWNER_OK" ] || skip "--uid-owner not supported"
+    source /opt/tests/helpers/apf-config.sh
+    apf_set_config "SMTP_BLOCK" "1"
+    apf_set_config "SMTP_ALLOWUSER" "nobody"
+    "$APF" -f 2>/dev/null
+    "$APF" -s
+
+    assert_rule_exists_ips SMTP_BLK "--uid-owner nobody.*ACCEPT"
+}
+
+@test "SMTP_ALLOWGROUP allows listed group" {
+    [ -n "$_UID_OWNER_OK" ] || skip "--uid-owner not supported"
+    [ -n "$_GID_OWNER_OK" ] || skip "--gid-owner not supported"
+    source /opt/tests/helpers/apf-config.sh
+    apf_set_config "SMTP_BLOCK" "1"
+    apf_set_config "SMTP_ALLOWGROUP" "mail"
+    "$APF" -f 2>/dev/null
+    "$APF" -s
+
+    assert_rule_exists_ips SMTP_BLK "--gid-owner mail.*ACCEPT"
+}
+
+@test "SMTP_BLK has DROP/REJECT rule at end" {
+    [ -n "$_UID_OWNER_OK" ] || skip "--uid-owner not supported"
+    source /opt/tests/helpers/apf-config.sh
+    apf_set_config "SMTP_BLOCK" "1"
+    "$APF" -f 2>/dev/null
+    "$APF" -s
+
+    # Should have a DROP or REJECT rule for SMTP ports
+    run iptables -S SMTP_BLK
+    assert_success
+    echo "$output" | grep -qE -- "--dports 25,465,587 -j (DROP|REJECT)"
+}
+
+@test "SMTP_BLK applies to custom SMTP_PORTS" {
+    [ -n "$_UID_OWNER_OK" ] || skip "--uid-owner not supported"
+    source /opt/tests/helpers/apf-config.sh
+    apf_set_config "SMTP_BLOCK" "1"
+    apf_set_config "SMTP_PORTS" "25,587"
+    "$APF" -f 2>/dev/null
+    "$APF" -s
+
+    assert_rule_exists_ips SMTP_BLK "--dports 25,587"
+    # Should NOT have port 465
+    run iptables -S SMTP_BLK
+    ! echo "$output" | grep -q "465"
+}
+
+@test "SMTP_BLOCK works with EGF=0" {
+    [ -n "$_UID_OWNER_OK" ] || skip "--uid-owner not supported"
+    source /opt/tests/helpers/apf-config.sh
+    apf_set_config "EGF" "0"
+    apf_set_config "SMTP_BLOCK" "1"
+    "$APF" -f 2>/dev/null
+    "$APF" -s
+
+    # SMTP_BLK chain should exist even with EGF=0
+    assert_chain_exists SMTP_BLK
+    assert_rule_exists_ips OUTPUT "-j SMTP_BLK"
 }
