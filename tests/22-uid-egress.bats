@@ -222,7 +222,7 @@ teardown_file() {
     "$APF" -f 2>/dev/null
     "$APF" -s
 
-    assert_rule_exists_ips SMTP_BLK "--uid-owner nobody.*ACCEPT"
+    assert_rule_exists_ips SMTP_BLK "-p tcp.*--dports.*--uid-owner nobody.*ACCEPT"
 }
 
 @test "SMTP_ALLOWGROUP allows listed group" {
@@ -234,7 +234,7 @@ teardown_file() {
     "$APF" -f 2>/dev/null
     "$APF" -s
 
-    assert_rule_exists_ips SMTP_BLK "--gid-owner mail.*ACCEPT"
+    assert_rule_exists_ips SMTP_BLK "-p tcp.*--dports.*--gid-owner mail.*ACCEPT"
 }
 
 @test "SMTP_BLK has DROP/REJECT rule at end" {
@@ -275,4 +275,25 @@ teardown_file() {
     # SMTP_BLK chain should exist even with EGF=0
     assert_chain_exists SMTP_BLK
     assert_rule_exists_ips OUTPUT "-j SMTP_BLK"
+}
+
+@test "SMTP_BLK LOG rule when LOG_DROP=1" {
+    [ -n "$_UID_OWNER_OK" ] || skip "--uid-owner not supported"
+    source /opt/tests/helpers/apf-config.sh
+    apf_set_config "SMTP_BLOCK" "1"
+    apf_set_config "LOG_DROP" "1"
+    "$APF" -f 2>/dev/null
+    "$APF" -s
+
+    assert_rule_exists_ips SMTP_BLK "LOG.*SMTP_BLK"
+}
+
+@test "SMTP_BLOCK=1 with empty SMTP_PORTS produces no chain" {
+    source /opt/tests/helpers/apf-config.sh
+    apf_set_config "SMTP_BLOCK" "1"
+    apf_set_config "SMTP_PORTS" ""
+    "$APF" -f 2>/dev/null
+    "$APF" -s
+
+    assert_chain_not_exists SMTP_BLK
 }

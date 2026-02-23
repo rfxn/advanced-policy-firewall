@@ -627,7 +627,7 @@ flush_apf_chains() {
 	# Remove jumps from INPUT/OUTPUT to APF chains before deleting them
 	local apf_chains="TALLOW TDENY TGALLOW TGDENY REFRESH_TEMP
 		RESET PROHIBIT RABPSCAN TELNET_LOG SSH_LOG
-		IDENT P2P DEG IN_SANITY OUT_SANITY FRAG_UDP
+		IDENT P2P DEG SMTP_BLK IN_SANITY OUT_SANITY FRAG_UDP
 		PZERO MCAST LMAC PHP DSHIELD SDROP"
 	for chain in $apf_chains; do
 		if $IPT $IPT_FLAGS -L "$chain" -n >/dev/null 2>&1; then
@@ -640,7 +640,7 @@ flush_apf_chains() {
 	if [ "$USE_IPV6" == "1" ]; then
 		local apf_chains6="TALLOW TDENY TGALLOW TGDENY REFRESH_TEMP
 			RESET PROHIBIT RABPSCAN TELNET_LOG SSH_LOG
-			IDENT P2P PHP DSHIELD SDROP IN_SANITY6 OUT_SANITY6
+			IDENT P2P PHP DSHIELD SDROP SMTP_BLK IN_SANITY6 OUT_SANITY6
 			FRAG_UDP6 PZERO6 MCAST6"
 		for chain in $apf_chains6; do
 			if $IP6T $IPT_FLAGS -L "$chain" -n >/dev/null 2>&1; then

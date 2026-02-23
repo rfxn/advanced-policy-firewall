@@ -6,6 +6,11 @@
       exemptions via --gid-owner with runtime detection; works independently
       of EGF outbound filtering toggle; includes panel-specific examples for
       InterWorx, cPanel, and Plesk (conf.apf, cports.common, .ca.def)
+[Fix] SMTP_BLK chain added to Docker compat flush chain list (IPv4 and
+      IPv6); prevents orphaned chain on DOCKER_COMPAT=1 flush/restart
+      (functions.apf)
+[Fix] SMTP_BLOCK=1 with empty SMTP_PORTS now logs warning instead of
+      silently doing nothing (cports.common)
 [New] README/README.md: add section 4.4 Temporary Trust Entries documenting
       -ta, -td, --templ, --tempf CLI options, TTL syntax formats, automatic
       expiry behavior, and cron configuration; add temp trust commands to
