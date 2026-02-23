@@ -30,6 +30,8 @@ cp -f "$INSTALL_PATH.bk.last"/gre.rules "$INSTALL_PATH/" 2>/dev/null || true
 cp -pf "$INSTALL_PATH.bk.last"/hook_pre.sh "$INSTALL_PATH/" 2>/dev/null || true
 cp -pf "$INSTALL_PATH.bk.last"/hook_post.sh "$INSTALL_PATH/" 2>/dev/null || true
 cp -f "$INSTALL_PATH.bk.last"/silent_ips.rules "$INSTALL_PATH/" 2>/dev/null || true
+cp -f "$INSTALL_PATH.bk.last"/preroute.rules "$INSTALL_PATH/" 2>/dev/null || true
+cp -f "$INSTALL_PATH.bk.last"/postroute.rules "$INSTALL_PATH/" 2>/dev/null || true
 
 OV=$(awk '{print$2}' "$INSTALL_PATH.bk.last/VERSION")
 NV=$(awk '{print$2}' "$INSTALL_PATH/VERSION")

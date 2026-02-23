@@ -1,5 +1,40 @@
-- 2.0.2 | Feb 22 2026:
+- 2.0.2 | Feb 23 2026:
 
+[Fix] glob_allow_download()/glob_deny_download(): validate downloaded entries
+      with valid_host() instead of raw file copy; matches dlist_download()
+      pattern (functions.apf)
+[Fix] expirebans(): replace unquoted array expansion with IFS read to prevent
+      globbing; add date parse error handling (functions.apf)
+[Fix] escape dots in IP addresses used in sed patterns across cli_trust_remove(),
+      expirebans(), and expire_temp_entries() (functions.apf)
+[Fix] importconf: preserve preroute.rules and postroute.rules during upgrade;
+      custom ToS/routing rules were silently lost (importconf)
+[Fix] add ip6tables_available() skip guards to IPv6 connlimit and synflood
+      tests; fixes CI failures on platforms without ip6tables kernel module
+      (25-connlimit.bats, 28-synflood.bats)
+[Fix] ipset_migrate_rules(): add 5-field (v2.0.1) to 7-field migration;
+      5-field entries were silently dropped on upgrade (functions.apf)
+[Fix] revert Bash 4.2+ ${var,,}/${var^^} to tr-based case conversion for
+      CentOS 6 (Bash 4.1) compatibility (cports.common, internals.conf)
+[Fix] expirebans(): add local declarations; $ip loop variable shadowed
+      global iproute2 binary path after refresh (functions.apf)
+[Fix] lgate_mac(): use $VF_LGATE instead of undefined $LGATE_MAC; gateway
+      MAC filtering was non-functional (functions.apf)
+[New] test suite parallelization: --parallel [N] flag splits test files across
+      N parallel Docker containers using round-robin distribution; default N is
+      nproc*2; 3x speedup for single-OS runs (run-tests.sh, Makefile)
+[New] test-serial Makefile target preserving old sequential behavior (Makefile)
+[Fix] Dockerfile .clean state: add missing hook_pre.sh, hook_post.sh, and
+      silent_ips.rules .clean files needed for parallel container isolation
+      (all 10 Dockerfiles)
+[Fix] restore_bins() in 16-dependency-check.bats: use -L symlink check for
+      merged-usr compatibility; dangling symlinks on Debian 12+ caused stale
+      hidden binaries and failed teardown cleanup (16-dependency-check.bats)
+[Fix] help(): search description now mentions ipset alongside iptables to
+      reflect actual search() scope (functions.apf)
+[Fix] silent_ips.rules: add valid_host() check before ipt_for_host() to
+      skip invalid entries with WARNING instead of passing to iptables
+      (firewall)
 [New] SYN flood protection: SYNFLOOD rate-limits inbound TCP SYN packets
       via iptables limit module; SYNFLOOD_RATE for packets/unit threshold,
       SYNFLOOD_BURST for initial burst allowance; dedicated SYNFLOOD chain
@@ -113,21 +148,15 @@
       and rewrites them to 7-field format with defaults; handles both local
       paths and URLs with embedded colons; runs idempotently at each firewall
       start before ipset_load() parsing (functions.apf)
-[Change] README: modernize header with tagline and condensed copyright;
-      collapse GPL boilerplate to single-line reference (README)
-[New] README: add Quick Start section with install, configure, start,
-      trust/deny, and dev-mode-disable examples (README)
-[Change] README: reorganize 48-bullet feature list into 4 categorized
-      groups (Filtering & Rules, Trust System, Blocking & Prevention,
-      Infrastructure) with ~20 concise items (README)
-[Change] README.md: modernize header with version/license/CI badges and
-      one-line project tagline; collapse copyright to single line; remove
-      plain-text-version link (README.md)
-[New] README.md: add Quick Start section with install, configure, start,
-      trust/deny, and dev-mode-disable examples (README.md)
-[Change] README.md: reorganize 48-bullet feature list into 4 categorized
-      groups (Filtering & Rules, Trust System, Blocking & Prevention,
-      Infrastructure) with ~20 concise items (README.md)
+[Change] README/README.md: modernize headers with tagline and condensed
+      copyright; collapse GPL boilerplate to single-line reference; README.md
+      adds version/license/CI badges and removes plain-text-version link
+      (README, README.md)
+[New] README/README.md: add Quick Start section with install, configure,
+      start, trust/deny, and dev-mode-disable examples (README, README.md)
+[Change] README/README.md: reorganize 48-bullet feature list into 4
+      categorized groups (Filtering & Rules, Trust System, Blocking &
+      Prevention, Infrastructure) with ~20 concise items (README, README.md)
 [Change] help(): show all accepted CLI aliases (--flush, --unban), add
       "from ipset.rules" to --ipset-update, normalize dot-leader alignment
       and indentation; usage line changed from "$0" to "apf"
@@ -239,7 +268,6 @@
 [Change] Remove useless cat: cat file | grep → grep file across 10 sites;
       cat|grep|awk → awk in install.sh VERSION parsing; eliminates 1 fork+exec
       per invocation (install.sh, firewall, functions.apf)
-[Change] Remove redundant $(echo $var) wrappers in DNS for-loops (firewall)
 [New] 21-refactor-regression.bats: 23 targeted regression tests validating
       Phase 1-7 refactoring behavioral correctness; covers _icmp_filter()
       'all' keyword, rate limiting, empty types, uppercase handling; port

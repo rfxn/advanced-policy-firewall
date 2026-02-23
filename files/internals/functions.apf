@@ -436,7 +436,8 @@ cli_trust_remove() {
         $IPT_H $IPT_FLAGS -D TGDENY -s $DIP -j $ALL_STOP
         $IPT_H $IPT_FLAGS -D TGDENY -d $DIP -j $ALL_STOP
 
-	sed -i "\%^$DIP\b%d" "$ALLOW_HOSTS" "$DENY_HOSTS" "$GALLOW_HOSTS" "$GDENY_HOSTS"
+	local escaped_ip="${DIP//./\\.}"
+	sed -i "\%^${escaped_ip}\b%d" "$ALLOW_HOSTS" "$DENY_HOSTS" "$GALLOW_HOSTS" "$GDENY_HOSTS"
 
 	# Clean remaining rules from INPUT/OUTPUT (reverse order to preserve line numbers)
 	dil=$($IPT_H $IPT_FLAGS --numeric --list INPUT --line-numbers | grep -w "$DIP" | tac | awk '{print$1}')
@@ -790,7 +791,7 @@ help() {
 	echo "                                     load new rule into firewall"
 	echo "-u|--remove|--unban HOST ........... remove host from [glob]*_hosts.rules"
 	echo "                                     and immediately remove rule from firewall"
-	echo "-g|--search PATTERN ................ search iptables rules and trust files"
+	echo "-g|--search PATTERN ................ search iptables/ipset rules and trust files"
 	echo "-ta HOST TTL [CMT]|--temp-allow .... temporarily allow host with TTL"
 	echo "                                     (TTL: seconds, or 5m, 1h, 7d)"
 	echo "-td HOST TTL [CMT]|--temp-deny ..... temporarily deny host with TTL"
@@ -1329,6 +1330,13 @@ while IFS= read -r line; do
 		[ -n "$f7" ] && orig_path="${orig_path}:${f7}"
 		printf '%s\n' "${f1}:${f2}:${f3}:0:0:0:${orig_path}" >> "$tmp"
 		migrated=$((migrated + 1))
+	elif [ -n "$f5" ] && ! [[ "$f5" =~ ^[0-9]+$ ]]; then
+		# v2.0.1 5-field format — f4 is log flag, f5 starts file_or_url
+		local orig_path="$f5"
+		[ -n "$f6" ] && orig_path="${orig_path}:${f6}"
+		[ -n "$f7" ] && orig_path="${orig_path}:${f7}"
+		printf '%s\n' "${f1}:${f2}:${f3}:${f4}:0:0:${orig_path}" >> "$tmp"
+		migrated=$((migrated + 1))
 	else
 		printf '%s\n' "$line" >> "$tmp"
 	fi
@@ -1649,7 +1657,15 @@ if [ -n "$GA_URL" ] && [ "$USE_RGT" == "1" ] && [ -f "$WGET" ]; then
    $WGET -t 1 -T 4 "$GA_URL" >> /dev/null 2>&1
    if [ $? -eq 0 ] && [ -f "$URL_TMP/$URL_FILE" ]; then
         eout "{trust} parsing $URL_FILE into $GALLOW_HOSTS"
-        cat "$URL_TMP/$URL_FILE" > "$GALLOW_HOSTS"
+        local _entry
+        :> "$GALLOW_HOSTS"
+        while IFS= read -r _entry; do
+            case "$_entry" in \#*|"") continue ;; esac
+            read -r _entry _ <<< "$_entry"
+            if [ -n "$_entry" ] && valid_host "$_entry"; then
+                echo "$_entry" >> "$GALLOW_HOSTS"
+            fi
+        done < "$URL_TMP/$URL_FILE"
    else
         eout "{trust} download of $GA_URL failed"
    fi
@@ -1671,7 +1687,15 @@ if [ -n "$GD_URL" ] && [ "$USE_RGT" == "1" ] && [ -f "$WGET" ]; then
    $WGET -t 1 -T 4 "$GD_URL" >> /dev/null 2>&1
    if [ $? -eq 0 ] && [ -f "$URL_TMP/$URL_FILE" ]; then
         eout "{trust} parsing $URL_FILE into $GDENY_HOSTS"
-	cat "$URL_TMP/$URL_FILE" > "$GDENY_HOSTS"
+        local _entry
+        :> "$GDENY_HOSTS"
+        while IFS= read -r _entry; do
+            case "$_entry" in \#*|"") continue ;; esac
+            read -r _entry _ <<< "$_entry"
+            if [ -n "$_entry" ] && valid_host "$_entry"; then
+                echo "$_entry" >> "$GDENY_HOSTS"
+            fi
+        done < "$URL_TMP/$URL_FILE"
    else
         eout "{trust} download of $GD_URL failed"
    fi
@@ -1723,7 +1747,7 @@ fi
 
 lgate_mac() {
 ipt4 -N LMAC
-for mac in ${LGATE_MAC//,/ }; do
+for mac in ${VF_LGATE//,/ }; do
 MAC=$mac
 if [ -n "$MAC" ]; then
   ipt4 -A INPUT  -m mac ! --mac-source "$MAC" -j LMAC
@@ -1757,6 +1781,7 @@ cl_cports() {
 }
 
 expirebans() {
+local i ip date_d date_t ban_time time_diff expire_time check_time REFRESH_TIME
 if [ -z "$SET_EXPIRE" ]; then
         SET_EXPIRE=0
 fi
@@ -1768,17 +1793,15 @@ if [ "$SET_EXPIRE" -ge "60" ]; then
  if [ -f "$INSTALL_PATH/deny_hosts.rules" ]; then
          expire_time="$SET_EXPIRE"
          check_time=$(date +%s)
-         while IFS= read -r i; do
-                declare -a arr
-                arr=($(echo ${i//|/ }))
-                ip=${arr[0]}
-                date_d=${arr[1]}
-                date_t=${arr[2]}
-                ban_time=$(date --date "$date_d $date_t" +%s)
+         while IFS='|' read -r ip date_d date_t; do
+                [ -z "$ip" ] && continue
+                ban_time=$(date --date "$date_d $date_t" +%s 2>/dev/null)
+                [ -z "$ban_time" ] && continue
                 time_diff=$(($check_time-$ban_time))
                 if [ "$time_diff" -ge "$expire_time" ]; then
                         eout "{trust} removed expired ban for $ip (${time_diff}s/${expire_time}s)"
-                        sed -i "\%^$ip\b%d" "$INSTALL_PATH/deny_hosts.rules"
+                        local escaped_ip="${ip//./\\.}"
+                        sed -i "\%^${escaped_ip}\b%d" "$INSTALL_PATH/deny_hosts.rules"
                         cli_trust_remove "$ip" >> /dev/null 2>&1
                 fi
          done < <(grep -vE "static|noexpire|ttl=" "$INSTALL_PATH/deny_hosts.rules" | grep -iE "# added.*on.*" | awk '{print$3"|"$5"|"$6}')
@@ -1797,7 +1820,8 @@ expire_temp_entries() {
 			epoch="${line#*expire=}"
 			epoch="${epoch%% *}"
 			if [ "$current_time" -ge "$epoch" ] 2>/dev/null; then
-				sed -i "\%${ip}.*ttl=.*expire=%d" "$file"
+				local escaped_ip="${ip//./\\.}"
+				sed -i "\%${escaped_ip}.*ttl=.*expire=%d" "$file"
 				cli_trust_remove "$ip" >> /dev/null 2>&1
 				eout "{trust} removed expired temp entry for $ip"
 				count=$(($count + 1))

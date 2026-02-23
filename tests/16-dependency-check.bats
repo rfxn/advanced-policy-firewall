@@ -43,14 +43,18 @@ hide_bin() {
     done
 }
 
-# Restore all hidden binaries
+# Restore all hidden binaries.
+# Uses -e/-L to handle symlinks on merged-usr systems (Debian 12+) where
+# /sbin/ip is a symlink to /bin/ip — when hidden, the symlink dangles and
+# [ -f ] would fail to detect it.
 restore_bins() {
     for bin_path in $HIDDEN_BINS; do
-        if [ -f "${bin_path}.__hidden" ]; then
+        if [ -f "${bin_path}.__hidden" ] || [ -L "${bin_path}.__hidden" ]; then
             mv "${bin_path}.__hidden" "$bin_path"
         fi
     done
     HIDDEN_BINS=""
+    hash -r
 }
 
 teardown() {

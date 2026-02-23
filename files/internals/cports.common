@@ -73,7 +73,7 @@ _icmp_filter() {
 	[ -n "$addr_arg" ] && suffix=" on $VNET"
 	for i in ${types//,/ }; do
 		[ -z "$i" ] && continue
-		i="${i,,}"
+		i=$(echo "$i" | tr '[:upper:]' '[:lower:]')
 		if [ "$i" == "all" ]; then
 			$ipt_fn -A $chain -p $proto $addr_arg $eargs -j ACCEPT
 			eout "{glob} opening $direction $proto all$suffix"

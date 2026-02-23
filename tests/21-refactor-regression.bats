@@ -23,12 +23,6 @@ apf_set_url() {
     sed -i "s%^${var}=.*%${var}=\"${val}\"%" "$APF_DIR/conf.apf"
 }
 
-# Set config variable using % delimiter (safe for values containing /)
-apf_set_config_safe() {
-    local var="$1" val="$2"
-    sed -i "s%^${var}=.*%${var}=\"${val}\"%" "$APF_DIR/conf.apf"
-}
-
 setup_file() {
     source /opt/tests/helpers/setup-netns.sh
     source /opt/tests/helpers/reset-apf.sh
@@ -486,4 +480,98 @@ EOF
     fi
 
     apf_set_config "DLIST_DSHIELD" "0"
+}
+
+# =====================================================================
+# P0 bug fix regression tests
+# =====================================================================
+
+# Check if xt_mac module is available (needed for lgate_mac)
+mac_module_available() {
+    iptables -A INPUT -m mac --mac-source AA:BB:CC:DD:EE:FF -j DROP 2>/dev/null || return 1
+    iptables -D INPUT -m mac --mac-source AA:BB:CC:DD:EE:FF -j DROP 2>/dev/null
+    return 0
+}
+
+@test "lgate_mac creates LMAC chain with VF_LGATE set" {
+    if ! mac_module_available; then skip "xt_mac module not available"; fi
+    source /opt/tests/helpers/apf-config.sh
+    apf_set_config "VF_LGATE" "AA:BB:CC:DD:EE:FF"
+
+    "$APF" -f 2>/dev/null
+    "$APF" -s
+
+    assert_chain_exists LMAC
+    assert_rule_exists_ips LMAC "REJECT"
+
+    # Cleanup
+    apf_set_config "VF_LGATE" ""
+}
+
+# =====================================================================
+# P1 sed dot-escape and malformed timestamp tests
+# =====================================================================
+
+@test "apf -u escapes dots in sed IP pattern" {
+    source /opt/tests/helpers/apf-config.sh
+    # Add target IP and a similar entry that differs only by dot vs other char
+    echo "192.0.2.70" >> "$APF_DIR/allow_hosts.rules"
+    echo "192X0X2X70" >> "$APF_DIR/allow_hosts.rules"
+
+    "$APF" -f 2>/dev/null
+    "$APF" -s
+    "$APF" -u 192.0.2.70
+
+    # Target should be removed
+    run grep "^192\.0\.2\.70$" "$APF_DIR/allow_hosts.rules"
+    assert_failure
+
+    # Similar entry with X instead of . should be preserved
+    run grep "^192X0X2X70$" "$APF_DIR/allow_hosts.rules"
+    assert_success
+
+    # Cleanup
+    sed -i '/192X0X2X70/d' "$APF_DIR/allow_hosts.rules"
+}
+
+@test "expirebans handles malformed timestamp gracefully" {
+    source /opt/tests/helpers/apf-config.sh
+    apf_set_config "SET_EXPIRE" "60"
+    apf_set_config "SET_REFRESH" "1"
+
+    # Add a valid deny entry with proper format (old date — should expire)
+    echo "198.51.100.90" >> "$APF_DIR/deny_hosts.rules"
+    echo "# added 198.51.100.90 on 2020-01-01 00:00:00" >> "$APF_DIR/deny_hosts.rules"
+
+    # Add a deny entry with malformed timestamp
+    echo "198.51.100.91" >> "$APF_DIR/deny_hosts.rules"
+    echo "# added 198.51.100.91 on BADDATE BADTIME" >> "$APF_DIR/deny_hosts.rules"
+
+    "$APF" -f 2>/dev/null
+    "$APF" -s
+    # Trigger refresh which calls expirebans()
+    run "$APF" -e
+    assert_success
+
+    # The valid old entry (2020) should have been expired (>60s ago)
+    # Use ^ anchor since comment lines still contain the IP
+    run grep "^198.51.100.90" "$APF_DIR/deny_hosts.rules"
+    assert_failure
+
+    # The malformed entry should be preserved (skipped by date parse failure)
+    run grep "^198.51.100.91" "$APF_DIR/deny_hosts.rules"
+    assert_success
+
+    # Cleanup
+    sed -i '/198\.51\.100\.9[01]/d' "$APF_DIR/deny_hosts.rules"
+    apf_set_config "SET_EXPIRE" "0"
+}
+
+@test "no Bash 4.2+ case conversion in shell files" {
+    # Verify no ${var,,} or ${var^^} patterns in installed APF files
+    local pattern='\$\{[a-zA-Z_][a-zA-Z_0-9]*(\^{2}|,{2})\}'
+    run grep -rE "$pattern" "$APF_DIR/apf" "$APF_DIR/firewall" \
+        "$APF_DIR/internals/functions.apf" "$APF_DIR/internals/cports.common" \
+        "$APF_DIR/internals/internals.conf"
+    assert_failure  # grep returns 1 when no match found
 }
