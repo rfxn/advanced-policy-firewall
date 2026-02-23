@@ -104,6 +104,7 @@ For a detailed description of all APF features, review `conf.apf` (under your in
 - Reactive address blocking (RAB) with port scan detection
 - Remote block lists (Spamhaus, DShield, Project Honey Pot)
 - ipset kernel-level block lists with O(1) lookup
+- SYN flood rate limiting (iptables-level, complements kernel sysctl)
 - Implicit blocking (P2P, private/reserved space, ident)
 
 **Infrastructure**
@@ -277,6 +278,16 @@ This section will cover some of the basic configuration options found inside of 
 | `IG_UDP_CLIMIT` | Per-port concurrent connection limit for inbound UDP; same format |
 
 Connections exceeding the limit from a single source IP are rejected. Port ranges use underscore notation. Set empty to disable (default). Connlimit rules are inserted before ACCEPT rules to ensure they take effect. Overridable via VNET per-IP rules.
+
+**SYN flood protection** (via `xt_limit` module):
+
+| Variable | Purpose |
+|----------|---------|
+| `SYNFLOOD` | When `"1"`, rate-limits inbound TCP SYN packets; complements kernel-level protection (`SYSCTL_SYN`, `SYSCTL_SYNCOOKIES`) with iptables enforcement |
+| `SYNFLOOD_RATE` | Maximum SYN packet rate; format is `packets/unit` where unit is `s` (seconds), `m` (minutes), `h` (hours); default `"100/s"` |
+| `SYNFLOOD_BURST` | Initial burst allowance before rate limiting kicks in; allows short traffic spikes without triggering; default `"150"` |
+
+Under-limit SYN packets RETURN for normal processing (port filtering, trust checks, etc.). Excess packets are logged (if `LOG_DROP="1"`) and dropped via `TCP_STOP`. Dual-stack (IPv4 + IPv6 when `USE_IPV6="1"`).
 
 **User/application-based outbound filtering** (requires `EGF="1"`):
 

@@ -107,6 +107,7 @@ Blocking & Prevention:
 - reactive address blocking (RAB) with port scan detection
 - remote block lists (Spamhaus, DShield, Project Honey Pot)
 - ipset kernel-level block lists with O(1) lookup
+- SYN flood rate limiting (iptables-level, complements kernel sysctl)
 - implicit blocking (P2P, private/reserved space, ident)
 
 Infrastructure:
@@ -325,6 +326,20 @@ Connections exceeding the limit from a single source IP are rejected via
 the xt_connlimit module. Port ranges use underscore notation. Set empty to
 disable (default). Connlimit rules are inserted before ACCEPT rules to
 ensure they take effect.
+
+SYN flood protection variables:
+
+  SYNFLOOD       - when "1", rate-limits inbound TCP SYN packets using the
+                   iptables limit module; complements kernel-level protection
+                   (SYSCTL_SYN, SYSCTL_SYNCOOKIES) with iptables enforcement
+  SYNFLOOD_RATE  - maximum SYN packet rate; format is packets/unit where unit
+                   is s (seconds), m (minutes), h (hours); default "100/s"
+  SYNFLOOD_BURST - initial burst allowance before rate limiting kicks in;
+                   allows short traffic spikes without triggering; default "150"
+
+Under-limit SYN packets RETURN for normal processing (port filtering, trust
+checks, etc.). Excess packets are logged (if LOG_DROP="1") and dropped via
+TCP_STOP. Dual-stack (IPv4 + IPv6 when USE_IPV6="1").
 
 User/application-based outbound filtering (requires EGF="1"):
 
