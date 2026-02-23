@@ -18,7 +18,7 @@ VNET="$addr"
 # EG_ICMP_TYPES="all"
 # EG_TCP_UID="0:22"
 # EG_UDP_UID="0:53"
-# SMTP_BLOCK="1"
+# SMTP_BLOCK="1"           (system-wide scope, not per-IP)
 # SMTP_ALLOWUSER="cpanel"
 # SMTP_ALLOWGROUP="mail"
 #

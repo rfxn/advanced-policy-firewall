@@ -503,6 +503,9 @@ EG_DROP_CMD="eggdrop,psybnc,bitchx,BitchX,init,udp.pl"
 # and members of groups listed in SMTP_ALLOWGROUP can send outbound SMTP.
 # All other processes attempting to connect on SMTP ports are blocked.
 # This works independently of EGF (outbound filtering toggle).
+# Note: if EGF=1, ensure SMTP ports (25,465,587) are NOT listed in
+# EG_TCP_CPORTS, as the per-port ACCEPT rule takes precedence over
+# SMTP_BLOCK and would bypass the restriction.
 #
 # This forces web applications and user scripts to use the local MTA
 # (/usr/sbin/sendmail, mail command, etc.) instead of opening direct SMTP

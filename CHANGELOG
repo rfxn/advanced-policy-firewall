@@ -1,5 +1,28 @@
 - 2.0.2 | Feb 22 2026:
 
+[Fix] SMTP_BLK VNET re-sourcing: add chain-exists guard to prevent
+      duplicate rules and OUTPUT jumps when SET_VNET=1 and SMTP_BLOCK=1;
+      cports.common is sourced per bound IP plus main.rules (cports.common)
+[Fix] .ca.def preamble: add missing defaults for SYSCTL_CONNTRACK_ADAPTIVE,
+      _INCREMENT, _HIGH, _BUCKETS; prevents empty values on upgrade from
+      pre-2.0.1 versions (.ca.def)
+[Fix] importconf: cp -f → cp -pf for hook_pre.sh and hook_post.sh;
+      preserves executable permission (chmod 750) across upgrades
+      (importconf, files/extras/importconf)
+[Change] cl_cports(): add SMTP_BLOCK, SMTP_PORTS, SMTP_ALLOWUSER,
+      SMTP_ALLOWGROUP, IG_TCP_CLIMIT, IG_UDP_CLIMIT to variable reset
+      for consistency with VNET per-IP iteration (functions.apf)
+[Change] vnetgen.def: clarify SMTP_BLOCK has system-wide scope, not
+      per-IP, in VNET rule template comments (vnetgen.def)
+[Change] conf.apf: add note that SMTP ports in EG_TCP_CPORTS bypass
+      SMTP_BLOCK when EGF=1 (conf.apf)
+[Fix] help(): --temp-expire dot-leader alignment corrected (functions.apf)
+[Fix] README/README.md: add --temp-expire to CLI usage table; fix
+      --templ/--tempf dot-leader alignment to match help() (README,
+      README.md)
+[New] 22-uid-egress.bats: 3 new tests for IPv6 SMTP_BLK rules, multiple
+      SMTP_ALLOWUSER parsing, and SMTP_BLOCK + EGF conflict (tests)
+[New] 25-connlimit.bats: 1 new test for IPv6 connlimit rules (tests)
 [New] SMTP outbound blocking: SMTP_BLOCK restricts outbound SMTP (ports
       25, 465, 587) to whitelisted users and groups; root always allowed;
       SMTP_ALLOWUSER for per-user exemptions, SMTP_ALLOWGROUP for per-group

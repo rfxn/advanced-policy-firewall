@@ -297,3 +297,47 @@ teardown_file() {
 
     assert_chain_not_exists SMTP_BLK
 }
+
+@test "SMTP_BLK creates IPv6 rules when USE_IPV6=1" {
+    [ -n "$_UID_OWNER_OK" ] || skip "--uid-owner not supported"
+    source /opt/tests/helpers/apf-config.sh
+    apf_set_config "SMTP_BLOCK" "1"
+    apf_set_config "USE_IPV6" "1"
+    "$APF" -f 2>/dev/null
+    "$APF" -s
+
+    # IPv6 SMTP_BLK chain should exist with root ACCEPT and DROP/REJECT
+    assert_rule_exists_ip6s SMTP_BLK "-p tcp.*--dports 25,465,587.*--uid-owner [0r].*ACCEPT"
+    run ip6tables -S SMTP_BLK
+    assert_success
+    echo "$output" | grep -qE -- "--dports 25,465,587 -j (DROP|REJECT)"
+}
+
+@test "SMTP_ALLOWUSER with multiple comma-separated users" {
+    [ -n "$_UID_OWNER_OK" ] || skip "--uid-owner not supported"
+    source /opt/tests/helpers/apf-config.sh
+    apf_set_config "SMTP_BLOCK" "1"
+    apf_set_config "SMTP_ALLOWUSER" "nobody,daemon"
+    "$APF" -f 2>/dev/null
+    "$APF" -s
+
+    assert_rule_exists_ips SMTP_BLK "-p tcp.*--dports.*--uid-owner nobody.*ACCEPT"
+    assert_rule_exists_ips SMTP_BLK "-p tcp.*--dports.*--uid-owner daemon.*ACCEPT"
+}
+
+@test "SMTP_BLOCK=1 with EGF=1 and SMTP port in EG_TCP_CPORTS" {
+    [ -n "$_UID_OWNER_OK" ] || skip "--uid-owner not supported"
+    source /opt/tests/helpers/apf-config.sh
+    apf_set_config "EGF" "1"
+    apf_set_config "EG_TCP_CPORTS" "25,80,443"
+    apf_set_config "SMTP_BLOCK" "1"
+    "$APF" -f 2>/dev/null
+    "$APF" -s
+
+    # SMTP_BLK chain still exists (created regardless of EGF)
+    assert_chain_exists SMTP_BLK
+    assert_rule_exists_ips OUTPUT "-j SMTP_BLK"
+    # Note: EG_TCP_CPORTS ACCEPT for port 25 fires before SMTP_BLK jump
+    # in OUTPUT chain, so SMTP blocking is effectively bypassed for port 25.
+    # This is a documented configuration conflict (see conf.apf).
+}

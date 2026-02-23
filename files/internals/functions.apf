@@ -796,7 +796,7 @@ help() {
 	echo "-td HOST TTL [CMT]|--temp-deny ..... temporarily deny host with TTL"
 	echo "--templ|--temp-list ................ list temp entries with remaining TTL"
 	echo "--tempf|--temp-flush ............... remove all temporary entries"
-	echo "--temp-expire ..................... expire temporary entries (runs from cron)"
+	echo "--temp-expire ...................... expire temporary entries (runs from cron)"
 	echo "-o|--ovars ......................... output all configuration options"
 	echo "-v|--version ....................... output version number"
 	echo "--ipset-update ..................... hot-reload ipset block lists from ipset.rules"
@@ -1740,6 +1740,8 @@ ipt4 -A LMAC  -j REJECT --reject-with icmp-net-prohibited
 cl_cports() {
 	IG_TCP_CPORTS=""
 	IG_UDP_CPORTS=""
+	IG_TCP_CLIMIT=""
+	IG_UDP_CLIMIT=""
 	IG_ICMP_TYPES=""
 	IG_ICMPV6_TYPES=""
 	EG_TCP_CPORTS=""
@@ -1748,6 +1750,10 @@ cl_cports() {
 	EG_ICMPV6_TYPES=""
 	EG_TCP_UID=""
 	EG_UDP_UID=""
+	SMTP_BLOCK=""
+	SMTP_PORTS=""
+	SMTP_ALLOWUSER=""
+	SMTP_ALLOWGROUP=""
 }
 
 expirebans() {

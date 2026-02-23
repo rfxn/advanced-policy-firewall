@@ -159,8 +159,12 @@ if [ "$EGF" == "1" ]; then
 fi
 
 # SMTP outbound blocking — independent of EGF
+# System-wide scope: skip if already created (VNET re-sourcing calls
+# cports.common once per bound IP plus once for main.rules)
 if [ "$SMTP_BLOCK" == "1" ]; then
- if [ -n "$SMTP_PORTS" ]; then
+ if $IPT $IPT_FLAGS -L SMTP_BLK -n >> /dev/null 2>&1; then
+	:
+ elif [ -n "$SMTP_PORTS" ]; then
 	ipt -N SMTP_BLK
 
 	# Root (UID 0) always allowed
@@ -203,8 +207,6 @@ if [ "$SMTP_BLOCK" == "1" ]; then
 	fi
 	ipt -A SMTP_BLK -p tcp -m multiport --dports $SMTP_PORTS -j $TCP_STOP
 
-	# System-wide scope: uses ipt() not ipt_src() because SMTP blocking
-	# applies to all processes regardless of VNET IP binding
 	ipt -A OUTPUT -j SMTP_BLK
 	eout "{smtp_blk} SMTP outbound blocking active on ports $SMTP_PORTS"
  else

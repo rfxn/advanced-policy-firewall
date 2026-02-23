@@ -598,8 +598,9 @@ usage apf [OPTION]
 -ta HOST TTL [CMT]|--temp-allow .... temporarily allow host with TTL
                                      (TTL: seconds, or 5m, 1h, 7d)
 -td HOST TTL [CMT]|--temp-deny ..... temporarily deny host with TTL
---templ|--temp-list ................. list temp entries with remaining TTL
---tempf|--temp-flush ................ remove all temporary entries
+--templ|--temp-list ................ list temp entries with remaining TTL
+--tempf|--temp-flush ............... remove all temporary entries
+--temp-expire ...................... expire temporary entries (runs from cron)
 --gre-down ......................... tear down GRE tunnels
 --gre-status ....................... show GRE tunnel status
 ```
