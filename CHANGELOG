@@ -1,5 +1,10 @@
 - 2.0.2 | Feb 22 2026:
 
+[Fix] help(): search description now mentions ipset alongside iptables to
+      reflect actual search() scope (functions.apf)
+[Fix] silent_ips.rules: add valid_host() check before ipt_for_host() to
+      skip invalid entries with WARNING instead of passing to iptables
+      (firewall)
 [New] SYN flood protection: SYNFLOOD rate-limits inbound TCP SYN packets
       via iptables limit module; SYNFLOOD_RATE for packets/unit threshold,
       SYNFLOOD_BURST for initial burst allowance; dedicated SYNFLOOD chain

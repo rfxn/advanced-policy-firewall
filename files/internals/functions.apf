@@ -790,7 +790,7 @@ help() {
 	echo "                                     load new rule into firewall"
 	echo "-u|--remove|--unban HOST ........... remove host from [glob]*_hosts.rules"
 	echo "                                     and immediately remove rule from firewall"
-	echo "-g|--search PATTERN ................ search iptables rules and trust files"
+	echo "-g|--search PATTERN ................ search iptables/ipset rules and trust files"
 	echo "-ta HOST TTL [CMT]|--temp-allow .... temporarily allow host with TTL"
 	echo "                                     (TTL: seconds, or 5m, 1h, 7d)"
 	echo "-td HOST TTL [CMT]|--temp-deny ..... temporarily deny host with TTL"

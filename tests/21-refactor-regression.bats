@@ -23,12 +23,6 @@ apf_set_url() {
     sed -i "s%^${var}=.*%${var}=\"${val}\"%" "$APF_DIR/conf.apf"
 }
 
-# Set config variable using % delimiter (safe for values containing /)
-apf_set_config_safe() {
-    local var="$1" val="$2"
-    sed -i "s%^${var}=.*%${var}=\"${val}\"%" "$APF_DIR/conf.apf"
-}
-
 setup_file() {
     source /opt/tests/helpers/setup-netns.sh
     source /opt/tests/helpers/reset-apf.sh

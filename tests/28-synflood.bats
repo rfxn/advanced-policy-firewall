@@ -14,12 +14,6 @@ source /opt/tests/helpers/assert-iptables.bash
 APF="/opt/apf/apf"
 APF_DIR="/opt/apf"
 
-# Set config variable using % delimiter (safe for values containing /)
-apf_set_config_safe() {
-    local var="$1" val="$2"
-    sed -i "s%^${var}=.*%${var}=\"${val}\"%" "$APF_DIR/conf.apf"
-}
-
 setup_file() {
     source /opt/tests/helpers/setup-netns.sh
     source /opt/tests/helpers/reset-apf.sh

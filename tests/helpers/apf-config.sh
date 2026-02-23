@@ -12,6 +12,14 @@ apf_set_config() {
     sed -i "s/^${var}=.*/${var}=\"${val}\"/" "$APF_INSTALL/conf.apf"
 }
 
+# Set config variable using % delimiter (safe for values containing /)
+# Usage: apf_set_config_safe VAR VALUE
+apf_set_config_safe() {
+    local var="$1"
+    local val="$2"
+    sed -i "s%^${var}=.*%${var}=\"${val}\"%" "$APF_INSTALL/conf.apf"
+}
+
 # Set the untrusted/trusted interfaces
 # Usage: apf_set_interface IFACE_UNTRUSTED [IFACE_TRUSTED]
 apf_set_interface() {

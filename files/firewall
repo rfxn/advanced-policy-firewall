@@ -107,6 +107,10 @@ if [ -f "$INSTALL_PATH/silent_ips.rules" ]; then
   line="${line%%#*}"
   line="${line// /}"
   if [ -n "$line" ]; then
+   if ! valid_host "$line"; then
+    eout "{glob} WARNING: skipping invalid silent IP entry: $line"
+    continue
+   fi
    if ipt_for_host "$line"; then
     $IPT_H $IPT_FLAGS -A INPUT -d "$line" -j DROP
     $IPT_H $IPT_FLAGS -A OUTPUT -s "$line" -j DROP
