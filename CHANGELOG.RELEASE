@@ -1,5 +1,15 @@
-- 2.0.2 | Feb 22 2026:
+- 2.0.2 | Feb 23 2026:
 
+[New] test suite parallelization: --parallel [N] flag splits test files across
+      N parallel Docker containers using round-robin distribution; default N is
+      nproc*2; 3x speedup for single-OS runs (run-tests.sh, Makefile)
+[New] test-serial Makefile target preserving old sequential behavior (Makefile)
+[Fix] Dockerfile .clean state: add missing hook_pre.sh, hook_post.sh, and
+      silent_ips.rules .clean files needed for parallel container isolation
+      (all 10 Dockerfiles)
+[Fix] restore_bins() in 16-dependency-check.bats: use -L symlink check for
+      merged-usr compatibility; dangling symlinks on Debian 12+ caused stale
+      hidden binaries and failed teardown cleanup (16-dependency-check.bats)
 [Fix] help(): search description now mentions ipset alongside iptables to
       reflect actual search() scope (functions.apf)
 [Fix] silent_ips.rules: add valid_host() check before ipt_for_host() to

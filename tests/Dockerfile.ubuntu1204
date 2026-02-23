@@ -70,7 +70,10 @@ RUN cd /opt/apf-src && INSTALL_PATH=/opt/apf sh install.sh && \
 RUN for f in allow_hosts.rules deny_hosts.rules; do \
       sed '/^[^#]/d' "/opt/apf/$f" > "/opt/apf/$f.clean"; \
     done && \
-    cp /opt/apf/conf.apf /opt/apf/conf.apf.clean
+    cp /opt/apf/conf.apf /opt/apf/conf.apf.clean && \
+    cp /opt/apf/hook_pre.sh /opt/apf/hook_pre.sh.clean && \
+    cp /opt/apf/hook_post.sh /opt/apf/hook_post.sh.clean && \
+    cp /opt/apf/silent_ips.rules /opt/apf/silent_ips.rules.clean
 
 WORKDIR /opt/tests
 
