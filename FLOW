@@ -307,47 +307,60 @@ When RAB_SANITY=1, sanity violations also tag addresses for RAB blocking.
   Scope:  IPv4 + IPv6
 
 
-16g. IDENT Blocking
+16g. SYN Flood Protection
+
+When SYNFLOOD=1, creates the SYNFLOOD chain to rate-limit inbound TCP SYN
+packets. Packets within SYNFLOOD_RATE (burst SYNFLOOD_BURST) RETURN for
+normal processing. Excess SYN packets are logged (if LOG_DROP=1) and dropped
+via $TCP_STOP.
+
+  Source: bt.rules:335-347
+  Config: SYNFLOOD, SYNFLOOD_RATE, SYNFLOOD_BURST
+  Chains: INPUT (SYNFLOOD)
+  Scope:  Dual-stack
+
+
+16h. IDENT Blocking
 
 When BLK_IDENT=1 and port 113 is not in IG_TCP_CPORTS, creates the IDENT
 chain to REJECT ident requests (prevents service stalls).
 
-  Source: bt.rules:335-360
+  Source: bt.rules:349-374
   Config: BLK_IDENT
   Chains: INPUT, OUTPUT
   Scope:  Dual-stack
 
 
-16h. Multicast Blocking
+16i. Multicast Blocking
 
 When BLK_MCATNET=1, creates MCAST (IPv4 224.0.0.0/8) and MCAST6
 (IPv6 ff00::/8) chains. IPv6 NDP types 133-136 are exempted to preserve
 neighbor discovery.
 
-  Source: bt.rules:362-402
+  Source: bt.rules:376-416
   Config: BLK_MCATNET
   Chains: INPUT, OUTPUT
   Scope:  IPv4 + IPv6
 
 
-16i. P2P Blocking
+16j. P2P Blocking
 
 When BLK_P2P_PORTS is set, creates the P2P chain to block common
 peer-to-peer protocol ports (BitTorrent, Kazaa, eDonkey, etc.).
 
-  Source: bt.rules:404-453
+  Source: bt.rules:418-467
   Config: BLK_P2P_PORTS
   Chains: INPUT, OUTPUT
   Scope:  Dual-stack
 
 
-16j. TCP SACK Panic Mitigation
+16k. TCP SACK Panic Mitigation
 
 When BLK_TCP_SACK_PANIC=1, inserts (via -I, first position) an INPUT rule
 blocking TCP SYN packets with MSS 1-500 bytes. Mitigates
 CVE-2019-11477/11478/11479.
 
-  Source:     bt.rules:455-459
+  Source:     bt.rules:469-473
   Config:     BLK_TCP_SACK_PANIC
   Chains:     INPUT (INSERT, not APPEND)
   Scope:      Dual-stack

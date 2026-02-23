@@ -282,38 +282,48 @@ When `RAB_SANITY=1`, sanity violations also tag addresses for RAB blocking.
 **Source:** `bt.rules:37-333` | **Config:** `PKT_SANITY`, `PKT_SANITY_*`
 **Chains:** INPUT (IN_SANITY), OUTPUT (OUT_SANITY) | **Scope:** IPv4 + IPv6
 
-#### 16g. IDENT Blocking
+#### 16g. SYN Flood Protection
+
+When `SYNFLOOD=1`, creates the SYNFLOOD chain to rate-limit inbound TCP SYN
+packets. Packets within `SYNFLOOD_RATE` (burst `SYNFLOOD_BURST`) RETURN for
+normal processing. Excess SYN packets are logged (if `LOG_DROP=1`) and dropped
+via `$TCP_STOP`.
+
+**Source:** `bt.rules:335-347` | **Config:** `SYNFLOOD`, `SYNFLOOD_RATE`, `SYNFLOOD_BURST`
+**Chains:** INPUT (SYNFLOOD) | **Scope:** Dual-stack
+
+#### 16h. IDENT Blocking
 
 When `BLK_IDENT=1` and port 113 is not in `IG_TCP_CPORTS`, creates the
 IDENT chain to REJECT ident requests (prevents service stalls).
 
-**Source:** `bt.rules:335-360` | **Config:** `BLK_IDENT`
+**Source:** `bt.rules:349-374` | **Config:** `BLK_IDENT`
 **Chains:** INPUT, OUTPUT | **Scope:** Dual-stack
 
-#### 16h. Multicast Blocking
+#### 16i. Multicast Blocking
 
 When `BLK_MCATNET=1`, creates MCAST (IPv4 `224.0.0.0/8`) and MCAST6
 (IPv6 `ff00::/8`) chains. IPv6 NDP types 133-136 are exempted to preserve
 neighbor discovery.
 
-**Source:** `bt.rules:362-402` | **Config:** `BLK_MCATNET`
+**Source:** `bt.rules:376-416` | **Config:** `BLK_MCATNET`
 **Chains:** INPUT, OUTPUT | **Scope:** IPv4 + IPv6
 
-#### 16i. P2P Blocking
+#### 16j. P2P Blocking
 
 When `BLK_P2P_PORTS` is set, creates the P2P chain to block common
 peer-to-peer protocol ports (BitTorrent, Kazaa, eDonkey, etc.).
 
-**Source:** `bt.rules:404-453` | **Config:** `BLK_P2P_PORTS`
+**Source:** `bt.rules:418-467` | **Config:** `BLK_P2P_PORTS`
 **Chains:** INPUT, OUTPUT | **Scope:** Dual-stack
 
-#### 16j. TCP SACK Panic Mitigation
+#### 16k. TCP SACK Panic Mitigation
 
 When `BLK_TCP_SACK_PANIC=1`, inserts (via `-I`, first position) an INPUT
 rule blocking TCP SYN packets with MSS 1-500 bytes. Mitigates
 CVE-2019-11477/11478/11479.
 
-**Source:** `bt.rules:455-459` | **Config:** `BLK_TCP_SACK_PANIC`
+**Source:** `bt.rules:469-473` | **Config:** `BLK_TCP_SACK_PANIC`
 **Chains:** INPUT (INSERT, not APPEND) | **Scope:** Dual-stack
 **Precedence:** Inserted at top of INPUT, evaluated before all appended rules
 
@@ -583,32 +593,33 @@ Packets are evaluated top-to-bottom; the first matching rule wins.
  20  IN_SANITY6 (IPv6 sanity)      bt.rules        DROP
  21  FRAG_UDP6 (IPv6 frag UDP)     bt.rules        DROP
  22  PZERO6 (IPv6 port zero)       bt.rules        DROP
- 23  IDENT (port 113)              bt.rules        REJECT
- 24  MCAST (multicast)             bt.rules        DROP
- 25  MCAST6 (IPv6 multicast)       bt.rules        DROP
- 26  P2P (P2P ports)               bt.rules        REJECT
- 27  RAB trip (recent match)       firewall        DROP
- 28  RABPSCAN chain                firewall        DROP
- 29  ESTABLISHED,RELATED tcp       firewall        ACCEPT **
- 30  ESTABLISHED,RELATED udp       firewall        ACCEPT **
- 31  SSH_LOG / TELNET_LOG          log.rules       LOG (cont.)
- 32  VNET per-IP port rules        main.vnet       ACCEPT
- 33  Connlimit REJECT              cports.common   REJECT
- 34  Inbound TCP port ACCEPT       cports.common   ACCEPT
- 35  Inbound UDP port ACCEPT       cports.common   ACCEPT
- 36  ICMP type ACCEPT              cports.common   ACCEPT
- 37  NDP 133-136 ACCEPT            cports.common   ACCEPT
- 38  ICMPv6 type ACCEPT            cports.common   ACCEPT
+ 23  SYNFLOOD (SYN rate limit)     bt.rules        RETURN/DROP
+ 24  IDENT (port 113)              bt.rules        REJECT
+ 25  MCAST (multicast)             bt.rules        DROP
+ 26  MCAST6 (IPv6 multicast)       bt.rules        DROP
+ 27  P2P (P2P ports)               bt.rules        REJECT
+ 28  RAB trip (recent match)       firewall        DROP
+ 29  RABPSCAN chain                firewall        DROP
+ 30  ESTABLISHED,RELATED tcp       firewall        ACCEPT **
+ 31  ESTABLISHED,RELATED udp       firewall        ACCEPT **
+ 32  SSH_LOG / TELNET_LOG          log.rules       LOG (cont.)
+ 33  VNET per-IP port rules        main.vnet       ACCEPT
+ 34  Connlimit REJECT              cports.common   REJECT
+ 35  Inbound TCP port ACCEPT       cports.common   ACCEPT
+ 36  Inbound UDP port ACCEPT       cports.common   ACCEPT
+ 37  ICMP type ACCEPT              cports.common   ACCEPT
+ 38  NDP 133-136 ACCEPT            cports.common   ACCEPT
+ 39  ICMPv6 type ACCEPT            cports.common   ACCEPT
  --  SMTP_BLK (OUTPUT only)       cports.common   DROP/REJECT ****
- 39  Non-SYN NEW tcp DROP          firewall        DROP
- 40  DNS (per-nameserver)          firewall        ACCEPT
- 41  FTP helper                    firewall        ACCEPT
- 42  SSH helper                    firewall        ACCEPT
- 43  Traceroute                    firewall        ACCEPT
- 44  Log (rate-limited)            firewall        LOG (cont.)
- 45  Default DROP tcp              firewall        DROP
- 46  Default DROP udp              firewall        DROP
- 47  Default DROP all              firewall        DROP
+ 40  Non-SYN NEW tcp DROP          firewall        DROP
+ 41  DNS (per-nameserver)          firewall        ACCEPT
+ 42  FTP helper                    firewall        ACCEPT
+ 43  SSH helper                    firewall        ACCEPT
+ 44  Traceroute                    firewall        ACCEPT
+ 45  Log (rate-limited)            firewall        LOG (cont.)
+ 46  Default DROP tcp              firewall        DROP
+ 47  Default DROP udp              firewall        DROP
+ 48  Default DROP all              firewall        DROP
 
  *  BLK_TCP_SACK_PANIC uses -I (INSERT), placing it at position 1
     regardless of when it is loaded during the script.

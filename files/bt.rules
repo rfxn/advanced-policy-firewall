@@ -332,6 +332,19 @@ if [ "$PKT_SANITY" == "1" ] && [ "$USE_IPV6" == "1" ]; then
 	fi
 fi
 
+# SYN flood protection — rate limit inbound TCP SYN packets
+if [ "$SYNFLOOD" == "1" ]; then
+	eout "{synflood} set active SYNFLOOD"
+	eout "{synflood} rate limit inbound SYN to $SYNFLOOD_RATE burst $SYNFLOOD_BURST"
+	ipt -N SYNFLOOD
+	ipt -A SYNFLOOD -p tcp --syn -m limit --limit=$SYNFLOOD_RATE --limit-burst=$SYNFLOOD_BURST -j RETURN
+	if [ "$LOG_DROP" == "1" ]; then
+		ipt -A SYNFLOOD -p tcp --syn -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** SYNFLOOD ** "
+	fi
+	ipt -A SYNFLOOD -p tcp --syn -j $TCP_STOP
+	ipt -A INPUT -j SYNFLOOD
+fi
+
 if [ "$BLK_IDENT" = "1" ]; then
 	eout "{blk_ident} set active BLK_IDENT"
 	# Reject ident request if not defined in IG_TCP_CPORTS

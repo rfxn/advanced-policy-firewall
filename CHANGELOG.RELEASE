@@ -1,5 +1,11 @@
 - 2.0.2 | Feb 22 2026:
 
+[New] SYN flood protection: SYNFLOOD rate-limits inbound TCP SYN packets
+      via iptables limit module; SYNFLOOD_RATE for packets/unit threshold,
+      SYNFLOOD_BURST for initial burst allowance; dedicated SYNFLOOD chain
+      with RETURN for under-limit, LOG + $TCP_STOP for excess; dual-stack
+      via ipt(); complements kernel-level SYSCTL_SYN/SYSCTL_SYNCOOKIES
+      (conf.apf, bt.rules, .ca.def)
 [Fix] SMTP_BLK VNET re-sourcing: add chain-exists guard to prevent
       duplicate rules and OUTPUT jumps when SET_VNET=1 and SMTP_BLOCK=1;
       cports.common is sourced per bound IP plus main.rules (cports.common)

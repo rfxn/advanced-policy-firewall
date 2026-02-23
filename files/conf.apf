@@ -256,6 +256,21 @@ IG_TCP_CLIMIT=""
 # Per-port concurrent connection limit for inbound UDP
 IG_UDP_CLIMIT=""
 
+# SYN flood protection via iptables rate limiting. When enabled, inbound TCP
+# SYN packets are rate-limited using the limit module. Packets exceeding the
+# rate are dropped. This complements kernel-level SYN protection (SYSCTL_SYN,
+# SYSCTL_SYNCOOKIES) with iptables-level enforcement.
+# 0 = disabled (default), 1 = enabled
+SYNFLOOD="0"
+
+# Maximum rate of SYN packets to accept. Format: packets/unit where unit is
+# s (seconds), m (minutes), h (hours). Uses same format as ICMP_LIM.
+SYNFLOOD_RATE="100/s"
+
+# Initial burst allowance before rate limiting kicks in. Allows short traffic
+# spikes (e.g., page load with many connections) without triggering the limit.
+SYNFLOOD_BURST="150"
+
 # Creates firewall rules based on the local name servers as defined in the
 # /etc/resolv.conf file. This is the preferred secure method for client side
 # name server requests. This option has no bearing on a locally hosted DNS 
