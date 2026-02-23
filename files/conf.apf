@@ -498,6 +498,36 @@ EG_UDP_UID=""
 # CMD-Match outbound (egress) denied applications
 EG_DROP_CMD="eggdrop,psybnc,bitchx,BitchX,init,udp.pl"
 
+# Block outbound SMTP for all users except whitelisted UIDs and GIDs.
+# When enabled, only root (always allowed), users listed in SMTP_ALLOWUSER,
+# and members of groups listed in SMTP_ALLOWGROUP can send outbound SMTP.
+# All other processes attempting to connect on SMTP ports are blocked.
+# This works independently of EGF (outbound filtering toggle).
+# Note: if EGF=1, ensure SMTP ports (25,465,587) are NOT listed in
+# EG_TCP_CPORTS, as the per-port ACCEPT rule takes precedence over
+# SMTP_BLOCK and would bypass the restriction.
+#
+# This forces web applications and user scripts to use the local MTA
+# (/usr/sbin/sendmail, mail command, etc.) instead of opening direct SMTP
+# connections, reducing spam relay abuse from compromised accounts.
+#
+# Panel examples:
+#   InterWorx:   SMTP_ALLOWUSER="iworx"       SMTP_ALLOWGROUP="mail"
+#   cPanel/WHM:  SMTP_ALLOWUSER="cpanel"       SMTP_ALLOWGROUP="mail,mailman"
+#   Plesk:       SMTP_ALLOWUSER="postfix"      SMTP_ALLOWGROUP="postfix,mail"
+SMTP_BLOCK="0"
+
+# SMTP ports to block. Standard: 25 (SMTP), 465 (SMTPS), 587 (submission).
+SMTP_PORTS="25,465,587"
+
+# Comma-separated list of usernames allowed to send outbound SMTP.
+# Root (UID 0) is always allowed regardless of this setting.
+SMTP_ALLOWUSER=""
+
+# Comma-separated list of group names allowed to send outbound SMTP.
+# Processes whose primary or supplementary GID matches are allowed.
+SMTP_ALLOWGROUP=""
+
 ##
 # [Remote Rule Imports]
 ##

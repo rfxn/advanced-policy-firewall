@@ -95,6 +95,22 @@ teardown_file() {
 }
 
 # =====================================================================
+# IPv6 connlimit
+# =====================================================================
+
+@test "IG_TCP_CLIMIT creates IPv6 connlimit rule when USE_IPV6=1" {
+    [ -n "$_CONNLIMIT_OK" ] || skip "xt_connlimit not available on this kernel"
+    source /opt/tests/helpers/apf-config.sh
+    apf_set_config "IG_TCP_CLIMIT" "80:50"
+    apf_set_config "IG_UDP_CLIMIT" ""
+    apf_set_config "USE_IPV6" "1"
+    "$APF" -f 2>/dev/null
+    "$APF" -s
+
+    assert_rule_exists_ip6s INPUT "-p tcp.*--dport 80.*connlimit-above 50.*REJECT"
+}
+
+# =====================================================================
 # UDP connlimit (no --syn)
 # =====================================================================
 

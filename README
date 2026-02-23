@@ -93,6 +93,7 @@ Filtering & Rules:
 - IPv6 dual-stack support with automatic ip6tables rules
 - per-port concurrent connection limiting (connlimit)
 - user/application-based outbound filtering (uid-owner, cmd-owner)
+- SMTP outbound blocking with per-user and per-group exemptions
 - packet sanity checks (forged sources, malformed flags, fragments)
 - Type of Service (TOS) traffic prioritization
 
@@ -335,6 +336,26 @@ EG_DROP_CMD - Comma-separated executable names blocked from outbound network
 access (e.g., "eggdrop,psybnc,bitchx"). Uses iptables --cmd-owner match.
 Requires EGF="1". Depends on kernel xt_owner command support, detected at
 runtime and skipped gracefully if unavailable.
+
+SMTP outbound blocking (independent of EGF -- works whether outbound filtering
+is on or off):
+
+  SMTP_BLOCK      - When "1", blocks outbound SMTP for all processes except
+                    whitelisted users/groups. Forces web apps and user scripts
+                    to use the local MTA instead of opening direct SMTP
+                    connections
+  SMTP_PORTS      - Ports to block (default "25,465,587" -- SMTP, SMTPS,
+                    submission)
+  SMTP_ALLOWUSER  - Comma-separated usernames allowed to send outbound SMTP.
+                    Root (UID 0) is always allowed regardless of this setting
+  SMTP_ALLOWGROUP - Comma-separated group names allowed to send outbound SMTP.
+                    Uses --gid-owner match, detected at runtime and skipped
+                    gracefully if unavailable
+
+Panel examples:
+  InterWorx:   SMTP_ALLOWUSER="iworx"    SMTP_ALLOWGROUP="mail"
+  cPanel/WHM:  SMTP_ALLOWUSER="cpanel"   SMTP_ALLOWGROUP="mail,mailman"
+  Plesk:       SMTP_ALLOWUSER="postfix"  SMTP_ALLOWGROUP="postfix,mail"
 
 LOG_DROP - Enable detailed firewall packet logging. Typically left disabled on
 production systems due to log volume and disk I/O impact.
@@ -709,8 +730,9 @@ usage apf [OPTION]
 -ta HOST TTL [CMT]|--temp-allow .... temporarily allow host with TTL
                                      (TTL: seconds, or 5m, 1h, 7d)
 -td HOST TTL [CMT]|--temp-deny ..... temporarily deny host with TTL
---templ|--temp-list ................. list temp entries with remaining TTL
---tempf|--temp-flush ................ remove all temporary entries
+--templ|--temp-list ................ list temp entries with remaining TTL
+--tempf|--temp-flush ............... remove all temporary entries
+--temp-expire ...................... expire temporary entries (runs from cron)
 --gre-down ......................... tear down GRE tunnels
 --gre-status ....................... show GRE tunnel status
 

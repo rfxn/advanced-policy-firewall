@@ -431,9 +431,20 @@ skips gracefully if unsupported.
 
 **Config:** `EG_DROP_CMD`
 
+#### 22g. SMTP Outbound Blocking (independent of EGF)
+
+When `SMTP_BLOCK=1`, creates the `SMTP_BLK` chain to block outbound SMTP
+(ports 25, 465, 587 by default) for all processes except root (always
+allowed), whitelisted users (`SMTP_ALLOWUSER`), and whitelisted groups
+(`SMTP_ALLOWGROUP`). Uses `--gid-owner` with runtime detection. Jumped
+from OUTPUT unconditionally — works whether `EGF` is enabled or not.
+System-wide scope (not VNET-scoped).
+
+**Config:** `SMTP_BLOCK`, `SMTP_PORTS`, `SMTP_ALLOWUSER`, `SMTP_ALLOWGROUP`
+
 - **Source:** `cports.common`, loaded via `main.rules`
-- **Chains:** INPUT, OUTPUT
-- **Scope:** Dual-stack via `ipt_dst()` / `ipt_src()`
+- **Chains:** OUTPUT (SMTP_BLK)
+- **Scope:** Dual-stack via `ipt()`
 
 ### Step 23: Non-SYN NEW DROP
 
@@ -588,6 +599,7 @@ Packets are evaluated top-to-bottom; the first matching rule wins.
  36  ICMP type ACCEPT              cports.common   ACCEPT
  37  NDP 133-136 ACCEPT            cports.common   ACCEPT
  38  ICMPv6 type ACCEPT            cports.common   ACCEPT
+ --  SMTP_BLK (OUTPUT only)       cports.common   DROP/REJECT ****
  39  Non-SYN NEW tcp DROP          firewall        DROP
  40  DNS (per-nameserver)          firewall        ACCEPT
  41  FTP helper                    firewall        ACCEPT
@@ -608,6 +620,9 @@ Packets are evaluated top-to-bottom; the first matching rule wins.
     table because they run outside the INPUT chain evaluation order —
     hook_pre before any rules exist, hook_post after all rules
     including default policies.
+ **** SMTP_BLK applies to OUTPUT only (not INPUT). Independent of EGF.
+    Root (UID 0) always allowed; SMTP_ALLOWUSER/SMTP_ALLOWGROUP exempt
+    specific users/groups. Not numbered because it does not affect INPUT.
 ```
 
 > **Note:** Rules marked "LOG (cont.)" log the packet but do not terminate
