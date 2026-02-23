@@ -111,8 +111,7 @@ RULES
 
 @test "silent_ips supports IPv6 addresses" {
     source /opt/tests/helpers/apf-config.sh
-    # Check if IPv6 is available
-    [ -n "$(command -v ip6tables)" ] || skip "ip6tables not available"
+    if ! ip6tables_available; then skip "ip6tables not available"; fi
     apf_set_config "USE_IPV6" "1"
 
     cat > "$APF_DIR/silent_ips.rules" <<'RULES'
@@ -186,7 +185,7 @@ RULES
 
 @test "search finds IPv6 rule when enabled" {
     source /opt/tests/helpers/apf-config.sh
-    [ -n "$(command -v ip6tables)" ] || skip "ip6tables not available"
+    if ! ip6tables_available; then skip "ip6tables not available"; fi
     apf_set_config "USE_IPV6" "1"
     "$APF" -f 2>/dev/null
     "$APF" -s
