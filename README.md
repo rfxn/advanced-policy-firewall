@@ -38,6 +38,7 @@ trust-based host management, reactive address blocking, and per-IP virtual netwo
   - [4.1 Trust System](#41-trust-system)
   - [4.2 Global Trust System](#42-global-trust-system)
   - [4.3 Advanced Trust Syntax](#43-advanced-trust-syntax)
+  - [4.4 Temporary Trust Entries](#44-temporary-trust-entries)
 - [5. License](#5-license)
 - [6. Support Information](#6-support-information)
 
@@ -582,6 +583,11 @@ usage apf [OPTION]
 --ipset-update ..................... hot-reload ipset block lists from ipset.rules
 --gre-up ........................... bring up GRE tunnels from gre.rules
 -g|--search PATTERN ................ search iptables rules and trust files
+-ta HOST TTL [CMT]|--temp-allow .... temporarily allow host with TTL
+                                     (TTL: seconds, or 5m, 1h, 7d)
+-td HOST TTL [CMT]|--temp-deny ..... temporarily deny host with TTL
+--templ|--temp-list ................. list temp entries with remaining TTL
+--tempf|--temp-flush ................ remove all temporary entries
 --gre-down ......................... tear down GRE tunnels
 --gre-status ....................... show GRE tunnel status
 ```
@@ -691,6 +697,41 @@ Plain (non-advanced) IPv6 addresses can be added directly without brackets:
 ```
 2001:db8::1
 ```
+
+### 4.4 Temporary Trust Entries
+
+In addition to permanent trust entries, APF supports temporary allow/deny with per-entry TTL (time-to-live). Temporary entries are stored in the same trust files with `ttl=` and `expire=` metadata markers and are automatically removed when their TTL expires.
+
+**TTL formats:**
+
+| Format | Example | Meaning |
+|--------|---------|---------|
+| Bare seconds | `300` | 5 minutes |
+| Seconds suffix | `300s` | 5 minutes |
+| Minutes | `5m` | 5 minutes |
+| Hours | `1h` | 1 hour |
+| Days | `7d` | 7 days |
+
+**Usage:**
+
+```bash
+# Temporarily allow a host for 1 hour
+apf -ta 10.0.0.5 1h "temp maintenance access"
+
+# Temporarily deny a host for 7 days
+apf -td 192.168.3.111 7d "temp block"
+
+# List all temporary entries with remaining TTL
+apf --templ
+
+# Flush all temporary entries immediately
+apf --tempf
+
+# Remove a temporary entry manually (same as permanent entries)
+apf -u 10.0.0.5
+```
+
+Expiry is handled automatically by a cron job that runs every minute (`/etc/cron.d/apf`). Temporary entries use their own per-entry TTL and are not affected by the global `SET_EXPIRE` timer. To reset a temp entry's timer, remove it first (`apf -u HOST`) then re-add it with a new TTL.
 
 ---
 

@@ -1,5 +1,9 @@
 - 2.0.2 | Feb 22 2026:
 
+[New] README/README.md: add section 4.4 Temporary Trust Entries documenting
+      -ta, -td, --templ, --tempf CLI options, TTL syntax formats, automatic
+      expiry behavior, and cron configuration; add temp trust commands to
+      section 4 CLI reference; update Table of Contents (README, README.md)
 [New] Temporary allow/deny with per-entry TTL: apf -ta HOST TTL [comment]
       and apf -td HOST TTL [comment]; TTL supports seconds (300), minutes
       (5m), hours (1h), and days (7d); entries stored in allow_hosts.rules /

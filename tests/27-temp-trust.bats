@@ -151,6 +151,12 @@ setup() {
     assert_success
 }
 
+@test "parse_ttl parses seconds suffix (300s)" {
+    "$APF" -ta 192.0.2.50 300s
+    run grep "ttl=300 " "$APF_DIR/allow_hosts.rules"
+    assert_success
+}
+
 @test "parse_ttl rejects non-numeric" {
     run "$APF" -ta 192.0.2.50 "fivem"
     assert_output --partial "Invalid TTL"
@@ -298,4 +304,28 @@ setup() {
     assert_success
     assert_rule_exists_ip6s TALLOW "-s 2001:db8::50"
     assert_rule_exists_ip6s TALLOW "-d 2001:db8::50"
+}
+
+@test "-td with IPv6 host" {
+    if ! ip6tables_available; then skip "ip6tables not available"; fi
+    run "$APF" -td 2001:db8::50 1h "ipv6 deny"
+    assert_success
+    run grep "2001:db8::50" "$APF_DIR/deny_hosts.rules"
+    assert_success
+    assert_rule_exists_ip6s TDENY "-s 2001:db8::50"
+    assert_rule_exists_ip6s TDENY "-d 2001:db8::50"
+}
+
+# =====================================================================
+# Empty state
+# =====================================================================
+
+@test "--tempf with no temp entries shows zero count" {
+    # Ensure no ttl= entries exist
+    sed -i '/ttl=/d' "$APF_DIR/allow_hosts.rules"
+    sed -i '/ttl=/d' "$APF_DIR/deny_hosts.rules"
+
+    run "$APF" --tempf
+    assert_success
+    assert_output --partial "0 temporary trust entries"
 }
