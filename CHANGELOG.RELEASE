@@ -11,6 +11,11 @@
       (functions.apf)
 [Fix] SMTP_BLOCK=1 with empty SMTP_PORTS now logs warning instead of
       silently doing nothing (cports.common)
+[New] README/README.md: add SMTP outbound blocking to feature list and
+      configuration section with variable table, panel examples, and
+      EGF independence note (README, README.md)
+[New] FLOW/FLOW.md: add Step 22g (SMTP Outbound Blocking) and SMTP_BLK
+      row in precedence table with footnote (FLOW, FLOW.md)
 [New] README/README.md: add section 4.4 Temporary Trust Entries documenting
       -ta, -td, --templ, --tempf CLI options, TTL syntax formats, automatic
       expiry behavior, and cron configuration; add temp trust commands to

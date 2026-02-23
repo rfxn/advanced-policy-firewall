@@ -90,6 +90,7 @@ For a detailed description of all APF features, review `conf.apf` (under your in
 - IPv6 dual-stack support with automatic ip6tables rules
 - Per-port concurrent connection limiting (connlimit)
 - User/application-based outbound filtering (uid-owner, cmd-owner)
+- SMTP outbound blocking with per-user and per-group exemptions
 - Packet sanity checks (forged sources, malformed flags, fragments)
 - Type of Service (TOS) traffic prioritization
 
@@ -284,6 +285,17 @@ Connections exceeding the limit from a single source IP are rejected. Port range
 | `EG_TCP_UID` | UID-based outbound TCP filtering; format is `uid:port` pairs (e.g., `"0:22,33:80"`) |
 | `EG_UDP_UID` | UID-based outbound UDP filtering; same format |
 | `EG_DROP_CMD` | Comma-separated executable names blocked from outbound network access (e.g., `"eggdrop,psybnc,bitchx"`). Uses iptables `--cmd-owner` match. Depends on kernel xt_owner command support, detected at runtime and skipped gracefully if unavailable |
+
+**SMTP outbound blocking** (independent of `EGF` — works whether outbound filtering is on or off):
+
+| Variable | Purpose |
+|----------|---------|
+| `SMTP_BLOCK` | When `"1"`, blocks outbound SMTP for all processes except whitelisted users/groups. Forces web apps and user scripts to use the local MTA instead of opening direct SMTP connections |
+| `SMTP_PORTS` | Ports to block (default `"25,465,587"` — SMTP, SMTPS, submission) |
+| `SMTP_ALLOWUSER` | Comma-separated usernames allowed to send outbound SMTP. Root (UID 0) is always allowed regardless of this setting |
+| `SMTP_ALLOWGROUP` | Comma-separated group names allowed to send outbound SMTP. Uses `--gid-owner` match, detected at runtime and skipped gracefully if unavailable |
+
+Panel examples: InterWorx (`SMTP_ALLOWUSER="iworx"` `SMTP_ALLOWGROUP="mail"`), cPanel (`SMTP_ALLOWUSER="cpanel"` `SMTP_ALLOWGROUP="mail,mailman"`), Plesk (`SMTP_ALLOWUSER="postfix"` `SMTP_ALLOWGROUP="postfix,mail"`).
 
 **`LOG_DROP`** - Enable detailed firewall packet logging. Typically left disabled on production systems due to log volume and disk I/O impact.
 
