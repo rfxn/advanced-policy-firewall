@@ -1989,33 +1989,30 @@ refresh() {
 		glob_deny_download
 	fi
 
-	tmpra=$(mktemp "$INSTALL_PATH/internals/refresh.allow.XXXXXX")
-	# Extract currently-trusted IPv4 addresses from iptables-save
-        $IPTS | grep -E "TALLOW|TGALLOW" | grep -E '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | awk '{print$4}' | sort -n | uniq > $tmpra
-	# Also extract IPv6 addresses from ip6tables-save
-	if [ "$USE_IPV6" == "1" ] && [ -n "$IP6TS" ]; then
-		$IP6TS | grep -E "TALLOW|TGALLOW" | grep -E '[0-9a-fA-F]*:[0-9a-fA-F:]+' | awk '{print$4}' | sort | uniq >> $tmpra
-	fi
-        ipt -F REFRESH_TEMP
-        while IFS= read -r i; do
-                [[ "$i" == \#* || -z "$i" ]] && continue
-                if ipt_for_host "$i"; then
-                 $IPT_H $IPT_FLAGS -A REFRESH_TEMP -s $i -d $ANY_ADDR -j ACCEPT
-                 $IPT_H $IPT_FLAGS -A REFRESH_TEMP -d $i -s $ANY_ADDR -j ACCEPT
-                fi
-        done < "$tmpra"
-        tmprd=$(mktemp "$INSTALL_PATH/internals/refresh.drop.XXXXXX")
-        $IPTS | grep -E "TDENY|TGDENY" | grep -E '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | awk '{print$4}' | sort -n | uniq > $tmprd
-	if [ "$USE_IPV6" == "1" ] && [ -n "$IP6TS" ]; then
-		$IP6TS | grep -E "TDENY|TGDENY" | grep -E '[0-9a-fA-F]*:[0-9a-fA-F:]+' | awk '{print$4}' | sort | uniq >> $tmprd
-	fi
-        while IFS= read -r i; do
-                [[ "$i" == \#* || -z "$i" ]] && continue
-                if ipt_for_host "$i"; then
-                 $IPT_H $IPT_FLAGS -A REFRESH_TEMP -s $i -d $ANY_ADDR -j $ALL_STOP
-                 $IPT_H $IPT_FLAGS -A REFRESH_TEMP -d $i -s $ANY_ADDR -j $ALL_STOP
-                fi
-        done < "$tmprd"
+	# Populate REFRESH_TEMP from trust files (more reliable than iptables-save
+	# parsing, which can miss entries added since last save)
+	ipt -F REFRESH_TEMP
+	local _rf_file _rf_line
+	for _rf_file in "$ALLOW_HOSTS" "$GALLOW_HOSTS"; do
+		[ -f "$_rf_file" ] || continue
+		while IFS= read -r _rf_line; do
+			case "$_rf_line" in '#'*|''|*:*) continue ;; esac
+			if ipt_for_host "$_rf_line"; then
+				$IPT_H $IPT_FLAGS -A REFRESH_TEMP -s "$_rf_line" -j ACCEPT 2>/dev/null
+				$IPT_H $IPT_FLAGS -A REFRESH_TEMP -d "$_rf_line" -j ACCEPT 2>/dev/null
+			fi
+		done < "$_rf_file"
+	done
+	for _rf_file in "$DENY_HOSTS" "$GDENY_HOSTS"; do
+		[ -f "$_rf_file" ] || continue
+		while IFS= read -r _rf_line; do
+			case "$_rf_line" in '#'*|''|*:*) continue ;; esac
+			if ipt_for_host "$_rf_line"; then
+				$IPT_H $IPT_FLAGS -A REFRESH_TEMP -s "$_rf_line" -j $ALL_STOP 2>/dev/null
+				$IPT_H $IPT_FLAGS -A REFRESH_TEMP -d "$_rf_line" -j $ALL_STOP 2>/dev/null
+			fi
+		done < "$_rf_file"
+	done
         trim $DENY_HOSTS $SET_TRIM
         trim $GDENY_HOSTS $SET_TRIM
         ipt -F TDENY
@@ -2027,7 +2024,6 @@ refresh() {
 	deny_hosts $GDENY_HOSTS TGDENY
 	deny_hosts $DENY_HOSTS TDENY
         ipt -F REFRESH_TEMP
-        rm -f $tmpra $tmprd
 }
 
 cron_refresh() {
