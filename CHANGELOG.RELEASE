@@ -1,5 +1,8 @@
 - 2.0.2 | Feb 23 2026:
 
+[Fix] add ip6tables_available() skip guards to IPv6 connlimit and synflood
+      tests; fixes CI failures on platforms without ip6tables kernel module
+      (25-connlimit.bats, 28-synflood.bats)
 [Fix] ipset_migrate_rules(): add 5-field (v2.0.1) to 7-field migration;
       5-field entries were silently dropped on upgrade (functions.apf)
 [Fix] revert Bash 4.2+ ${var,,}/${var^^} to tr-based case conversion for

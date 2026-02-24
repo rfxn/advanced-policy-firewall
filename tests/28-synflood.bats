@@ -86,6 +86,7 @@ teardown_file() {
 # =====================================================================
 
 @test "SYNFLOOD creates IPv6 rules when USE_IPV6=1" {
+    if ! ip6tables_available; then skip "ip6tables not available"; fi
     source /opt/tests/helpers/apf-config.sh
     apf_set_config "SYNFLOOD" "1"
     apf_set_config "USE_IPV6" "1"

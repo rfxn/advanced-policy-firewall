@@ -100,6 +100,7 @@ teardown_file() {
 
 @test "IG_TCP_CLIMIT creates IPv6 connlimit rule when USE_IPV6=1" {
     [ -n "$_CONNLIMIT_OK" ] || skip "xt_connlimit not available on this kernel"
+    if ! ip6tables_available; then skip "ip6tables not available"; fi
     source /opt/tests/helpers/apf-config.sh
     apf_set_config "IG_TCP_CLIMIT" "80:50"
     apf_set_config "IG_UDP_CLIMIT" ""
