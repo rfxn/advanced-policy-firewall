@@ -491,8 +491,8 @@ cli_trust_remove() {
 		return 1
 	fi
 	local found=0
-	local dil dol i
 
+	# Remove known rule specs directly (race-free)
 	$IPT_H $IPT_FLAGS -D INPUT -s $DIP -j ACCEPT 2>/dev/null && found=1
 	$IPT_H $IPT_FLAGS -D OUTPUT -d $DIP -j ACCEPT 2>/dev/null && found=1
 	$IPT_H $IPT_FLAGS -D INPUT -s $DIP -j $ALL_STOP 2>/dev/null && found=1
@@ -515,38 +515,16 @@ cli_trust_remove() {
 	fi
 	sed -i "\%^${escaped_ip}\b%d" "$ALLOW_HOSTS" "$DENY_HOSTS" "$GALLOW_HOSTS" "$GDENY_HOSTS"
 
-	# Clean remaining rules from INPUT/OUTPUT (reverse order to preserve line numbers)
-	dil=$($IPT_H $IPT_FLAGS --numeric --list INPUT --line-numbers | grep -w "$DIP" | tac | awk '{print$1}')
-	for i in $dil; do
-		$IPT_H $IPT_FLAGS -D INPUT $i >> /dev/null 2>&1
-		found=1
-	done
-	dol=$($IPT_H $IPT_FLAGS --numeric --list OUTPUT --line-numbers | grep -w "$DIP" | tac | awk '{print$1}')
-	for i in $dol; do
-		$IPT_H $IPT_FLAGS -D OUTPUT $i >> /dev/null 2>&1
-		found=1
-	done
-
-	dil=$($IPT_H $IPT_FLAGS --numeric --list TALLOW --line-numbers | grep -w "$DIP" | tac | awk '{print$1}')
-	for i in $dil; do
-		$IPT_H $IPT_FLAGS -D TALLOW $i >> /dev/null 2>&1
-		found=1
-	done
-	dol=$($IPT_H $IPT_FLAGS --numeric --list TDENY --line-numbers | grep -w "$DIP" | tac | awk '{print$1}')
-	for i in $dol; do
-		$IPT_H $IPT_FLAGS -D TDENY $i >> /dev/null 2>&1
-		found=1
-	done
-
-	dil=$($IPT_H $IPT_FLAGS --numeric --list TGALLOW --line-numbers | grep -w "$DIP" | tac | awk '{print$1}')
-	for i in $dil; do
-		$IPT_H $IPT_FLAGS -D TGALLOW $i >> /dev/null 2>&1
-		found=1
-	done
-	dol=$($IPT_H $IPT_FLAGS --numeric --list TGDENY --line-numbers | grep -w "$DIP" | tac | awk '{print$1}')
-	for i in $dol; do
-		$IPT_H $IPT_FLAGS -D TGDENY $i >> /dev/null 2>&1
-		found=1
+	# Spec-based cleanup: extract full rule specs from iptables -S and delete
+	# by spec (race-free; no line-number shifting between list and delete)
+	local _ctr_chain _ctr_rule _ctr_spec
+	for _ctr_chain in INPUT OUTPUT TALLOW TDENY TGALLOW TGDENY; do
+		while IFS= read -r _ctr_rule; do
+			[ -z "$_ctr_rule" ] && continue
+			_ctr_spec="${_ctr_rule#-A $_ctr_chain }"
+			# shellcheck disable=SC2086
+			$IPT_H $IPT_FLAGS -D "$_ctr_chain" $_ctr_spec 2>/dev/null && found=1
+		done < <($IPT_H $IPT_FLAGS -S "$_ctr_chain" 2>/dev/null | grep -w -- "$DIP")
 	done
 
 	if [ "$found" == "0" ]; then
