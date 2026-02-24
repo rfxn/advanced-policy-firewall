@@ -1,329 +1,126 @@
 - 2.0.2 | Feb 23 2026:
 
-[Fix] glob_allow_download()/glob_deny_download(): validate downloaded entries
-      with valid_host() instead of raw file copy; matches dlist_download()
-      pattern (functions.apf)
-[Fix] expirebans(): replace unquoted array expansion with IFS read to prevent
-      globbing; add date parse error handling (functions.apf)
-[Fix] escape dots in IP addresses used in sed patterns across cli_trust_remove(),
-      expirebans(), and expire_temp_entries() (functions.apf)
-[Fix] importconf: preserve preroute.rules and postroute.rules during upgrade;
-      custom ToS/routing rules were silently lost (importconf)
-[Fix] add ip6tables_available() skip guards to IPv6 connlimit and synflood
-      tests; fixes CI failures on platforms without ip6tables kernel module
-      (25-connlimit.bats, 28-synflood.bats)
-[Fix] ipset_migrate_rules(): add 5-field (v2.0.1) to 7-field migration;
-      5-field entries were silently dropped on upgrade (functions.apf)
-[Fix] revert Bash 4.2+ ${var,,}/${var^^} to tr-based case conversion for
-      CentOS 6 (Bash 4.1) compatibility (cports.common, internals.conf)
-[Fix] expirebans(): add local declarations; $ip loop variable shadowed
-      global iproute2 binary path after refresh (functions.apf)
+  -- New Features --
+
+[New] SYN flood protection: SYNFLOOD chain rate-limits inbound TCP SYN packets
+      via iptables limit module; configurable rate/burst thresholds, LOG +
+      DROP for excess, dual-stack support (conf.apf, bt.rules, .ca.def)
+[New] SMTP outbound blocking: SMTP_BLOCK restricts outbound SMTP (ports 25,
+      465, 587) to whitelisted users/groups; root always allowed;
+      SMTP_ALLOWUSER/SMTP_ALLOWGROUP exemptions with runtime --gid-owner
+      detection; works independently of EGF toggle (conf.apf, cports.common)
+[New] Temporary allow/deny with per-entry TTL: apf -ta/-td HOST TTL adds
+      time-limited trust entries; supports seconds/minutes/hours/days (300,
+      5m, 1h, 7d); automatic cron expiry; list with --templ, flush with
+      --tempf (apf, functions.apf, cron.d.apf)
+[New] Custom hook scripts: hook_pre.sh/hook_post.sh sourced before/after
+      iptables rules; activated by chmod 750; all APF variables available;
+      preserved across upgrades (firewall, importconf)
+[New] Silent IP blocking: silent_ips.rules drops all traffic to/from listed
+      addresses with no logging; IPv4/IPv6 supported; preserved across
+      upgrades (firewall, importconf)
+[New] Search CLI: apf -g PATTERN searches iptables rules (IPv4/IPv6), ipset
+      sets, and trust files; case-insensitive (apf, functions.apf)
+[New] Per-port connection limiting via xt_connlimit: IG_TCP_CLIMIT and
+      IG_UDP_CLIMIT config variables with port:limit pairs, port range
+      support, and VNET per-IP binding (conf.apf, cports.common)
+[New] ipset 7-field format: per-list refresh interval and max entry count;
+      IPSET_REFRESH global default; per-list interval tracking via
+      .ipset.timestamps; backward-compatible auto-migration from 4-field
+      and 5-field formats (functions.apf, ipset.rules, conf.apf)
+[New] download_url(): unified download helper with curl primary, wget
+      fallback; all download sites migrated, eliminates cd-to-temp-directory
+      pattern; check_deps() warns when neither available (functions.apf)
+
+  -- Bug Fixes --
+
+[Fix] All download functions: add redirect following, increase timeout from
+      4s to 10s connect / 60s total, increase retries from 1 to 3
+      (functions.apf)
+[Fix] Add EXIT trap in CLI entry point; mutex lock released on unexpected
+      termination (SIGTERM/SIGINT/SIGHUP); prevents orphaned lock files (apf)
 [Fix] lgate_mac(): use $VF_LGATE instead of undefined $LGATE_MAC; gateway
       MAC filtering was non-functional (functions.apf)
-[New] test suite parallelization: --parallel [N] flag splits test files across
-      N parallel Docker containers using round-robin distribution; default N is
-      nproc*2; 3x speedup for single-OS runs (run-tests.sh, Makefile)
-[New] test-serial Makefile target preserving old sequential behavior (Makefile)
-[Fix] Dockerfile .clean state: add missing hook_pre.sh, hook_post.sh, and
-      silent_ips.rules .clean files needed for parallel container isolation
-      (all 10 Dockerfiles)
-[Fix] restore_bins() in 16-dependency-check.bats: use -L symlink check for
-      merged-usr compatibility; dangling symlinks on Debian 12+ caused stale
-      hidden binaries and failed teardown cleanup (16-dependency-check.bats)
-[Fix] help(): search description now mentions ipset alongside iptables to
-      reflect actual search() scope (functions.apf)
-[Fix] silent_ips.rules: add valid_host() check before ipt_for_host() to
-      skip invalid entries with WARNING instead of passing to iptables
-      (firewall)
-[New] SYN flood protection: SYNFLOOD rate-limits inbound TCP SYN packets
-      via iptables limit module; SYNFLOOD_RATE for packets/unit threshold,
-      SYNFLOOD_BURST for initial burst allowance; dedicated SYNFLOOD chain
-      with RETURN for under-limit, LOG + $TCP_STOP for excess; dual-stack
-      via ipt(); complements kernel-level SYSCTL_SYN/SYSCTL_SYNCOOKIES
-      (conf.apf, bt.rules, .ca.def)
-[Fix] SMTP_BLK VNET re-sourcing: add chain-exists guard to prevent
-      duplicate rules and OUTPUT jumps when SET_VNET=1 and SMTP_BLOCK=1;
-      cports.common is sourced per bound IP plus main.rules (cports.common)
-[Fix] .ca.def preamble: add missing defaults for SYSCTL_CONNTRACK_ADAPTIVE,
-      _INCREMENT, _HIGH, _BUCKETS; prevents empty values on upgrade from
-      pre-2.0.1 versions (.ca.def)
-[Fix] importconf: cp -f → cp -pf for hook_pre.sh and hook_post.sh;
-      preserves executable permission (chmod 750) across upgrades
-      (importconf, files/extras/importconf)
-[Change] cl_cports(): add SMTP_BLOCK, SMTP_PORTS, SMTP_ALLOWUSER,
-      SMTP_ALLOWGROUP, IG_TCP_CLIMIT, IG_UDP_CLIMIT to variable reset
-      for consistency with VNET per-IP iteration (functions.apf)
-[Change] vnetgen.def: clarify SMTP_BLOCK has system-wide scope, not
-      per-IP, in VNET rule template comments (vnetgen.def)
-[Change] conf.apf: add note that SMTP ports in EG_TCP_CPORTS bypass
-      SMTP_BLOCK when EGF=1 (conf.apf)
-[Fix] help(): --temp-expire dot-leader alignment corrected (functions.apf)
-[Fix] README/README.md: add --temp-expire to CLI usage table; fix
-      --templ/--tempf dot-leader alignment to match help() (README,
-      README.md)
-[New] 22-uid-egress.bats: 3 new tests for IPv6 SMTP_BLK rules, multiple
-      SMTP_ALLOWUSER parsing, and SMTP_BLOCK + EGF conflict (tests)
-[New] 25-connlimit.bats: 1 new test for IPv6 connlimit rules (tests)
-[New] SMTP outbound blocking: SMTP_BLOCK restricts outbound SMTP (ports
-      25, 465, 587) to whitelisted users and groups; root always allowed;
-      SMTP_ALLOWUSER for per-user exemptions, SMTP_ALLOWGROUP for per-group
-      exemptions via --gid-owner with runtime detection; works independently
-      of EGF outbound filtering toggle; includes panel-specific examples for
-      InterWorx, cPanel, and Plesk (conf.apf, cports.common, .ca.def)
-[Fix] SMTP_BLK chain added to Docker compat flush chain list (IPv4 and
-      IPv6); prevents orphaned chain on DOCKER_COMPAT=1 flush/restart
-      (functions.apf)
-[Fix] SMTP_BLOCK=1 with empty SMTP_PORTS now logs warning instead of
-      silently doing nothing (cports.common)
-[New] README/README.md: add SMTP outbound blocking to feature list and
-      configuration section with variable table, panel examples, and
-      EGF independence note (README, README.md)
-[New] FLOW/FLOW.md: add Step 22g (SMTP Outbound Blocking) and SMTP_BLK
-      row in precedence table with footnote (FLOW, FLOW.md)
-[New] README/README.md: add section 4.4 Temporary Trust Entries documenting
-      -ta, -td, --templ, --tempf CLI options, TTL syntax formats, automatic
-      expiry behavior, and cron configuration; add temp trust commands to
-      section 4 CLI reference; update Table of Contents (README, README.md)
-[New] Temporary allow/deny with per-entry TTL: apf -ta HOST TTL [comment]
-      and apf -td HOST TTL [comment]; TTL supports seconds (300), minutes
-      (5m), hours (1h), and days (7d); entries stored in allow_hosts.rules /
-      deny_hosts.rules with ttl= and expire= markers; automatic expiry via
-      consolidated cron (every minute); list with --templ, flush with --tempf
-      (apf, functions.apf, install.sh)
-[Change] expirebans() skips ttl= entries; temporary entries use their own
-      per-entry TTL instead of global SET_EXPIRE timer (functions.apf)
-[New] 27-temp-trust.bats: tests for temporary trust entries covering CLI
-      add/deny, TTL parsing, automatic expiry, listing, flushing, IPv6,
-      duplicate prevention, and expirebans interaction
-      (tests/27-temp-trust.bats)
-[Change] Consolidate 3 cron files (cron.daily, cron.d.apf_ipset,
-      cron.d.apf_temp) into single cron.d.apf with daily restart, hourly
-      ipset refresh, and per-minute temp expiry; install.sh cleans up legacy
-      cron files during upgrade (cron.d.apf, install.sh)
-[New] ipset.rules 7-field format: per-list refresh interval and max entry
-      count fields; backward-compatible migration from legacy 4-field format
-      (functions.apf, ipset.rules)
-[New] IPSET_REFRESH config variable: global default refresh interval for
-      ipset block lists during --ipset-update; minimum effective interval
-      is 1 hour since the cron runs hourly (conf.apf, .ca.def)
-[New] Per-list interval tracking via .ipset.timestamps; --ipset-update
-      skips lists that haven't reached their refresh interval (functions.apf)
-[Change] cron.d.apf_ipset: run hourly instead of every 6 hours; actual
-      refresh timing governed by per-list intervals (cron.d.apf_ipset)
-[New] Custom hook scripts: hook_pre.sh sourced after flush/modinit but before
-      any iptables rules; hook_post.sh sourced after all rules including default
-      DROP policies; activated by chmod 750 (ships as 640 = inactive); all APF
-      variables and helpers available; preserved across upgrades via importconf
-      (firewall, hook_pre.sh, hook_post.sh, importconf)
-[New] Silent IP blocking: silent_ips.rules drops all traffic to/from listed
-      server addresses with no logging; one IP/CIDR per line, IPv4 and IPv6
-      supported via ipt_for_host(); loaded after loopback/trusted interface
-      acceptance, before GRE/trust/bt.rules; empty file is no-op; preserved
-      across upgrades via importconf (firewall, silent_ips.rules, importconf)
-[New] Search/grep CLI: apf -g PATTERN / apf --search PATTERN searches all
-      iptables rules (IPv4 + IPv6 via -S format), ipset sets, and trust files
-      for a pattern match; case-insensitive, line-numbered output; no mutex
-      required (read-only operation) (apf, functions.apf)
-[New] 26-hook-search-silent.bats: tests for hook scripts (inactive/active,
-      pre/post ordering), silent IP blocking (inbound/outbound, IPv6, empty
-      no-op), and search CLI (rule match, trust file match, no match, empty
-      pattern) (tests/26-hook-search-silent.bats)
-[Change] Move ESTABLISHED,RELATED state tracking from after port filtering
-      to after trust chains, blocklists, sanity checks, and RAB; established
-      connections now fast-path through the INPUT chain, skipping VNET per-IP
-      rules, port filtering, and logging traversal; non-SYN NEW DROP stays
-      in original position after port rules; deny lists, blocklists, sanity
-      checks, and RAB all still block established connections (firewall)
-[New] FLOW.md and FLOW: standalone order-of-operations document covering
-      full load sequence, INPUT chain rule order with precedence table,
-      key "what beats what" rules, and fast load vs full load conditions
-      (FLOW.md, FLOW)
-[New] README/README.md: add section 3.12 Firewall Order of Operations with
-      condensed INPUT chain evaluation order table, key precedence rules,
-      and link to FLOW.md; update Table of Contents (README, README.md)
-[Change] Fast load uptime threshold raised from 5 minutes (300s) to 10
-      minutes (600s); ensures full rule generation on recently booted systems
-      where network state may still be settling (apf, conf.apf)
-[New] ipset_migrate_rules() auto-detects legacy 4-field ipset.rules entries
-      and rewrites them to 7-field format with defaults; handles both local
-      paths and URLs with embedded colons; runs idempotently at each firewall
-      start before ipset_load() parsing (functions.apf)
-[Change] README/README.md: modernize headers with tagline and condensed
-      copyright; collapse GPL boilerplate to single-line reference; README.md
-      adds version/license/CI badges and removes plain-text-version link
-      (README, README.md)
-[New] README/README.md: add Quick Start section with install, configure,
-      start, trust/deny, and dev-mode-disable examples (README, README.md)
-[Change] README/README.md: reorganize 48-bullet feature list into 4
-      categorized groups (Filtering & Rules, Trust System, Blocking &
-      Prevention, Infrastructure) with ~20 concise items (README, README.md)
-[Change] help(): show all accepted CLI aliases (--flush, --unban), add
-      "from ipset.rules" to --ipset-update, normalize dot-leader alignment
-      and indentation; usage line changed from "$0" to "apf"
-      (functions.apf, README, README.md)
-[New] Per-port concurrent connection limiting via xt_connlimit module;
-      IG_TCP_CLIMIT and IG_UDP_CLIMIT config variables with port:limit pairs,
-      port range support, VNET per-IP binding, and REJECT action for immediate
-      client feedback (conf.apf, cports.common, functions.apf)
-[New] 25-connlimit.bats: tests for connlimit feature covering empty config,
-      single/multiple port:limit pairs, port ranges, UDP, chain ordering, and
-      VNET per-IP binding; runtime xt_connlimit detection for graceful skip
-      on older kernels (tests/25-connlimit.bats)
-[Change] vnetgen.def: add IG_TCP_CLIMIT and IG_UDP_CLIMIT to commented
-      examples so VNET per-IP rule files document the available connlimit
-      overrides (vnetgen.def)
-[Change] ipset batch loading via ipset restore; replaces per-entry $IPSET add
-      loop (31K+ fork+exec calls) with single awk pre-filter piped to
-      ipset restore -exist, reducing load time from minutes to seconds
-      (functions.apf)
-[Change] ipset_load() and ipset_update() now log per-set "loading/updating
-      set $name from $source" before processing begins, providing visibility
-      into which set is being loaded during long ipset operations
-      (functions.apf)
-[Change] valid_ip_cidr(), valid_host(), ipt_for_host() replaced echo|grep
-      subprocess calls with bash builtins ([[ =~ ]] and [[ == *pattern* ]]);
-      eliminates 2-6 fork+exec calls per invocation in hot validation paths
-      (functions.apf)
-[Change] trust_protect_ipv6() and trust_restore_ipv6() converted from echo
-      return to variable-return (_TPV6_RESULT, _TRV6_RESULT); eliminates 1
-      subshell fork per advanced trust entry across 12 call sites in
-      allow_hosts/deny_hosts (functions.apf)
-[New] expand_port() helper converts underscore port ranges to colon format
-      using bash parameter expansion; replaces echo|grep/echo|tr subprocess
-      chains across 10 call sites (functions.apf)
-[Change] cports.common port filtering blocks simplified from 12-line if/else
-      per block to 3-line expand_port call; eliminates 4 fork+exec calls per
-      port entry across 4 inbound/outbound TCP/UDP blocks and 2 UID blocks
-      (cports.common)
-[Change] bt.rules P2P port block replaced echo|grep/echo|tr|awk subprocess
-      chains with expand_port and bash builtins (bt.rules)
-[Change] cdports() simplified from 20-line if/else to 7-line expand_port
-      loop (functions.apf)
-[Change] tosroute() consolidated from 6 identical TOS blocks (~48 lines) to
-      single loop with indirect variable expansion (~18 lines); replaces 6
-      echo|tr subprocess calls with expand_port (functions.apf)
-[New] load_local_addrs() and is_local_addr() cache .localaddrs/.localaddrs6
-      into a shell variable at function entry; replaces 7 cat|grep subprocess
-      chains (2 forks each) with zero-fork string comparison in
-      cli_trust/allow_hosts/deny_hosts (functions.apf)
-[New] trust_parse_fields() splits advanced trust entries on ':=' using IFS
-      into positional _TF1-_TF6 variables; replaces ~42 echo|tr|tr|awk
-      subprocess chains (3 forks each) with single zero-fork IFS split in
-      6 advanced trust loops across allow_hosts/deny_hosts (functions.apf)
-[Change] PPORT expansion in advanced trust loops replaced echo|grep/echo|tr|
-      awk chains with expand_port(); eliminates 3-7 additional forks per
-      entry with port range syntax (functions.apf)
-[Change] allow_hosts() and deny_hosts() unified into parameterized
-      trust_hosts() with action target and verb arguments; eliminates ~185
-      lines of duplicated trust parsing logic across 4 while-loops
-      (functions.apf)
-[New] dlist_download() consolidates dlist_php/dlist_dshield/dlist_spamhaus/
-      dlist_ecnshame download logic into single parameterized helper with
-      backup/restore, mktemp, wget, and valid_ip_cidr validation; eliminates
-      ~115 lines of duplicated download/parse code (functions.apf)
-[Change] Modernize string tests: replace [ "$x" == "" ] with [ -z "$x" ] and
-      [ ! "$x" == "" ] with [ -n "$x" ] across all files; POSIX-compliant
-      idiom, zero behavioral change (apf, firewall, functions.apf,
-      cports.common, bt.rules, sysctl.rules, vnetgen, main.vnet, get_ports,
-      install.sh)
-[Change] Replace echo|tr subprocess chains with bash parameter expansion:
-      comma-split $(echo $x | tr ',' ' ') → ${x//,/ }, lowercase
-      $(echo $x | tr '[:upper:]' '[:lower:]') → ${x,,}, uppercase
-      $(echo $x | tr '[:lower:]' '[:upper:]') → ${x^^}; eliminates 2
-      fork+exec calls per invocation across ~27 sites (cports.common,
-      functions.apf, firewall, bt.rules, internals.conf, vnetgen)
-[Change] ICMP_LIM rate parsing $(echo $x | tr '/' ' ' | awk '{print$1}')
-      → ${x%%/*} in 4 ICMP filter blocks; eliminates 3 fork+exec calls each
-      (cports.common)
-[Change] dlist_resnet URL_FILE extraction: echo|tr|grep|tail pipe replaced
-      with ${url##*/} parameter expansion (functions.apf)
-[Change] vnetgen trusted interface lookup: echo|tr|grep pipe replaced with
-      [[ ",$list," == *,"$item",* ]] bash builtin test (vnetgen)
-[Change] bt.rules IDENT port check: echo|tr|grep pipe replaced with
-      [[ ",$list," == *,113,* ]] bash builtin test (bt.rules)
-[Change] Remove unnecessary $(echo $var) wrappers in for loops; redundant
-      when variable is already space-separated (cports.common, functions.apf,
-      firewall)
-[Change] Replace echo|awk/cut field parsing with bash builtins: UID:PORT
-      parsing echo|tr|awk → ${var%%:*}/${var#*:}, ipset field parsing
-      echo|cut → IFS=: read, TCP flag parsing echo|awk → read, GRE keepalive
-      echo|awk → read; eliminates 2-5 fork+exec calls per invocation across
-      ~20 sites (cports.common, functions.apf, bt.rules, gretunnel.sh)
-[Change] dlist_download() parse loop: echo|grep|awk|tr pipeline replaced
-      with case/read/bash-test builtins; eliminates 4-6 forks per blocklist
-      entry (functions.apf)
-[Change] EG_DROP_CMD prefix: echo|cut → ${i:0:6} substring (cports.common)
-[New] _icmp_filter() helper consolidates 4 nearly-identical ICMP/ICMPv6
-      filtering blocks (~96 lines) into single parameterized function (~22
-      lines); handles ipt4/ipt6, INPUT/OUTPUT, icmp/ipv6-icmp, rate limiting,
-      and VNET address binding via arguments (cports.common)
-[Change] NDP types 133-136 inbound/outbound blocks consolidated from 8
-      individual ipt6 calls to 2 for-loops (cports.common)
-[Change] Replace remaining echo|grep subprocess calls with bash builtins:
-      IPv6 nameserver detection echo|grep ':' → [[ == *:* ]], GRE linkid/key
-      integer validation echo|grep '^[0-9]+$' → [[ =~ ^[0-9]+$ ]], ipset
-      URL detection echo|grep '^https?://' → [[ =~ ^https?:// ]]; eliminates
-      1-2 fork+exec calls per invocation across 5 sites (firewall,
-      gretunnel.sh, functions.apf)
-[Change] Remove useless cat: cat file | grep → grep file across 10 sites;
-      cat|grep|awk → awk in install.sh VERSION parsing; eliminates 1 fork+exec
-      per invocation (install.sh, firewall, functions.apf)
-[New] 21-refactor-regression.bats: 23 targeted regression tests validating
-      Phase 1-7 refactoring behavioral correctness; covers _icmp_filter()
-      'all' keyword, rate limiting, empty types, uppercase handling; port
-      list delimiter edge cases (trailing/leading/double comma); expand_port()
-      range conversion; NDP type collision with user ICMPv6 types; advanced
-      trust port range and protocol parsing; GRE linkid validation boundaries;
-      dlist invalid CIDR rejection and comment skipping
-      (tests/21-refactor-regression.bats)
-[Change] VNET main.vnet: replace ls|grep with glob-based for loop;
-      replace echo|sed with parameter expansion; fix ifconfig detection
-      from [ -f "$ifconfig" ] to [ -n "$ifconfig" ]; quote all source/path
-      expansions (main.vnet)
-[Change] VNET vnetgen: replace $ip addr list|tr|grep|awk fork chains
-      with $ip -o addr show + while IFS read loop; consolidate repeated
-      touch/chmod/source blocks into _vnet_create_rule() helper (vnetgen)
-[Change] apf: replace cat|tr|awk /proc/uptime and /proc/loadavg with
-      read builtin + ${var%%.*} parameter expansion; replace cat .last.full,
-      .md5.cores, .apf.restore.backend with read/$(< ) builtins; quote
-      source, $DIFF, and cp path arguments (apf)
-[Change] firewall: quote source $CNF path argument (firewall)
-[Change] importconf: replace cat|awk VERSION parsing with awk direct
-      file read; installed copy uses $INSTALL_PATH consistently with
-      quoting; add glob/ipset/gre rule preservation (importconf)
-[Change] sysctl.rules: replace cat /proc/sys/net/nf_conntrack_count and
-      nf_conntrack_max with read builtin (sysctl.rules)
-[Change] functions.apf: replace cat .trusts.md5 with read builtin in
-      refresh path (functions.apf)
-[New] 22-uid-egress.bats: tests for EG_TCP_UID, EG_UDP_UID uid-owner
-      rules and EG_DROP_CMD cmd-owner rules with runtime capability
-      detection (tests/22-uid-egress.bats)
-[New] 23-devel-fastload.bats: tests for DEVEL_MODE warning/cron and
-      fast load edge cases: first run skip, config change detection,
-      backend mismatch, snapshot creation (tests/23-devel-fastload.bats)
-[New] 24-vnet.bats: tests for VNET subsystem: disabled message, vnetgen
-      rule file creation, per-IP rule loading, unbound IP skip, per-IP
-      port overrides (tests/24-vnet.bats)
-[Fix] 22-uid-egress.bats: legacy iptables resolves numeric UIDs to
-      usernames in -S output; patterns now use character class to match
-      both numeric and name forms (tests/22-uid-egress.bats)
-[Change] Drop Ubuntu 22.04 from CI matrix; redundant coverage between
-      Ubuntu 20.04 and 24.04 (smoke-test.yml, tests/Makefile)
-[Fix] conf.apf: correct DOCKER_COMPAT comment to match actual behavior;
-      only FORWARD chain and nat table are preserved, not INPUT/OUTPUT
+[Fix] expirebans(): fix $ip loop variable shadowing global iproute2 path;
+      replace unquoted array expansion with IFS read to prevent globbing;
+      add date parse error handling; skip ttl= entries (functions.apf)
+[Fix] ipset_migrate_rules(): add 5-field (v2.0.1) to 7-field migration;
+      5-field entries were silently dropped on upgrade (functions.apf)
+[Fix] glob_allow_download()/glob_deny_download(): validate entries with
+      valid_host() instead of raw file copy (functions.apf)
+[Fix] escape dots in IP addresses used in sed patterns across
+      cli_trust_remove(), expirebans(), expire_temp_entries() (functions.apf)
+[Fix] importconf: preserve preroute.rules/postroute.rules and hook script
+      permissions during upgrade (importconf)
+[Fix] SMTP_BLK: add chain-exists guard for VNET re-sourcing; add to Docker
+      compat flush chain list; warn on empty SMTP_PORTS (cports.common,
+      functions.apf)
+[Fix] .ca.def preamble: add missing defaults for SYSCTL_CONNTRACK_*,
+      DOCKER_COMPAT, IG_ICMPV6_TYPES, EG_ICMPV6_TYPES; prevents empty
+      values on upgrade from pre-2.0.1 (.ca.def)
+[Fix] silent_ips.rules: validate entries with valid_host() before passing
+      to iptables (firewall)
+[Fix] conf.apf: correct DOCKER_COMPAT comment to match actual behavior
       (conf.apf)
-[Fix] functions.apf: fix (trust) eout prefix to {trust} for consistency
-      with all other eout calls (functions.apf)
-[Fix] functions.apf: add missing {trust} prefix to trust_hosts() fatal
-      error eout call (functions.apf)
-[New] README/README.md: add documentation for IG_TCP_CLIMIT/IG_UDP_CLIMIT
-      per-port connection limiting, EG_TCP_UID/EG_UDP_UID uid-based
-      outbound filtering, IG_ICMPV6_TYPES/EG_ICMPV6_TYPES; add connlimit
-      to feature list; remove phantom PKT_SANITY_STUFFED reference
-      (README, README.md)
-[Change] .ca.def: add missing preamble defaults for DOCKER_COMPAT,
-      IG_ICMPV6_TYPES, EG_ICMPV6_TYPES to ensure correct values during
-      importconf upgrades from pre-2.0.1 versions (.ca.def)
+[Fix] Bash 4.2+ ${var,,}/${var^^} reverted to tr-based case conversion for
+      CentOS 6 compatibility (cports.common, internals.conf)
+
+  -- Changes --
+
+[Change] ESTABLISHED,RELATED state tracking moved earlier in INPUT chain;
+      established connections now fast-path past VNET, port filtering, and
+      logging (firewall)
+[Change] Fast load uptime threshold raised from 5 to 10 minutes (apf)
+[Change] Consolidate 3 cron files into single cron.d.apf with daily restart,
+      hourly ipset refresh, and per-minute temp expiry (cron.d.apf, install.sh)
+[Change] ipset batch loading via ipset restore; reduces load time from
+      minutes to seconds for large block lists (functions.apf)
+[Change] Performance: replace subprocess chains (echo|tr|awk|grep) with bash
+      builtins and parameter expansion across all hot paths; eliminate useless
+      cat pipes; convert subshell returns to variable-return pattern; cache
+      local address lookups (functions.apf, cports.common, bt.rules, firewall,
+      vnetgen, main.vnet, sysctl.rules, install.sh, internals.conf)
+[Change] Consolidate duplicated code: trust_hosts() unifies allow/deny
+      loading; dlist_download() unifies 4 download functions; _icmp_filter()
+      unifies 4 ICMP blocks; expand_port() replaces 10 port-range conversions;
+      trust_parse_fields() replaces per-entry field parsing; tosroute()
+      consolidated from 6 blocks to 1 loop (functions.apf, cports.common)
+[Change] Modernize string tests ([ "$x" == "" ] → [ -z "$x" ]) and remove
+      unnecessary $(echo $var) wrappers across all files
+[Change] VNET: replace fork-heavy parsing with builtins and glob patterns;
+      fix ifconfig detection; add variable quoting (main.vnet, vnetgen)
+[Change] help(): show all CLI aliases, normalize alignment (functions.apf)
+[Change] cl_cports(): reset SMTP and connlimit variables for VNET per-IP
+      consistency (functions.apf)
+[Change] Drop Ubuntu 22.04 from CI matrix; redundant with 20.04+24.04
+      (smoke-test.yml)
+
+  -- Documentation --
+
+[New] FLOW.md/FLOW: standalone order-of-operations document with INPUT chain
+      precedence table and fast/full load conditions
+[Change] README/README.md: modernize headers; add Quick Start section;
+      reorganize feature list; add documentation for connlimit, uid-based
+      egress, ICMPv6 types, SMTP blocking, temporary trust, hooks, silent
+      IPs, search CLI, and firewall order of operations
+
+  -- Correctness Fixes --
+
+[Change] File-based flock mutex: replace FD-based exec/flock locking with
+      file-based flock gate that re-invokes under exclusive lock; noclobber +
+      PID fallback when flock unavailable; stale lock detection (apf,
+      functions.apf)
+[Fix] Trust CLI operations (-a, -d, -u, -ta, -td) now acquire mutex lock
+      via exec-flock gate, preventing races with concurrent cron operations
+      (apf)
+
+  -- Test Suite --
+
+[New] 8 new test files: 21-refactor-regression, 22-uid-egress,
+      23-devel-fastload, 24-vnet, 25-connlimit, 26-hook-search-silent,
+      27-temp-trust, 28-synflood (398 tests total across 28 files)
+[New] Test parallelization: --parallel [N] flag splits across N containers;
+      3x speedup (run-tests.sh, Makefile)
 
 - 2.0.1 | Feb 20 2026:
 
