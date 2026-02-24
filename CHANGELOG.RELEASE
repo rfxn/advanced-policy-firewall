@@ -31,8 +31,16 @@
 [New] download_url(): unified download helper with curl primary, wget
       fallback; all download sites migrated, eliminates cd-to-temp-directory
       pattern; check_deps() warns when neither available (functions.apf)
+[New] Block escalation: PERMBLOCK_COUNT/PERMBLOCK_INTERVAL auto-promote
+      repeat temp denies to permanent; tracks deny history in .block_history
+      state file; configurable count threshold and time window; disabled
+      by default (conf.apf, functions.apf, .ca.def)
 
   -- Bug Fixes --
+
+[Fix] cli_trust_remove(): spec-based iptables rule deletion replaces racy
+      line-number approach; uses iptables -S to extract full rule specs
+      then deletes by spec (functions.apf)
 
 [Fix] All download functions: add redirect following, increase timeout from
       4s to 10s connect / 60s total, increase retries from 1 to 3
@@ -67,6 +75,9 @@
 
   -- Changes --
 
+[Change] refresh(): populate REFRESH_TEMP from trust files instead of
+      iptables-save parsing; eliminates missed entries from unsaved state
+      (functions.apf)
 [Change] ESTABLISHED,RELATED state tracking moved earlier in INPUT chain;
       established connections now fast-path past VNET, port filtering, and
       logging (firewall)

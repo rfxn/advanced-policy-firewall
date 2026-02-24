@@ -710,7 +710,7 @@ escalate_to_permanent() {
 
 	# Remove temp entry markers from deny_hosts.rules
 	escaped_ip=$(echo "$ip" | sed 's/\./\\./g')
-	sed -i "/ttl=.*expire=.*${escaped_ip}/d" "$DENY_HOSTS"
+	sed -i "/${escaped_ip}.*ttl=.*expire=/d" "$DENY_HOSTS"
 	sed -i "/^${escaped_ip}$/d" "$DENY_HOSTS"
 
 	# Add as permanent with static noexpire markers
