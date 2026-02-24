@@ -29,8 +29,8 @@
       .ipset.timestamps; backward-compatible auto-migration from 4-field
       and 5-field formats (functions.apf, ipset.rules, conf.apf)
 [New] download_url(): unified download helper with curl primary, wget
-      fallback; curl preferred for better TLS 1.2 support on CentOS 6
-      (functions.apf)
+      fallback; all download sites migrated, eliminates cd-to-temp-directory
+      pattern; check_deps() warns when neither available (functions.apf)
 
   -- Bug Fixes --
 
@@ -50,10 +50,8 @@
       valid_host() instead of raw file copy (functions.apf)
 [Fix] escape dots in IP addresses used in sed patterns across
       cli_trust_remove(), expirebans(), expire_temp_entries() (functions.apf)
-[Fix] importconf: preserve preroute.rules and postroute.rules during
-      upgrade; custom ToS/routing rules were silently lost (importconf)
-[Fix] importconf: cp -pf for hook scripts to preserve executable permission
-      across upgrades (importconf)
+[Fix] importconf: preserve preroute.rules/postroute.rules and hook script
+      permissions during upgrade (importconf)
 [Fix] SMTP_BLK: add chain-exists guard for VNET re-sourcing; add to Docker
       compat flush chain list; warn on empty SMTP_PORTS (cports.common,
       functions.apf)
@@ -72,10 +70,6 @@
 [Change] ESTABLISHED,RELATED state tracking moved earlier in INPUT chain;
       established connections now fast-path past VNET, port filtering, and
       logging (firewall)
-[Change] Migrate all download sites to download_url(); eliminates cd-to-
-      temp-directory pattern (functions.apf)
-[Change] check_deps(): warn when neither curl nor wget available instead
-      of only checking wget (functions.apf)
 [Change] Fast load uptime threshold raised from 5 to 10 minutes (apf)
 [Change] Consolidate 3 cron files into single cron.d.apf with daily restart,
       hourly ipset refresh, and per-minute temp expiry (cron.d.apf, install.sh)
