@@ -283,10 +283,10 @@ check_deps() {
   fi
  fi
 
- # Warn: wget (when remote lists or RGT enabled)
+ # Warn: curl/wget (when remote lists or RGT enabled)
  if [ "$DLIST_PHP" == "1" ] || [ "$DLIST_SPAMHAUS" == "1" ] || [ "$DLIST_DSHIELD" == "1" ] || [ "$DLIST_RESERVED" == "1" ] || [ "$DLIST_ECNSHAME" == "1" ] || [ "$USE_RGT" == "1" ]; then
-  if [ -z "$WGET" ]; then
-   warn="$warn wget(remote-lists)"
+  if [ -z "$CURL" ] && [ -z "$WGET" ]; then
+   warn="$warn curl|wget(remote-lists)"
   fi
  fi
 
@@ -1112,32 +1112,43 @@ allow_hosts() { trust_hosts "$1" "$2" ACCEPT ACCEPT ACCEPT "allow"; }
 
 deny_hosts() { trust_hosts "$1" "$2" "$ALL_STOP" "$TCP_STOP" "$UDP_STOP" "deny"; }
 
+# download_url URL OUTPUT_FILE
+# Tries curl first (better TLS 1.2 on CentOS 6), falls back to wget.
+# Returns 0 on success, 1 on failure.
+download_url() {
+    local url="$1" output="$2"
+    if [ -n "$CURL" ]; then
+        $CURL -sSL --connect-timeout 10 --max-time 60 --retry 3 \
+            -o "$output" "$url" >> /dev/null 2>&1 && return 0
+    fi
+    if [ -n "$WGET" ]; then
+        $WGET -q -t 3 -T 10 -O "$output" "$url" >> /dev/null 2>&1 && return 0
+    fi
+    return 1
+}
 
 dlist_resnet() {
  if [ -f "$RESNET" ]; then
         cp "$RESNET" "$RESNET.bk"
         chmod 600 "$RESNET" "$RESNET.bk"
  fi
-if [ -f "$WGET" ] && [ -f "$RESNET" ]; then
-   URL_TMP=$(mktemp -d "$INSTALL_PATH/.apf-XXXXXX")
-   URL_FILE="${DLIST_RESERVED_URL##*/}"
-   cd "$URL_TMP"
+if ( [ -n "$CURL" ] || [ -n "$WGET" ] ) && [ -f "$RESNET" ]; then
+   local url_tmp
+   url_tmp=$(mktemp "$INSTALL_PATH/.apf-XXXXXX")
    eout "{resnet} downloading $DLIST_RESERVED_URL"
-   $WGET -t 1 -T 4 "$DLIST_RESERVED_URL" >> /dev/null 2>&1
-   if [ $? -eq 0 ] && [ -f "$URL_TMP/$URL_FILE" ]; then
-        eout "{resnet} parsing $URL_FILE into $RESNET"
-        cat "$URL_TMP/$URL_FILE" > "$RESNET"
+   if download_url "$DLIST_RESERVED_URL" "$url_tmp"; then
+        eout "{resnet} parsing download into $RESNET"
+        cat "$url_tmp" > "$RESNET"
    else
         eout "{resnet} download of $DLIST_RESERVED_URL failed"
-	 if [ -f "$RESNET" ]; then
+	 if [ -f "$RESNET.bk" ]; then
 	     cp "$RESNET.bk" "$RESNET"
-   	     chmod 600 "$RESNET" "$RESNET.bk"
+	     chmod 600 "$RESNET" "$RESNET.bk"
 	 fi
    fi
-   rm -rf "$URL_TMP"
-   cd "$INSTALL_PATH"
+   rm -f "$url_tmp"
 else
- if [ -f "$RESNET" ]; then
+ if [ -f "$RESNET.bk" ]; then
 	cp "$RESNET.bk" "$RESNET"
 	chmod 600 "$RESNET" "$RESNET.bk"
  fi
@@ -1151,14 +1162,11 @@ if [ -f "$hosts_file" ]; then
    cp "$hosts_file" "$hosts_file.bk"
    chmod 600 "$hosts_file" "$hosts_file.bk"
 fi
-local url_tmp url_file
-url_tmp=$(mktemp -d "$INSTALL_PATH/.apf-XXXXXX")
-url_file="${url##*/}"
-cd "$url_tmp"
+local url_tmp
+url_tmp=$(mktemp "$INSTALL_PATH/.apf-XXXXXX")
 eout "{$tag} downloading $url"
-$WGET -t 1 -T 4 "$url" >> /dev/null 2>&1
-if [ $? -eq 0 ] && [ -f "$url_tmp/$url_file" ]; then
-        eout "{$tag} parsing $url_file into $hosts_file"
+if download_url "$url" "$url_tmp"; then
+        eout "{$tag} parsing download into $hosts_file"
         :> "$hosts_file"
         while IFS= read -r str; do
                 case "$str" in \#*|"") continue ;; esac
@@ -1172,7 +1180,7 @@ if [ $? -eq 0 ] && [ -f "$url_tmp/$url_file" ]; then
                 if [ -n "$str" ] && valid_ip_cidr "$str"; then
                         echo "$str" >> "$hosts_file"
                 fi
-        done < "$url_tmp/$url_file"
+        done < "$url_tmp"
 else
         eout "{$tag} download of $url failed"
         if [ -f "$hosts_file.bk" ]; then
@@ -1180,12 +1188,11 @@ else
             chmod 600 "$hosts_file" "$hosts_file.bk"
         fi
 fi
-rm -rf "$url_tmp"
-cd "$INSTALL_PATH"
+rm -f "$url_tmp"
 }
 
 dlist_php() {
-if [ -n "$DLIST_PHP_URL" ] && [ "$DLIST_PHP" == "1" ] && [ -f "$WGET" ]; then
+if [ -n "$DLIST_PHP_URL" ] && [ "$DLIST_PHP" == "1" ] && ( [ -n "$CURL" ] || [ -n "$WGET" ] ); then
    dlist_download "php" "$DLIST_PHP_URL" "$PHP_HOSTS"
 else
    rm -f "$PHP_HOSTS"; touch "$PHP_HOSTS"; chmod 600 "$PHP_HOSTS"
@@ -1217,7 +1224,7 @@ fi
 }
 
 dlist_dshield() {
-if [ -n "$DLIST_DSHIELD_URL" ] && [ "$DLIST_DSHIELD" == "1" ] && [ -f "$WGET" ]; then
+if [ -n "$DLIST_DSHIELD_URL" ] && [ "$DLIST_DSHIELD" == "1" ] && ( [ -n "$CURL" ] || [ -n "$WGET" ] ); then
    dlist_download "dshield" "$DLIST_DSHIELD_URL" "$DS_HOSTS"
 else
    rm -f "$DS_HOSTS"; touch "$DS_HOSTS"; chmod 600 "$DS_HOSTS"
@@ -1249,7 +1256,7 @@ fi
 }
 
 dlist_spamhaus() {
-if [ -n "$DLIST_SPAMHAUS_URL" ] && [ "$DLIST_SPAMHAUS" == "1" ] && [ -f "$WGET" ]; then
+if [ -n "$DLIST_SPAMHAUS_URL" ] && [ "$DLIST_SPAMHAUS" == "1" ] && ( [ -n "$CURL" ] || [ -n "$WGET" ] ); then
    dlist_download "sdrop" "$DLIST_SPAMHAUS_URL" "$DROP_HOSTS" "spamhaus"
 else
    rm -f "$DROP_HOSTS"; touch "$DROP_HOSTS"; chmod 600 "$DROP_HOSTS"
@@ -1282,7 +1289,7 @@ fi
 }
 
 dlist_ecnshame() {
-if [ -n "$DLIST_ECNSHAME_URL" ] && [ "$DLIST_ECNSHAME" == "1" ] && [ -f "$WGET" ]; then
+if [ -n "$DLIST_ECNSHAME_URL" ] && [ "$DLIST_ECNSHAME" == "1" ] && ( [ -n "$CURL" ] || [ -n "$WGET" ] ); then
    dlist_download "ecnshame" "$DLIST_ECNSHAME_URL" "$ECNSHAME_HOSTS"
 else
    rm -f "$ECNSHAME_HOSTS"; touch "$ECNSHAME_HOSTS"; chmod 600 "$ECNSHAME_HOSTS"
@@ -1397,29 +1404,21 @@ while IFS= read -r line; do
 
 	# Resolve file_or_url to a local file
 	if [[ "$file_or_url" =~ ^https?:// ]]; then
-		# Download to temp dir
 		local url_tmp
-		url_tmp=$(mktemp -d "$INSTALL_PATH/.apf-XXXXXX")
-		local dl_ok=0
-		if [ -n "$CURL" ]; then
-			$CURL -sSL --connect-timeout 10 --retry 3 -o "$url_tmp/ipset_dl" "$file_or_url" >> /dev/null 2>&1 && dl_ok=1
-		fi
-		if [ "$dl_ok" != "1" ] && [ -n "$WGET" ]; then
-			$WGET -q -t 3 -T 10 -O "$url_tmp/ipset_dl" "$file_or_url" >> /dev/null 2>&1 && dl_ok=1
-		fi
-		if [ "$dl_ok" != "1" ]; then
+		url_tmp=$(mktemp "$INSTALL_PATH/.apf-XXXXXX")
+		if ! download_url "$file_or_url" "$url_tmp"; then
 			eout "{ipset} download failed for $name: $file_or_url"
-			rm -rf "$url_tmp"
+			rm -f "$url_tmp"
 			continue
 		fi
-		data_file="$url_tmp/ipset_dl"
+		data_file="$url_tmp"
 	else
 		data_file="$file_or_url"
 	fi
 
 	if [ ! -f "$data_file" ] || [ ! -s "$data_file" ]; then
 		eout "{ipset} empty or missing data for $name"
-		[ -n "$url_tmp" ] && rm -rf "$url_tmp"
+		[ -n "$url_tmp" ] && rm -f "$url_tmp"
 		continue
 	fi
 
@@ -1460,7 +1459,7 @@ while IFS= read -r line; do
 	fi
 	rm -f "$restore_file"
 
-	[ -n "$url_tmp" ] && rm -rf "$url_tmp"
+	[ -n "$url_tmp" ] && rm -f "$url_tmp"
 
 	if [ "$count" -eq 0 ]; then
 		eout "{ipset} no valid entries for $name, skipping"
@@ -1557,26 +1556,19 @@ while IFS= read -r line; do
 	eout "{ipset} updating set $name from $file_or_url"
 
 	if [[ "$file_or_url" =~ ^https?:// ]]; then
-		url_tmp=$(mktemp -d "$INSTALL_PATH/.apf-XXXXXX")
-		local dl_ok=0
-		if [ -n "$CURL" ]; then
-			$CURL -sSL --connect-timeout 10 --retry 3 -o "$url_tmp/ipset_dl" "$file_or_url" >> /dev/null 2>&1 && dl_ok=1
-		fi
-		if [ "$dl_ok" != "1" ] && [ -n "$WGET" ]; then
-			$WGET -q -t 3 -T 10 -O "$url_tmp/ipset_dl" "$file_or_url" >> /dev/null 2>&1 && dl_ok=1
-		fi
-		if [ "$dl_ok" != "1" ]; then
+		url_tmp=$(mktemp "$INSTALL_PATH/.apf-XXXXXX")
+		if ! download_url "$file_or_url" "$url_tmp"; then
 			eout "{ipset} update download failed for $name: $file_or_url"
-			rm -rf "$url_tmp"
+			rm -f "$url_tmp"
 			continue
 		fi
-		data_file="$url_tmp/ipset_dl"
+		data_file="$url_tmp"
 	else
 		data_file="$file_or_url"
 	fi
 
 	if [ ! -f "$data_file" ] || [ ! -s "$data_file" ]; then
-		[ -n "$url_tmp" ] && rm -rf "$url_tmp"
+		[ -n "$url_tmp" ] && rm -f "$url_tmp"
 		continue
 	fi
 
@@ -1615,7 +1607,7 @@ while IFS= read -r line; do
 	fi
 	rm -f "$restore_file"
 
-	[ -n "$url_tmp" ] && rm -rf "$url_tmp"
+	[ -n "$url_tmp" ] && rm -f "$url_tmp"
 
 	if [ "$count" -gt 0 ]; then
 		$IPSET swap "${name}-tmp" "$name"
@@ -1649,14 +1641,12 @@ rm -f "$INSTALL_PATH/internals/.ipset.timestamps"
 }
 
 glob_allow_download() {
-if [ -n "$GA_URL" ] && [ "$USE_RGT" == "1" ] && [ -f "$WGET" ]; then
-   URL_TMP=$(mktemp -d "$INSTALL_PATH/.apf-XXXXXX")
-   URL_FILE="${GA_URL##*/}"
-   cd "$URL_TMP"
+if [ -n "$GA_URL" ] && [ "$USE_RGT" == "1" ] && ( [ -n "$CURL" ] || [ -n "$WGET" ] ); then
+   local url_tmp
+   url_tmp=$(mktemp "$INSTALL_PATH/.apf-XXXXXX")
    eout "{trust} downloading $GA_URL"
-   $WGET -t 1 -T 4 "$GA_URL" >> /dev/null 2>&1
-   if [ $? -eq 0 ] && [ -f "$URL_TMP/$URL_FILE" ]; then
-        eout "{trust} parsing $URL_FILE into $GALLOW_HOSTS"
+   if download_url "$GA_URL" "$url_tmp"; then
+        eout "{trust} parsing download into $GALLOW_HOSTS"
         local _entry
         :> "$GALLOW_HOSTS"
         while IFS= read -r _entry; do
@@ -1665,12 +1655,11 @@ if [ -n "$GA_URL" ] && [ "$USE_RGT" == "1" ] && [ -f "$WGET" ]; then
             if [ -n "$_entry" ] && valid_host "$_entry"; then
                 echo "$_entry" >> "$GALLOW_HOSTS"
             fi
-        done < "$URL_TMP/$URL_FILE"
+        done < "$url_tmp"
    else
         eout "{trust} download of $GA_URL failed"
    fi
-   rm -rf "$URL_TMP"
-   cd "$INSTALL_PATH"
+   rm -f "$url_tmp"
 else
    rm -f "$GALLOW_HOSTS"
    touch "$GALLOW_HOSTS"
@@ -1679,14 +1668,12 @@ fi
 }
 
 glob_deny_download() {
-if [ -n "$GD_URL" ] && [ "$USE_RGT" == "1" ] && [ -f "$WGET" ]; then
-   URL_TMP=$(mktemp -d "$INSTALL_PATH/.apf-XXXXXX")
-   URL_FILE="${GD_URL##*/}"
-   cd "$URL_TMP"
+if [ -n "$GD_URL" ] && [ "$USE_RGT" == "1" ] && ( [ -n "$CURL" ] || [ -n "$WGET" ] ); then
+   local url_tmp
+   url_tmp=$(mktemp "$INSTALL_PATH/.apf-XXXXXX")
    eout "{trust} downloading $GD_URL"
-   $WGET -t 1 -T 4 "$GD_URL" >> /dev/null 2>&1
-   if [ $? -eq 0 ] && [ -f "$URL_TMP/$URL_FILE" ]; then
-        eout "{trust} parsing $URL_FILE into $GDENY_HOSTS"
+   if download_url "$GD_URL" "$url_tmp"; then
+        eout "{trust} parsing download into $GDENY_HOSTS"
         local _entry
         :> "$GDENY_HOSTS"
         while IFS= read -r _entry; do
@@ -1695,12 +1682,11 @@ if [ -n "$GD_URL" ] && [ "$USE_RGT" == "1" ] && [ -f "$WGET" ]; then
             if [ -n "$_entry" ] && valid_host "$_entry"; then
                 echo "$_entry" >> "$GDENY_HOSTS"
             fi
-        done < "$URL_TMP/$URL_FILE"
+        done < "$url_tmp"
    else
         eout "{trust} download of $GD_URL failed"
    fi
-   rm -rf "$URL_TMP"
-   cd "$INSTALL_PATH"
+   rm -f "$url_tmp"
 else
    rm -f "$GDENY_HOSTS"
    touch "$GDENY_HOSTS"

@@ -91,15 +91,16 @@ teardown() {
     "$APF" -f 2>/dev/null || true
 }
 
-@test "warns on missing wget when DLIST enabled" {
+@test "warns on missing curl and wget when DLIST enabled" {
     source /opt/tests/helpers/apf-config.sh
     apf_set_config "DLIST_PHP" "1"
+    hide_bin curl
     hide_bin wget
     run "$APF" -s
     # Should still succeed (warning, not critical)
     assert_success
     # Check log for warning
-    run grep "missing optional dependencies.*wget" /var/log/apf_log
+    run grep "missing optional dependencies.*curl|wget" /var/log/apf_log
     assert_success
     "$APF" -f 2>/dev/null || true
     source /opt/tests/helpers/reset-apf.sh
