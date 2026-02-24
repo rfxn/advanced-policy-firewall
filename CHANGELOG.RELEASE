@@ -123,6 +123,20 @@
 [Fix] Quote $INSTALL_PATH in 32+ locations across apf, firewall, and
       functions.apf — redirections, command execution, and source contexts
       (apf, firewall, functions.apf)
+[Fix] Strip control characters (newline, carriage return, tab) from trust
+      comment field to prevent line injection in allow/deny hosts files
+      (functions.apf)
+[Fix] install.sh: cd to script directory and verify source files exist
+      before installing; prevents broken install from wrong CWD (install.sh)
+[Fix] install.sh: remove pre-install rm -rf of install directory; cp -fR
+      already overwrites files, preventing data loss on install failure
+      (install.sh)
+[Fix] refresh(): move temp file creation past MD5 early-exit to prevent
+      orphaned temp files in internals/ on unchanged trust (functions.apf)
+[New] validate_config(): startup validation for TCP_STOP/UDP_STOP/ALL_STOP
+      stop targets, SYNFLOOD rate/burst format, and connlimit entry syntax;
+      clear error messages instead of cryptic iptables failures (functions.apf,
+      apf)
 
   -- Test Suite --
 

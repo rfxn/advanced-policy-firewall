@@ -335,6 +335,47 @@ check_deps() {
  fi
 }
 
+validate_config() {
+ local err=""
+ # Validate stop targets
+ for _vc_pair in "TCP_STOP:$TCP_STOP" "UDP_STOP:$UDP_STOP" "ALL_STOP:$ALL_STOP"; do
+    local _vc_name="${_vc_pair%%:*}" _vc_val="${_vc_pair#*:}"
+    case "$_vc_val" in
+        DROP|REJECT|RESET|PROHIBIT) ;;
+        *) err="${err}${_vc_name}='${_vc_val}' is invalid (must be DROP, REJECT, RESET, or PROHIBIT); " ;;
+    esac
+ done
+ # Validate SYNFLOOD rate/burst (only when enabled)
+ if [ "$SYNFLOOD" == "1" ]; then
+    local _vc_rate='^[0-9]+/[smh]$'
+    if [[ ! "$SYNFLOOD_RATE" =~ $_vc_rate ]]; then
+        err="${err}SYNFLOOD_RATE='$SYNFLOOD_RATE' is invalid (must be number/s, number/m, or number/h); "
+    fi
+    local _vc_burst='^[0-9]+$'
+    if [[ ! "$SYNFLOOD_BURST" =~ $_vc_burst ]]; then
+        err="${err}SYNFLOOD_BURST='$SYNFLOOD_BURST' is invalid (must be a positive integer); "
+    fi
+ fi
+ # Validate connlimit entries
+ local _vc_clpat='^[0-9_]+:[0-9]+$'
+ for _vc_pair in "IG_TCP_CLIMIT:$IG_TCP_CLIMIT" "IG_UDP_CLIMIT:$IG_UDP_CLIMIT"; do
+    local _vc_name="${_vc_pair%%:*}" _vc_val="${_vc_pair#*:}"
+    [ -z "$_vc_val" ] && continue
+    for _vc_entry in ${_vc_val//,/ }; do
+        [ -z "$_vc_entry" ] && continue
+        if [[ ! "$_vc_entry" =~ $_vc_clpat ]]; then
+            err="${err}${_vc_name} entry '${_vc_entry}' is invalid (must be port:limit or port_range:limit); "
+        fi
+    done
+ done
+ if [ -n "$err" ]; then
+    eout "{glob} configuration error: $err"
+    [ "$SET_VERBOSE" != "1" ] && echo "apf($$): configuration error: $err"
+    mutex_unlock
+    exit 1
+ fi
+}
+
 mutex_lock() {
   if [ "$APF_MUTEX_LOCKED" == "1" ]; then
     return
@@ -533,6 +574,9 @@ cli_trust() {
                 echo "$HOST appears to be IPv6 but USE_IPV6 is not enabled"
         else
 	        TIME=$(date +"%D %H:%M:%S")
+		CMT="${CMT//$'\n'/ }"
+		CMT="${CMT//$'\r'/}"
+		CMT="${CMT//$'\t'/ }"
 		if [ "$CMT" ]; then
 			echo "# added $HOST on $TIME with comment: $CMT" >> $FILE
 		else
@@ -595,6 +639,9 @@ cli_trust_temp() {
 	echo "$HOST appears to be IPv6 but USE_IPV6 is not enabled"
  else
 	TIME=$(date +"%D %H:%M:%S")
+	CMT="${CMT//$'\n'/ }"
+	CMT="${CMT//$'\r'/}"
+	CMT="${CMT//$'\t'/ }"
 	EXPIRE_EPOCH=$(($(date +%s) + _TTL_SECONDS))
 	if [ -n "$CMT" ]; then
 		echo "# added $HOST on $TIME ttl=$_TTL_SECONDS expire=$EXPIRE_EPOCH with comment: $CMT" >> "$FILE"
@@ -1933,7 +1980,6 @@ refresh() {
 	fi
 
         eout "{glob} refreshing trust system rules"
-	tmpra=$(mktemp "$INSTALL_PATH/internals/refresh.allow.XXXXXX")
 
         if [ "$SET_EXPIRE" -ge "60" ]; then
                 # expire deny_hosts bans
@@ -1962,6 +2008,7 @@ refresh() {
 		glob_deny_download
 	fi
 
+	tmpra=$(mktemp "$INSTALL_PATH/internals/refresh.allow.XXXXXX")
 	# Extract currently-trusted IPv4 addresses from iptables-save
         $IPTS | grep -E "TALLOW|TGALLOW" | grep -E '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | awk '{print$4}' | sort -n | uniq > $tmpra
 	# Also extract IPv6 addresses from ip6tables-save

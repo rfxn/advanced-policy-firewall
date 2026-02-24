@@ -56,6 +56,7 @@ fi
 
 start() {
 check_deps
+validate_config
 ##
 # Fast Load
 ##

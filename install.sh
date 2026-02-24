@@ -11,6 +11,9 @@ INSTALL_PATH=${INSTALL_PATH:-"/etc/apf"}
 BINPATH=${BINPATH:-"/usr/local/sbin/apf"}
 COMPAT_BINPATH=${COMPAT_BINPATH:-"/usr/local/sbin/fwmgr"}
 
+cd "$(dirname "$0")" || { echo "Error: cannot cd to script directory"; exit 1; }
+[ -f "files/VERSION" ] || { echo "Error: source files not found — run install.sh from the APF source directory"; exit 1; }
+
 install() {
         mkdir -p "$INSTALL_PATH"
         cp -fR files/* "$INSTALL_PATH"
@@ -92,7 +95,6 @@ if [ -d "$INSTALL_PATH" ]; then
 	cp -R "$INSTALL_PATH" "$INSTALL_PATH.bk$DVAL" || { echo "Backup failed, aborting."; exit 1; }
 	rm -f "$INSTALL_PATH.bk.last"
 	ln -fs "$INSTALL_PATH.bk$DVAL" "${INSTALL_PATH}.bk.last"
-	rm -rf "$INSTALL_PATH"
 	echo -n "Installing APF $VER: "
 	install
 else
