@@ -162,6 +162,23 @@ teardown_file() {
     rm -rf "${APF_DIR}.bk.last" "${APF_DIR}".bk[0-9]*
 }
 
+@test "importconf preserves preroute and postroute rules" {
+    rm -rf "${APF_DIR}.bk.last" "${APF_DIR}".bk[0-9]*
+    cp -a "$APF_DIR" "${APF_DIR}.bk.last"
+    # Add custom rules to preroute and postroute in backup
+    echo "-A PREROUTING -p tcp --dport 80 -j TOS --set-tos 0x10" >> "${APF_DIR}.bk.last/preroute.rules"
+    echo "-A POSTROUTING -p tcp --sport 80 -j TOS --set-tos 0x10" >> "${APF_DIR}.bk.last/postroute.rules"
+    cd /opt/apf-src
+    INSTALL_PATH="$APF_DIR" sh install.sh >/dev/null 2>&1
+    # Verify custom preroute content preserved
+    run grep "PREROUTING.*TOS" "$APF_DIR/preroute.rules"
+    assert_success
+    # Verify custom postroute content preserved
+    run grep "POSTROUTING.*TOS" "$APF_DIR/postroute.rules"
+    assert_success
+    rm -rf "${APF_DIR}.bk.last" "${APF_DIR}".bk[0-9]*
+}
+
 @test "log rotation config installed" {
     if [ ! -d "/etc/logrotate.d" ]; then
         skip "logrotate not available"
