@@ -32,6 +32,9 @@ if [ ! -f "$LOG_APF" ]; then
         eout "{glob} status log not found, created"
 fi
 
+# Clean up mutex lock on unexpected termination
+trap 'mutex_unlock' EXIT
+
 start() {
 check_deps
 ##

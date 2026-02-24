@@ -31,6 +31,8 @@
 
   -- Bug Fixes --
 
+[Fix] Add EXIT trap in CLI entry point; mutex lock released on unexpected
+      termination (SIGTERM/SIGINT/SIGHUP); prevents orphaned lock files (apf)
 [Fix] lgate_mac(): use $VF_LGATE instead of undefined $LGATE_MAC; gateway
       MAC filtering was non-functional (functions.apf)
 [Fix] expirebans(): fix $ip loop variable shadowing global iproute2 path;
