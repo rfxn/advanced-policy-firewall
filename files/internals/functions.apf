@@ -374,6 +374,13 @@ validate_config() {
  if [ "$SYSCTL_SYNCOOKIES" == "1" ] && [ "$SYSCTL_OVERFLOW" == "1" ]; then
     err="${err}SYSCTL_SYNCOOKIES and SYSCTL_OVERFLOW are both enabled (conf.apf recommends only one); "
  fi
+ # Validate PERMBLOCK settings
+ local _vc_int='^[0-9]+$'
+ if [[ "$PERMBLOCK_COUNT" =~ $_vc_int ]] && [ "$PERMBLOCK_COUNT" -gt 0 ]; then
+    if [[ "$PERMBLOCK_INTERVAL" =~ $_vc_int ]] && [ "$PERMBLOCK_INTERVAL" -lt 60 ]; then
+        err="${err}PERMBLOCK_INTERVAL must be at least 60 seconds; "
+    fi
+ fi
  if [ -n "$err" ]; then
     eout "{glob} configuration error: $err"
     [ "$SET_VERBOSE" != "1" ] && echo "apf($$): configuration error: $err"
@@ -640,7 +647,83 @@ cli_trust_temp() {
 	if [ "$SET_VERBOSE" != "1" ]; then
 		echo "Inserted into firewall: temporary $ACTION all to/from $HOST (ttl=${_TTL_SECONDS}s, expires $EXPIRE_DISP)"
 	fi
+	# Block escalation: record and check for auto-promotion
+	if [ "$PERMBLOCK_COUNT" -gt 0 ] && [ "$ACTION" == "DENY" ]; then
+		record_block "$HOST"
+		if check_block_escalation "$HOST"; then
+			escalate_to_permanent "$HOST"
+		fi
+	fi
  fi
+}
+
+record_block() {
+	local ip="$1"
+	local history_file="$INSTALL_PATH/internals/.block_history"
+	local now h_ip count first last found_entry=0
+	now=$(date +%s)
+	local tmpfile
+	tmpfile=$(mktemp "$INSTALL_PATH/internals/.block_history.XXXXXX")
+
+	if [ -f "$history_file" ]; then
+		while IFS='|' read -r h_ip count first last; do
+			[ -z "$h_ip" ] && continue
+			# Prune entries outside the interval window
+			if [ $((now - first)) -gt "$PERMBLOCK_INTERVAL" ]; then
+				continue
+			fi
+			if [ "$h_ip" = "$ip" ]; then
+				count=$((count + 1))
+				last="$now"
+				found_entry=1
+			fi
+			echo "${h_ip}|${count}|${first}|${last}"
+		done < "$history_file" > "$tmpfile"
+	fi
+
+	if [ "$found_entry" -eq 0 ]; then
+		echo "${ip}|1|${now}|${now}" >> "$tmpfile"
+	fi
+
+	mv -f "$tmpfile" "$history_file"
+	chmod 640 "$history_file"
+}
+
+check_block_escalation() {
+	local ip="$1"
+	local history_file="$INSTALL_PATH/internals/.block_history"
+	[ ! -f "$history_file" ] && return 1
+
+	local count
+	count=$(grep -Fm1 "${ip}|" "$history_file" | cut -d'|' -f2)
+	[ -z "$count" ] && return 1
+
+	if [ "$count" -ge "$PERMBLOCK_COUNT" ]; then
+		return 0
+	fi
+	return 1
+}
+
+escalate_to_permanent() {
+	local ip="$1"
+	local escaped_ip
+
+	# Remove temp entry markers from deny_hosts.rules
+	escaped_ip=$(echo "$ip" | sed 's/\./\\./g')
+	sed -i "/ttl=.*expire=.*${escaped_ip}/d" "$DENY_HOSTS"
+	sed -i "/^${escaped_ip}$/d" "$DENY_HOSTS"
+
+	# Add as permanent with static noexpire markers
+	echo "# added $ip on $(date +"%D %H:%M:%S") static noexpire with comment: auto-escalated from temp deny (PERMBLOCK)" >> "$DENY_HOSTS"
+	echo "$ip" >> "$DENY_HOSTS"
+
+	eout "{trust} $ip auto-escalated to permanent deny (PERMBLOCK_COUNT=$PERMBLOCK_COUNT reached)"
+
+	# Remove from block history (escalation complete)
+	local history_file="$INSTALL_PATH/internals/.block_history"
+	local escaped_ip_grep
+	escaped_ip_grep=$(echo "$ip" | sed 's/\./\\./g')
+	sed -i "/^${escaped_ip_grep}|/d" "$history_file"
 }
 
 save_external_baseline() {
@@ -803,6 +886,7 @@ fi
 ipset_flush
 gre_flush
 rm -f /etc/cron.d/refresh.apf
+rm -f "$INSTALL_PATH/internals/.block_history"
 
 if [ ! "$1" = "1" ]; then
 	eout "{glob} firewall offline"

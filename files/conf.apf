@@ -88,6 +88,16 @@ DOCKER_COMPAT="0"
 # [value in seconds, 0 to disable, recommended 600]
 SET_EXPIRE="0"
 
+# Block Escalation — auto-promote repeat temporary denies to permanent.
+# When an IP is temp-denied PERMBLOCK_COUNT times within PERMBLOCK_INTERVAL
+# seconds, it is auto-promoted to a permanent deny entry.
+# [value is count threshold, 0 to disable]
+PERMBLOCK_COUNT="0"
+
+# Time window (seconds) for counting repeat temp denies.
+# [value in seconds, default 86400 = 24 hours]
+PERMBLOCK_INTERVAL="86400"
+
 # This controls how often, if at all, the trust system refreshes rules.
 # The firewall will flush & reload trust chains (TALLOW/TDENY/TGALLOW/TGDENY),
 # redownload global rules and re-resolve any DNS names in the rules. This is
