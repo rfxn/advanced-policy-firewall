@@ -35,6 +35,25 @@ fi
 # Clean up mutex lock on unexpected termination
 trap 'mutex_unlock' EXIT
 
+# Acquire exclusive lock for mutating operations via file-based flock.
+# Re-invokes this script under flock; child sees _APF_LOCKED=1 and skips gate.
+# Read-only ops (-l, -t, -o, -v, -g, --templ, --gre-status) excluded.
+# Restart (-r) excluded — sub-invocations lock individually to avoid deadlock.
+if [ "$_APF_LOCKED" != "1" ]; then
+  case "$1" in
+    -s|--start|-f|--stop|--flush|-e|--refresh|\
+    -a|--allow|-d|--deny|-u|--remove|--unban|\
+    -ta|--temp-allow|-td|--temp-deny|\
+    --tempf|--temp-flush|--temp-expire|\
+    --ipset-update|--gre-up|--gre-down)
+      if command -v flock >/dev/null 2>&1; then
+        _APF_LOCKED=1 flock -w "$ENTER_LOCK_TIMEOUT" "$LOCK_FILE" "$0" "$@"
+        exit $?
+      fi
+      ;;
+  esac
+fi
+
 start() {
 check_deps
 ##

@@ -104,6 +104,16 @@
       egress, ICMPv6 types, SMTP blocking, temporary trust, hooks, silent
       IPs, search CLI, and firewall order of operations
 
+  -- Correctness Fixes --
+
+[Change] File-based flock mutex: replace FD-based exec/flock locking with
+      file-based flock gate that re-invokes under exclusive lock; noclobber +
+      PID fallback when flock unavailable; stale lock detection (apf,
+      functions.apf)
+[Fix] Trust CLI operations (-a, -d, -u, -ta, -td) now acquire mutex lock
+      via exec-flock gate, preventing races with concurrent cron operations
+      (apf)
+
   -- Test Suite --
 
 [New] 8 new test files: 21-refactor-regression, 22-uid-egress,
