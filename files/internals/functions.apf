@@ -442,51 +442,68 @@ cli_trust_remove() {
 		echo "Cannot remove '$DIP': IPv6 address but USE_IPV6 is not enabled"
 		return 1
 	fi
-	$IPT_H $IPT_FLAGS -D INPUT -s $DIP -j ACCEPT
-	$IPT_H $IPT_FLAGS -D OUTPUT -d $DIP -j ACCEPT
-        $IPT_H $IPT_FLAGS -D INPUT -s $DIP -j $ALL_STOP
-        $IPT_H $IPT_FLAGS -D OUTPUT -d $DIP -j $ALL_STOP
+	local found=0
 
-	$IPT_H $IPT_FLAGS -D TALLOW -s $DIP -j ACCEPT
-	$IPT_H $IPT_FLAGS -D TALLOW -d $DIP -j ACCEPT
-        $IPT_H $IPT_FLAGS -D TDENY -s $DIP -j $ALL_STOP
-        $IPT_H $IPT_FLAGS -D TDENY -d $DIP -j $ALL_STOP
+	$IPT_H $IPT_FLAGS -D INPUT -s $DIP -j ACCEPT 2>/dev/null && found=1
+	$IPT_H $IPT_FLAGS -D OUTPUT -d $DIP -j ACCEPT 2>/dev/null && found=1
+	$IPT_H $IPT_FLAGS -D INPUT -s $DIP -j $ALL_STOP 2>/dev/null && found=1
+	$IPT_H $IPT_FLAGS -D OUTPUT -d $DIP -j $ALL_STOP 2>/dev/null && found=1
 
-	$IPT_H $IPT_FLAGS -D TGALLOW -s $DIP -j ACCEPT
-	$IPT_H $IPT_FLAGS -D TGALLOW -d $DIP -j ACCEPT
-        $IPT_H $IPT_FLAGS -D TGDENY -s $DIP -j $ALL_STOP
-        $IPT_H $IPT_FLAGS -D TGDENY -d $DIP -j $ALL_STOP
+	$IPT_H $IPT_FLAGS -D TALLOW -s $DIP -j ACCEPT 2>/dev/null && found=1
+	$IPT_H $IPT_FLAGS -D TALLOW -d $DIP -j ACCEPT 2>/dev/null && found=1
+	$IPT_H $IPT_FLAGS -D TDENY -s $DIP -j $ALL_STOP 2>/dev/null && found=1
+	$IPT_H $IPT_FLAGS -D TDENY -d $DIP -j $ALL_STOP 2>/dev/null && found=1
 
+	$IPT_H $IPT_FLAGS -D TGALLOW -s $DIP -j ACCEPT 2>/dev/null && found=1
+	$IPT_H $IPT_FLAGS -D TGALLOW -d $DIP -j ACCEPT 2>/dev/null && found=1
+	$IPT_H $IPT_FLAGS -D TGDENY -s $DIP -j $ALL_STOP 2>/dev/null && found=1
+	$IPT_H $IPT_FLAGS -D TGDENY -d $DIP -j $ALL_STOP 2>/dev/null && found=1
+
+	# Check trust files for entry before removing
 	local escaped_ip="${DIP//./\\.}"
+	if grep -q -- "^${escaped_ip}\b" "$ALLOW_HOSTS" "$DENY_HOSTS" "$GALLOW_HOSTS" "$GDENY_HOSTS" 2>/dev/null; then
+		found=1
+	fi
 	sed -i "\%^${escaped_ip}\b%d" "$ALLOW_HOSTS" "$DENY_HOSTS" "$GALLOW_HOSTS" "$GDENY_HOSTS"
 
 	# Clean remaining rules from INPUT/OUTPUT (reverse order to preserve line numbers)
 	dil=$($IPT_H $IPT_FLAGS --numeric --list INPUT --line-numbers | grep -w "$DIP" | tac | awk '{print$1}')
 	for i in $dil; do
 		$IPT_H $IPT_FLAGS -D INPUT $i >> /dev/null 2>&1
+		found=1
 	done
 	dol=$($IPT_H $IPT_FLAGS --numeric --list OUTPUT --line-numbers | grep -w "$DIP" | tac | awk '{print$1}')
 	for i in $dol; do
 		$IPT_H $IPT_FLAGS -D OUTPUT $i >> /dev/null 2>&1
+		found=1
 	done
 
 	dil=$($IPT_H $IPT_FLAGS --numeric --list TALLOW --line-numbers | grep -w "$DIP" | tac | awk '{print$1}')
 	for i in $dil; do
 		$IPT_H $IPT_FLAGS -D TALLOW $i >> /dev/null 2>&1
+		found=1
 	done
 	dol=$($IPT_H $IPT_FLAGS --numeric --list TDENY --line-numbers | grep -w "$DIP" | tac | awk '{print$1}')
 	for i in $dol; do
 		$IPT_H $IPT_FLAGS -D TDENY $i >> /dev/null 2>&1
+		found=1
 	done
 
 	dil=$($IPT_H $IPT_FLAGS --numeric --list TGALLOW --line-numbers | grep -w "$DIP" | tac | awk '{print$1}')
 	for i in $dil; do
 		$IPT_H $IPT_FLAGS -D TGALLOW $i >> /dev/null 2>&1
+		found=1
 	done
 	dol=$($IPT_H $IPT_FLAGS --numeric --list TGDENY --line-numbers | grep -w "$DIP" | tac | awk '{print$1}')
 	for i in $dol; do
 		$IPT_H $IPT_FLAGS -D TGDENY $i >> /dev/null 2>&1
+		found=1
 	done
+
+	if [ "$found" == "0" ]; then
+		return 1
+	fi
+	return 0
 }
 
 cli_trust() {
@@ -714,9 +731,9 @@ flush_apf_chains() {
 flush() {
 firewall_on=$($IPT $IPT_FLAGS -L --numeric | grep -vE "Chain|destination")
 if [ "$SET_FASTLOAD" == "1" ] && [ "$DOCKER_COMPAT" != "1" ] && [ "$1" != "1" ] && [ "$DEVEL_ON" != "1" ] && [ -n "$firewall_on" ]; then
-	$IPTS > $INSTALL_PATH/internals/.apf.restore
+	$IPTS > "$INSTALL_PATH/internals/.apf.restore"
 	if [ "$USE_IPV6" == "1" ] && [ -n "$IP6TS" ]; then
-		$IP6TS > $INSTALL_PATH/internals/.apf6.restore
+		$IP6TS > "$INSTALL_PATH/internals/.apf6.restore"
 	fi
 	eout "{glob} fast load snapshot saved"
 fi
@@ -939,7 +956,7 @@ local action_all="$3" action_tcp="$4" action_udp="$5" verb="$6"
 load_local_addrs
 if [ -z "$file" ] || [ -z "$chain" ]; then
         eout "{trust} could not process trust_hosts $file $chain, fatal error, aborting!"
-        $INSTALL_PATH/apf -f
+        "$INSTALL_PATH/apf" -f
         mutex_unlock
         exit 1
 fi
@@ -1931,14 +1948,14 @@ refresh() {
 		read last_trusts_md5 < "$INSTALL_PATH/internals/.trusts.md5"
 		if [ "$trusts_md5" == "$last_trusts_md5" ]; then
 		        eout "{glob} trust rules unchanged since last refresh, doing nothing."
-	                echo "$trusts_md5" > $INSTALL_PATH/internals/.trusts.md5
+	                echo "$trusts_md5" > "$INSTALL_PATH/internals/.trusts.md5"
 		        mutex_unlock
 			exit 1
 		else
-	                echo "$trusts_md5" > $INSTALL_PATH/internals/.trusts.md5
+	                echo "$trusts_md5" > "$INSTALL_PATH/internals/.trusts.md5"
 		fi
 	 else
-		echo "$trusts_md5" > $INSTALL_PATH/internals/.trusts.md5
+		echo "$trusts_md5" > "$INSTALL_PATH/internals/.trusts.md5"
 	 fi
 	else
 		glob_allow_download
@@ -1987,11 +2004,11 @@ refresh() {
 
 cron_refresh() {
 if [ "$SET_REFRESH" != "0" ] && [ -n "$SET_REFRESH" ]; then
-cat<<EOF > $INSTALL_PATH/internals/cron.refresh
+cat<<EOF > "$INSTALL_PATH/internals/cron.refresh"
 */$SET_REFRESH * * * * root $INSTALL_PATH/apf --refresh >> /dev/null 2>&1 &
 EOF
-	chmod 644 $INSTALL_PATH/internals/cron.refresh
-	ln -fs $INSTALL_PATH/internals/cron.refresh /etc/cron.d/refresh.apf
+	chmod 644 "$INSTALL_PATH/internals/cron.refresh"
+	ln -fs "$INSTALL_PATH/internals/cron.refresh" /etc/cron.d/refresh.apf
 	eout "{glob} SET_REFRESH is set to $SET_REFRESH minutes"
 else
 	rm -f /etc/cron.d/refresh.apf

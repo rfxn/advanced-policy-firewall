@@ -84,12 +84,12 @@ if [ ! -f "$INSTALL_PATH/internals/.md5.cores" ]; then
 else
         EMPTY_MD5=$(< "$INSTALL_PATH/internals/.md5.cores")
         if [ -z "$EMPTY_MD5" ]; then
-                $MD5 $MD5_FILES > $INSTALL_PATH/internals/.md5.cores 2> /dev/null
+                $MD5 $MD5_FILES > "$INSTALL_PATH/internals/.md5.cores" 2> /dev/null
         fi
-	$MD5 $MD5_FILES > $INSTALL_PATH/internals/.md5.cores.new 2> /dev/null 
+	$MD5 $MD5_FILES > "$INSTALL_PATH/internals/.md5.cores.new" 2> /dev/null
         VARS_DIFF=$($DIFF "$INSTALL_PATH/internals/.md5.cores.new" "$INSTALL_PATH/internals/.md5.cores")
         if [ -n "$VARS_DIFF" ]; then
-		$MD5 $MD5_FILES > $INSTALL_PATH/internals/.md5.cores 2> /dev/null
+		$MD5 $MD5_FILES > "$INSTALL_PATH/internals/.md5.cores" 2> /dev/null
                 SKIP_FASTLOAD_VARS=1
         fi
 fi
@@ -101,13 +101,13 @@ if [ ! -f "$INSTALL_PATH/internals/.md5.cores.new" ] && [ -f "$INSTALL_PATH/inte
 fi
 
 if [ ! -f "$INSTALL_PATH/internals/.last.vars" ]; then
-	$INSTALL_PATH/apf -o > $INSTALL_PATH/internals/.last.vars
+	"$INSTALL_PATH/apf" -o > "$INSTALL_PATH/internals/.last.vars"
 	SKIP_FASTLOAD_VARS=1
 else
-	$INSTALL_PATH/apf -o > $INSTALL_PATH/internals/.last.vars.new
+	"$INSTALL_PATH/apf" -o > "$INSTALL_PATH/internals/.last.vars.new"
 	VARS_DIFF=$($DIFF "$INSTALL_PATH/internals/.last.vars.new" "$INSTALL_PATH/internals/.last.vars")
 	if [ -n "$VARS_DIFF" ]; then
-	        $INSTALL_PATH/apf -o > $INSTALL_PATH/internals/.last.vars
+	        "$INSTALL_PATH/apf" -o > "$INSTALL_PATH/internals/.last.vars"
 		SKIP_FASTLOAD_VARS=1
 	fi
 fi
@@ -134,8 +134,9 @@ if [ -z "$SKIP_FASTLOAD_FIRSTRUN" ] && [ -z "$SKIP_FASTLOAD_EXPIRED" ] && [ -z "
 	if [ "$SKIP_FASTLOAD_BACKEND" != "1" ]; then
 		devm
 		eout "{glob} activating firewall, fast load ($IPT_BACKEND_CURRENT)"
-		if ! $IPTR $IPT_FLAGS $INSTALL_PATH/internals/.apf.restore 2>/dev/null; then
+		if ! $IPTR $IPT_FLAGS "$INSTALL_PATH/internals/.apf.restore" 2>/dev/null; then
 			eout "{glob} fast load failed (iptables-restore error), going full load"
+			flush
 		elif [ "$USE_IPV6" == "1" ] && [ -z "$IP6TR" ]; then
 			eout "{glob} fast load incomplete (ip6tables-restore not found), going full load"
 			flush
@@ -143,7 +144,7 @@ if [ -z "$SKIP_FASTLOAD_FIRSTRUN" ] && [ -z "$SKIP_FASTLOAD_EXPIRED" ] && [ -z "
 			eout "{glob} fast load incomplete (IPv6 enabled but no IPv6 snapshot), going full load"
 			flush
 		elif [ "$USE_IPV6" == "1" ] && [ -n "$IP6TR" ] && [ -f "$INSTALL_PATH/internals/.apf6.restore" ]; then
-			if ! $IP6TR $IPT_FLAGS $INSTALL_PATH/internals/.apf6.restore 2>/dev/null; then
+			if ! $IP6TR $IPT_FLAGS "$INSTALL_PATH/internals/.apf6.restore" 2>/dev/null; then
 				eout "{glob} fast load failed (ip6tables-restore error), going full load"
 				flush
 			else
@@ -197,9 +198,9 @@ fi
 # check dev mode
 devm
 # generate vnet rules
-$INSTALL_PATH/vnet/vnetgen
+"$INSTALL_PATH/vnet/vnetgen"
 # start main firewall script
-$INSTALL_PATH/firewall
+"$INSTALL_PATH/firewall"
 # check for/load bandmin
 read LOAD _ < /proc/loadavg; LOAD="${LOAD%%.*}"
  if [ ! "$LOAD" -gt "10" ]; then
@@ -207,21 +208,21 @@ read LOAD _ < /proc/loadavg; LOAD="${LOAD%%.*}"
  fi
 eout "{glob} firewall initialized"
 if [ "$MD5_FIRSTRUN" == "1" ]; then
-        $MD5 $MD5_FILES > $INSTALL_PATH/internals/.md5.cores 2> /dev/null
+        $MD5 $MD5_FILES > "$INSTALL_PATH/internals/.md5.cores" 2> /dev/null
 fi
 
 firewall_on=$($IPT $IPT_FLAGS -L --numeric | grep -vE "Chain|destination")
 if [ "$DEVEL_ON" != "1" ] && [ "$DOCKER_COMPAT" != "1" ] && [ -n "$firewall_on" ]; then
-	$IPTS > $INSTALL_PATH/internals/.apf.restore
+	$IPTS > "$INSTALL_PATH/internals/.apf.restore"
 	if [ "$USE_IPV6" == "1" ] && [ -n "$IP6TS" ]; then
-		$IP6TS > $INSTALL_PATH/internals/.apf6.restore
+		$IP6TS > "$INSTALL_PATH/internals/.apf6.restore"
 	fi
 	# Save backend marker for snapshot compatibility detection
 	IPT_BACKEND_CURRENT="legacy"
 	if $IPT --version 2>&1 | grep -q nf_tables; then
 		IPT_BACKEND_CURRENT="nft"
 	fi
-	echo "$IPT_BACKEND_CURRENT" > $INSTALL_PATH/internals/.apf.restore.backend
+	echo "$IPT_BACKEND_CURRENT" > "$INSTALL_PATH/internals/.apf.restore.backend"
 	eout "{glob} fast load snapshot saved (backend: $IPT_BACKEND_CURRENT)"
 fi
 if [ "$SET_VERBOSE" == "1" ] && [ "$DEVEL_ON" == "1" ]; then
@@ -229,7 +230,7 @@ if [ "$SET_VERBOSE" == "1" ] && [ "$DEVEL_ON" == "1" ]; then
 fi
 
 if [ "$SET_REFRESH_MD5" == "1" ] && [ "$MD5" ]; then
-	$MD5 $DENY_HOSTS $GDENY_HOSTS $ALLOW_HOSTS $GALLOW_HOSTS | $MD5 | awk '{print$1}' > $INSTALL_PATH/internals/.trusts.md5
+	$MD5 $DENY_HOSTS $GDENY_HOSTS $ALLOW_HOSTS $GALLOW_HOSTS | $MD5 | awk '{print$1}' > "$INSTALL_PATH/internals/.trusts.md5"
 fi
 }
 
@@ -330,6 +331,8 @@ case "$1" in
 *)
 	head
 	help
+	exit 1
+	;;
 esac
 mutex_unlock
 exit 0

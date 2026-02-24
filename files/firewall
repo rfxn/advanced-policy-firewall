@@ -67,9 +67,9 @@ if [ -n "$IFACE_TRUSTED" ] && [ "$VF_ROUTE" == "1" ]; then
  done
 fi
 
-$ip addr list $IFACE_UNTRUSTED | grep -w inet | grep -v inet6 | tr '/' ' ' | awk '{print$2}' > $INSTALL_PATH/internals/.localaddrs
+$ip addr list $IFACE_UNTRUSTED | grep -w inet | grep -v inet6 | tr '/' ' ' | awk '{print$2}' > "$INSTALL_PATH/internals/.localaddrs"
 if [ "$USE_IPV6" == "1" ]; then
-	$ip addr list $IFACE_UNTRUSTED | grep -w inet6 | tr '/' ' ' | awk '{print$2}' > $INSTALL_PATH/internals/.localaddrs6
+	$ip addr list $IFACE_UNTRUSTED | grep -w inet6 | tr '/' ' ' | awk '{print$2}' > "$INSTALL_PATH/internals/.localaddrs6"
 fi
 
 if [ "$RAB" == "0" ]; then
@@ -132,7 +132,7 @@ ipt4 -A PROHIBIT -j REJECT --reject-with icmp-host-prohibited
 ipt6 -A PROHIBIT -j REJECT --reject-with icmp6-adm-prohibited
 
 # Load our SYSCTL rules
-. $INSTALL_PATH/sysctl.rules >> /dev/null 2>&1
+. "$INSTALL_PATH/sysctl.rules" >> /dev/null 2>&1
 
 # Fix MTU/MSS Problems
 ipt -A OUTPUT -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu
@@ -169,7 +169,7 @@ ipt -A INPUT -j TGDENY
 ipt -A OUTPUT -j TGDENY
 
 # Load our Blocked Traffic rules
-. $INSTALL_PATH/bt.rules
+. "$INSTALL_PATH/bt.rules"
 
 # Set refresh cron
 cron_refresh
@@ -247,10 +247,10 @@ ipt -A OUTPUT -p tcp --dport 1024:65535 -m state --state ESTABLISHED,RELATED -j 
 ipt -A OUTPUT -p udp --dport 1024:65535 -m state --state ESTABLISHED,RELATED -j ACCEPT
 
 # Load our LOG rules
-. $INSTALL_PATH/log.rules
+. "$INSTALL_PATH/log.rules"
 
 # Virtual Adapters
-. $INSTALL_PATH/vnet/main.vnet
+. "$INSTALL_PATH/vnet/main.vnet"
 
 # Clear any cport values
 cl_cports
@@ -262,7 +262,7 @@ if [ "$SET_VNET" == "1" ]; then
 else
 	VNET="0/0"
 fi
-. $INSTALL_PATH/main.rules
+. "$INSTALL_PATH/main.rules"
 
 # Drop NEW tcp connections after this point
 ipt -A INPUT  -p tcp ! --syn -m state --state NEW -j $ALL_STOP

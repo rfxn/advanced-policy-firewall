@@ -113,6 +113,16 @@
 [Fix] Trust CLI operations (-a, -d, -u, -ta, -td) now acquire mutex lock
       via exec-flock gate, preventing races with concurrent cron operations
       (apf)
+[Fix] cli_trust_remove() now tracks whether rules or file entries were
+      actually removed and returns 1 when host not found, enabling correct
+      "removed" vs "not found" output (functions.apf)
+[Fix] Fast load IPv4 restore failure now flushes partial rules before
+      falling through to full load, matching IPv6 failure behavior (apf)
+[Fix] Unknown CLI options now exit with code 1 instead of 0, allowing
+      scripts to detect usage errors (apf)
+[Fix] Quote $INSTALL_PATH in 32+ locations across apf, firewall, and
+      functions.apf — redirections, command execution, and source contexts
+      (apf, firewall, functions.apf)
 
   -- Test Suite --
 
