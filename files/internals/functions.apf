@@ -9,7 +9,7 @@
 #
 
 eout() {
-arg=$1
+local arg="$1"
         if [ -n "$arg" ]; then
                 echo "$(date +"%b %d %H:%M:%S") $(hostname -s) $APPN($$): $arg" >> "$LOG_APF"
                 if [ "$SET_VERBOSE" == "1" ] || [ "$2" == "1" ]; then
@@ -19,7 +19,7 @@ arg=$1
 }
 
 devm() {
- cron_file="/etc/cron.d/apf_develmode"
+ local cron_file="/etc/cron.d/apf_develmode"
  if [ "$DEVEL_MODE" == "1" ]; then
         DEVEL_ON=1
         if [ "$SET_VERBOSE" != "1" ]; then
@@ -168,8 +168,8 @@ is_local_addr() {
 }
 
 ml() {
- FATAL="$2"
- MEXT="ko"
+ local FATAL="$2"
+ local MEXT="ko"
 
  # Primary: use modprobe --dry-run (handles .ko, .ko.xz, .ko.zst, all paths)
  if $MPB --dry-run "$1" >> /dev/null 2>&1; then
@@ -178,7 +178,8 @@ ml() {
  fi
 
  # Fallback: manual path check for systems where --dry-run behaves oddly
- KMOD="/lib/modules/$(uname -r)/kernel/net"
+ local KMOD="/lib/modules/$(uname -r)/kernel/net"
+ local ext subdir
  for ext in "$MEXT" "${MEXT}.xz" "${MEXT}.zst"; do
         for subdir in "ipv4/netfilter" "netfilter"; do
                 if [ -f "$KMOD/$subdir/$1.$ext" ]; then
@@ -201,6 +202,7 @@ ml() {
 }
 
 modinit() {
+ local IPC_VAL modlist mod ip6modlist
  # Remove ipchains module if loaded (kernel 2.4 only)
  if [ "$KREL" == "2.4" ]; then
   IPC_VAL=$($LSM | grep ipchains)
@@ -368,6 +370,10 @@ validate_config() {
         fi
     done
  done
+ # Validate SYNCOOKIES / OVERFLOW mutual exclusion
+ if [ "$SYSCTL_SYNCOOKIES" == "1" ] && [ "$SYSCTL_OVERFLOW" == "1" ]; then
+    err="${err}SYSCTL_SYNCOOKIES and SYSCTL_OVERFLOW are both enabled (conf.apf recommends only one); "
+ fi
  if [ -n "$err" ]; then
     eout "{glob} configuration error: $err"
     [ "$SET_VERBOSE" != "1" ] && echo "apf($$): configuration error: $err"
@@ -421,8 +427,9 @@ mutex_unlock() {
 }
 
 trim() {
- FILE=$1
- MAXLINES=$2
+ local FILE="$1"
+ local MAXLINES="$2"
+ local LINES CHK_CMT CHK_SCMT
 
  if [ -z "$MAXLINES" ]; then
 	MAXLINES=0
@@ -474,7 +481,7 @@ valid_host() {
 }
 
 cli_trust_remove() {
-	DIP="$1"
+	local DIP="$1"
 	if ! valid_host "$DIP"; then
 		echo "Invalid host '$DIP': must be a valid IP/IPv6 address, CIDR block, or FQDN"
 		return 1
@@ -484,6 +491,7 @@ cli_trust_remove() {
 		return 1
 	fi
 	local found=0
+	local dil dol i
 
 	$IPT_H $IPT_FLAGS -D INPUT -s $DIP -j ACCEPT 2>/dev/null && found=1
 	$IPT_H $IPT_FLAGS -D OUTPUT -d $DIP -j ACCEPT 2>/dev/null && found=1
@@ -548,11 +556,8 @@ cli_trust_remove() {
 }
 
 cli_trust() {
- CHAIN="$1"
- ACTION="$2"
- FILE="$3"
- HOST="$4"
- CMT="$5"
+ local CHAIN="$1" ACTION="$2" FILE="$3" HOST="$4" CMT="$5"
+ local tlist f valtrust TIME JACTION
  if [ -n "$HOST" ]; then
 	if ! valid_host "$HOST"; then
 		echo "Invalid host '$HOST': must be a valid IP/IPv6 address, CIDR block, or FQDN"
@@ -601,12 +606,8 @@ cli_trust() {
 }
 
 cli_trust_temp() {
- CHAIN="$1"
- ACTION="$2"
- FILE="$3"
- HOST="$4"
- TTL_STR="$5"
- CMT="$6"
+ local CHAIN="$1" ACTION="$2" FILE="$3" HOST="$4" TTL_STR="$5" CMT="$6"
+ local tlist f valtrust TIME EXPIRE_EPOCH JACTION EXPIRE_DISP
  if [ -z "$HOST" ]; then
 	echo "an FQDN or IP address is required for this option"
 	return 1
@@ -823,6 +824,7 @@ fi
 
 ipset_flush
 gre_flush
+rm -f /etc/cron.d/refresh.apf
 
 if [ ! "$1" = "1" ]; then
 	eout "{glob} firewall offline"
@@ -899,13 +901,13 @@ tosroute() {
 # 8: Maximum Throughput - Minimum Delay
 # 16: No Delay - Moderate Throughput - High Reliability
 #
-TYPE="$1"
+local TYPE="$1"
 
 if [ -z "$TYPE" ]; then
 	return
 fi
 
-local tos_val tos_var ports
+local tos_val tos_var ports i
 for tos_val in 0 2 4 8 16; do
 	tos_var="TOS_$tos_val"
 	ports="${!tos_var}"
@@ -997,9 +999,10 @@ search() {
 }
 
 trust_hosts() {
-file="$1"
-chain="$2"
+local file="$1"
+local chain="$2"
 local action_all="$3" action_tcp="$4" action_udp="$5" verb="$6"
+local i PFLOW PFLOW_T PPORT IPFLOW PIP NFLOW NFLOW_T PTYPE
 load_local_addrs
 if [ -z "$file" ] || [ -z "$chain" ]; then
         eout "{trust} could not process trust_hosts $file $chain, fatal error, aborting!"
