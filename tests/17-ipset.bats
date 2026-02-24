@@ -377,6 +377,60 @@ ISEOF
     "$APF" -s
 }
 
+# --- 5-field migration tests ---
+
+@test "legacy 5-field local path migrated to 7-field" {
+    if ! ipset_available; then
+        skip "ipset not available"
+    fi
+    "$APF" -f 2>/dev/null || true
+    ipset destroy test_block 2>/dev/null || true
+
+    create_test_blocklist
+
+    # Write v2.0.1 5-field format: name:dir:type:log:path
+    cat > "$APF_DIR/ipset.rules" <<'ISEOF'
+test_block:src:ip:1:/opt/apf/test_blocklist.txt
+ISEOF
+
+    "$APF" -s
+
+    # File should be rewritten to 7-field with 0:0 inserted for interval:maxelem
+    run cat "$APF_DIR/ipset.rules"
+    assert_line "test_block:src:ip:1:0:0:/opt/apf/test_blocklist.txt"
+
+    # ipset should still be created and functional
+    run ipset list test_block
+    assert_success
+}
+
+@test "legacy 5-field URL entry migrated to 7-field" {
+    if ! ipset_available; then
+        skip "ipset not available"
+    fi
+    "$APF" -f 2>/dev/null || true
+    ipset destroy test_url 2>/dev/null || true
+
+    # Write v2.0.1 5-field format with URL (contains colons)
+    cat > "$APF_DIR/ipset.rules" <<'ISEOF'
+test_url:src:net:0:https://example.com/blocklist.txt
+ISEOF
+
+    "$APF" -s
+
+    # File should be rewritten to 7-field
+    run cat "$APF_DIR/ipset.rules"
+    assert_line "test_url:src:net:0:0:0:https://example.com/blocklist.txt"
+
+    # Restore original ipset.rules
+    "$APF" -f 2>/dev/null || true
+    ipset destroy test_url 2>/dev/null || true
+    cat > "$APF_DIR/ipset.rules" <<'ISEOF'
+test_block:src:ip:1:0:0:/opt/apf/test_blocklist.txt
+ISEOF
+    "$APF" -s
+}
+
 # --- maxelem tests ---
 
 @test "maxelem limits entries loaded into ipset" {

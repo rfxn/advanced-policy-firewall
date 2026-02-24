@@ -1329,6 +1329,13 @@ while IFS= read -r line; do
 		[ -n "$f7" ] && orig_path="${orig_path}:${f7}"
 		printf '%s\n' "${f1}:${f2}:${f3}:0:0:0:${orig_path}" >> "$tmp"
 		migrated=$((migrated + 1))
+	elif [ -n "$f5" ] && ! [[ "$f5" =~ ^[0-9]+$ ]]; then
+		# v2.0.1 5-field format — f4 is log flag, f5 starts file_or_url
+		local orig_path="$f5"
+		[ -n "$f6" ] && orig_path="${orig_path}:${f6}"
+		[ -n "$f7" ] && orig_path="${orig_path}:${f7}"
+		printf '%s\n' "${f1}:${f2}:${f3}:${f4}:0:0:${orig_path}" >> "$tmp"
+		migrated=$((migrated + 1))
 	else
 		printf '%s\n' "$line" >> "$tmp"
 	fi
@@ -1723,7 +1730,7 @@ fi
 
 lgate_mac() {
 ipt4 -N LMAC
-for mac in ${LGATE_MAC//,/ }; do
+for mac in ${VF_LGATE//,/ }; do
 MAC=$mac
 if [ -n "$MAC" ]; then
   ipt4 -A INPUT  -m mac ! --mac-source "$MAC" -j LMAC
@@ -1757,6 +1764,8 @@ cl_cports() {
 }
 
 expirebans() {
+local i ip date_d date_t ban_time time_diff expire_time check_time REFRESH_TIME
+local -a arr
 if [ -z "$SET_EXPIRE" ]; then
         SET_EXPIRE=0
 fi
@@ -1769,7 +1778,6 @@ if [ "$SET_EXPIRE" -ge "60" ]; then
          expire_time="$SET_EXPIRE"
          check_time=$(date +%s)
          while IFS= read -r i; do
-                declare -a arr
                 arr=($(echo ${i//|/ }))
                 ip=${arr[0]}
                 date_d=${arr[1]}

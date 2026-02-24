@@ -1,5 +1,13 @@
 - 2.0.2 | Feb 23 2026:
 
+[Fix] ipset_migrate_rules(): add 5-field (v2.0.1) to 7-field migration;
+      5-field entries were silently dropped on upgrade (functions.apf)
+[Fix] revert Bash 4.2+ ${var,,}/${var^^} to tr-based case conversion for
+      CentOS 6 (Bash 4.1) compatibility (cports.common, internals.conf)
+[Fix] expirebans(): add local declarations; $ip loop variable shadowed
+      global iproute2 binary path after refresh (functions.apf)
+[Fix] lgate_mac(): use $VF_LGATE instead of undefined $LGATE_MAC; gateway
+      MAC filtering was non-functional (functions.apf)
 [New] test suite parallelization: --parallel [N] flag splits test files across
       N parallel Docker containers using round-robin distribution; default N is
       nproc*2; 3x speedup for single-OS runs (run-tests.sh, Makefile)

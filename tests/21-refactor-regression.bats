@@ -481,3 +481,38 @@ EOF
 
     apf_set_config "DLIST_DSHIELD" "0"
 }
+
+# =====================================================================
+# P0 bug fix regression tests
+# =====================================================================
+
+# Check if xt_mac module is available (needed for lgate_mac)
+mac_module_available() {
+    iptables -A INPUT -m mac --mac-source AA:BB:CC:DD:EE:FF -j DROP 2>/dev/null || return 1
+    iptables -D INPUT -m mac --mac-source AA:BB:CC:DD:EE:FF -j DROP 2>/dev/null
+    return 0
+}
+
+@test "lgate_mac creates LMAC chain with VF_LGATE set" {
+    if ! mac_module_available; then skip "xt_mac module not available"; fi
+    source /opt/tests/helpers/apf-config.sh
+    apf_set_config "VF_LGATE" "AA:BB:CC:DD:EE:FF"
+
+    "$APF" -f 2>/dev/null
+    "$APF" -s
+
+    assert_chain_exists LMAC
+    assert_rule_exists_ips LMAC "REJECT"
+
+    # Cleanup
+    apf_set_config "VF_LGATE" ""
+}
+
+@test "no Bash 4.2+ case conversion in shell files" {
+    # Verify no ${var,,} or ${var^^} patterns in installed APF files
+    local pattern='\$\{[a-zA-Z_][a-zA-Z_0-9]*(\^{2}|,{2})\}'
+    run grep -rE "$pattern" "$APF_DIR/apf" "$APF_DIR/firewall" \
+        "$APF_DIR/internals/functions.apf" "$APF_DIR/internals/cports.common" \
+        "$APF_DIR/internals/internals.conf"
+    assert_failure  # grep returns 1 when no match found
+}
