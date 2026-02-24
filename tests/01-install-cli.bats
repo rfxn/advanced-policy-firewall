@@ -60,9 +60,9 @@ teardown_file() {
     assert_output "2.0.2"
 }
 
-@test "apf with no args shows help" {
+@test "apf with no args shows help and exits 1" {
     run "$APF"
-    assert_success
+    assert_failure
     assert_output --partial "usage"
 }
 

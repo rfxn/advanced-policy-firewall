@@ -22,6 +22,8 @@ SYSCTL_CONNTRACK_ADAPTIVE="${SYSCTL_CONNTRACK_ADAPTIVE:-0}"
 SYSCTL_CONNTRACK_INCREMENT="${SYSCTL_CONNTRACK_INCREMENT:-65536}"
 SYSCTL_CONNTRACK_HIGH="${SYSCTL_CONNTRACK_HIGH:-1048576}"
 SYSCTL_CONNTRACK_BUCKETS="${SYSCTL_CONNTRACK_BUCKETS:-16384}"
+PERMBLOCK_COUNT="${PERMBLOCK_COUNT:-0}"
+PERMBLOCK_INTERVAL="${PERMBLOCK_INTERVAL:-86400}"
 
 cat > .conf.apf <<EOF
 #!/bin/sh
@@ -113,6 +115,16 @@ DOCKER_COMPAT="$DOCKER_COMPAT"
 # import rules. Must not be less than SET_REFRESH in seconds (e.g., 10 min = 600s).
 # [value in seconds, 0 to disable, recommended 600]
 SET_EXPIRE="$SET_EXPIRE"
+
+# Block Escalation — auto-promote repeat temporary denies to permanent.
+# When an IP is temp-denied PERMBLOCK_COUNT times within PERMBLOCK_INTERVAL
+# seconds, it is auto-promoted to a permanent deny entry.
+# [value is count threshold, 0 to disable]
+PERMBLOCK_COUNT="$PERMBLOCK_COUNT"
+
+# Time window (seconds) for counting repeat temp denies.
+# [value in seconds, default 86400 = 24 hours]
+PERMBLOCK_INTERVAL="$PERMBLOCK_INTERVAL"
 
 # This controls how often, if at all, the trust system refreshes rules.
 # The firewall will flush & reload trust chains (TALLOW/TDENY/TGALLOW/TGDENY),

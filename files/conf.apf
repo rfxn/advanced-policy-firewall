@@ -88,6 +88,16 @@ DOCKER_COMPAT="0"
 # [value in seconds, 0 to disable, recommended 600]
 SET_EXPIRE="0"
 
+# Block Escalation — auto-promote repeat temporary denies to permanent.
+# When an IP is temp-denied PERMBLOCK_COUNT times within PERMBLOCK_INTERVAL
+# seconds, it is auto-promoted to a permanent deny entry.
+# [value is count threshold, 0 to disable]
+PERMBLOCK_COUNT="0"
+
+# Time window (seconds) for counting repeat temp denies.
+# [value in seconds, default 86400 = 24 hours]
+PERMBLOCK_INTERVAL="86400"
+
 # This controls how often, if at all, the trust system refreshes rules.
 # The firewall will flush & reload trust chains (TALLOW/TDENY/TGALLOW/TGDENY),
 # redownload global rules and re-resolve any DNS names in the rules. This is
@@ -675,9 +685,12 @@ LOG_RATE="30"
 # sends outputs to this file
 LOG_APF="/var/log/apf_log"
 
-# Adds -w flag to iptables to enable locking support. This is only available
-# on iptables >= 1.4.20, but if supported you probably want this.
+# Adds -w flag to iptables to enable locking support. Available on
+# iptables >= 1.4.20 (RHEL/CentOS 7+, Debian 8+, Ubuntu 14.04+).
+# Recommended to enable on modern systems; default "0" preserves
+# compatibility with CentOS 6 / RHEL 6 (iptables 1.4.7, no -w support).
 IPT_LOCK_SUPPORT="0"
+# Seconds to wait for iptables lock before giving up (requires above = 1)
 IPT_LOCK_TIMEOUT="3"
 
 ##

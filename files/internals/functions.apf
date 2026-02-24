@@ -9,7 +9,7 @@
 #
 
 eout() {
-arg=$1
+local arg="$1"
         if [ -n "$arg" ]; then
                 echo "$(date +"%b %d %H:%M:%S") $(hostname -s) $APPN($$): $arg" >> "$LOG_APF"
                 if [ "$SET_VERBOSE" == "1" ] || [ "$2" == "1" ]; then
@@ -19,7 +19,7 @@ arg=$1
 }
 
 devm() {
- cron_file="/etc/cron.d/apf_develmode"
+ local cron_file="/etc/cron.d/apf_develmode"
  if [ "$DEVEL_MODE" == "1" ]; then
         DEVEL_ON=1
         if [ "$SET_VERBOSE" != "1" ]; then
@@ -168,8 +168,8 @@ is_local_addr() {
 }
 
 ml() {
- FATAL="$2"
- MEXT="ko"
+ local FATAL="$2"
+ local MEXT="ko"
 
  # Primary: use modprobe --dry-run (handles .ko, .ko.xz, .ko.zst, all paths)
  if $MPB --dry-run "$1" >> /dev/null 2>&1; then
@@ -178,7 +178,8 @@ ml() {
  fi
 
  # Fallback: manual path check for systems where --dry-run behaves oddly
- KMOD="/lib/modules/$(uname -r)/kernel/net"
+ local KMOD="/lib/modules/$(uname -r)/kernel/net"
+ local ext subdir
  for ext in "$MEXT" "${MEXT}.xz" "${MEXT}.zst"; do
         for subdir in "ipv4/netfilter" "netfilter"; do
                 if [ -f "$KMOD/$subdir/$1.$ext" ]; then
@@ -201,6 +202,7 @@ ml() {
 }
 
 modinit() {
+ local IPC_VAL modlist mod ip6modlist
  # Remove ipchains module if loaded (kernel 2.4 only)
  if [ "$KREL" == "2.4" ]; then
   IPC_VAL=$($LSM | grep ipchains)
@@ -335,6 +337,58 @@ check_deps() {
  fi
 }
 
+validate_config() {
+ local err=""
+ # Validate stop targets
+ for _vc_pair in "TCP_STOP:$TCP_STOP" "UDP_STOP:$UDP_STOP" "ALL_STOP:$ALL_STOP"; do
+    local _vc_name="${_vc_pair%%:*}" _vc_val="${_vc_pair#*:}"
+    case "$_vc_val" in
+        DROP|REJECT|RESET|PROHIBIT) ;;
+        *) err="${err}${_vc_name}='${_vc_val}' is invalid (must be DROP, REJECT, RESET, or PROHIBIT); " ;;
+    esac
+ done
+ # Validate SYNFLOOD rate/burst (only when enabled)
+ if [ "$SYNFLOOD" == "1" ]; then
+    local _vc_rate='^[0-9]+/[smh]$'
+    if [[ ! "$SYNFLOOD_RATE" =~ $_vc_rate ]]; then
+        err="${err}SYNFLOOD_RATE='$SYNFLOOD_RATE' is invalid (must be number/s, number/m, or number/h); "
+    fi
+    local _vc_burst='^[0-9]+$'
+    if [[ ! "$SYNFLOOD_BURST" =~ $_vc_burst ]]; then
+        err="${err}SYNFLOOD_BURST='$SYNFLOOD_BURST' is invalid (must be a positive integer); "
+    fi
+ fi
+ # Validate connlimit entries
+ local _vc_clpat='^[0-9_]+:[0-9]+$'
+ for _vc_pair in "IG_TCP_CLIMIT:$IG_TCP_CLIMIT" "IG_UDP_CLIMIT:$IG_UDP_CLIMIT"; do
+    local _vc_name="${_vc_pair%%:*}" _vc_val="${_vc_pair#*:}"
+    [ -z "$_vc_val" ] && continue
+    for _vc_entry in ${_vc_val//,/ }; do
+        [ -z "$_vc_entry" ] && continue
+        if [[ ! "$_vc_entry" =~ $_vc_clpat ]]; then
+            err="${err}${_vc_name} entry '${_vc_entry}' is invalid (must be port:limit or port_range:limit); "
+        fi
+    done
+ done
+ # Validate SYNCOOKIES / OVERFLOW mutual exclusion
+ if [ "$SYSCTL_SYNCOOKIES" == "1" ] && [ "$SYSCTL_OVERFLOW" == "1" ]; then
+    err="${err}SYSCTL_SYNCOOKIES and SYSCTL_OVERFLOW are both enabled (conf.apf recommends only one); "
+ fi
+ # Validate PERMBLOCK settings
+ local _vc_int='^[0-9]+$'
+ if [[ "$PERMBLOCK_COUNT" =~ $_vc_int ]] && [ "$PERMBLOCK_COUNT" -gt 0 ]; then
+    if [[ "$PERMBLOCK_INTERVAL" =~ $_vc_int ]] && [ "$PERMBLOCK_INTERVAL" -lt 60 ]; then
+        err="${err}PERMBLOCK_INTERVAL must be at least 60 seconds; "
+    fi
+ fi
+ if [ -n "$err" ]; then
+    eout "{glob} configuration error: $err"
+    [ "$SET_VERBOSE" != "1" ] && echo "apf($$): configuration error: $err"
+    mutex_unlock
+    exit 1
+ fi
+}
+
 mutex_lock() {
   if [ "$APF_MUTEX_LOCKED" == "1" ]; then
     return
@@ -380,8 +434,9 @@ mutex_unlock() {
 }
 
 trim() {
- FILE=$1
- MAXLINES=$2
+ local FILE="$1"
+ local MAXLINES="$2"
+ local LINES CHK_CMT CHK_SCMT
 
  if [ -z "$MAXLINES" ]; then
 	MAXLINES=0
@@ -433,7 +488,7 @@ valid_host() {
 }
 
 cli_trust_remove() {
-	DIP="$1"
+	local DIP="$1"
 	if ! valid_host "$DIP"; then
 		echo "Invalid host '$DIP': must be a valid IP/IPv6 address, CIDR block, or FQDN"
 		return 1
@@ -442,59 +497,52 @@ cli_trust_remove() {
 		echo "Cannot remove '$DIP': IPv6 address but USE_IPV6 is not enabled"
 		return 1
 	fi
-	$IPT_H $IPT_FLAGS -D INPUT -s $DIP -j ACCEPT
-	$IPT_H $IPT_FLAGS -D OUTPUT -d $DIP -j ACCEPT
-        $IPT_H $IPT_FLAGS -D INPUT -s $DIP -j $ALL_STOP
-        $IPT_H $IPT_FLAGS -D OUTPUT -d $DIP -j $ALL_STOP
+	local found=0
 
-	$IPT_H $IPT_FLAGS -D TALLOW -s $DIP -j ACCEPT
-	$IPT_H $IPT_FLAGS -D TALLOW -d $DIP -j ACCEPT
-        $IPT_H $IPT_FLAGS -D TDENY -s $DIP -j $ALL_STOP
-        $IPT_H $IPT_FLAGS -D TDENY -d $DIP -j $ALL_STOP
+	# Remove known rule specs directly (race-free)
+	$IPT_H $IPT_FLAGS -D INPUT -s $DIP -j ACCEPT 2>/dev/null && found=1
+	$IPT_H $IPT_FLAGS -D OUTPUT -d $DIP -j ACCEPT 2>/dev/null && found=1
+	$IPT_H $IPT_FLAGS -D INPUT -s $DIP -j $ALL_STOP 2>/dev/null && found=1
+	$IPT_H $IPT_FLAGS -D OUTPUT -d $DIP -j $ALL_STOP 2>/dev/null && found=1
 
-	$IPT_H $IPT_FLAGS -D TGALLOW -s $DIP -j ACCEPT
-	$IPT_H $IPT_FLAGS -D TGALLOW -d $DIP -j ACCEPT
-        $IPT_H $IPT_FLAGS -D TGDENY -s $DIP -j $ALL_STOP
-        $IPT_H $IPT_FLAGS -D TGDENY -d $DIP -j $ALL_STOP
+	$IPT_H $IPT_FLAGS -D TALLOW -s $DIP -j ACCEPT 2>/dev/null && found=1
+	$IPT_H $IPT_FLAGS -D TALLOW -d $DIP -j ACCEPT 2>/dev/null && found=1
+	$IPT_H $IPT_FLAGS -D TDENY -s $DIP -j $ALL_STOP 2>/dev/null && found=1
+	$IPT_H $IPT_FLAGS -D TDENY -d $DIP -j $ALL_STOP 2>/dev/null && found=1
 
+	$IPT_H $IPT_FLAGS -D TGALLOW -s $DIP -j ACCEPT 2>/dev/null && found=1
+	$IPT_H $IPT_FLAGS -D TGALLOW -d $DIP -j ACCEPT 2>/dev/null && found=1
+	$IPT_H $IPT_FLAGS -D TGDENY -s $DIP -j $ALL_STOP 2>/dev/null && found=1
+	$IPT_H $IPT_FLAGS -D TGDENY -d $DIP -j $ALL_STOP 2>/dev/null && found=1
+
+	# Check trust files for entry before removing
 	local escaped_ip="${DIP//./\\.}"
+	if grep -q -- "^${escaped_ip}\b" "$ALLOW_HOSTS" "$DENY_HOSTS" "$GALLOW_HOSTS" "$GDENY_HOSTS" 2>/dev/null; then
+		found=1
+	fi
 	sed -i "\%^${escaped_ip}\b%d" "$ALLOW_HOSTS" "$DENY_HOSTS" "$GALLOW_HOSTS" "$GDENY_HOSTS"
 
-	# Clean remaining rules from INPUT/OUTPUT (reverse order to preserve line numbers)
-	dil=$($IPT_H $IPT_FLAGS --numeric --list INPUT --line-numbers | grep -w "$DIP" | tac | awk '{print$1}')
-	for i in $dil; do
-		$IPT_H $IPT_FLAGS -D INPUT $i >> /dev/null 2>&1
-	done
-	dol=$($IPT_H $IPT_FLAGS --numeric --list OUTPUT --line-numbers | grep -w "$DIP" | tac | awk '{print$1}')
-	for i in $dol; do
-		$IPT_H $IPT_FLAGS -D OUTPUT $i >> /dev/null 2>&1
-	done
-
-	dil=$($IPT_H $IPT_FLAGS --numeric --list TALLOW --line-numbers | grep -w "$DIP" | tac | awk '{print$1}')
-	for i in $dil; do
-		$IPT_H $IPT_FLAGS -D TALLOW $i >> /dev/null 2>&1
-	done
-	dol=$($IPT_H $IPT_FLAGS --numeric --list TDENY --line-numbers | grep -w "$DIP" | tac | awk '{print$1}')
-	for i in $dol; do
-		$IPT_H $IPT_FLAGS -D TDENY $i >> /dev/null 2>&1
+	# Spec-based cleanup: extract full rule specs from iptables -S and delete
+	# by spec (race-free; no line-number shifting between list and delete)
+	local _ctr_chain _ctr_rule _ctr_spec
+	for _ctr_chain in INPUT OUTPUT TALLOW TDENY TGALLOW TGDENY; do
+		while IFS= read -r _ctr_rule; do
+			[ -z "$_ctr_rule" ] && continue
+			_ctr_spec="${_ctr_rule#-A $_ctr_chain }"
+			# shellcheck disable=SC2086
+			$IPT_H $IPT_FLAGS -D "$_ctr_chain" $_ctr_spec 2>/dev/null && found=1
+		done < <($IPT_H $IPT_FLAGS -S "$_ctr_chain" 2>/dev/null | grep -w -- "$DIP")
 	done
 
-	dil=$($IPT_H $IPT_FLAGS --numeric --list TGALLOW --line-numbers | grep -w "$DIP" | tac | awk '{print$1}')
-	for i in $dil; do
-		$IPT_H $IPT_FLAGS -D TGALLOW $i >> /dev/null 2>&1
-	done
-	dol=$($IPT_H $IPT_FLAGS --numeric --list TGDENY --line-numbers | grep -w "$DIP" | tac | awk '{print$1}')
-	for i in $dol; do
-		$IPT_H $IPT_FLAGS -D TGDENY $i >> /dev/null 2>&1
-	done
+	if [ "$found" == "0" ]; then
+		return 1
+	fi
+	return 0
 }
 
 cli_trust() {
- CHAIN="$1"
- ACTION="$2"
- FILE="$3"
- HOST="$4"
- CMT="$5"
+ local CHAIN="$1" ACTION="$2" FILE="$3" HOST="$4" CMT="$5"
+ local tlist f valtrust TIME JACTION
  if [ -n "$HOST" ]; then
 	if ! valid_host "$HOST"; then
 		echo "Invalid host '$HOST': must be a valid IP/IPv6 address, CIDR block, or FQDN"
@@ -516,6 +564,9 @@ cli_trust() {
                 echo "$HOST appears to be IPv6 but USE_IPV6 is not enabled"
         else
 	        TIME=$(date +"%D %H:%M:%S")
+		CMT="${CMT//$'\n'/ }"
+		CMT="${CMT//$'\r'/}"
+		CMT="${CMT//$'\t'/ }"
 		if [ "$CMT" ]; then
 			echo "# added $HOST on $TIME with comment: $CMT" >> $FILE
 		else
@@ -540,12 +591,8 @@ cli_trust() {
 }
 
 cli_trust_temp() {
- CHAIN="$1"
- ACTION="$2"
- FILE="$3"
- HOST="$4"
- TTL_STR="$5"
- CMT="$6"
+ local CHAIN="$1" ACTION="$2" FILE="$3" HOST="$4" TTL_STR="$5" CMT="$6"
+ local tlist f valtrust TIME EXPIRE_EPOCH JACTION EXPIRE_DISP
  if [ -z "$HOST" ]; then
 	echo "an FQDN or IP address is required for this option"
 	return 1
@@ -578,6 +625,9 @@ cli_trust_temp() {
 	echo "$HOST appears to be IPv6 but USE_IPV6 is not enabled"
  else
 	TIME=$(date +"%D %H:%M:%S")
+	CMT="${CMT//$'\n'/ }"
+	CMT="${CMT//$'\r'/}"
+	CMT="${CMT//$'\t'/ }"
 	EXPIRE_EPOCH=$(($(date +%s) + _TTL_SECONDS))
 	if [ -n "$CMT" ]; then
 		echo "# added $HOST on $TIME ttl=$_TTL_SECONDS expire=$EXPIRE_EPOCH with comment: $CMT" >> "$FILE"
@@ -597,7 +647,83 @@ cli_trust_temp() {
 	if [ "$SET_VERBOSE" != "1" ]; then
 		echo "Inserted into firewall: temporary $ACTION all to/from $HOST (ttl=${_TTL_SECONDS}s, expires $EXPIRE_DISP)"
 	fi
+	# Block escalation: record and check for auto-promotion
+	if [ "$PERMBLOCK_COUNT" -gt 0 ] && [ "$ACTION" == "DENY" ]; then
+		record_block "$HOST"
+		if check_block_escalation "$HOST"; then
+			escalate_to_permanent "$HOST"
+		fi
+	fi
  fi
+}
+
+record_block() {
+	local ip="$1"
+	local history_file="$INSTALL_PATH/internals/.block_history"
+	local now h_ip count first last found_entry=0
+	now=$(date +%s)
+	local tmpfile
+	tmpfile=$(mktemp "$INSTALL_PATH/internals/.block_history.XXXXXX")
+
+	if [ -f "$history_file" ]; then
+		while IFS='|' read -r h_ip count first last; do
+			[ -z "$h_ip" ] && continue
+			# Prune entries outside the interval window
+			if [ $((now - first)) -gt "$PERMBLOCK_INTERVAL" ]; then
+				continue
+			fi
+			if [ "$h_ip" = "$ip" ]; then
+				count=$((count + 1))
+				last="$now"
+				found_entry=1
+			fi
+			echo "${h_ip}|${count}|${first}|${last}"
+		done < "$history_file" > "$tmpfile"
+	fi
+
+	if [ "$found_entry" -eq 0 ]; then
+		echo "${ip}|1|${now}|${now}" >> "$tmpfile"
+	fi
+
+	mv -f "$tmpfile" "$history_file"
+	chmod 640 "$history_file"
+}
+
+check_block_escalation() {
+	local ip="$1"
+	local history_file="$INSTALL_PATH/internals/.block_history"
+	[ ! -f "$history_file" ] && return 1
+
+	local count
+	count=$(grep -Fm1 "${ip}|" "$history_file" | cut -d'|' -f2)
+	[ -z "$count" ] && return 1
+
+	if [ "$count" -ge "$PERMBLOCK_COUNT" ]; then
+		return 0
+	fi
+	return 1
+}
+
+escalate_to_permanent() {
+	local ip="$1"
+	local escaped_ip
+
+	# Remove temp entry markers from deny_hosts.rules
+	escaped_ip=$(echo "$ip" | sed 's/\./\\./g')
+	sed -i "/${escaped_ip}.*ttl=.*expire=/d" "$DENY_HOSTS"
+	sed -i "/^${escaped_ip}$/d" "$DENY_HOSTS"
+
+	# Add as permanent with static noexpire markers
+	echo "# added $ip on $(date +"%D %H:%M:%S") static noexpire with comment: auto-escalated from temp deny (PERMBLOCK)" >> "$DENY_HOSTS"
+	echo "$ip" >> "$DENY_HOSTS"
+
+	eout "{trust} $ip auto-escalated to permanent deny (PERMBLOCK_COUNT=$PERMBLOCK_COUNT reached)"
+
+	# Remove from block history (escalation complete)
+	local history_file="$INSTALL_PATH/internals/.block_history"
+	local escaped_ip_grep
+	escaped_ip_grep=$(echo "$ip" | sed 's/\./\\./g')
+	sed -i "/^${escaped_ip_grep}|/d" "$history_file"
 }
 
 save_external_baseline() {
@@ -714,9 +840,9 @@ flush_apf_chains() {
 flush() {
 firewall_on=$($IPT $IPT_FLAGS -L --numeric | grep -vE "Chain|destination")
 if [ "$SET_FASTLOAD" == "1" ] && [ "$DOCKER_COMPAT" != "1" ] && [ "$1" != "1" ] && [ "$DEVEL_ON" != "1" ] && [ -n "$firewall_on" ]; then
-	$IPTS > $INSTALL_PATH/internals/.apf.restore
+	$IPTS > "$INSTALL_PATH/internals/.apf.restore"
 	if [ "$USE_IPV6" == "1" ] && [ -n "$IP6TS" ]; then
-		$IP6TS > $INSTALL_PATH/internals/.apf6.restore
+		$IP6TS > "$INSTALL_PATH/internals/.apf6.restore"
 	fi
 	eout "{glob} fast load snapshot saved"
 fi
@@ -759,6 +885,8 @@ fi
 
 ipset_flush
 gre_flush
+rm -f /etc/cron.d/refresh.apf
+rm -f "$INSTALL_PATH/internals/.block_history"
 
 if [ ! "$1" = "1" ]; then
 	eout "{glob} firewall offline"
@@ -786,14 +914,14 @@ for ed in pico nano vi vim; do
 done
 if [ -n "$EDITOR_CMD" ]; then
 	$EDITOR_CMD "$iptc"
+	command -v clear > /dev/null 2>&1 && clear
 fi
-clear
 rm -f "$iptc"
 }
 
 status() {
 echo "$NAME Status Log:"
-tac "$LOG_APF" | more
+tac "$LOG_APF" | ${PAGER:-more}
 }
 
 help() {
@@ -835,13 +963,13 @@ tosroute() {
 # 8: Maximum Throughput - Minimum Delay
 # 16: No Delay - Moderate Throughput - High Reliability
 #
-TYPE="$1"
+local TYPE="$1"
 
 if [ -z "$TYPE" ]; then
 	return
 fi
 
-local tos_val tos_var ports
+local tos_val tos_var ports i
 for tos_val in 0 2 4 8 16; do
 	tos_var="TOS_$tos_val"
 	ports="${!tos_var}"
@@ -933,13 +1061,14 @@ search() {
 }
 
 trust_hosts() {
-file="$1"
-chain="$2"
+local file="$1"
+local chain="$2"
 local action_all="$3" action_tcp="$4" action_udp="$5" verb="$6"
+local i PFLOW PFLOW_T PPORT IPFLOW PIP NFLOW NFLOW_T PTYPE
 load_local_addrs
 if [ -z "$file" ] || [ -z "$chain" ]; then
         eout "{trust} could not process trust_hosts $file $chain, fatal error, aborting!"
-        $INSTALL_PATH/apf -f
+        "$INSTALL_PATH/apf" -f
         mutex_unlock
         exit 1
 fi
@@ -1916,7 +2045,6 @@ refresh() {
 	fi
 
         eout "{glob} refreshing trust system rules"
-	tmpra=$(mktemp "$INSTALL_PATH/internals/refresh.allow.XXXXXX")
 
         if [ "$SET_EXPIRE" -ge "60" ]; then
                 # expire deny_hosts bans
@@ -1931,46 +2059,44 @@ refresh() {
 		read last_trusts_md5 < "$INSTALL_PATH/internals/.trusts.md5"
 		if [ "$trusts_md5" == "$last_trusts_md5" ]; then
 		        eout "{glob} trust rules unchanged since last refresh, doing nothing."
-	                echo "$trusts_md5" > $INSTALL_PATH/internals/.trusts.md5
+	                echo "$trusts_md5" > "$INSTALL_PATH/internals/.trusts.md5"
 		        mutex_unlock
 			exit 1
 		else
-	                echo "$trusts_md5" > $INSTALL_PATH/internals/.trusts.md5
+	                echo "$trusts_md5" > "$INSTALL_PATH/internals/.trusts.md5"
 		fi
 	 else
-		echo "$trusts_md5" > $INSTALL_PATH/internals/.trusts.md5
+		echo "$trusts_md5" > "$INSTALL_PATH/internals/.trusts.md5"
 	 fi
 	else
 		glob_allow_download
 		glob_deny_download
 	fi
 
-	# Extract currently-trusted IPv4 addresses from iptables-save
-        $IPTS | grep -E "TALLOW|TGALLOW" | grep -E '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | awk '{print$4}' | sort -n | uniq > $tmpra
-	# Also extract IPv6 addresses from ip6tables-save
-	if [ "$USE_IPV6" == "1" ] && [ -n "$IP6TS" ]; then
-		$IP6TS | grep -E "TALLOW|TGALLOW" | grep -E '[0-9a-fA-F]*:[0-9a-fA-F:]+' | awk '{print$4}' | sort | uniq >> $tmpra
-	fi
-        ipt -F REFRESH_TEMP
-        while IFS= read -r i; do
-                [[ "$i" == \#* || -z "$i" ]] && continue
-                if ipt_for_host "$i"; then
-                 $IPT_H $IPT_FLAGS -A REFRESH_TEMP -s $i -d $ANY_ADDR -j ACCEPT
-                 $IPT_H $IPT_FLAGS -A REFRESH_TEMP -d $i -s $ANY_ADDR -j ACCEPT
-                fi
-        done < "$tmpra"
-        tmprd=$(mktemp "$INSTALL_PATH/internals/refresh.drop.XXXXXX")
-        $IPTS | grep -E "TDENY|TGDENY" | grep -E '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | awk '{print$4}' | sort -n | uniq > $tmprd
-	if [ "$USE_IPV6" == "1" ] && [ -n "$IP6TS" ]; then
-		$IP6TS | grep -E "TDENY|TGDENY" | grep -E '[0-9a-fA-F]*:[0-9a-fA-F:]+' | awk '{print$4}' | sort | uniq >> $tmprd
-	fi
-        while IFS= read -r i; do
-                [[ "$i" == \#* || -z "$i" ]] && continue
-                if ipt_for_host "$i"; then
-                 $IPT_H $IPT_FLAGS -A REFRESH_TEMP -s $i -d $ANY_ADDR -j $ALL_STOP
-                 $IPT_H $IPT_FLAGS -A REFRESH_TEMP -d $i -s $ANY_ADDR -j $ALL_STOP
-                fi
-        done < "$tmprd"
+	# Populate REFRESH_TEMP from trust files (more reliable than iptables-save
+	# parsing, which can miss entries added since last save)
+	ipt -F REFRESH_TEMP
+	local _rf_file _rf_line
+	for _rf_file in "$ALLOW_HOSTS" "$GALLOW_HOSTS"; do
+		[ -f "$_rf_file" ] || continue
+		while IFS= read -r _rf_line; do
+			case "$_rf_line" in '#'*|''|*:*) continue ;; esac
+			if ipt_for_host "$_rf_line"; then
+				$IPT_H $IPT_FLAGS -A REFRESH_TEMP -s "$_rf_line" -j ACCEPT 2>/dev/null
+				$IPT_H $IPT_FLAGS -A REFRESH_TEMP -d "$_rf_line" -j ACCEPT 2>/dev/null
+			fi
+		done < "$_rf_file"
+	done
+	for _rf_file in "$DENY_HOSTS" "$GDENY_HOSTS"; do
+		[ -f "$_rf_file" ] || continue
+		while IFS= read -r _rf_line; do
+			case "$_rf_line" in '#'*|''|*:*) continue ;; esac
+			if ipt_for_host "$_rf_line"; then
+				$IPT_H $IPT_FLAGS -A REFRESH_TEMP -s "$_rf_line" -j $ALL_STOP 2>/dev/null
+				$IPT_H $IPT_FLAGS -A REFRESH_TEMP -d "$_rf_line" -j $ALL_STOP 2>/dev/null
+			fi
+		done < "$_rf_file"
+	done
         trim $DENY_HOSTS $SET_TRIM
         trim $GDENY_HOSTS $SET_TRIM
         ipt -F TDENY
@@ -1982,16 +2108,15 @@ refresh() {
 	deny_hosts $GDENY_HOSTS TGDENY
 	deny_hosts $DENY_HOSTS TDENY
         ipt -F REFRESH_TEMP
-        rm -f $tmpra $tmprd
 }
 
 cron_refresh() {
 if [ "$SET_REFRESH" != "0" ] && [ -n "$SET_REFRESH" ]; then
-cat<<EOF > $INSTALL_PATH/internals/cron.refresh
+cat<<EOF > "$INSTALL_PATH/internals/cron.refresh"
 */$SET_REFRESH * * * * root $INSTALL_PATH/apf --refresh >> /dev/null 2>&1 &
 EOF
-	chmod 644 $INSTALL_PATH/internals/cron.refresh
-	ln -fs $INSTALL_PATH/internals/cron.refresh /etc/cron.d/refresh.apf
+	chmod 644 "$INSTALL_PATH/internals/cron.refresh"
+	ln -fs "$INSTALL_PATH/internals/cron.refresh" /etc/cron.d/refresh.apf
 	eout "{glob} SET_REFRESH is set to $SET_REFRESH minutes"
 else
 	rm -f /etc/cron.d/refresh.apf

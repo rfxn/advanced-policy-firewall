@@ -31,6 +31,7 @@ PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 OS="debian12"
 PARALLEL=0
 PARALLEL_N=0
+BATS_FORMATTER=""
 while [ $# -gt 0 ]; do
     case "$1" in
         --os)
@@ -46,6 +47,10 @@ while [ $# -gt 0 ]; do
             else
                 shift
             fi
+            ;;
+        --formatter)
+            BATS_FORMATTER="$2"
+            shift 2
             ;;
         *)
             break
@@ -112,7 +117,11 @@ fi
 # Sequential mode (no --parallel)
 if [ "$PARALLEL" -eq 0 ]; then
     echo "Running tests on $OS..."
-    docker run --rm --privileged "$IMAGE_NAME"
+    if [ -n "$BATS_FORMATTER" ]; then
+        docker run --rm --privileged "$IMAGE_NAME" bats --formatter "$BATS_FORMATTER" /opt/tests/
+    else
+        docker run --rm --privileged "$IMAGE_NAME"
+    fi
     exit $?
 fi
 

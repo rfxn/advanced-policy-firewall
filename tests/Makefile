@@ -15,7 +15,7 @@ test-serial:
 	./run-tests.sh
 
 test-verbose:
-	./run-tests.sh --parallel --formatter pretty
+	./run-tests.sh --formatter pretty
 
 # Individual OS targets (parallel within-OS)
 test-centos7:

@@ -6,7 +6,7 @@
 # This program may be freely redistributed under the terms of the GNU GPL v2
 ##
 #
-INSTALL_PATH="/etc/apf"
+INSTALL_PATH="${INSTALL_PATH:-/etc/apf}"
 if [ "$SET_VNET" == "1" ]; then
         eout "{glob} virtual network enabled, loading vnet rules."
 for i in "$INSTALL_PATH/vnet/"*.rules; do
