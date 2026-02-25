@@ -855,7 +855,7 @@ cli_trust_remove() {
 
 	# Remove comment lines referencing the FQDN/IP (covers resolved= metadata)
 	local escaped_dip="${DIP//./\\.}"
-	sed -i "\%# added.*${escaped_dip}%d" "$ALLOW_HOSTS" "$DENY_HOSTS" "$GALLOW_HOSTS" "$GDENY_HOSTS"
+	sed -i "\%# added ${escaped_dip} %d" "$ALLOW_HOSTS" "$DENY_HOSTS" "$GALLOW_HOSTS" "$GDENY_HOSTS"
 
 	if [ "$found" == "0" ]; then
 		return 1
@@ -956,7 +956,7 @@ cli_trust() {
  fi
  tlist=""
  for f in $DENY_HOSTS $ALLOW_HOSTS $GALLOW_HOSTS $GDENY_HOSTS; do
-     if [ -f "$f" ] && grep -v '^#' "$f" | grep -Fwq "$HOST"; then
+     if [ -f "$f" ] && grep -v '^#' "$f" | grep -Fxq "$HOST"; then
          tlist="$tlist$f "
      fi
  done
@@ -1245,8 +1245,9 @@ check_block_escalation() {
 	local history_file="$INSTALL_PATH/internals/.block_history"
 	[ ! -f "$history_file" ] && return 1
 
-	local count
-	count=$(grep -Fm1 "${ip}|" "$history_file" | cut -d'|' -f2)
+	local count escaped_ip_re
+	escaped_ip_re="${ip//./\\.}"
+	count=$(grep -m1 "^${escaped_ip_re}|" "$history_file" | cut -d'|' -f2)
 	[ -z "$count" ] && return 1
 
 	if [ "$count" -ge "$PERMBLOCK_COUNT" ]; then
@@ -1257,12 +1258,11 @@ check_block_escalation() {
 
 escalate_to_permanent() {
 	local ip="$1"
-	local escaped_ip
+	local escaped_ip="${ip//./\\.}"
 
 	# Remove temp entry markers from deny_hosts.rules
-	escaped_ip=$(echo "$ip" | sed 's/\./\\./g')
-	sed -i "/${escaped_ip}.*ttl=.*expire=/d" "$DENY_HOSTS"
-	sed -i "/^${escaped_ip}$/d" "$DENY_HOSTS"
+	sed -i "\%# added ${escaped_ip} .*ttl=.*expire=%d" "$DENY_HOSTS"
+	sed -i "\%^${escaped_ip}$%d" "$DENY_HOSTS"
 
 	# Add as permanent with static noexpire markers
 	echo "# added $ip on $(date +"%D %H:%M:%S") static noexpire with comment: auto-escalated from temp deny (PERMBLOCK)" >> "$DENY_HOSTS"
@@ -1272,9 +1272,7 @@ escalate_to_permanent() {
 
 	# Remove from block history (escalation complete)
 	local history_file="$INSTALL_PATH/internals/.block_history"
-	local escaped_ip_grep
-	escaped_ip_grep=$(echo "$ip" | sed 's/\./\\./g')
-	sed -i "/^${escaped_ip_grep}|/d" "$history_file"
+	sed -i "\%^${escaped_ip}|%d" "$history_file"
 }
 
 save_external_baseline() {
@@ -2581,7 +2579,7 @@ expire_temp_entries() {
 			epoch="${epoch%% *}"
 			if [ "$current_time" -ge "$epoch" ] 2>/dev/null; then
 				local escaped_ip="${ip//./\\.}"
-				sed -i "\%${escaped_ip}.*ttl=.*expire=%d" "$file"
+				sed -i "\%# added ${escaped_ip} .*ttl=.*expire=%d" "$file"
 				cli_trust_remove "$ip" >> /dev/null 2>&1
 				eout "{trust} removed expired temp entry for $ip"
 				count=$(($count + 1))
