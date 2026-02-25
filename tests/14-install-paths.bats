@@ -203,3 +203,27 @@ teardown_file() {
     perms=$(stat -c "%a" "$APF_DIR/vnet/vnetgen")
     [ "$perms" = "750" ]
 }
+
+@test "man page installed to /usr/share/man/man8/" {
+    if [ ! -d "/usr/share/man/man8" ]; then
+        skip "man page directory not available"
+    fi
+    [ -f "/usr/share/man/man8/apf.8.gz" ]
+}
+
+@test "man page has correct permissions (644)" {
+    if [ ! -f "/usr/share/man/man8/apf.8.gz" ]; then
+        skip "man page not installed"
+    fi
+    local perms
+    perms=$(stat -c '%a' /usr/share/man/man8/apf.8.gz)
+    [ "$perms" = "644" ]
+}
+
+@test "man page contains path-substituted install path" {
+    if [ ! -f "/usr/share/man/man8/apf.8.gz" ]; then
+        skip "man page not installed"
+    fi
+    run zgrep '/opt/apf' /usr/share/man/man8/apf.8.gz
+    assert_success
+}

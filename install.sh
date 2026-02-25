@@ -28,7 +28,7 @@ install() {
 	chmod 750 "$INSTALL_PATH"
 	cp -pf .ca.def importconf "$INSTALL_PATH/extras/"
 	mkdir -p "$INSTALL_PATH/doc"
-	cp README CHANGELOG COPYING.GPL "$INSTALL_PATH/doc"
+	cp README CHANGELOG COPYING.GPL apf.8 "$INSTALL_PATH/doc"
         ln -fs "$INSTALL_PATH/apf" "$BINPATH"
         ln -fs "$INSTALL_PATH/apf" "$COMPAT_BINPATH"
 	rm -f /etc/cron.hourly/fw /etc/cron.daily/fw /etc/cron.d/fwdev "$INSTALL_PATH/cron.fwdev"
@@ -79,6 +79,15 @@ install() {
 	if [ -d "/etc/logrotate.d" ] && [ -f "logrotate.d.apf" ]; then
 		cp logrotate.d.apf /etc/logrotate.d/apf
 	fi
+	# Install man page
+	if [ -d "/usr/share/man/man8" ] && [ -f "apf.8" ]; then
+		cp apf.8 /usr/share/man/man8/apf.8
+		if [ "$INSTALL_PATH" != "/etc/apf" ]; then
+			sed -i "s:/etc/apf:$INSTALL_PATH:g" /usr/share/man/man8/apf.8
+		fi
+		gzip -f /usr/share/man/man8/apf.8
+		chmod 644 /usr/share/man/man8/apf.8.gz
+	fi
 	"$INSTALL_PATH/vnet/vnetgen"
 	if [ -f "/usr/bin/dialog" ] && [ -d "$INSTALL_PATH/extras/apf-m" ]; then
 		last=$(pwd)
@@ -109,6 +118,9 @@ echo "Installation Details:"
 echo "  Install path:         $INSTALL_PATH/"
 echo "  Config path:          $INSTALL_PATH/conf.apf"
 echo "  Executable path:      $BINPATH"
+if [ -f "/usr/share/man/man8/apf.8.gz" ]; then
+	echo "  Man page:             /usr/share/man/man8/apf.8.gz"
+fi
 echo ""
 echo "Other Details:"
 if [ -d "$INSTALL_PATH.bk.last" ]; then
