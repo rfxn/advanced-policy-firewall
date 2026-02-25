@@ -1,0 +1,287 @@
+.\" Advanced Policy Firewall (APF) v2.0.2
+.\"             (C) 2002-2026, R-fx Networks <proj@rfxn.com>
+.\"             (C) 2026, Ryan MacDonald <ryan@rfxn.com>
+.\" This program may be freely redistributed under the terms of the GNU GPL v2
+.\"
+.TH APF 8 "February 2026" "APF 2.0.2" "System Administration"
+.SH NAME
+apf \- Advanced Policy Firewall
+.SH SYNOPSIS
+.B apf
+.RB [ \-s | \-r | \-f | \-l | \-t | \-e | \-o | \-v ]
+.br
+.B apf
+.RB { \-a | \-d }
+.IR HOST\  [ COMMENT ]
+.br
+.B apf
+.RB { \-ta | \-td }
+.IR HOST\  TTL\  [ COMMENT ]
+.br
+.B apf
+.B \-g
+.I PATTERN
+.SH DESCRIPTION
+Advanced Policy Firewall (APF) is an iptables/netfilter\-based firewall
+management system for Linux servers.
+It provides three approaches to network filtering:
+stateful packet inspection policies,
+trust\-based allow/deny host management with automatic DNS resolution,
+and Reactive Address Blocking (RAB) for runtime policy violation tracking.
+APF supports both IPv4 and IPv6, ipset\-based block lists, GRE tunnel
+management, per\-IP virtual network policies, and temporary trust entries
+with automatic expiry.
+.SH OPTIONS
+.SS Core Operations
+.TP
+.BR \-s ", " \-\-start
+Load all firewall rules.
+Uses fast load (iptables\-restore from snapshot) when available,
+otherwise performs a full load.
+.TP
+.BR \-r ", " \-\-restart
+Stop (flush) and reload all firewall rules.
+.TP
+.BR \-f ", " \-\-stop ", " \-\-flush
+Stop (flush) all firewall rules and reset chains to ACCEPT.
+.TP
+.BR \-l ", " \-\-list
+List all active iptables rules.
+.TP
+.BR \-t ", " \-\-status
+Display the firewall status log.
+.TP
+.BR \-e ", " \-\-refresh
+Refresh and re\-resolve DNS names in trust rules.
+.SS Trust Management
+.TP
+.BR \-a " \fIHOST\fR [\fICOMMENT\fR], " \-\-allow " \fIHOST\fR [\fICOMMENT\fR]"
+Add
+.I HOST
+(IPv4, IPv6, CIDR, or FQDN) to
+.I allow_hosts.rules
+and immediately load the rule into the live firewall.
+.TP
+.BR \-d " \fIHOST\fR [\fICOMMENT\fR], " \-\-deny " \fIHOST\fR [\fICOMMENT\fR]"
+Add
+.I HOST
+to
+.I deny_hosts.rules
+and immediately load the rule into the live firewall.
+.TP
+.BR \-u " \fIHOST\fR, " \-\-remove " \fIHOST\fR, " \-\-unban " \fIHOST\fR"
+Remove
+.I HOST
+from all trust files (allow, deny, global) and immediately remove
+matching rules from the live firewall.
+.SS Temporary Trust
+.TP
+.BR \-ta " \fIHOST\fR \fITTL\fR [\fICOMMENT\fR], " \-\-temp\-allow " \fIHOST\fR \fITTL\fR [\fICOMMENT\fR]"
+Temporarily allow
+.I HOST
+with a time\-to\-live of
+.IR TTL .
+TTL may be in seconds or with a suffix:
+.BR 5m " (minutes), " 1h " (hours), " 7d " (days)."
+The entry is automatically removed when the TTL expires.
+.TP
+.BR \-td " \fIHOST\fR \fITTL\fR [\fICOMMENT\fR], " \-\-temp\-deny " \fIHOST\fR \fITTL\fR [\fICOMMENT\fR]"
+Temporarily deny
+.I HOST
+with a time\-to\-live of
+.IR TTL .
+.TP
+.BR \-\-templ ", " \-\-temp\-list
+List all temporary trust entries with remaining TTL.
+.TP
+.BR \-\-tempf ", " \-\-temp\-flush
+Remove all temporary trust entries.
+.TP
+.B \-\-temp\-expire
+Expire temporary entries whose TTL has elapsed.
+Normally run from cron every minute.
+.SS Diagnostics
+.TP
+.BR \-g " \fIPATTERN\fR, " \-\-search " \fIPATTERN\fR"
+Search iptables rules (IPv4 and IPv6), ipset sets, and trust files for
+.IR PATTERN .
+Case\-insensitive.
+.TP
+.BR \-o ", " \-\-ovars
+Output all configuration variables.
+.TP
+.BR \-v ", " \-\-version
+Output the version number.
+.SS ipset Block Lists
+.TP
+.B \-\-ipset\-update
+Hot\-reload ipset block lists from
+.IR ipset.rules .
+Lists are refreshed per their configured interval.
+.SS GRE Tunnels
+.TP
+.B \-\-gre\-up
+Bring up GRE tunnels defined in
+.IR gre.rules .
+.TP
+.B \-\-gre\-down
+Tear down GRE tunnels.
+.TP
+.B \-\-gre\-status
+Show GRE tunnel status.
+.SH TRUST SYSTEM
+APF uses file\-based trust lists for allow and deny rules:
+.TP
+.I allow_hosts.rules
+Local allow list (one entry per line).
+.TP
+.I deny_hosts.rules
+Local deny list (one entry per line).
+.TP
+.I glob_allow.rules / glob_deny.rules
+Downloaded global allow/deny lists.
+.PP
+Each entry may be an IPv4 address, IPv6 address, CIDR block, or FQDN.
+FQDNs are resolved to IPv4 addresses on load and refresh.
+An optional comment may follow the address, separated by a space.
+.PP
+Advanced trust syntax allows protocol, direction, and port filtering:
+.PP
+.RS
+.B proto:flow:[s/d]=port:[s/d]=ip(/mask)
+.RE
+.PP
+For example:
+.B tcp:in:d=22:s=10.0.0.0/8
+allows inbound TCP port 22 from 10.0.0.0/8.
+.PP
+Temporary entries (added via
+.B \-ta
+or
+.BR \-td )
+include TTL and expiry metadata and are automatically removed by cron.
+.SH CONFIGURATION
+All configuration is in a single file,
+.IR conf.apf ,
+organized into sections:
+.TP
+.B Main Config
+Development mode, install path, interfaces, IPv6 toggle, fast load, VNET.
+.TP
+.B Reactive Address Blocking
+RAB enable/disable, sanity and port\-scan triggers, thresholds, timers.
+.TP
+.B Packet Filtering
+TCP/UDP/ALL stop targets, packet sanity checks, INVALID state blocking.
+.TP
+.B Port & ICMP Filtering
+Inbound/outbound TCP/UDP/ICMP ports, connection limits, SYN flood protection,
+DNS resolution, P2P, multicast.
+.TP
+.B User & Application Filtering
+UID\-based egress, command\-owner blocking, SMTP outbound restrictions.
+.TP
+.B Remote Lists & ipset
+DShield, Spamhaus DROP, Project Honey Pot, ECN, global trust, ipset lists, GRE.
+.TP
+.B Logging & Kernel Tuning
+Log targets, rate limits, sysctl tunables, conntrack, helper chains.
+.SH FILES
+.TP
+.I /etc/apf/conf.apf
+Main configuration file.
+.TP
+.I /etc/apf/allow_hosts.rules
+Local allow trust list.
+.TP
+.I /etc/apf/deny_hosts.rules
+Local deny trust list.
+.TP
+.I /etc/apf/glob_allow.rules
+Global (downloaded) allow list.
+.TP
+.I /etc/apf/glob_deny.rules
+Global (downloaded) deny list.
+.TP
+.I /etc/apf/ipset.rules
+ipset block list definitions.
+.TP
+.I /etc/apf/gre.rules
+GRE tunnel definitions.
+.TP
+.I /etc/apf/hook_pre.sh
+Pre\-configuration hook script (inactive when permissions are 640).
+.TP
+.I /etc/apf/hook_post.sh
+Post\-configuration hook script (inactive when permissions are 640).
+.TP
+.I /etc/apf/vnet/
+Per\-IP virtual network policy files.
+.TP
+.I /etc/cron.d/apf
+Consolidated cron: daily restart, hourly ipset refresh, per\-minute temp expiry.
+.TP
+.I /var/log/apf_log
+Default status log location.
+.SH EXIT STATUS
+.TP
+.B 0
+Success.
+.TP
+.B 1
+Error (missing dependency, invalid argument, lock contention, iptables failure).
+.SH ENVIRONMENT
+.TP
+.B INSTALL_PATH
+Override default install path
+.RB ( /etc/apf ).
+Must be set before running
+.BR install.sh .
+.TP
+.B DEVEL_MODE
+When set to
+.B 1
+in
+.IR conf.apf ,
+a cron job automatically flushes the firewall every 5 minutes to prevent
+lockout during testing.
+.SH EXAMPLES
+Start the firewall:
+.PP
+.RS
+.B apf \-s
+.RE
+.PP
+Allow a host with a comment:
+.PP
+.RS
+.B apf \-a 192.168.1.100 "office gateway"
+.RE
+.PP
+Temporarily deny a host for 1 hour:
+.PP
+.RS
+.B apf \-td 203.0.113.50 1h "brute force"
+.RE
+.PP
+Search rules for an IP address:
+.PP
+.RS
+.B apf \-g 10.0.0.1
+.RE
+.PP
+Restart the firewall after configuration changes:
+.PP
+.RS
+.B apf \-r
+.RE
+.SH SEE ALSO
+.BR iptables (8),
+.BR ip6tables (8),
+.BR ipset (8),
+.BR iptables\-save (8),
+.BR iptables\-restore (8)
+.SH AUTHORS
+Ryan MacDonald <ryan@rfxn.com>, R-fx Networks <proj@rfxn.com>
+.PP
+https://github.com/rfxn/advanced\-policy\-firewall

@@ -184,6 +184,9 @@
 [Change] Improve IPT_LOCK_SUPPORT/IPT_LOCK_TIMEOUT comments: document
       which platforms require default off and recommend enabling on
       modern systems (conf.apf)
+[New] Man page: apf.8 section 8, all CLI operations, trust system overview,
+      configuration reference, installed to /usr/share/man/man8/ (apf.8,
+      install.sh)
 
 - 2.0.1 | Feb 20 2026:
 
