@@ -19,26 +19,30 @@ trust-based host management, reactive address blocking, and per-IP virtual netwo
   - [1.1 Supported Systems & Requirements](#11-supported-systems--requirements)
 - [2. Installation](#2-installation)
   - [2.1 Boot Loading](#21-boot-loading)
+  - [2.2 Upgrading](#22-upgrading)
+  - [2.3 Key Files](#23-key-files)
 - [3. Configuration](#3-configuration)
   - [3.1 Basic Options](#31-basic-options)
-  - [3.2 Advanced Options](#32-advanced-options)
-  - [3.3 Reactive Address Blocking](#33-reactive-address-blocking)
-  - [3.4 Virtual Network Files](#34-virtual-network-files)
-  - [3.5 Global Variables & Custom Rules](#35-global-variables--custom-rules)
-  - [3.6 Hook Scripts](#36-hook-scripts)
-  - [3.7 Silent IP Blocking](#37-silent-ip-blocking)
-  - [3.8 Docker/Container Compatibility](#38-dockercontainer-compatibility)
-  - [3.9 ipset Block Lists](#39-ipset-block-lists)
-  - [3.10 GRE Tunnels](#310-gre-tunnels)
-  - [3.11 Remote Block Lists](#311-remote-block-lists)
-  - [3.12 Logging & Control](#312-logging--control)
-  - [3.13 Implicit Blocking](#313-implicit-blocking)
-  - [3.14 Firewall Order of Operations](#314-firewall-order-of-operations)
+  - [3.2 Outbound Filtering & Rate Limiting](#32-outbound-filtering--rate-limiting)
+  - [3.3 Advanced Options](#33-advanced-options)
+  - [3.4 Reactive Address Blocking](#34-reactive-address-blocking)
+  - [3.5 Virtual Network Files](#35-virtual-network-files)
+  - [3.6 Global Variables & Custom Rules](#36-global-variables--custom-rules)
+  - [3.7 Hook Scripts](#37-hook-scripts)
+  - [3.8 Silent IP Blocking](#38-silent-ip-blocking)
+  - [3.9 Docker/Container Compatibility](#39-dockercontainer-compatibility)
+  - [3.10 ipset Block Lists](#310-ipset-block-lists)
+  - [3.11 GRE Tunnels](#311-gre-tunnels)
+  - [3.12 Remote Block Lists](#312-remote-block-lists)
+  - [3.13 Logging & Control](#313-logging--control)
+  - [3.14 Implicit Blocking](#314-implicit-blocking)
+  - [3.15 Firewall Order of Operations](#315-firewall-order-of-operations)
 - [4. General Usage](#4-general-usage)
   - [4.1 Trust System](#41-trust-system)
   - [4.2 Global Trust System](#42-global-trust-system)
   - [4.3 Advanced Trust Syntax](#43-advanced-trust-syntax)
   - [4.4 Temporary Trust Entries](#44-temporary-trust-entries)
+  - [4.5 Troubleshooting](#45-troubleshooting)
 - [5. License](#5-license)
 - [6. Support Information](#6-support-information)
 
@@ -69,9 +73,9 @@ apf -r
 
 ## 1. Introduction
 
-Advanced Policy Firewall (APF) is an iptables(netfilter) based firewall system designed around the essential needs of today's Internet deployed servers and the unique needs of custom deployed Linux installations. The configuration of APF is designed to be very informative and present the user with an easy to follow process, from top to bottom of the configuration file. The management of APF on a day-to-day basis is conducted from the command line with the `apf` command, which includes detailed usage information and all the features one would expect from a current and forward thinking firewall solution.
+Advanced Policy Firewall (APF) is an iptables(netfilter) based firewall system designed for Internet-facing Linux servers. Configuration is managed through a single annotated file (`conf.apf`) and day-to-day operations through the `apf` command.
 
-The technical side of APF is such that it embraces the latest stable features put forward by the iptables(netfilter) project to provide a very robust and powerful firewall. The filtering performed by APF is three fold:
+The filtering performed by APF is three fold:
 
 1. **Static rule based policies** (not to be confused with a "static firewall")
 2. **Connection based stateful policies**
@@ -162,8 +166,7 @@ ls /lib/modules/$(uname -r)/kernel/net/netfilter/
 - RHEL / Rocky Linux / AlmaLinux 8, 9
 - CentOS 7 (legacy support)
 - Debian 12
-- Ubuntu 20.04, 22.04, 24.04
-- Fedora (current releases)
+- Ubuntu 20.04, 24.04
 
 APF will generally run on any Linux distribution that provides iptables (legacy or nft backend) and a bash shell with standard GNU utilities (grep, awk, sed, etc.).
 
@@ -196,6 +199,8 @@ After installation is completed the documentation and convenience scripts are co
 
 > **Note:** APF ships with `DEVEL_MODE="1"` enabled by default. This safety feature automatically flushes the firewall every 5 minutes to prevent lockout during initial configuration. Set `DEVEL_MODE="0"` in `conf.apf` once your configuration is verified and you are ready for persistent operation.
 
+A comprehensive man page is installed automatically; run `man apf` for a complete CLI and configuration reference.
+
 ### 2.1 Boot Loading
 
 On installation APF will install a systemd service unit (`apf.service`) on systems with systemd, or an init script to `/etc/init.d/apf` on older systems, and configure it to load on boot. If you are setting up APF in a more custom situation then you may follow the below instructions.
@@ -226,6 +231,38 @@ It is **NOT** recommended that you use multiple startup methods together.
 
 **The third and final approach** is to simply run APF in an on-demand fashion. That is, enable it with the `apf -s` command when desired and disable it with the `apf -f` when desired.
 
+### 2.2 Upgrading
+
+When upgrading from a previous version of APF:
+
+- `install.sh` automatically backs up your existing installation to `/etc/apf.bkDDMMYY-UTIME` before overwriting.
+- `importconf` migrates your `conf.apf` settings into the new version, preserving customized values while adding new variables.
+- New configuration variables introduced in later versions receive safe defaults from the `.ca.def` preamble, so upgrades never produce unbound variable errors.
+- Hook scripts (`hook_pre.sh`, `hook_post.sh`), `silent_ips.rules`, and trust files are preserved across upgrades via `importconf`.
+- Review the CHANGELOG for new features, changed defaults, and any manual steps required for your version.
+
+### 2.3 Key Files
+
+The following files are located under your install path (`/etc/apf` by default):
+
+| File | Purpose |
+|------|---------|
+| `conf.apf` | Main configuration file |
+| `allow_hosts.rules` | Local allow trust list |
+| `deny_hosts.rules` | Local deny trust list |
+| `glob_allow.rules` | Global (downloaded) allow list |
+| `glob_deny.rules` | Global (downloaded) deny list |
+| `ipset.rules` | ipset block list definitions |
+| `gre.rules` | GRE tunnel definitions |
+| `hook_pre.sh` | Pre-configuration hook script (640 = inactive) |
+| `hook_post.sh` | Post-configuration hook script (640 = inactive) |
+| `silent_ips.rules` | Silent IP blocking list |
+| `preroute.rules` | Pre-routing custom rules |
+| `postroute.rules` | Post-routing custom rules |
+| `vnet/` | Per-IP virtual network policy files |
+| `/etc/cron.d/apf` | Consolidated cron: daily restart, hourly ipset refresh, per-minute temp trust expiry |
+| `/var/log/apf_log` | Default status log location |
+
 ---
 
 ## 3. Configuration
@@ -252,9 +289,9 @@ This section will cover some of the basic configuration options found inside of 
 
 **`SET_FASTLOAD`** - Save and restore firewall snapshots for fast startup. Instead of regenerating every rule, APF loads from a saved snapshot. Configuration changes and iptables backend changes (legacy vs nft) are detected automatically, forcing a full reload when needed.
 
-**`SET_VNET`** - Enable the virtual network subsystem (VNET) which generates per-IP policy files for aliased addresses. See [section 3.4](#34-virtual-network-files).
+**`SET_VNET`** - Enable the virtual network subsystem (VNET) which generates per-IP policy files for aliased addresses. See [section 3.5](#35-virtual-network-files).
 
-**`SET_ADDIFACE`** - Firewall additional untrusted interfaces through the VNET system. See [section 3.4](#34-virtual-network-files).
+**`SET_ADDIFACE`** - Firewall additional untrusted interfaces through the VNET system. See [section 3.5](#35-virtual-network-files).
 
 **Port filtering variables** (global context, overridable via VNET per-IP rules):
 
@@ -269,6 +306,12 @@ This section will cover some of the basic configuration options found inside of 
 | `EG_UDP_CPORTS` | Outbound UDP ports (e.g., `53,873`) |
 | `EG_ICMP_TYPES` | Outbound ICMP types (see `internals/icmp.types`) |
 | `EG_ICMPV6_TYPES` | Outbound ICMPv6 types (requires `USE_IPV6="1"`); NDP types 133-136 always permitted |
+
+**`LOG_DROP`** - Enable detailed firewall packet logging. Typically left disabled on production systems due to log volume and disk I/O impact.
+
+### 3.2 Outbound Filtering & Rate Limiting
+
+These options control rate limiting, per-user outbound restrictions, and protocol-specific blocking. They build on the basic port filtering in [section 3.1](#31-basic-options).
 
 **Per-port connection limiting** (via `xt_connlimit` module):
 
@@ -308,9 +351,7 @@ Under-limit SYN packets RETURN for normal processing (port filtering, trust chec
 
 Panel examples: InterWorx (`SMTP_ALLOWUSER="iworx"` `SMTP_ALLOWGROUP="mail"`), cPanel (`SMTP_ALLOWUSER="cpanel"` `SMTP_ALLOWGROUP="mail,mailman"`), Plesk (`SMTP_ALLOWUSER="postfix"` `SMTP_ALLOWGROUP="postfix,mail"`).
 
-**`LOG_DROP`** - Enable detailed firewall packet logging. Typically left disabled on production systems due to log volume and disk I/O impact.
-
-### 3.2 Advanced Options
+### 3.3 Advanced Options
 
 The advanced options, although not required, are those which afford the firewall the ability to be a more robust and encompassing solution in protecting a host. These options should be reviewed on a case-by-case basis and enabled only as you determine their merit to meet a particular need on a host or network.
 
@@ -352,7 +393,7 @@ The advanced options, although not required, are those which afford the firewall
 
 See `conf.apf` for detailed descriptions of each setting and their sub-options.
 
-### 3.3 Reactive Address Blocking
+### 3.4 Reactive Address Blocking
 
 The Reactive Address Blocking (RAB) system provides in-line intrusion prevention by automatically blocking addresses that trigger sanity violations or port scan detection. RAB is configured through the `RAB_*` variables in `conf.apf`.
 
@@ -372,15 +413,15 @@ The Reactive Address Blocking (RAB) system provides in-line intrusion prevention
 
 **`RAB_LOG_TRIP`** - Log all subsequent traffic from blocked addresses. Can generate a lot of logs but provides valuable information about attacker intent. `LOG_DROP=1` overrides this to force logging.
 
-### 3.4 Virtual Network Files
+### 3.5 Virtual Network Files
 
 When `SET_VNET=1`, APF generates per-IP policy files under the `vnet/` directory for each aliased address on the `IFACE_UNTRUSTED` interface. Each file (e.g., `vnet/192.168.1.100.rules`) can override the global port filtering variables (`IG_TCP_CPORTS`, `EG_TCP_CPORTS`, etc.) for that specific IP address. This allows fine-grained control over which ports are open on each address. Run `apf -s` after editing VNET files to apply changes. Note that the VNET subsystem operates on IPv4 addresses only.
 
-### 3.5 Global Variables & Custom Rules
+### 3.6 Global Variables & Custom Rules
 
 All variables defined in `conf.apf` are available for use in VNET per-IP rule files, allowing you to import global settings and selectively override them. For custom iptables rules beyond what `conf.apf` provides, you can add rules directly to the `preroute.rules` file which is loaded early in the firewall chain. Any valid iptables syntax can be used in these files, as they are sourced directly into the firewall's bash execution environment.
 
-### 3.6 Hook Scripts
+### 3.7 Hook Scripts
 
 APF supports custom pre- and post-configuration hook scripts that are sourced during firewall startup:
 
@@ -389,13 +430,13 @@ APF supports custom pre- and post-configuration hook scripts that are sourced du
 
 Both scripts ship as permission 640 (inactive). To activate, make executable: `chmod 750 /etc/apf/hook_pre.sh`. All APF variables and helpers (`ipt`/`ipt4`/`ipt6`, `eout`, etc.) are available. Scripts are preserved across upgrades via `importconf`.
 
-### 3.7 Silent IP Blocking
+### 3.8 Silent IP Blocking
 
 The `silent_ips.rules` file lists server IP addresses that should receive no traffic at all. Traffic to and from these addresses is silently dropped (no logging) in both INPUT and OUTPUT chains. One IP or CIDR per line, `#` comments supported, both IPv4 and IPv6.
 
 Positioned after loopback and trusted interface acceptance — loopback and trusted interfaces still work. All other traffic is blocked before trust chains, block lists, or port filtering. An empty or comment-only file is a no-op. Preserved across upgrades via `importconf`.
 
-### 3.8 Docker/Container Compatibility
+### 3.9 Docker/Container Compatibility
 
 When running APF alongside Docker, Podman, Kubernetes, or other container runtimes, the default flush behavior (which wipes all iptables rules and chains) will destroy the container runtime's networking rules. The `DOCKER_COMPAT` option solves this by switching APF to a surgical flush mode.
 
@@ -412,7 +453,7 @@ When `DOCKER_COMPAT` is enabled, `SET_FASTLOAD` is automatically disabled becaus
 
 Enable this option if you see Docker containers losing network connectivity after running `apf -s` or `apf -r`.
 
-### 3.9 ipset Block Lists
+### 3.10 ipset Block Lists
 
 The ipset subsystem uses kernel-level hash tables for high-performance IP matching. Instead of creating one iptables rule per blocked IP address (which scales linearly), ipset creates a single iptables rule per block list that references a kernel hash set, providing O(1) lookup performance regardless of list size.
 
@@ -444,7 +485,7 @@ firehol_level2:src:net:1:0:0:https://iplists.firehol.org/files/firehol_level2.ne
 
 Run `apf --ipset-update` to hot-reload all ipset block lists without restarting the firewall. A cron job (`cron.d/apf`) runs hourly; actual refresh timing is governed by per-list intervals and `IPSET_REFRESH`.
 
-### 3.10 GRE Tunnels
+### 3.11 GRE Tunnels
 
 APF can manage GRE (Generic Routing Encapsulation) point-to-point tunnels with dedicated firewall chains and protocol 47 rules. This is useful for servers that need encapsulated point-to-point links to remote endpoints.
 
@@ -489,7 +530,7 @@ apf --gre-down     # tear down all tunnels and remove firewall rules
 apf --gre-status   # show current tunnel interface status
 ```
 
-### 3.11 Remote Block Lists
+### 3.12 Remote Block Lists
 
 APF can automatically download and apply IP block lists from external sources. Each list is loaded into a dedicated iptables chain on full firewall start. The following `DLIST_*` variables in `conf.apf` control these lists:
 
@@ -503,7 +544,7 @@ APF can automatically download and apply IP block lists from external sources. E
 
 Each has a companion `_URL` variable (e.g., `DLIST_PHP_URL`) for the download source. Set the toggle to `"1"` to enable a list. Lists are validated during parsing and backed up before each download. Failed downloads restore from backup to prevent data loss. Note that `DLIST_RESERVED` interacts with `BLK_RESNET` — when both are enabled, the downloaded reserved.networks list supplements the built-in private.networks blocking.
 
-### 3.12 Logging & Control
+### 3.13 Logging & Control
 
 APF provides configurable logging of filtered packets through the `LOG_*` variables in `conf.apf`:
 
@@ -520,7 +561,7 @@ APF provides configurable logging of filtered packets through the `LOG_*` variab
 
 For iptables concurrency control, `IPT_LOCK_SUPPORT` and `IPT_LOCK_TIMEOUT` configure the `-w` lock flag behavior for iptables >= 1.4.20. This prevents concurrent iptables modifications from corrupting rule state.
 
-### 3.13 Implicit Blocking
+### 3.14 Implicit Blocking
 
 The `BLK_*` variables in `conf.apf` control implicit blocking of specific traffic patterns without explicit port rules. These apply globally to all interfaces:
 
@@ -534,7 +575,7 @@ The `BLK_*` variables in `conf.apf` control implicit blocking of specific traffi
 | `BLK_TCP_SACK_PANIC` | Block low-MSS TCP SACK exploit packets (CVE-2019-11477) |
 | `BLK_IDENT` | REJECT ident (TCP 113) requests instead of silently dropping; some services stall without ident response |
 
-### 3.14 Firewall Order of Operations
+### 3.15 Firewall Order of Operations
 
 When APF starts (`apf -s`), rules are loaded in a specific order that determines how packets are evaluated. Understanding this order is essential for troubleshooting and for knowing which features take precedence.
 
@@ -577,7 +618,7 @@ When APF starts (`apf -s`), rules are loaded in a specific order that determines
 - VNET per-IP rules override global port configuration
 - Hook scripts (`hook_pre.sh` / `hook_post.sh`) run outside the normal chain; pre-hook before any rules, post-hook after default policies
 
-For the complete step-by-step initialization flow with source file references, see [FLOW.md](FLOW.md).
+For the complete step-by-step initialization flow — including source file references, each chain's creation point, and the full OUTPUT chain evaluation order — see [FLOW.md](FLOW.md) (also installed as `/etc/apf/doc/FLOW`).
 
 ---
 
@@ -601,17 +642,17 @@ usage apf [OPTION]
                                      load new rule into firewall
 -u|--remove|--unban HOST ........... remove host from [glob]*_hosts.rules
                                      and immediately remove rule from firewall
--o|--ovars ......................... output all configuration options
--v|--version ....................... output version number
---ipset-update ..................... hot-reload ipset block lists from ipset.rules
---gre-up ........................... bring up GRE tunnels from gre.rules
--g|--search PATTERN ................ search iptables rules and trust files
+-g|--search PATTERN ................ search iptables/ipset rules and trust files
 -ta HOST TTL [CMT]|--temp-allow .... temporarily allow host with TTL
                                      (TTL: seconds, or 5m, 1h, 7d)
 -td HOST TTL [CMT]|--temp-deny ..... temporarily deny host with TTL
 --templ|--temp-list ................ list temp entries with remaining TTL
 --tempf|--temp-flush ............... remove all temporary entries
 --temp-expire ...................... expire temporary entries (runs from cron)
+-o|--ovars ......................... output all configuration options
+-v|--version ....................... output version number
+--ipset-update ..................... hot-reload ipset block lists from ipset.rules
+--gre-up ........................... bring up GRE tunnels from gre.rules
 --gre-down ......................... tear down GRE tunnels
 --gre-status ....................... show GRE tunnel status
 ```
@@ -622,7 +663,13 @@ The **`-e|--refresh`** option flushes trust chains and reloads them from rule fi
 
 The **`-a|--allow`** and **`-d|--deny`** options add entries to the trust system immediately without a firewall restart. Both accept an optional comment string. The **`-u|--remove`** option removes an address from all trust files. See [section 4.1](#41-trust-system) for details.
 
-The **`-g|--search`** option searches all iptables rules (IPv4 + IPv6), ipset sets, and trust files for a pattern match. Case-insensitive, with line-numbered output. Useful for quickly finding which rules or trust entries match a given IP, port, or chain name.
+The **`-g|--search`** option searches all iptables rules (IPv4 + IPv6), ipset sets, and trust files for a pattern match. Case-insensitive, with line-numbered output. Useful for quickly finding which rules or trust entries match a given IP, port, or chain name. Examples:
+
+```bash
+apf -g 192.168.1.50
+apf -g DROP
+apf -g :443
+```
 
 The **`-o|--ovars`** option outputs all configured variables and their values — useful for troubleshooting or when reporting problems (see [section 6](#6-support-information)).
 
@@ -672,6 +719,8 @@ The trust system has several operational controls in `conf.apf`:
 | `SET_REFRESH` | Refresh interval in minutes for trust rules and DNS re-resolution (default: 10) |
 | `SET_REFRESH_MD5` | Skip refresh if trust files are unchanged (`1` to enable) |
 | `SET_TRIM` | Max deny entries before oldest are purged (default: 250) |
+
+For temporary trust entries with per-entry TTL, see [section 4.4](#44-temporary-trust-entries).
 
 ### 4.2 Global Trust System
 
@@ -757,6 +806,31 @@ apf -u 10.0.0.5
 
 Expiry is handled automatically by a cron job that runs every minute (`/etc/cron.d/apf`). Temporary entries use their own per-entry TTL and are not affected by the global `SET_EXPIRE` timer. To reset a temp entry's timer, remove it first (`apf -u HOST`) then re-add it with a new TTL.
 
+**Block Escalation:**
+
+When the same IP address is repeatedly temp-denied, APF can automatically promote it to a permanent deny entry. This is controlled by two variables in `conf.apf`:
+
+| Variable | Purpose |
+|----------|---------|
+| `PERMBLOCK_COUNT` | Number of temp denies within `PERMBLOCK_INTERVAL` before auto-promoting to permanent (default: `0`, disabled) |
+| `PERMBLOCK_INTERVAL` | Time window in seconds for counting repeat temp denies (default: `86400`, 24 hours) |
+
+For example, setting `PERMBLOCK_COUNT="3"` and `PERMBLOCK_INTERVAL="86400"` will permanently block any IP that is temp-denied 3 or more times within 24 hours. Escalated entries are added to `deny_hosts.rules` with a `"noexpire"` marker so they are not affected by `SET_EXPIRE`.
+
+### 4.5 Troubleshooting
+
+**Locked out of the server?** `DEVEL_MODE="1"` (the default) auto-flushes the firewall every 5 minutes. If DEVEL_MODE is off, rebooting will clear rules unless boot loading is configured (see [section 2.1](#21-boot-loading)).
+
+**Docker containers lost network after `apf -s`?** Set `DOCKER_COMPAT="1"` in `conf.apf` to preserve container networking rules during firewall operations. See [section 3.9](#39-dockercontainer-compatibility).
+
+**Firewall rules gone after reboot?** Ensure boot loading is configured — systemd service, chkconfig, or rc.local entry. See [section 2.1](#21-boot-loading).
+
+**ipset block lists not loading?** Install the ipset package (`apt-get install ipset` / `yum install ipset`), set `USE_IPSET="1"` in `conf.apf`, and verify with `apf -o | grep IPSET`.
+
+**How to see what is blocked?** Use `apf -g IP` to search iptables rules and trust files, or `apf -l | grep IP` to search loaded rules directly.
+
+**How to check if APF is running?** Run `apf -t` to view the status log, or `iptables -S | head` to check for loaded rules.
+
 ---
 
 ## 5. License
@@ -771,6 +845,6 @@ APF (Advanced Policy Firewall) is distributed under the GNU General Public Licen
 
 The APF source repository is at: https://github.com/rfxn/advanced-policy-firewall
 
-Bugs, feature requests, and general questions can be filed as GitHub issues or sent to proj@rfxn.com. When reporting issues, include the output of `apf --ovars` to help diagnose configuration problems.
+Bugs, feature requests, and general questions can be filed as GitHub issues or sent to proj@rfxn.com. When reporting issues, include the output of `apf --ovars` to help diagnose configuration problems. For a complete CLI and configuration reference, run `man apf`.
 
 The official project page is at: https://www.rfxn.com/projects/advanced-policy-firewall/
