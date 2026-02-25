@@ -682,10 +682,10 @@ The two basic trust level files are located at:
 - `/etc/apf/allow_hosts.rules`
 - `/etc/apf/deny_hosts.rules`
 
-These files by nature are static, meaning that once you add an entry to them, they will remain in the files till you remove them yourself. The trust files accept FQDN (fully qualified domain names), IPv4 addresses, and IPv6 addresses with optional bit masking. Examples:
+These files by nature are static, meaning that once you add an entry to them, they will remain in the files till you remove them yourself. The trust files accept FQDN (fully qualified domain names), IPv4 addresses, and IPv6 addresses with optional bit masking. FQDNs are pre-resolved to IP addresses via `getent` before loading into iptables. When `USE_IPV6=1`, both A and AAAA records are used. Resolved addresses are stored as metadata in trust file comments for efficient removal. The resolution timeout is controlled by `FQDN_TIMEOUT` (default 10 seconds) in `conf.apf`. On refresh (`apf -e`), FQDNs are re-resolved to pick up DNS changes. Examples:
 
 ```
-yourhost.you.com        (FQDN)
+yourhost.you.com        (FQDN — resolved to IP before loading)
 192.168.2.102           (IPv4 Address)
 192.168.1.0/24          (IPv4 Address with 24 bit mask)
 2001:db8::1             (IPv6 Address)
@@ -723,6 +723,7 @@ The trust system has several operational controls in `conf.apf`:
 | `SET_EXPIRE` | Auto-expire deny entries after N seconds (`0` to disable). Use `"static"` or `"noexpire"` in a ban comment to exempt it. |
 | `SET_REFRESH` | Refresh interval in minutes for trust rules and DNS re-resolution (default: 10) |
 | `SET_REFRESH_MD5` | Skip refresh if trust files are unchanged (`1` to enable) |
+| `FQDN_TIMEOUT` | Timeout in seconds for FQDN resolution in trust rules (default: 10) |
 | `SET_TRIM` | Max deny entries before oldest are purged (default: 250) |
 
 For temporary trust entries with per-entry TTL, see [section 4.4](#44-temporary-trust-entries).

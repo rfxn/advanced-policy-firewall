@@ -112,6 +112,14 @@ SET_REFRESH="10"
 # [value 1 to enable, 0 to disable]
 SET_REFRESH_MD5="0"
 
+# Timeout in seconds for FQDN (hostname) resolution in trust rules.
+# When an FQDN is used in allow/deny/temp rules, APF resolves it to IP
+# addresses before loading iptables rules. If DNS is unreachable, the
+# resolution attempt is abandoned after this many seconds.
+# Requires 'getent' (glibc) and 'timeout' (coreutils), both standard.
+# [value in seconds, default 10]
+FQDN_TIMEOUT="10"
+
 # This is the total amount of rules allowed inside of the deny trust system.
 # When this limit is reached, the deny rule files will begin to purge older
 # entries to maintain the set limit. [value is max lines, 0 for unlimited]

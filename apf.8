@@ -157,7 +157,17 @@ Local deny list (one entry per line).
 Downloaded global allow/deny lists.
 .PP
 Each entry may be an IPv4 address, IPv6 address, CIDR block, or FQDN.
-FQDNs are resolved to IPv4 addresses on load and refresh.
+FQDNs are pre\-resolved to IP addresses (IPv4 and IPv6 when USE_IPV6=1)
+via
+.B getent
+before loading into iptables. Resolved IPs are stored in trust file
+comments as
+.B resolved=
+metadata for efficient removal. Resolution timeout is controlled by
+.B FQDN_TIMEOUT
+(default 10 seconds). On refresh
+.RB ( \-e ),
+FQDNs are re\-resolved to pick up DNS changes.
 An optional comment may follow the address, separated by a space.
 .PP
 Advanced trust syntax allows protocol, direction, and port filtering:
@@ -181,7 +191,8 @@ All configuration is in a single file,
 organized into sections:
 .TP
 .B Main Config
-Development mode, install path, interfaces, IPv6 toggle, fast load, VNET.
+Development mode, install path, interfaces, IPv6 toggle, fast load, VNET,
+FQDN resolution timeout.
 .TP
 .B Reactive Address Blocking
 RAB enable/disable, sanity and port\-scan triggers, thresholds, timers.

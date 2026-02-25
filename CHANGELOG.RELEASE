@@ -44,6 +44,13 @@
       stop targets, SYNFLOOD rate/burst format, connlimit entry syntax, and
       SYSCTL_SYNCOOKIES/SYSCTL_OVERFLOW conflict; clear error messages
       instead of cryptic iptables failures (functions.apf, apf)
+[New] FQDN pre-resolution in trust system: hostnames are resolved to IP
+      addresses via getent before loading into iptables; supports multiple
+      A/AAAA records, IPv6 (when USE_IPV6=1), configurable timeout via
+      FQDN_TIMEOUT; resolved= metadata in trust file comments enables
+      removal without DNS; refresh (apf -e) re-resolves FQDNs; works in
+      CLI (-a/-d/-ta/-td/-u) and bulk load (functions.apf, conf.apf,
+      internals.conf, .ca.def; 20 tests)
 
   -- Bug Fixes --
 
