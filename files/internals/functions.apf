@@ -487,8 +487,165 @@ valid_host() {
 	return 1
 }
 
+# Validate an advanced trust entry (contains '=') or delegate to valid_host().
+# Sets _VTE_IP to the extracted IP for local-addr checks.
+# Returns 0 on valid, 1 on invalid.
+valid_trust_entry() {
+	local entry="$1"
+	if [[ "$entry" != *=* ]]; then
+		_VTE_IP="$entry"
+		valid_host "$entry"
+		return $?
+	fi
+	trust_protect_ipv6 "$entry"; local safe="$_TPV6_RESULT"
+	trust_parse_fields "$safe"
+	local proto="" dir="" pflow="" port="" ipflow="" pip=""
+	# trust_parse_fields splits on ':' and '=' so token count differs from
+	# the logical field count:
+	#   3-field  d=PORT:s=IP             → 4 tokens
+	#   4-field  in:d=PORT:s=IP          → 5 tokens
+	#   5-field  tcp:in:d=PORT:s=IP      → 6 tokens
+	# IPv6 addresses with @ placeholders stay as one token.
+	case "$_TF_COUNT" in
+		4)
+			# 3-field: d=PORT:s=IP
+			pflow="$_TF1"; port="$_TF2"; ipflow="$_TF3"
+			trust_restore_ipv6 "$_TF4"; pip="$_TRV6_RESULT"
+			;;
+		5)
+			# 4-field: in:d=PORT:s=IP
+			dir="$_TF1"; pflow="$_TF2"; port="$_TF3"; ipflow="$_TF4"
+			trust_restore_ipv6 "$_TF5"; pip="$_TRV6_RESULT"
+			;;
+		6)
+			# 5-field: tcp:in:d=PORT:s=IP
+			proto="$_TF1"; dir="$_TF2"; pflow="$_TF3"; port="$_TF4"
+			ipflow="$_TF5"
+			trust_restore_ipv6 "$_TF6"; pip="$_TRV6_RESULT"
+			;;
+		*)
+			return 1
+			;;
+	esac
+	# Validate protocol if present
+	if [ -n "$proto" ]; then
+		[ "$proto" == "tcp" ] || [ "$proto" == "udp" ] || return 1
+	fi
+	# Validate direction if present
+	if [ -n "$dir" ]; then
+		[ "$dir" == "in" ] || [ "$dir" == "out" ] || return 1
+	fi
+	# Validate port flow
+	[ "$pflow" == "s" ] || [ "$pflow" == "d" ] || return 1
+	# Validate port (numeric or underscore range)
+	local _vte_ppat='^[0-9_]+$'
+	[[ "$port" =~ $_vte_ppat ]] || return 1
+	# Validate IP flow
+	[ "$ipflow" == "s" ] || [ "$ipflow" == "d" ] || return 1
+	# Validate IP address
+	valid_host "$pip" || return 1
+	_VTE_IP="$pip"
+	return 0
+}
+
+# Generate iptables rule(s) for an advanced trust entry.
+# Args: $1=entry $2=chain $3=action(ALLOW/DENY) $4=mode(-I/-A/-D)
+# Sets _TER_IP (extracted IP) and _TER_DESC (description for logging).
+# Returns 1 on parse failure.
+trust_entry_rule() {
+	local entry="$1" chain="$2" action="$3" mode="$4"
+	local action_tcp action_udp action_all
+	if [ "$action" == "DENY" ]; then
+		action_tcp="$TCP_STOP"; action_udp="$UDP_STOP"; action_all="$ALL_STOP"
+	else
+		action_tcp="ACCEPT"; action_udp="ACCEPT"; action_all="ACCEPT"
+	fi
+
+	trust_protect_ipv6 "$entry"; local safe="$_TPV6_RESULT"
+	trust_parse_fields "$safe"
+	local proto="" dir="" pflow="" port="" ipflow="" pip=""
+	case "$_TF_COUNT" in
+		4)
+			pflow="$_TF1"; port="$_TF2"; ipflow="$_TF3"
+			trust_restore_ipv6 "$_TF4"; pip="$_TRV6_RESULT"
+			;;
+		5)
+			dir="$_TF1"; pflow="$_TF2"; port="$_TF3"; ipflow="$_TF4"
+			trust_restore_ipv6 "$_TF5"; pip="$_TRV6_RESULT"
+			;;
+		6)
+			proto="$_TF1"; dir="$_TF2"; pflow="$_TF3"; port="$_TF4"
+			ipflow="$_TF5"
+			trust_restore_ipv6 "$_TF6"; pip="$_TRV6_RESULT"
+			;;
+		*)
+			return 1
+			;;
+	esac
+
+	expand_port "$port"; port="$_PORT"
+	if ! ipt_for_host "$pip"; then
+		return 1
+	fi
+	_TER_IP="$pip"
+
+	# Build port flow flag
+	local pflag
+	if [ "$pflow" == "s" ]; then pflag="sport"; else pflag="dport"; fi
+
+	# Build description
+	local proto_desc="${proto:+$proto }"
+	local dir_desc=""
+	[ "$dir" == "in" ] && dir_desc="inbound "
+	[ "$dir" == "out" ] && dir_desc="outbound "
+	local flow_desc
+	if [ "$pflow" == "d" ]; then flow_desc="to"; else flow_desc="from"; fi
+	_TER_DESC="${dir_desc}${proto_desc}${pip} ${flow_desc} port ${port}"
+
+	# Apply rule(s)
+	if [ -n "$proto" ]; then
+		# Single protocol
+		local jtarget
+		if [ "$proto" == "tcp" ]; then jtarget="$action_tcp"; else jtarget="$action_udp"; fi
+		$IPT_H $IPT_FLAGS $mode $chain -p $proto -m multiport -$ipflow $pip --$pflag $port -j $jtarget
+	else
+		# Both protocols
+		$IPT_H $IPT_FLAGS $mode $chain -p tcp -m multiport -$ipflow $pip --$pflag $port -j $action_tcp
+		$IPT_H $IPT_FLAGS $mode $chain -p udp -m multiport -$ipflow $pip --$pflag $port -j $action_udp
+	fi
+	return 0
+}
+
 cli_trust_remove() {
 	local DIP="$1"
+
+	# Advanced syntax removal
+	if [[ "$DIP" == *=* ]]; then
+		if ! valid_trust_entry "$DIP"; then
+			echo "Invalid trust entry '$DIP'"
+			return 1
+		fi
+		local found=0
+		# Remove iptables rules via trust_entry_rule in delete mode
+		trust_entry_rule "$DIP" "TALLOW" "ALLOW" "-D" 2>/dev/null && found=1
+		trust_entry_rule "$DIP" "TDENY" "DENY" "-D" 2>/dev/null && found=1
+		# Remove exact entry + associated comment from trust files
+		local escaped_entry
+		escaped_entry=$(echo "$DIP" | sed 's/[.\/\[\]]/\\&/g')
+		for f in "$ALLOW_HOSTS" "$DENY_HOSTS" "$GALLOW_HOSTS" "$GDENY_HOSTS"; do
+			[ -f "$f" ] || continue
+			if grep -Fq "$DIP" "$f" 2>/dev/null; then
+				found=1
+			fi
+			sed -i "\%# added ${escaped_entry} %d" "$f"
+			sed -i "\%^${escaped_entry}$%d" "$f"
+		done
+		if [ "$found" == "0" ]; then
+			return 1
+		fi
+		return 0
+	fi
+
 	if ! valid_host "$DIP"; then
 		echo "Invalid host '$DIP': must be a valid IP/IPv6 address, CIDR block, or FQDN"
 		return 1
@@ -522,6 +679,16 @@ cli_trust_remove() {
 	fi
 	sed -i "\%^${escaped_ip}\b%d" "$ALLOW_HOSTS" "$DENY_HOSTS" "$GALLOW_HOSTS" "$GDENY_HOSTS"
 
+	# Also remove advanced trust entries containing this bare IP
+	local _ctr_adv_entry
+	for f in "$ALLOW_HOSTS" "$DENY_HOSTS" "$GALLOW_HOSTS" "$GDENY_HOSTS"; do
+		[ -f "$f" ] || continue
+		while IFS= read -r _ctr_adv_entry; do
+			[ -z "$_ctr_adv_entry" ] && continue
+			cli_trust_remove "$_ctr_adv_entry" >> /dev/null 2>&1 && found=1
+		done < <(grep -v '^#' "$f" | grep '=' | grep -Fw "$DIP")
+	done
+
 	# Spec-based cleanup: extract full rule specs from iptables -S and delete
 	# by spec (race-free; no line-number shifting between list and delete)
 	local _ctr_chain _ctr_rule _ctr_spec
@@ -543,50 +710,93 @@ cli_trust_remove() {
 cli_trust() {
  local CHAIN="$1" ACTION="$2" FILE="$3" HOST="$4" CMT="$5"
  local tlist f valtrust TIME JACTION
- if [ -n "$HOST" ]; then
-	if ! valid_host "$HOST"; then
-		echo "Invalid host '$HOST': must be a valid IP/IPv6 address, CIDR block, or FQDN"
+ if [ -z "$HOST" ]; then
+        echo "an FQDN or IP address is required for this option"
+        return 1
+ fi
+
+ # Advanced trust syntax (contains '=')
+ if [[ "$HOST" == *=* ]]; then
+	if ! valid_trust_entry "$HOST"; then
+		echo "Invalid trust entry '$HOST'"
 		return 1
 	fi
-        tlist=""
-        for f in $DENY_HOSTS $ALLOW_HOSTS $GALLOW_HOSTS $GDENY_HOSTS; do
-            if [ -f "$f" ] && grep -v '^#' "$f" | grep -Fwq "$HOST"; then
-                tlist="$tlist$f "
-            fi
-        done
-	valtrust="$tlist"
-        load_local_addrs
-        if [ "$valtrust" ]; then
-                echo "$HOST already exists in $tlist"
-        elif is_local_addr "$HOST"; then
-                echo "$HOST is a local address and can not be added to the trust system"
-        elif ! ipt_for_host "$HOST"; then
-                echo "$HOST appears to be IPv6 but USE_IPV6 is not enabled"
-        else
-	        TIME=$(date +"%D %H:%M:%S")
+	tlist=""
+	for f in $DENY_HOSTS $ALLOW_HOSTS $GALLOW_HOSTS $GDENY_HOSTS; do
+		if [ -f "$f" ] && grep -v '^#' "$f" | grep -Fxq "$HOST"; then
+			tlist="$tlist$f "
+		fi
+	done
+	load_local_addrs
+	if [ -n "$tlist" ]; then
+		echo "$HOST already exists in $tlist"
+	elif is_local_addr "$_VTE_IP"; then
+		echo "$_VTE_IP is a local address and can not be added to the trust system"
+	else
+		TIME=$(date +"%D %H:%M:%S")
 		CMT="${CMT//$'\n'/ }"
 		CMT="${CMT//$'\r'/}"
 		CMT="${CMT//$'\t'/ }"
-		if [ "$CMT" ]; then
-			echo "# added $HOST on $TIME with comment: $CMT" >> $FILE
+		if [ -n "$CMT" ]; then
+			echo "# added $HOST on $TIME with comment: $CMT" >> "$FILE"
 		else
-			echo "# added $HOST on $TIME" >> $FILE
+			echo "# added $HOST on $TIME" >> "$FILE"
 		fi
-	        echo "$HOST" >> $FILE
-		if [ "$ACTION" == "DENY" ]; then
-			JACTION="$ALL_STOP"
-		elif [ "$ACTION" == "ALLOW" ]; then
-			JACTION="ACCEPT"
+		echo "$HOST" >> "$FILE"
+		if trust_entry_rule "$HOST" "$CHAIN" "$ACTION" "-I"; then
+			eout "{trust} added $ACTION $_TER_DESC"
+			if [ "$SET_VERBOSE" != "1" ]; then
+				echo "Inserted into firewall: $ACTION $_TER_DESC"
+			fi
+		else
+			echo "Failed to insert rule for '$HOST'"
+			return 1
 		fi
-	        $IPT_H $IPT_FLAGS -I $CHAIN -s $HOST -j $JACTION
-	       	$IPT_H $IPT_FLAGS -I $CHAIN -d $HOST -j $JACTION
-	        eout "{trust} added $ACTION all to/from $HOST"
-	        if [ "$SET_VERBOSE" != "1" ]; then
-		        echo "Inserted into firewall: $ACTION all to/from $HOST"
-		fi
-        fi
+	fi
+	return 0
+ fi
+
+ # Bare host path (IP/CIDR/FQDN)
+ if ! valid_host "$HOST"; then
+	echo "Invalid host '$HOST': must be a valid IP/IPv6 address, CIDR block, or FQDN"
+	return 1
+ fi
+ tlist=""
+ for f in $DENY_HOSTS $ALLOW_HOSTS $GALLOW_HOSTS $GDENY_HOSTS; do
+     if [ -f "$f" ] && grep -v '^#' "$f" | grep -Fwq "$HOST"; then
+         tlist="$tlist$f "
+     fi
+ done
+ valtrust="$tlist"
+ load_local_addrs
+ if [ "$valtrust" ]; then
+         echo "$HOST already exists in $tlist"
+ elif is_local_addr "$HOST"; then
+         echo "$HOST is a local address and can not be added to the trust system"
+ elif ! ipt_for_host "$HOST"; then
+         echo "$HOST appears to be IPv6 but USE_IPV6 is not enabled"
  else
-        echo "an FQDN or IP address is required for this option"
+         TIME=$(date +"%D %H:%M:%S")
+	CMT="${CMT//$'\n'/ }"
+	CMT="${CMT//$'\r'/}"
+	CMT="${CMT//$'\t'/ }"
+	if [ "$CMT" ]; then
+		echo "# added $HOST on $TIME with comment: $CMT" >> $FILE
+	else
+		echo "# added $HOST on $TIME" >> $FILE
+	fi
+         echo "$HOST" >> $FILE
+	if [ "$ACTION" == "DENY" ]; then
+		JACTION="$ALL_STOP"
+	elif [ "$ACTION" == "ALLOW" ]; then
+		JACTION="ACCEPT"
+	fi
+         $IPT_H $IPT_FLAGS -I $CHAIN -s $HOST -j $JACTION
+        	$IPT_H $IPT_FLAGS -I $CHAIN -d $HOST -j $JACTION
+         eout "{trust} added $ACTION all to/from $HOST"
+         if [ "$SET_VERBOSE" != "1" ]; then
+	        echo "Inserted into firewall: $ACTION all to/from $HOST"
+	fi
  fi
 }
 
@@ -597,10 +807,21 @@ cli_trust_temp() {
 	echo "an FQDN or IP address is required for this option"
 	return 1
  fi
- if ! valid_host "$HOST"; then
-	echo "Invalid host '$HOST': must be a valid IP/IPv6 address, CIDR block, or FQDN"
-	return 1
+
+ # Validate entry (advanced or bare)
+ if [[ "$HOST" == *=* ]]; then
+	if ! valid_trust_entry "$HOST"; then
+		echo "Invalid trust entry '$HOST'"
+		return 1
+	fi
+ else
+	if ! valid_host "$HOST"; then
+		echo "Invalid host '$HOST': must be a valid IP/IPv6 address, CIDR block, or FQDN"
+		return 1
+	fi
+	_VTE_IP="$HOST"
  fi
+
  if [ -z "$TTL_STR" ]; then
 	echo "a TTL value is required (e.g., 300, 5m, 1h, 7d)"
 	return 1
@@ -611,7 +832,7 @@ cli_trust_temp() {
  fi
  tlist=""
  for f in $DENY_HOSTS $ALLOW_HOSTS $GALLOW_HOSTS $GDENY_HOSTS; do
-	if [ -f "$f" ] && grep -v '^#' "$f" | grep -Fwq "$HOST"; then
+	if [ -f "$f" ] && grep -v '^#' "$f" | grep -Fxq "$HOST"; then
 		tlist="$tlist$f "
 	fi
  done
@@ -619,10 +840,8 @@ cli_trust_temp() {
  load_local_addrs
  if [ "$valtrust" ]; then
 	echo "$HOST already exists in $tlist"
- elif is_local_addr "$HOST"; then
-	echo "$HOST is a local address and can not be added to the trust system"
- elif ! ipt_for_host "$HOST"; then
-	echo "$HOST appears to be IPv6 but USE_IPV6 is not enabled"
+ elif is_local_addr "$_VTE_IP"; then
+	echo "$_VTE_IP is a local address and can not be added to the trust system"
  else
 	TIME=$(date +"%D %H:%M:%S")
 	CMT="${CMT//$'\n'/ }"
@@ -635,23 +854,49 @@ cli_trust_temp() {
 		echo "# added $HOST on $TIME ttl=$_TTL_SECONDS expire=$EXPIRE_EPOCH" >> "$FILE"
 	fi
 	echo "$HOST" >> "$FILE"
-	if [ "$ACTION" == "DENY" ]; then
-		JACTION="$ALL_STOP"
-	elif [ "$ACTION" == "ALLOW" ]; then
-		JACTION="ACCEPT"
-	fi
-	$IPT_H $IPT_FLAGS -I $CHAIN -s $HOST -j $JACTION
-	$IPT_H $IPT_FLAGS -I $CHAIN -d $HOST -j $JACTION
-	EXPIRE_DISP=$(date -d "@$EXPIRE_EPOCH" +"%D %H:%M:%S")
-	eout "{trust} added temporary $ACTION all to/from $HOST (ttl=${_TTL_SECONDS}s, expires $EXPIRE_DISP)"
-	if [ "$SET_VERBOSE" != "1" ]; then
-		echo "Inserted into firewall: temporary $ACTION all to/from $HOST (ttl=${_TTL_SECONDS}s, expires $EXPIRE_DISP)"
-	fi
-	# Block escalation: record and check for auto-promotion
-	if [ "$PERMBLOCK_COUNT" -gt 0 ] && [ "$ACTION" == "DENY" ]; then
-		record_block "$HOST"
-		if check_block_escalation "$HOST"; then
-			escalate_to_permanent "$HOST"
+
+	if [[ "$HOST" == *=* ]]; then
+		# Advanced syntax — use trust_entry_rule for iptables insertion
+		if ! trust_entry_rule "$HOST" "$CHAIN" "$ACTION" "-I"; then
+			echo "Failed to insert rule for '$HOST'"
+			return 1
+		fi
+		EXPIRE_DISP=$(date -d "@$EXPIRE_EPOCH" +"%D %H:%M:%S")
+		eout "{trust} added temporary $ACTION $_TER_DESC (ttl=${_TTL_SECONDS}s, expires $EXPIRE_DISP)"
+		if [ "$SET_VERBOSE" != "1" ]; then
+			echo "Inserted into firewall: temporary $ACTION $_TER_DESC (ttl=${_TTL_SECONDS}s, expires $EXPIRE_DISP)"
+		fi
+		# Block escalation uses extracted IP
+		if [ "$PERMBLOCK_COUNT" -gt 0 ] && [ "$ACTION" == "DENY" ]; then
+			record_block "$_TER_IP"
+			if check_block_escalation "$_TER_IP"; then
+				escalate_to_permanent "$_TER_IP"
+			fi
+		fi
+	else
+		# Bare host path
+		if ! ipt_for_host "$HOST"; then
+			echo "$HOST appears to be IPv6 but USE_IPV6 is not enabled"
+			return 1
+		fi
+		if [ "$ACTION" == "DENY" ]; then
+			JACTION="$ALL_STOP"
+		elif [ "$ACTION" == "ALLOW" ]; then
+			JACTION="ACCEPT"
+		fi
+		$IPT_H $IPT_FLAGS -I $CHAIN -s $HOST -j $JACTION
+		$IPT_H $IPT_FLAGS -I $CHAIN -d $HOST -j $JACTION
+		EXPIRE_DISP=$(date -d "@$EXPIRE_EPOCH" +"%D %H:%M:%S")
+		eout "{trust} added temporary $ACTION all to/from $HOST (ttl=${_TTL_SECONDS}s, expires $EXPIRE_DISP)"
+		if [ "$SET_VERBOSE" != "1" ]; then
+			echo "Inserted into firewall: temporary $ACTION all to/from $HOST (ttl=${_TTL_SECONDS}s, expires $EXPIRE_DISP)"
+		fi
+		# Block escalation: record and check for auto-promotion
+		if [ "$PERMBLOCK_COUNT" -gt 0 ] && [ "$ACTION" == "DENY" ]; then
+			record_block "$HOST"
+			if check_block_escalation "$HOST"; then
+				escalate_to_permanent "$HOST"
+			fi
 		fi
 	fi
  fi
@@ -935,15 +1180,22 @@ help() {
 	echo "-a HOST CMT|--allow HOST COMMENT ... add host (IP/IPv6/CIDR/FQDN) to"
 	echo "                                     allow_hosts.rules and immediately"
 	echo "                                     load new rule into firewall"
+	echo "                                     also accepts advanced trust syntax:"
+	echo "                                       apf -a \"tcp:in:d=22:s=192.168.1.0/24\""
+	echo "                                       apf -a \"d=3306:s=10.0.0.5\""
 	echo "-d HOST CMT|--deny HOST COMMENT .... add host (IP/IPv6/CIDR/FQDN) to"
 	echo "                                     deny_hosts.rules and immediately"
 	echo "                                     load new rule into firewall"
+	echo "                                     also accepts advanced trust syntax"
 	echo "-u|--remove|--unban HOST ........... remove host from [glob]*_hosts.rules"
 	echo "                                     and immediately remove rule from firewall"
+	echo "                                     also removes advanced trust entries"
 	echo "-g|--search PATTERN ................ search iptables/ipset rules and trust files"
 	echo "-ta HOST TTL [CMT]|--temp-allow .... temporarily allow host with TTL"
 	echo "                                     (TTL: seconds, or 5m, 1h, 7d)"
+	echo "                                     also accepts advanced trust syntax"
 	echo "-td HOST TTL [CMT]|--temp-deny ..... temporarily deny host with TTL"
+	echo "                                     also accepts advanced trust syntax"
 	echo "--templ|--temp-list ................ list temp entries with remaining TTL"
 	echo "--tempf|--temp-flush ............... remove all temporary entries"
 	echo "--temp-expire ...................... expire temporary entries (runs from cron)"

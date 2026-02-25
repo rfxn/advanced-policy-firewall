@@ -707,9 +707,14 @@ apf -d 192.168.3.111 "keeps trying to bruteforce"
 
 # Remove an address
 apf -u myhost.example.com
+
+# Advanced trust syntax (see section 4.3 for full format)
+apf -a "tcp:in:d=22:s=10.0.0.0/8"       # allow inbound TCP 22 from subnet
+apf -d "d=3306:s=203.0.113.50"           # deny port 3306 (tcp+udp) from host
+apf -u "tcp:in:d=22:s=10.0.0.0/8"       # remove advanced trust entry
 ```
 
-Please take note that the `--remove|-u` option does not accept a comment string and will remove entries that match from allow_hosts.rules, deny_hosts.rules and the global extensions of these files.
+The `--remove|-u` option does not accept a comment string and will remove entries that match from allow_hosts.rules, deny_hosts.rules and the global extensions of these files. When removing a bare IP, any advanced trust entries containing that IP are also removed.
 
 The trust system has several operational controls in `conf.apf`:
 
@@ -793,6 +798,10 @@ apf -ta 10.0.0.5 1h "temp maintenance access"
 
 # Temporarily deny a host for 7 days
 apf -td 192.168.3.111 7d "temp block"
+
+# Advanced syntax with TTL
+apf -ta "tcp:in:d=443:s=192.168.1.100" 1h "temp HTTPS access"
+apf -td "d=80:s=203.0.113.50" 24h "temp block port 80"
 
 # List all temporary entries with remaining TTL
 apf --templ

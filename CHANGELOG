@@ -1,4 +1,4 @@
-- 2.0.2 | Feb 24 2026:
+- 2.0.2 | Feb 25 2026:
 
   -- New Features --
 
@@ -34,6 +34,12 @@
       fallback; redirect following, 10s connect / 60s total timeout, 3
       retries; all download sites migrated; check_deps() warns when
       neither available (functions.apf)
+[New] Advanced trust syntax in CLI: apf -a/-d/-ta/-td/-u now accept
+      proto:flow:port:ip format (e.g., "tcp:in:d=22:s=10.0.0.0/8") for
+      protocol/direction/port-scoped trust rules; live iptables insertion
+      via trust_entry_rule(); bare IP removal also removes advanced entries
+      containing that IP; duplicate detection, IPv6 bracket syntax, port
+      ranges, and temp trust TTL markers all supported (functions.apf)
 [New] validate_config(): startup validation for TCP_STOP/UDP_STOP/ALL_STOP
       stop targets, SYNFLOOD rate/burst format, connlimit entry syntax, and
       SYSCTL_SYNCOOKIES/SYSCTL_OVERFLOW conflict; clear error messages
