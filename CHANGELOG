@@ -151,9 +151,10 @@
 
   -- Test Suite --
 
-[New] 8 new test files: 21-refactor-regression, 22-uid-egress,
+[New] 9 new test files: 21-refactor-regression, 22-uid-egress,
       23-devel-fastload, 24-vnet, 25-connlimit, 26-hook-search-silent,
-      27-temp-trust, 28-synflood (398 tests total across 28 files)
+      27-temp-trust, 28-synflood, 29-block-escalation (411 tests total
+      across 29 files)
 [New] Test parallelization: --parallel [N] flag splits across N containers;
       3x speedup (run-tests.sh, Makefile)
 
@@ -171,6 +172,18 @@
 [Fix] test-verbose Makefile target: remove --parallel (incompatible with
       pretty formatter); add --formatter option parsing to run-tests.sh
       (Makefile, run-tests.sh)
+
+  -- Style & Documentation --
+
+[Change] Remove useless echo in interface loop; quote $i and
+      $IFACE_UNTRUSTED in command arguments per project standard (firewall)
+[Change] list(): guard clear with command -v and move inside editor
+      conditional; status(): use ${PAGER:-more} fallback (functions.apf)
+[Change] Remove untested Debian 10/11 from supported platforms list;
+      only Debian 12 is in CI matrix (README, README.md)
+[Change] Improve IPT_LOCK_SUPPORT/IPT_LOCK_TIMEOUT comments: document
+      which platforms require default off and recommend enabling on
+      modern systems (conf.apf)
 
 - 2.0.1 | Feb 20 2026:
 
