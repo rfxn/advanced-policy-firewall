@@ -1,3 +1,4 @@
+FQDN_TIMEOUT="${FQDN_TIMEOUT:-10}"
 SMTP_BLOCK="${SMTP_BLOCK:-0}"
 SMTP_PORTS="${SMTP_PORTS:-25,465,587}"
 SMTP_ALLOWUSER="${SMTP_ALLOWUSER:-}"
@@ -139,6 +140,14 @@ SET_REFRESH="$SET_REFRESH"
 # rules, which require regular DNS refreshes, you should keep this disabled.
 # [value 1 to enable, 0 to disable]
 SET_REFRESH_MD5="$SET_REFRESH_MD5"
+
+# Timeout in seconds for FQDN (hostname) resolution in trust rules.
+# When an FQDN is used in allow/deny/temp rules, APF resolves it to IP
+# addresses before loading iptables rules. If DNS is unreachable, the
+# resolution attempt is abandoned after this many seconds.
+# Requires 'getent' (glibc) and 'timeout' (coreutils), both standard.
+# [value in seconds, default 10]
+FQDN_TIMEOUT="$FQDN_TIMEOUT"
 
 # This is the total amount of rules allowed inside of the deny trust system.
 # When this limit is reached, the deny rule files will begin to purge older

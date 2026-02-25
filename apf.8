@@ -61,6 +61,16 @@ Add
 (IPv4, IPv6, CIDR, or FQDN) to
 .I allow_hosts.rules
 and immediately load the rule into the live firewall.
+.I HOST
+may also be an advanced trust expression (see
+.B TRUST SYSTEM
+below):
+.RS
+.nf
+apf \-a "tcp:in:d=22:s=10.0.0.0/8"
+apf \-a "d=3306:s=192.168.1.5"
+.fi
+.RE
 .TP
 .BR \-d " \fIHOST\fR [\fICOMMENT\fR], " \-\-deny " \fIHOST\fR [\fICOMMENT\fR]"
 Add
@@ -68,12 +78,15 @@ Add
 to
 .I deny_hosts.rules
 and immediately load the rule into the live firewall.
+Also accepts advanced trust syntax.
 .TP
 .BR \-u " \fIHOST\fR, " \-\-remove " \fIHOST\fR, " \-\-unban " \fIHOST\fR"
 Remove
 .I HOST
 from all trust files (allow, deny, global) and immediately remove
 matching rules from the live firewall.
+Accepts both bare hosts and advanced trust syntax.
+Removing a bare IP also removes any advanced trust entries containing that IP.
 .SS Temporary Trust
 .TP
 .BR \-ta " \fIHOST\fR \fITTL\fR [\fICOMMENT\fR], " \-\-temp\-allow " \fIHOST\fR \fITTL\fR [\fICOMMENT\fR]"
@@ -84,12 +97,14 @@ with a time\-to\-live of
 TTL may be in seconds or with a suffix:
 .BR 5m " (minutes), " 1h " (hours), " 7d " (days)."
 The entry is automatically removed when the TTL expires.
+Also accepts advanced trust syntax.
 .TP
 .BR \-td " \fIHOST\fR \fITTL\fR [\fICOMMENT\fR], " \-\-temp\-deny " \fIHOST\fR \fITTL\fR [\fICOMMENT\fR]"
 Temporarily deny
 .I HOST
 with a time\-to\-live of
 .IR TTL .
+Also accepts advanced trust syntax.
 .TP
 .BR \-\-templ ", " \-\-temp\-list
 List all temporary trust entries with remaining TTL.
@@ -142,7 +157,17 @@ Local deny list (one entry per line).
 Downloaded global allow/deny lists.
 .PP
 Each entry may be an IPv4 address, IPv6 address, CIDR block, or FQDN.
-FQDNs are resolved to IPv4 addresses on load and refresh.
+FQDNs are pre\-resolved to IP addresses (IPv4 and IPv6 when USE_IPV6=1)
+via
+.B getent
+before loading into iptables. Resolved IPs are stored in trust file
+comments as
+.B resolved=
+metadata for efficient removal. Resolution timeout is controlled by
+.B FQDN_TIMEOUT
+(default 10 seconds). On refresh
+.RB ( \-e ),
+FQDNs are re\-resolved to pick up DNS changes.
 An optional comment may follow the address, separated by a space.
 .PP
 Advanced trust syntax allows protocol, direction, and port filtering:
@@ -166,7 +191,8 @@ All configuration is in a single file,
 organized into sections:
 .TP
 .B Main Config
-Development mode, install path, interfaces, IPv6 toggle, fast load, VNET.
+Development mode, install path, interfaces, IPv6 toggle, fast load, VNET,
+FQDN resolution timeout.
 .TP
 .B Reactive Address Blocking
 RAB enable/disable, sanity and port\-scan triggers, thresholds, timers.
@@ -262,6 +288,30 @@ Temporarily deny a host for 1 hour:
 .PP
 .RS
 .B apf \-td 203.0.113.50 1h "brute force"
+.RE
+.PP
+Allow inbound TCP port 22 from a subnet:
+.PP
+.RS
+.B apf \-a "tcp:in:d=22:s=10.0.0.0/8"
+.RE
+.PP
+Deny inbound port 3306 (both TCP and UDP) from a host:
+.PP
+.RS
+.B apf \-d "d=3306:s=203.0.113.50"
+.RE
+.PP
+Temporarily allow inbound TCP port 443 for 1 hour:
+.PP
+.RS
+.B apf \-ta "tcp:in:d=443:s=192.168.1.100" 1h
+.RE
+.PP
+Remove an advanced trust entry:
+.PP
+.RS
+.B apf \-u "tcp:in:d=22:s=10.0.0.0/8"
 .RE
 .PP
 Search rules for an IP address:
