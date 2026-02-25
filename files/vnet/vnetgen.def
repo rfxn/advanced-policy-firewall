@@ -30,5 +30,5 @@ VNET="$addr"
 
 #
 # conf.apf configurable common ports
-. $INSTALL_PATH/internals/cports.common
+. "\$INSTALL_PATH/internals/cports.common"
 EOF

@@ -227,3 +227,75 @@ teardown_file() {
     run zgrep '/opt/apf' /usr/share/man/man8/apf.8.gz
     assert_success
 }
+
+# =====================================================================
+# install.sh modernization tests
+# =====================================================================
+
+@test "subdirectories have 750 permissions after install" {
+    # All directories under INSTALL_PATH should be 750
+    local bad
+    bad=$(find "$APF_DIR" -type d ! -perm 750 2>/dev/null)
+    [ -z "$bad" ]
+}
+
+@test "install produces no Device errors on stderr" {
+    rm -rf "${APF_DIR}.bk.last" "${APF_DIR}".bk[0-9]*
+    cd /opt/apf-src
+    local stderr_out
+    stderr_out=$(INSTALL_PATH="$APF_DIR" sh install.sh 2>&1 1>/dev/null)
+    [[ ! "$stderr_out" =~ "Device" ]]
+}
+
+@test "upgrade produces no 'cannot stat' errors with empty vnet" {
+    rm -rf "${APF_DIR}.bk.last" "${APF_DIR}".bk[0-9]*
+    cp -a "$APF_DIR" "${APF_DIR}.bk.last"
+    # Remove any .rules files from backup vnet dir to trigger glob failure
+    rm -f "${APF_DIR}.bk.last"/vnet/*.rules 2>/dev/null || true
+    cd /opt/apf-src
+    local output
+    output=$(INSTALL_PATH="$APF_DIR" sh install.sh 2>&1)
+    [[ ! "$output" =~ "cannot stat" ]]
+    rm -rf "${APF_DIR}.bk.last" "${APF_DIR}".bk[0-9]*
+}
+
+@test "same-version reinstall shows 'Restored configuration' message" {
+    rm -rf "${APF_DIR}.bk.last" "${APF_DIR}".bk[0-9]*
+    cp -a "$APF_DIR" "${APF_DIR}.bk.last"
+    cd /opt/apf-src
+    local output
+    output=$(INSTALL_PATH="$APF_DIR" sh install.sh 2>&1)
+    [[ "$output" =~ "Restored configuration from backup" ]]
+    rm -rf "${APF_DIR}.bk.last" "${APF_DIR}".bk[0-9]*
+}
+
+@test "existing IFACE_UNTRUSTED preserved on upgrade" {
+    rm -rf "${APF_DIR}.bk.last" "${APF_DIR}".bk[0-9]*
+    cp -a "$APF_DIR" "${APF_DIR}.bk.last"
+    # Set custom interface in backup
+    sed -i 's/^IFACE_UNTRUSTED=.*/IFACE_UNTRUSTED="ens192"/' "${APF_DIR}.bk.last/conf.apf"
+    cd /opt/apf-src
+    INSTALL_PATH="$APF_DIR" sh install.sh >/dev/null 2>&1
+    # importconf should have preserved the user's custom value
+    run grep '^IFACE_UNTRUSTED="ens192"' "$APF_DIR/conf.apf"
+    assert_success
+    rm -rf "${APF_DIR}.bk.last" "${APF_DIR}".bk[0-9]*
+}
+
+@test "fresh install shows Default interface in output" {
+    rm -rf "${APF_DIR}.bk.last" "${APF_DIR}".bk[0-9]*
+    cd /opt/apf-src
+    local output
+    output=$(INSTALL_PATH="$APF_DIR" sh install.sh 2>&1)
+    [[ "$output" =~ "Default interface:" ]]
+}
+
+@test "upgrade install shows Default interface in output" {
+    rm -rf "${APF_DIR}.bk.last" "${APF_DIR}".bk[0-9]*
+    cp -a "$APF_DIR" "${APF_DIR}.bk.last"
+    cd /opt/apf-src
+    local output
+    output=$(INSTALL_PATH="$APF_DIR" sh install.sh 2>&1)
+    [[ "$output" =~ "Default interface:" ]]
+    rm -rf "${APF_DIR}.bk.last" "${APF_DIR}".bk[0-9]*
+}

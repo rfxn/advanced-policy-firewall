@@ -38,8 +38,10 @@ setup() {
     # Flush trust chains so stale iptables rules don't interfere
     iptables -F TALLOW 2>/dev/null || true
     iptables -F TDENY 2>/dev/null || true
-    ip6tables -F TALLOW 2>/dev/null || true
-    ip6tables -F TDENY 2>/dev/null || true
+    if ip6tables_available; then
+        ip6tables -F TALLOW 2>/dev/null || true
+        ip6tables -F TDENY 2>/dev/null || true
+    fi
 }
 
 @test "apf -a adds host to allow_hosts.rules file" {
@@ -117,7 +119,7 @@ setup() {
 
 @test "apf -a rejects invalid host" {
     run "$APF" -a "not-valid" "bad host"
-    assert_success
+    assert_failure
     assert_output --partial "Invalid host"
 }
 
@@ -222,4 +224,9 @@ setup() {
         echo "Host 2001:db8::50 still in TALLOW chain after -u" >&2
         return 1
     fi
+}
+
+@test "apf -u with no argument shows error" {
+    run "$APF" -u
+    assert_output --partial "FQDN or IP address is required"
 }

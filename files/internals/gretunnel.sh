@@ -14,9 +14,10 @@ create_gretun() {
 	local routefrom="$2"
 	local routeto="$3"
 	local ipfile="$4"
+	local _cg_int='^[0-9]+$'
 
 	# Validate linkid: must be integer 1-99
-	if ! [[ "$linkid" =~ ^[0-9]+$ ]]; then
+	if ! [[ "$linkid" =~ $_cg_int ]]; then
 		eout "{gre} error: linkid '$linkid' is not a valid integer"
 		unset gre_keepalive gre_mtu gre_ttl gre_key
 		return 1
@@ -69,7 +70,7 @@ create_gretun() {
 	local key="${gre_key:-}"
 
 	# Validate key as integer if specified
-	if [ -n "$key" ] && ! [[ "$key" =~ ^[0-9]+$ ]]; then
+	if [ -n "$key" ] && ! [[ "$key" =~ $_cg_int ]]; then
 		eout "{gre} error: invalid key '$key' (must be integer)"
 		unset gre_keepalive gre_mtu gre_ttl gre_key
 		return 1

@@ -575,3 +575,227 @@ mac_module_available() {
         "$APF_DIR/internals/internals.conf"
     assert_failure  # grep returns 1 when no match found
 }
+
+# =====================================================================
+# validate_config() coverage (C-002)
+# =====================================================================
+
+@test "validate_config rejects invalid ICMP_LIM format" {
+    source /opt/tests/helpers/apf-config.sh
+    apf_set_config_safe "ICMP_LIM" "badvalue"
+    "$APF" -f 2>/dev/null || true
+
+    run "$APF" -s
+    assert_failure
+    [[ "$output" == *"ICMP_LIM"*"invalid"* ]]
+
+    apf_set_config_safe "ICMP_LIM" "30/s"
+}
+
+@test "validate_config accepts ICMP_LIM=0 (unlimited)" {
+    source /opt/tests/helpers/apf-config.sh
+    apf_set_config_safe "ICMP_LIM" "0"
+    "$APF" -f 2>/dev/null || true
+
+    run "$APF" -s
+    assert_success
+
+    apf_set_config_safe "ICMP_LIM" "30/s"
+}
+
+@test "validate_config rejects invalid LOG_LEVEL" {
+    source /opt/tests/helpers/apf-config.sh
+    apf_set_config "LOG_DROP" "1"
+    apf_set_config "LOG_LEVEL" "badlevel"
+    "$APF" -f 2>/dev/null || true
+
+    run "$APF" -s
+    assert_failure
+    [[ "$output" == *"LOG_LEVEL"*"invalid"* ]]
+
+    apf_set_config "LOG_LEVEL" "info"
+    apf_set_config "LOG_DROP" "0"
+}
+
+@test "validate_config rejects invalid LOG_TARGET" {
+    source /opt/tests/helpers/apf-config.sh
+    apf_set_config "LOG_DROP" "1"
+    apf_set_config "LOG_TARGET" "BADTARGET"
+    "$APF" -f 2>/dev/null || true
+
+    run "$APF" -s
+    assert_failure
+    [[ "$output" == *"LOG_TARGET"*"invalid"* ]]
+
+    apf_set_config "LOG_TARGET" "LOG"
+    apf_set_config "LOG_DROP" "0"
+}
+
+@test "validate_config rejects non-numeric LOG_RATE" {
+    source /opt/tests/helpers/apf-config.sh
+    apf_set_config "LOG_DROP" "1"
+    apf_set_config "LOG_RATE" "abc"
+    "$APF" -f 2>/dev/null || true
+
+    run "$APF" -s
+    assert_failure
+    [[ "$output" == *"LOG_RATE"*"invalid"* ]]
+
+    apf_set_config "LOG_RATE" "30"
+    apf_set_config "LOG_DROP" "0"
+}
+
+@test "validate_config rejects non-numeric SYSCTL_CONNTRACK" {
+    source /opt/tests/helpers/apf-config.sh
+    apf_set_config "SYSCTL_CONNTRACK" "notanum"
+    "$APF" -f 2>/dev/null || true
+
+    run "$APF" -s
+    assert_failure
+    [[ "$output" == *"SYSCTL_CONNTRACK"*"invalid"* ]]
+
+    apf_set_config "SYSCTL_CONNTRACK" "65536"
+}
+
+@test "validate_config rejects non-numeric PERMBLOCK_COUNT" {
+    source /opt/tests/helpers/apf-config.sh
+    apf_set_config "PERMBLOCK_COUNT" "abc"
+    "$APF" -f 2>/dev/null || true
+
+    run "$APF" -s
+    assert_failure
+    [[ "$output" == *"PERMBLOCK_COUNT"*"invalid"* ]]
+
+    apf_set_config "PERMBLOCK_COUNT" "0"
+}
+
+@test "validate_config rejects non-numeric PERMBLOCK_INTERVAL" {
+    source /opt/tests/helpers/apf-config.sh
+    apf_set_config "PERMBLOCK_COUNT" "3"
+    apf_set_config "PERMBLOCK_INTERVAL" "xyz"
+    "$APF" -f 2>/dev/null || true
+
+    run "$APF" -s
+    assert_failure
+    [[ "$output" == *"PERMBLOCK_INTERVAL"*"invalid"* ]]
+
+    apf_set_config "PERMBLOCK_COUNT" "0"
+    apf_set_config "PERMBLOCK_INTERVAL" "86400"
+}
+
+# =====================================================================
+# trim() inode preservation (C-003)
+# =====================================================================
+
+@test "trim() preserves file inode after truncation" {
+    local tmpfile
+    tmpfile=$(mktemp /tmp/trim-test-XXXXXX)
+
+    # Write enough lines to trigger trimming (MAXLINES default is 2048)
+    seq 1 3000 > "$tmpfile"
+
+    local inode_before
+    inode_before=$(stat -c %i "$tmpfile")
+
+    # Source and call trim in subshell to avoid set -e issues with internals.conf
+    run bash -c "
+        source '$APF_DIR/conf.apf'
+        source '$APF_DIR/internals/functions.apf'
+        trim '$tmpfile'
+    "
+    assert_success
+
+    local inode_after
+    inode_after=$(stat -c %i "$tmpfile")
+
+    [ "$inode_before" = "$inode_after" ]
+
+    rm -f "$tmpfile"
+}
+
+# =====================================================================
+# download_url() test coverage (F-053)
+# =====================================================================
+
+# Helper: start a one-shot HTTP server that serves content then exits.
+# Uses portable nc syntax (positional port, no -p/-q) + timeout for auto-cleanup.
+# Works across: netcat-openbsd (Debian/Ubuntu), nmap-ncat (Rocky/RHEL), nc-1.84 (CentOS 6).
+_dl_serve() {
+    local port="$1" content="$2"
+    local response="HTTP/1.0 200 OK\r\nContent-Length: ${#content}\r\n\r\n${content}"
+    printf '%b' "$response" | timeout 5 nc -l "$port" >/dev/null 2>&1 &
+}
+
+@test "download_url succeeds with wget" {
+    local dst port=18901
+    dst=$(mktemp /tmp/dl-dst-XXXXXX)
+
+    _dl_serve "$port" "test-content-wget"
+    sleep 0.5
+
+    # Source only conf.apf + functions.apf; set CURL/WGET directly to avoid
+    # internals.conf side effects (network probing, file sourcing) that fail
+    # on deep legacy OSes
+    run bash -c "
+        source '$APF_DIR/conf.apf'
+        source '$APF_DIR/internals/functions.apf'
+        CURL=\$(command -v curl 2>/dev/null)
+        WGET=\$(command -v wget 2>/dev/null)
+        download_url 'http://127.0.0.1:$port/test' '$dst'
+    "
+    assert_success
+
+    run cat "$dst"
+    assert_output "test-content-wget"
+
+    rm -f "$dst"
+}
+
+@test "download_url fails when both curl and wget missing" {
+    run bash -c "
+        source '$APF_DIR/conf.apf'
+        source '$APF_DIR/internals/functions.apf'
+        CURL=''
+        WGET=''
+        download_url 'http://127.0.0.1:1/nonexistent' '/tmp/dl-none'
+    "
+    assert_failure
+}
+
+@test "download_url fails on unreachable URL" {
+    local dst
+    dst=$(mktemp /tmp/dl-dst-XXXXXX)
+
+    run bash -c "
+        source '$APF_DIR/conf.apf'
+        source '$APF_DIR/internals/functions.apf'
+        CURL=\$(command -v curl 2>/dev/null)
+        WGET=\$(command -v wget 2>/dev/null)
+        download_url 'http://127.0.0.1:1/nonexistent' '$dst'
+    "
+    assert_failure
+
+    rm -f "$dst"
+}
+
+@test "download_url skips curl when CURL empty and falls back to wget" {
+    local dst port=18902
+    dst=$(mktemp /tmp/dl-dst-XXXXXX)
+
+    _dl_serve "$port" "fallback-content"
+    sleep 0.5
+
+    run bash -c "
+        source '$APF_DIR/conf.apf'
+        source '$APF_DIR/internals/functions.apf'
+        CURL=''
+        WGET=\$(command -v wget 2>/dev/null)
+        download_url 'http://127.0.0.1:$port/test' '$dst'
+    "
+    assert_success
+
+    run cat "$dst"
+    assert_output "fallback-content"
+
+    rm -f "$dst"
+}

@@ -273,7 +273,7 @@ if [ "$PKT_SANITY" == "1" ] && [ "$USE_IPV6" == "1" ]; then
 	for flags in "ALL NONE" "SYN,FIN SYN,FIN" "SYN,RST SYN,RST" "FIN,RST FIN,RST" \
 		     "ACK,FIN FIN" "ACK,URG URG" "ACK,PSH PSH" "ALL FIN,URG,PSH" \
 		     "ALL SYN,RST,ACK,FIN,URG" "ALL ALL" "ALL FIN"; do
-		read mask comp <<< "$flags"
+		read -r mask comp <<< "$flags"
 		if [ "$LOG_DROP" == "1" ]; then
 			ipt6 -A IN_SANITY6 -p tcp --tcp-flags $mask $comp -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** SANITY6 ** "
 		fi
@@ -287,7 +287,7 @@ if [ "$PKT_SANITY" == "1" ] && [ "$USE_IPV6" == "1" ]; then
 	for flags in "ALL NONE" "SYN,FIN SYN,FIN" "SYN,RST SYN,RST" "FIN,RST FIN,RST" \
 		     "ACK,FIN FIN" "ACK,PSH PSH" "ACK,URG URG" "ALL FIN,URG,PSH" \
 		     "ALL SYN,RST,ACK,FIN,URG" "ALL ALL" "ALL FIN"; do
-		read mask comp <<< "$flags"
+		read -r mask comp <<< "$flags"
 		if [ "$LOG_DROP" == "1" ]; then
 			ipt6 -A OUT_SANITY6 -p tcp --tcp-flags $mask $comp -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** SANITY6 ** "
 		fi

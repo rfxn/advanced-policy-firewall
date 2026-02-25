@@ -110,6 +110,22 @@ teardown_file() {
     assert_rule_exists_ips SYNFLOOD "tcp.*tcp-flags.*SYN.*LOG.*SYNFLOOD"
 }
 
+@test "SYNFLOOD no LOG rule when LOG_DROP=0" {
+    source /opt/tests/helpers/apf-config.sh
+    apf_set_config "SYNFLOOD" "1"
+    apf_set_config "LOG_DROP" "0"
+    "$APF" -f 2>/dev/null
+    "$APF" -s
+
+    # Chain should still exist with RETURN and DROP rules
+    assert_chain_exists SYNFLOOD
+    assert_rule_exists_ips SYNFLOOD "RETURN"
+    # LOG rule must be absent
+    run iptables -S SYNFLOOD
+    assert_success
+    ! echo "$output" | grep -q "LOG"
+}
+
 # =====================================================================
 # Chain ordering — RETURN before DROP
 # =====================================================================

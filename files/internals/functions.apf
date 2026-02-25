@@ -32,6 +32,17 @@ devm() {
  fi
 }
 
+## Temp file tracking for signal-safe cleanup
+_APF_TMPFILES=""
+_apf_reg_tmp() { _APF_TMPFILES="$_APF_TMPFILES $1"; }
+_apf_cleanup_tmp() {
+	local f
+	for f in $_APF_TMPFILES; do
+		[ -f "$f" ] && rm -f "$f"
+	done
+	_APF_TMPFILES=""
+}
+
 ## Dual-stack iptables helpers
 # ipt()  — apply rule to both IPv4 and IPv6 (protocol-agnostic rules only)
 # ipt4() — IPv4 only (explicit)
@@ -92,6 +103,7 @@ ipt_for_host() {
 parse_ttl() {
 	local val="$1"
 	local num factor=1
+	local _pt_int='^[0-9]+$'
 	case "$val" in
 		*d) num="${val%d}" ; factor=86400 ;;
 		*h) num="${val%h}" ; factor=3600 ;;
@@ -99,7 +111,7 @@ parse_ttl() {
 		*s) num="${val%s}" ;;
 		*)  num="$val" ;;
 	esac
-	if ! [[ "$num" =~ ^[0-9]+$ ]] || [ "$num" -eq 0 ]; then
+	if ! [[ "$num" =~ $_pt_int ]] || [ "$num" -eq 0 ]; then
 		return 1
 	fi
 	_TTL_SECONDS=$(($num * $factor))
@@ -344,9 +356,12 @@ check_deps() {
 
 validate_config() {
  local err=""
+ local _vc_rate='^[0-9]+/[smh]$'
+ local _vc_int='^[0-9]+$'
+ local _vc_name _vc_val _vc_burst _vc_entry
  # Validate stop targets
  for _vc_pair in "TCP_STOP:$TCP_STOP" "UDP_STOP:$UDP_STOP" "ALL_STOP:$ALL_STOP"; do
-    local _vc_name="${_vc_pair%%:*}" _vc_val="${_vc_pair#*:}"
+    _vc_name="${_vc_pair%%:*}"; _vc_val="${_vc_pair#*:}"
     case "$_vc_val" in
         DROP|REJECT|RESET|PROHIBIT) ;;
         *) err="${err}${_vc_name}='${_vc_val}' is invalid (must be DROP, REJECT, RESET, or PROHIBIT); " ;;
@@ -354,19 +369,43 @@ validate_config() {
  done
  # Validate SYNFLOOD rate/burst (only when enabled)
  if [ "$SYNFLOOD" == "1" ]; then
-    local _vc_rate='^[0-9]+/[smh]$'
     if [[ ! "$SYNFLOOD_RATE" =~ $_vc_rate ]]; then
         err="${err}SYNFLOOD_RATE='$SYNFLOOD_RATE' is invalid (must be number/s, number/m, or number/h); "
     fi
-    local _vc_burst='^[0-9]+$'
-    if [[ ! "$SYNFLOOD_BURST" =~ $_vc_burst ]]; then
+    if [[ ! "$SYNFLOOD_BURST" =~ $_vc_int ]]; then
         err="${err}SYNFLOOD_BURST='$SYNFLOOD_BURST' is invalid (must be a positive integer); "
+    fi
+ fi
+ # Validate ICMP_LIM rate format (only when set and non-zero)
+ if [ -n "$ICMP_LIM" ] && [ "$ICMP_LIM" != "0" ]; then
+    if [[ ! "$ICMP_LIM" =~ $_vc_rate ]]; then
+        err="${err}ICMP_LIM='$ICMP_LIM' is invalid (must be 0 or number/s, number/m, or number/h); "
+    fi
+ fi
+ # Validate LOG_LEVEL (only when LOG_DROP is enabled)
+ if [ "$LOG_DROP" == "1" ] && [ -n "$LOG_LEVEL" ]; then
+    case "$LOG_LEVEL" in
+        emerg|alert|crit|err|warning|notice|info|debug) ;;
+        *) err="${err}LOG_LEVEL='$LOG_LEVEL' is invalid (must be emerg, alert, crit, err, warning, notice, info, or debug); " ;;
+    esac
+ fi
+ # Validate LOG_TARGET (only when LOG_DROP is enabled)
+ if [ "$LOG_DROP" == "1" ] && [ -n "$LOG_TARGET" ]; then
+    case "$LOG_TARGET" in
+        LOG|ULOG|NFLOG) ;;
+        *) err="${err}LOG_TARGET='$LOG_TARGET' is invalid (must be LOG, ULOG, or NFLOG); " ;;
+    esac
+ fi
+ # Validate LOG_RATE (only when LOG_DROP is enabled)
+ if [ "$LOG_DROP" == "1" ] && [ -n "$LOG_RATE" ]; then
+    if [[ ! "$LOG_RATE" =~ $_vc_int ]]; then
+        err="${err}LOG_RATE='$LOG_RATE' is invalid (must be a positive integer); "
     fi
  fi
  # Validate connlimit entries
  local _vc_clpat='^[0-9_]+:[0-9]+$'
  for _vc_pair in "IG_TCP_CLIMIT:$IG_TCP_CLIMIT" "IG_UDP_CLIMIT:$IG_UDP_CLIMIT"; do
-    local _vc_name="${_vc_pair%%:*}" _vc_val="${_vc_pair#*:}"
+    _vc_name="${_vc_pair%%:*}"; _vc_val="${_vc_pair#*:}"
     [ -z "$_vc_val" ] && continue
     for _vc_entry in ${_vc_val//,/ }; do
         [ -z "$_vc_entry" ] && continue
@@ -379,8 +418,21 @@ validate_config() {
  if [ "$SYSCTL_SYNCOOKIES" == "1" ] && [ "$SYSCTL_OVERFLOW" == "1" ]; then
     err="${err}SYSCTL_SYNCOOKIES and SYSCTL_OVERFLOW are both enabled (conf.apf recommends only one); "
  fi
+ # Validate SYSCTL_CONNTRACK (when set and non-empty)
+ if [ -n "$SYSCTL_CONNTRACK" ]; then
+    if [[ ! "$SYSCTL_CONNTRACK" =~ $_vc_int ]]; then
+        err="${err}SYSCTL_CONNTRACK='$SYSCTL_CONNTRACK' is invalid (must be a positive integer); "
+    fi
+ fi
  # Validate PERMBLOCK settings
- local _vc_int='^[0-9]+$'
+ if [ -n "$PERMBLOCK_COUNT" ] && [ "$PERMBLOCK_COUNT" != "0" ]; then
+    if [[ ! "$PERMBLOCK_COUNT" =~ $_vc_int ]]; then
+        err="${err}PERMBLOCK_COUNT='$PERMBLOCK_COUNT' is invalid (must be a positive integer or 0); "
+    fi
+    if [ -n "$PERMBLOCK_INTERVAL" ] && [[ ! "$PERMBLOCK_INTERVAL" =~ $_vc_int ]]; then
+        err="${err}PERMBLOCK_INTERVAL='$PERMBLOCK_INTERVAL' is invalid (must be a positive integer); "
+    fi
+ fi
  if [[ "$PERMBLOCK_COUNT" =~ $_vc_int ]] && [ "$PERMBLOCK_COUNT" -gt 0 ]; then
     if [[ "$PERMBLOCK_INTERVAL" =~ $_vc_int ]] && [ "$PERMBLOCK_INTERVAL" -lt 60 ]; then
         err="${err}PERMBLOCK_INTERVAL must be at least 60 seconds; "
@@ -413,7 +465,7 @@ mutex_lock() {
       return 0
     fi
     local lock_pid
-    read lock_pid < "$LOCK_FILE" 2>/dev/null || lock_pid=""
+    read -r lock_pid < "$LOCK_FILE" 2>/dev/null || lock_pid=""
     if [ -n "$lock_pid" ] && ! kill -0 "$lock_pid" 2>/dev/null; then
       rm -f "$LOCK_FILE"
       continue
@@ -457,13 +509,15 @@ trim() {
                         MAXLINES=$((1+$MAXLINES))
                 fi
                 tail -n "$MAXLINES" "$FILE" > "$FILE.new"
-                mv -f "$FILE.new" "$FILE"
+                cat "$FILE.new" > "$FILE"
+                rm -f "$FILE.new"
         fi
  fi
 }
 
 valid_ip_cidr() {
-	[[ "$1" =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}(/[0-9]{1,2})?$ ]] || return 1
+	local _vic_ipv4='^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}(/[0-9]{1,2})?$'
+	[[ "$1" =~ $_vic_ipv4 ]] || return 1
 	local IFS='./'; set -- $1
 	[ "$1" -le 255 ] && [ "$2" -le 255 ] && [ "$3" -le 255 ] && [ "$4" -le 255 ] || return 1
 	[ -n "$5" ] && { [ "$5" -le 32 ] || return 1; }
@@ -472,13 +526,16 @@ valid_ip_cidr() {
 
 valid_host() {
 	local h="$1"
+	local _vh_ipv4='^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}(/[0-9]{1,2})?$'
+	local _vh_ipv6='^[0-9a-fA-F]{0,4}(:[0-9a-fA-F]{0,4}){2,7}(/[0-9]{1,3})?$'
+	local _vh_fqdn='^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?)+$'
 	# IPv4 address or CIDR — delegate to valid_ip_cidr for octet/mask range checking
-	if [[ "$h" =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}(/[0-9]{1,2})?$ ]]; then
+	if [[ "$h" =~ $_vh_ipv4 ]]; then
 		valid_ip_cidr "$h"
 		return $?
 	fi
 	# IPv6 address or CIDR
-	if [[ "$h" =~ ^[0-9a-fA-F]{0,4}(:[0-9a-fA-F]{0,4}){2,7}(/[0-9]{1,3})?$ ]]; then
+	if [[ "$h" =~ $_vh_ipv6 ]]; then
 		if [[ "$h" == */* ]]; then
 			local mask="${h##*/}"
 			[ "$mask" -le 128 ] || return 1
@@ -486,7 +543,7 @@ valid_host() {
 		return 0
 	fi
 	# FQDN: requires at least one dot, alphanumeric labels, TLD 2+ chars
-	if [[ "$h" =~ ^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?)+$ ]]; then
+	if [[ "$h" =~ $_vh_fqdn ]]; then
 		return 0
 	fi
 	return 1
@@ -495,7 +552,8 @@ valid_host() {
 # Detect whether input is an FQDN (not an IP or CIDR).
 # Reuses the FQDN regex from valid_host().
 is_fqdn() {
-	[[ "$1" =~ ^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?)+$ ]]
+	local _if_fqdn='^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?)+$'
+	[[ "$1" =~ $_if_fqdn ]]
 }
 
 # Resolve FQDN to IP addresses via getent ahosts.
@@ -612,11 +670,11 @@ valid_trust_entry() {
 # Returns 1 on parse failure.
 trust_entry_rule() {
 	local entry="$1" chain="$2" action="$3" mode="$4"
-	local action_tcp action_udp action_all
+	local action_tcp action_udp
 	if [ "$action" == "DENY" ]; then
-		action_tcp="$TCP_STOP"; action_udp="$UDP_STOP"; action_all="$ALL_STOP"
+		action_tcp="$TCP_STOP"; action_udp="$UDP_STOP"
 	else
-		action_tcp="ACCEPT"; action_udp="ACCEPT"; action_all="ACCEPT"
+		action_tcp="ACCEPT"; action_udp="ACCEPT"
 	fi
 
 	trust_protect_ipv6 "$entry"; local safe="$_TPV6_RESULT"
@@ -676,6 +734,10 @@ trust_entry_rule() {
 
 cli_trust_remove() {
 	local DIP="$1"
+	if [ -z "$DIP" ]; then
+		echo "an FQDN or IP address is required for this option"
+		return 1
+	fi
 
 	# Advanced syntax removal
 	if [[ "$DIP" == *=* ]]; then
@@ -855,7 +917,7 @@ cli_trust_remove() {
 
 	# Remove comment lines referencing the FQDN/IP (covers resolved= metadata)
 	local escaped_dip="${DIP//./\\.}"
-	sed -i "\%# added.*${escaped_dip}%d" "$ALLOW_HOSTS" "$DENY_HOSTS" "$GALLOW_HOSTS" "$GDENY_HOSTS"
+	sed -i "\%# added ${escaped_dip} %d" "$ALLOW_HOSTS" "$DENY_HOSTS" "$GALLOW_HOSTS" "$GDENY_HOSTS"
 
 	if [ "$found" == "0" ]; then
 		return 1
@@ -956,7 +1018,7 @@ cli_trust() {
  fi
  tlist=""
  for f in $DENY_HOSTS $ALLOW_HOSTS $GALLOW_HOSTS $GDENY_HOSTS; do
-     if [ -f "$f" ] && grep -v '^#' "$f" | grep -Fwq "$HOST"; then
+     if [ -f "$f" ] && grep -v '^#' "$f" | grep -Fxq "$HOST"; then
          tlist="$tlist$f "
      fi
  done
@@ -1245,8 +1307,9 @@ check_block_escalation() {
 	local history_file="$INSTALL_PATH/internals/.block_history"
 	[ ! -f "$history_file" ] && return 1
 
-	local count
-	count=$(grep -Fm1 "${ip}|" "$history_file" | cut -d'|' -f2)
+	local count escaped_ip_re
+	escaped_ip_re="${ip//./\\.}"
+	count=$(grep -m1 "^${escaped_ip_re}|" "$history_file" | cut -d'|' -f2)
 	[ -z "$count" ] && return 1
 
 	if [ "$count" -ge "$PERMBLOCK_COUNT" ]; then
@@ -1257,12 +1320,11 @@ check_block_escalation() {
 
 escalate_to_permanent() {
 	local ip="$1"
-	local escaped_ip
+	local escaped_ip="${ip//./\\.}"
 
 	# Remove temp entry markers from deny_hosts.rules
-	escaped_ip=$(echo "$ip" | sed 's/\./\\./g')
-	sed -i "/${escaped_ip}.*ttl=.*expire=/d" "$DENY_HOSTS"
-	sed -i "/^${escaped_ip}$/d" "$DENY_HOSTS"
+	sed -i "\%# added ${escaped_ip} .*ttl=.*expire=%d" "$DENY_HOSTS"
+	sed -i "\%^${escaped_ip}$%d" "$DENY_HOSTS"
 
 	# Add as permanent with static noexpire markers
 	echo "# added $ip on $(date +"%D %H:%M:%S") static noexpire with comment: auto-escalated from temp deny (PERMBLOCK)" >> "$DENY_HOSTS"
@@ -1272,9 +1334,7 @@ escalate_to_permanent() {
 
 	# Remove from block history (escalation complete)
 	local history_file="$INSTALL_PATH/internals/.block_history"
-	local escaped_ip_grep
-	escaped_ip_grep=$(echo "$ip" | sed 's/\./\\./g')
-	sed -i "/^${escaped_ip_grep}|/d" "$history_file"
+	sed -i "\%^${escaped_ip}|%d" "$history_file"
 }
 
 save_external_baseline() {
@@ -1481,7 +1541,7 @@ help() {
 	echo "-r|--restart ....................... stop (flush) & reload firewall rules"
 	echo "-f|--stop|--flush .................. stop (flush) all firewall rules"
 	echo "-l|--list .......................... list all firewall rules"
-	echo "-t|--status ........................ output firewall status log"
+	echo "-t|-st|--status .................... output firewall status log"
 	echo "-e|--refresh ....................... refresh & re-resolve FQDNs in trust rules"
 	echo "-a HOST CMT|--allow HOST COMMENT ... add host (IP/IPv6/CIDR/FQDN) to"
 	echo "                                     allow_hosts.rules and immediately"
@@ -1631,7 +1691,9 @@ if [ -z "$file" ] || [ -z "$chain" ]; then
         exit 1
 fi
 
-if [ -n "$(grep -v "#" "$file")" ]; then
+local _th_raw
+_th_raw=$(grep -v '#' "$file")
+if [ -n "$_th_raw" ]; then
         eout "{glob} loading $file"
         #
         #
@@ -1665,7 +1727,7 @@ if [ -n "$(grep -v "#" "$file")" ]; then
                   fi
                  fi
 		fi
-        done < <(grep -v '#' "$file" | grep -v '=')
+        done < <(printf '%s\n' "$_th_raw" | grep -v '=')
         #
         #
         while IFS= read -r i; do
@@ -1715,7 +1777,7 @@ if [ -n "$(grep -v "#" "$file")" ]; then
                          fi
                         fi
                 fi
-        done < <(grep -v '#' "$file" | grep '=' | grep -vw in | grep -vw out | grep -v tcp | grep -v udp)
+        done < <(printf '%s\n' "$_th_raw" | grep '=' | grep -vw in | grep -vw out | grep -v tcp | grep -v udp)
         #
         #
         while IFS= read -r i; do
@@ -1788,7 +1850,7 @@ if [ -n "$(grep -v "#" "$file")" ]; then
                          fi
                         fi
                 fi
-        done < <(grep -v '#' "$file" | grep '=' | grep -v tcp | grep -v udp)
+        done < <(printf '%s\n' "$_th_raw" | grep '=' | grep -wE 'in|out' | grep -v tcp | grep -v udp)
         #
         #
         while IFS= read -r i; do
@@ -1878,7 +1940,7 @@ if [ -n "$(grep -v "#" "$file")" ]; then
                          fi
                         fi
                 fi
-        done < <(grep -v '#' "$file" | grep '=')
+        done < <(printf '%s\n' "$_th_raw" | grep '=' | grep -wE 'tcp|udp')
 fi
 }
 
@@ -1909,6 +1971,7 @@ dlist_resnet() {
 if ( [ -n "$CURL" ] || [ -n "$WGET" ] ) && [ -f "$RESNET" ]; then
    local url_tmp
    url_tmp=$(mktemp "$INSTALL_PATH/.apf-XXXXXX")
+   _apf_reg_tmp "$url_tmp"
    eout "{resnet} downloading $DLIST_RESERVED_URL"
    if download_url "$DLIST_RESERVED_URL" "$url_tmp"; then
         eout "{resnet} parsing download into $RESNET"
@@ -1938,6 +2001,7 @@ if [ -f "$hosts_file" ]; then
 fi
 local url_tmp
 url_tmp=$(mktemp "$INSTALL_PATH/.apf-XXXXXX")
+_apf_reg_tmp "$url_tmp"
 eout "{$tag} downloading $url"
 if download_url "$url" "$url_tmp"; then
         eout "{$tag} parsing download into $hosts_file"
@@ -2092,6 +2156,7 @@ ipset_migrate_rules() {
 local ipset_rules="$INSTALL_PATH/ipset.rules"
 [ -f "$ipset_rules" ] || return 0
 local migrated=0
+local _imr_int='^[0-9]+$'
 local tmp
 tmp=$(mktemp "$INSTALL_PATH/.apf-XXXXXX")
 while IFS= read -r line; do
@@ -2111,7 +2176,7 @@ while IFS= read -r line; do
 		[ -n "$f7" ] && orig_path="${orig_path}:${f7}"
 		printf '%s\n' "${f1}:${f2}:${f3}:0:0:0:${orig_path}" >> "$tmp"
 		migrated=$((migrated + 1))
-	elif [ -n "$f5" ] && ! [[ "$f5" =~ ^[0-9]+$ ]]; then
+	elif [ -n "$f5" ] && ! [[ "$f5" =~ $_imr_int ]]; then
 		# v2.0.1 5-field format — f4 is log flag, f5 starts file_or_url
 		local orig_path="$f5"
 		[ -n "$f6" ] && orig_path="${orig_path}:${f6}"
@@ -2133,6 +2198,8 @@ ipset_load() {
 if [ "$USE_IPSET" != "1" ] || [ -z "$IPSET" ]; then
 	return
 fi
+local _ils_int='^[0-9]+$'
+local _ils_url='^https?://'
 local ipset_rules="$INSTALL_PATH/ipset.rules"
 if [ ! -f "$ipset_rules" ]; then
 	return
@@ -2150,8 +2217,8 @@ while IFS= read -r line; do
 	# _rest contains field 7+ (may include colons in URLs)
 	file_or_url="$_rest"
 	# Default non-numeric interval/maxelem to 0
-	[[ "$interval" =~ ^[0-9]+$ ]] || interval=0
-	[[ "$maxelem" =~ ^[0-9]+$ ]] || maxelem=0
+	[[ "$interval" =~ $_ils_int ]] || interval=0
+	[[ "$maxelem" =~ $_ils_int ]] || maxelem=0
 
 	# Validate fields
 	if [ -z "$name" ] || [ -z "$flow" ] || [ -z "$iptype" ] || [ -z "$logflag" ] || [ -z "$file_or_url" ]; then
@@ -2177,9 +2244,10 @@ while IFS= read -r line; do
 	eout "{ipset} loading set $name from $file_or_url"
 
 	# Resolve file_or_url to a local file
-	if [[ "$file_or_url" =~ ^https?:// ]]; then
+	if [[ "$file_or_url" =~ $_ils_url ]]; then
 		local url_tmp
 		url_tmp=$(mktemp "$INSTALL_PATH/.apf-XXXXXX")
+		_apf_reg_tmp "$url_tmp"
 		if ! download_url "$file_or_url" "$url_tmp"; then
 			eout "{ipset} download failed for $name: $file_or_url"
 			rm -f "$url_tmp"
@@ -2211,6 +2279,7 @@ while IFS= read -r line; do
 	# Pre-filter data into ipset restore format for batch loading
 	local restore_file
 	restore_file=$(mktemp "$INSTALL_PATH/.apf-XXXXXX")
+	_apf_reg_tmp "$restore_file"
 	awk -v max="$ipset_maxelem" '
 		BEGIN { count = 0 }
 		/^[[:space:]]*#/ || /^[[:space:]]*$/ || /^;;/ { next }
@@ -2278,6 +2347,8 @@ ipset_update() {
 if [ "$USE_IPSET" != "1" ] || [ -z "$IPSET" ]; then
 	return
 fi
+local _ius_int='^[0-9]+$'
+local _ius_url='^https?://'
 local ipset_rules="$INSTALL_PATH/ipset.rules"
 if [ ! -f "$ipset_rules" ]; then
 	return
@@ -2292,8 +2363,8 @@ while IFS= read -r line; do
 	IFS=: read -r name flow iptype logflag interval maxelem _rest <<< "$line"
 	file_or_url="$_rest"
 	# Default non-numeric interval/maxelem to 0
-	[[ "$interval" =~ ^[0-9]+$ ]] || interval=0
-	[[ "$maxelem" =~ ^[0-9]+$ ]] || maxelem=0
+	[[ "$interval" =~ $_ius_int ]] || interval=0
+	[[ "$maxelem" =~ $_ius_int ]] || maxelem=0
 
 	if [ -z "$name" ] || [ -z "$file_or_url" ]; then
 		continue
@@ -2329,8 +2400,9 @@ while IFS= read -r line; do
 
 	eout "{ipset} updating set $name from $file_or_url"
 
-	if [[ "$file_or_url" =~ ^https?:// ]]; then
+	if [[ "$file_or_url" =~ $_ius_url ]]; then
 		url_tmp=$(mktemp "$INSTALL_PATH/.apf-XXXXXX")
+		_apf_reg_tmp "$url_tmp"
 		if ! download_url "$file_or_url" "$url_tmp"; then
 			eout "{ipset} update download failed for $name: $file_or_url"
 			rm -f "$url_tmp"
@@ -2359,6 +2431,7 @@ while IFS= read -r line; do
 	# Pre-filter data into ipset restore format for batch loading
 	local restore_file
 	restore_file=$(mktemp "$INSTALL_PATH/.apf-XXXXXX")
+	_apf_reg_tmp "$restore_file"
 	awk -v max="$ipset_maxelem" '
 		BEGIN { count = 0 }
 		/^[[:space:]]*#/ || /^[[:space:]]*$/ || /^;;/ { next }
@@ -2418,6 +2491,7 @@ glob_allow_download() {
 if [ -n "$GA_URL" ] && [ "$USE_RGT" == "1" ] && ( [ -n "$CURL" ] || [ -n "$WGET" ] ); then
    local url_tmp
    url_tmp=$(mktemp "$INSTALL_PATH/.apf-XXXXXX")
+   _apf_reg_tmp "$url_tmp"
    eout "{trust} downloading $GA_URL"
    if download_url "$GA_URL" "$url_tmp"; then
         eout "{trust} parsing download into $GALLOW_HOSTS"
@@ -2445,6 +2519,7 @@ glob_deny_download() {
 if [ -n "$GD_URL" ] && [ "$USE_RGT" == "1" ] && ( [ -n "$CURL" ] || [ -n "$WGET" ] ); then
    local url_tmp
    url_tmp=$(mktemp "$INSTALL_PATH/.apf-XXXXXX")
+   _apf_reg_tmp "$url_tmp"
    eout "{trust} downloading $GD_URL"
    if download_url "$GD_URL" "$url_tmp"; then
         eout "{trust} parsing download into $GDENY_HOSTS"
@@ -2538,6 +2613,7 @@ cl_cports() {
 	SMTP_PORTS=""
 	SMTP_ALLOWUSER=""
 	SMTP_ALLOWGROUP=""
+	EG_DROP_CMD=""
 }
 
 expirebans() {
@@ -2581,7 +2657,7 @@ expire_temp_entries() {
 			epoch="${epoch%% *}"
 			if [ "$current_time" -ge "$epoch" ] 2>/dev/null; then
 				local escaped_ip="${ip//./\\.}"
-				sed -i "\%${escaped_ip}.*ttl=.*expire=%d" "$file"
+				sed -i "\%# added ${escaped_ip} .*ttl=.*expire=%d" "$file"
 				cli_trust_remove "$ip" >> /dev/null 2>&1
 				eout "{trust} removed expired temp entry for $ip"
 				count=$(($count + 1))
@@ -2680,7 +2756,7 @@ refresh() {
 	 glob_deny_download
 	 trusts_md5=$($MD5 $DENY_HOSTS $GDENY_HOSTS $ALLOW_HOSTS $GALLOW_HOSTS | $MD5 | awk '{print$1}')
 	 if [ -f "$INSTALL_PATH/internals/.trusts.md5" ]; then
-		read last_trusts_md5 < "$INSTALL_PATH/internals/.trusts.md5"
+		read -r last_trusts_md5 < "$INSTALL_PATH/internals/.trusts.md5"
 		if [ "$trusts_md5" == "$last_trusts_md5" ]; then
 		        eout "{glob} trust rules unchanged since last refresh, doing nothing."
 	                echo "$trusts_md5" > "$INSTALL_PATH/internals/.trusts.md5"
@@ -2704,7 +2780,11 @@ refresh() {
 	for _rf_file in "$ALLOW_HOSTS" "$GALLOW_HOSTS"; do
 		[ -f "$_rf_file" ] || continue
 		while IFS= read -r _rf_line; do
-			case "$_rf_line" in '#'*|''|*:*) continue ;; esac
+			# Skip comments, empty lines, metadata (key=val), and advanced
+			# trust entries (proto:flow:d=port:s=ip) — advanced entries need
+			# protocol/port/direction parsing that REFRESH_TEMP does not
+			# implement; bare IPv6 addresses pass through (contain : but no =)
+			case "$_rf_line" in '#'*|''|*=*) continue ;; esac
 			if is_fqdn "$_rf_line"; then
 				if resolve_fqdn "$_rf_line"; then
 					while IFS= read -r _rf_rip; do
@@ -2723,7 +2803,7 @@ refresh() {
 	for _rf_file in "$DENY_HOSTS" "$GDENY_HOSTS"; do
 		[ -f "$_rf_file" ] || continue
 		while IFS= read -r _rf_line; do
-			case "$_rf_line" in '#'*|''|*:*) continue ;; esac
+			case "$_rf_line" in '#'*|''|*=*) continue ;; esac
 			if is_fqdn "$_rf_line"; then
 				if resolve_fqdn "$_rf_line"; then
 					while IFS= read -r _rf_rip; do

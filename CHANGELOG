@@ -54,6 +54,42 @@
 
   -- Bug Fixes --
 
+[Fix] install.sh: fix chmod -R 640 breaking subdirectory traversal;
+      use find to set dirs=750, files=640, then explicit executable perms
+      (install.sh)
+[Fix] install.sh: suppress "Device does not exist" stderr from vnetgen
+      during install (install.sh)
+[Fix] importconf: guard vnet/*.rules glob to prevent "cannot stat" error
+      on fresh or non-VNET installs (importconf, files/extras/importconf)
+[Fix] importconf: suppress stderr noise from conf.apf sourcing during
+      config import (importconf, files/extras/importconf)
+[Fix] files/extras/importconf: use INSTALL_PATH variable default pattern
+      (files/extras/importconf)
+[New] install.sh: auto-detect default network interface on fresh install;
+      sets IFACE_UNTRUSTED when not eth0 (install.sh)
+[New] install.sh: show default routed interface and additional interfaces
+      during install; contextual output when no default route found
+      (install.sh)
+[Change] importconf: clarify message on same-version reinstall
+      (importconf, files/extras/importconf)
+[Change] install.sh: optimize sed path replacement with grep -rl
+      pre-filter; skip files that don't contain /etc/apf (install.sh)
+[Change] install.sh: add error handling for mkdir and file copy
+      (install.sh)
+[Change] install.sh: remove unnecessary sleep 1 (install.sh)
+[Fix] cli_trust_remove(): anchor comment cleanup sed pattern to prevent
+      over-deletion; '# added 192.0.2.1 ' no longer matches 192.0.2.10
+      (functions.apf)
+[Fix] cli_trust(): change duplicate check from grep -Fw to grep -Fx for
+      exact full-line match; prevents FQDN substring false positives
+      (functions.apf)
+[Fix] check_block_escalation(): anchor grep pattern with ^ and escape dots
+      to prevent IP prefix collisions in block history (functions.apf)
+[Fix] escalate_to_permanent(): anchor sed patterns to comment format, use
+      % delimiter for CIDR safety, replace subprocesses with bash parameter
+      expansion (functions.apf)
+[Fix] expire_temp_entries(): anchor sed pattern to '# added IP ' prefix to
+      prevent substring over-deletion of temp trust comments (functions.apf)
 [Fix] cli_trust_remove(): spec-based iptables rule deletion replaces racy
       line-number approach; tracks removal status and returns 1 when host
       not found (functions.apf)
@@ -95,6 +131,55 @@
       refresh into a stopped firewall (functions.apf)
 [Fix] Add missing local declarations to 10 functions to prevent global
       scope pollution (functions.apf)
+[Fix] Rename head() to apf_banner() to stop shadowing /usr/bin/head in
+      sourced scripts (apf)
+[Fix] Propagate cli_trust/cli_trust_temp return codes to CLI exit status;
+      apf -a/-d/-ta/-td now exit 1 on failure (apf)
+[Fix] REFRESH_TEMP now protects bare IPv6 trust entries during refresh;
+      change case filter from *:* to *=* so IPv6 addresses are not
+      excluded while advanced trust entries remain correctly skipped
+      (functions.apf)
+[Fix] Install FLOW document to doc/ directory alongside README; resolves
+      missing file referenced by README documentation (install.sh)
+[Fix] Migrate EG_DROP_CMD from space-separated (pre-2.0.2) to
+      comma-separated format during upgrade via importconf (importconf)
+[Fix] install.sh: display detected listening ports during upgrade installs;
+      previously only shown on fresh installs (install.sh)
+[Fix] validate_config(): add validation for ICMP_LIM (rate format), LOG_LEVEL,
+      LOG_TARGET, LOG_RATE (integer), SYSCTL_CONNTRACK (integer); reject
+      non-numeric PERMBLOCK_COUNT/PERMBLOCK_INTERVAL (functions.apf)
+[Fix] cl_cports(): clear EG_DROP_CMD between VNET iterations; prevents
+      command-owner rules from leaking across per-IP rule files (functions.apf)
+[Fix] cli_trust_remove(): reject empty argument with error message; prevents
+      confusing double output when apf -u called with no host (functions.apf)
+[Fix] Quote $IFACE_UNTRUSTED in sysctl.rules redirect paths and internals.conf
+      ip addr list calls; aligns with project variable quoting convention
+      (sysctl.rules, internals.conf)
+[Fix] logrotate: add copytruncate directive to preserve log file inode for
+      external tail -f consumers (logrotate.d.apf)
+[Fix] trim(): replace mv with cat+rm to preserve file inode; prevents inode
+      change when trust files are trimmed (functions.apf)
+[Change] trust_hosts(): cache file content in single read; tighten pass 3/4
+      grep filters to target only 4-field and 5-field entries respectively;
+      eliminates redundant file reads (functions.apf)
+[Fix] Replace deprecated -a test operator with && in OpenVZ detection
+      (internals.conf)
+[Fix] Quote all dot-source paths to prevent word splitting on paths with
+      spaces (internals.conf, firewall, conf.apf, vnetgen.def)
+[Fix] Hoist local declarations out of loops in validate_config(); remove
+      redundant _vc_burst variable (functions.apf)
+[Fix] Add -r flag to all read commands to prevent backslash interpretation
+      (apf, functions.apf, sysctl.rules, bt.rules)
+[Change] Extract inline regex patterns to named variables in validation
+      functions for portability and readability (functions.apf, gretunnel.sh)
+[Fix] Fast load failure now skips snapshot save to prevent overwriting
+      working snapshot with broken/partial state (apf)
+[Fix] Firewall script exit code checked; failure aborts start cleanly
+      instead of saving partial snapshot (apf)
+[Fix] Temp file cleanup on signal: global tracking prevents orphaned
+      files in install directory on SIGTERM/SIGINT (functions.apf, apf)
+[Change] Remove unused action_all variable from trust_entry_rule()
+      (functions.apf)
 
   -- Changes --
 
@@ -140,15 +225,29 @@
 [Change] conf.apf: correct DOCKER_COMPAT comment; improve IPT_LOCK docs
       (conf.apf)
 [Change] Remove untested Debian 10/11 from supported platforms list (README)
+[Fix] help() missing -st alias: add -st to status line help text to match
+      case dispatcher (functions.apf)
 
   -- Test Suite --
 
-[New] 9 new test files: 21-refactor-regression, 22-uid-egress,
+[New] 11 new test files: 21-refactor-regression, 22-uid-egress,
       23-devel-fastload, 24-vnet, 25-connlimit, 26-hook-search-silent,
-      27-temp-trust, 28-synflood, 29-block-escalation (414 tests total
-      across 29 files)
+      27-temp-trust, 28-synflood, 29-block-escalation, 30-advanced-trust-cli,
+      31-fqdn-trust (482 tests total across 31 files)
+[New] LOG_DROP=0 negative tests: verify SYNFLOOD and SMTP_BLK chains omit LOG
+      rules when LOG_DROP is disabled (28-synflood.bats, 22-uid-egress.bats)
+[New] Hook execution order tests: verify hook_pre.sh runs before trust chains
+      and hook_post.sh runs after default DROP policies (26-hook-search-silent.bats)
+[New] Hook environment test: verify hooks have access to $IPT and $INSTALL_PATH
+      variables (26-hook-search-silent.bats)
 [New] Test parallelization: --parallel [N] flag splits across N containers;
       3x speedup (run-tests.sh, Makefile)
+[Change] Migrate test infrastructure to batsman shared framework via git
+      submodule at tests/infra; replaces monolithic Dockerfiles with two-phase
+      base+project builds, replaces 254-line run-tests.sh and 91-line Makefile
+      with thin wrappers, replaces standalone CI with batsman reusable workflow;
+      drops untested ubuntu2204 target, adds rocky10 as EXTRA tier
+      (tests/Dockerfile*, tests/run-tests.sh, tests/Makefile, smoke-test.yml)
 
 - 2.0.1 | Feb 20 2026:
 
