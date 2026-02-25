@@ -29,9 +29,9 @@ if [ -x "$INSTALL_PATH/hook_pre.sh" ]; then
 fi
 
 if [ -n "$IF" ] && [ "$VF_ROUTE" == "1" ]; then
- for i in $(echo $IF); do
+ for i in $IF; do
   if [ -n "$ip" ]; then
-	VAL_IF=$($ip route show dev $i 2>/dev/null)
+	VAL_IF=$($ip route show dev "$i" 2>/dev/null)
   elif command -v route > /dev/null 2>&1; then
 	VAL_IF=$(route -n | grep -w "$i")
   else
@@ -50,7 +50,7 @@ fi
 if [ -n "$IFACE_TRUSTED" ] && [ "$VF_ROUTE" == "1" ]; then
  for i in ${IFACE_TRUSTED//,/ }; do
   if [ -n "$ip" ]; then
-	VAL_IFACE_TRUSTED=$($ip route show dev $i 2>/dev/null)
+	VAL_IFACE_TRUSTED=$($ip route show dev "$i" 2>/dev/null)
   elif command -v route > /dev/null 2>&1; then
 	VAL_IFACE_TRUSTED=$(route -n | grep -w "$i")
   else
@@ -67,9 +67,9 @@ if [ -n "$IFACE_TRUSTED" ] && [ "$VF_ROUTE" == "1" ]; then
  done
 fi
 
-$ip addr list $IFACE_UNTRUSTED | grep -w inet | grep -v inet6 | tr '/' ' ' | awk '{print$2}' > "$INSTALL_PATH/internals/.localaddrs"
+$ip addr list "$IFACE_UNTRUSTED" | grep -w inet | grep -v inet6 | tr '/' ' ' | awk '{print$2}' > "$INSTALL_PATH/internals/.localaddrs"
 if [ "$USE_IPV6" == "1" ]; then
-	$ip addr list $IFACE_UNTRUSTED | grep -w inet6 | tr '/' ' ' | awk '{print$2}' > "$INSTALL_PATH/internals/.localaddrs6"
+	$ip addr list "$IFACE_UNTRUSTED" | grep -w inet6 | tr '/' ' ' | awk '{print$2}' > "$INSTALL_PATH/internals/.localaddrs6"
 fi
 
 if [ "$RAB" == "0" ]; then

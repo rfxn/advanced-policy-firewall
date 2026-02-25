@@ -914,14 +914,14 @@ for ed in pico nano vi vim; do
 done
 if [ -n "$EDITOR_CMD" ]; then
 	$EDITOR_CMD "$iptc"
+	command -v clear > /dev/null 2>&1 && clear
 fi
-clear
 rm -f "$iptc"
 }
 
 status() {
 echo "$NAME Status Log:"
-tac "$LOG_APF" | more
+tac "$LOG_APF" | ${PAGER:-more}
 }
 
 help() {
