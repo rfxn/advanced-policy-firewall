@@ -192,7 +192,8 @@ organized into sections:
 .TP
 .B Main Config
 Development mode, install path, interfaces, IPv6 toggle, fast load, VNET,
-FQDN resolution timeout.
+FQDN resolution timeout, block escalation
+.RB ( PERMBLOCK_COUNT / PERMBLOCK_INTERVAL ).
 .TP
 .B Reactive Address Blocking
 RAB enable/disable, sanity and port\-scan triggers, thresholds, timers.
@@ -240,6 +241,15 @@ Pre\-configuration hook script (inactive when permissions are 640).
 .TP
 .I /etc/apf/hook_post.sh
 Post\-configuration hook script (inactive when permissions are 640).
+.TP
+.I /etc/apf/silent_ips.rules
+Silent IP blocking list; drops all traffic to/from listed addresses with no logging.
+.TP
+.I /etc/apf/preroute.rules
+Pre\-routing custom rules, sourced early in the firewall chain.
+.TP
+.I /etc/apf/postroute.rules
+Post\-routing custom rules.
 .TP
 .I /etc/apf/vnet/
 Per\-IP virtual network policy files.

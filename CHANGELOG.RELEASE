@@ -140,6 +140,8 @@
       missing file referenced by README documentation (install.sh)
 [Fix] Migrate EG_DROP_CMD from space-separated (pre-2.0.2) to
       comma-separated format during upgrade via importconf (importconf)
+[Fix] install.sh: display detected listening ports during upgrade installs;
+      previously only shown on fresh installs (install.sh)
 
   -- Changes --
 
