@@ -25,18 +25,20 @@ teardown_file() {
 
 setup() {
     # Clean test entries
-    for pattern in "192.0.2" "198.51.100"; do
+    for pattern in "192.0.2" "198.51.100" "2001:db8"; do
         sed -i "/${pattern}/d" "$APF_DIR/allow_hosts.rules" 2>/dev/null || true
         sed -i "/${pattern}/d" "$APF_DIR/deny_hosts.rules" 2>/dev/null || true
     done
+    sed -i '/tcp:in:d=22/d' "$APF_DIR/allow_hosts.rules" 2>/dev/null || true
 }
 
 teardown() {
     # Same cleanup on exit — prevents dirty state if test fails mid-execution
-    for pattern in "192.0.2" "198.51.100"; do
+    for pattern in "192.0.2" "198.51.100" "2001:db8"; do
         sed -i "/${pattern}/d" "$APF_DIR/allow_hosts.rules" 2>/dev/null || true
         sed -i "/${pattern}/d" "$APF_DIR/deny_hosts.rules" 2>/dev/null || true
     done
+    sed -i '/tcp:in:d=22/d' "$APF_DIR/allow_hosts.rules" 2>/dev/null || true
 }
 
 @test "apf -e with loaded rules succeeds" {
@@ -127,4 +129,42 @@ teardown() {
 
     run grep "^192.0.2.54" "$APF_DIR/deny_hosts.rules"
     assert_success
+}
+
+@test "refresh preserves IPv6 trust entries in REFRESH_TEMP" {
+    if ! ip6tables_available; then skip "ip6tables not available"; fi
+    source /opt/tests/helpers/apf-config.sh
+    apf_set_config "USE_IPV6" "1"
+
+    echo "2001:db8::50" >> "$APF_DIR/allow_hosts.rules"
+    "$APF" -f 2>/dev/null || true
+    "$APF" -s
+
+    # Verify entry exists in TALLOW
+    assert_rule_exists_ip6s TALLOW "2001:db8::50"
+
+    # Refresh — IPv6 entry should be protected in REFRESH_TEMP
+    "$APF" -e
+
+    # Entry should still be present after refresh
+    assert_rule_exists_ip6s TALLOW "2001:db8::50"
+}
+
+@test "refresh skips advanced trust entries in REFRESH_TEMP" {
+    echo "tcp:in:d=22:s=192.0.2.60" >> "$APF_DIR/allow_hosts.rules"
+    echo "192.0.2.61" >> "$APF_DIR/allow_hosts.rules"
+    "$APF" -f 2>/dev/null || true
+    "$APF" -s
+
+    # Both entries should exist in TALLOW
+    assert_rule_exists_ips TALLOW "192.0.2.61"
+    assert_rule_exists_ips TALLOW "192.0.2.60"
+
+    # Refresh
+    "$APF" -e
+
+    # Bare IP should survive (protected by REFRESH_TEMP)
+    assert_rule_exists_ips TALLOW "192.0.2.61"
+    # Advanced trust entry should also survive (reloaded from trust file)
+    assert_rule_exists_ips TALLOW "192.0.2.60"
 }

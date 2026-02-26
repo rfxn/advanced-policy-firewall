@@ -117,7 +117,7 @@ setup() {
 
 @test "apf -a rejects invalid host" {
     run "$APF" -a "not-valid" "bad host"
-    assert_success
+    assert_failure
     assert_output --partial "Invalid host"
 }
 

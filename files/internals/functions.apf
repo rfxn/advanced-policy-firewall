@@ -2702,7 +2702,11 @@ refresh() {
 	for _rf_file in "$ALLOW_HOSTS" "$GALLOW_HOSTS"; do
 		[ -f "$_rf_file" ] || continue
 		while IFS= read -r _rf_line; do
-			case "$_rf_line" in '#'*|''|*:*) continue ;; esac
+			# Skip comments, empty lines, metadata (key=val), and advanced
+			# trust entries (proto:flow:d=port:s=ip) — advanced entries need
+			# protocol/port/direction parsing that REFRESH_TEMP does not
+			# implement; bare IPv6 addresses pass through (contain : but no =)
+			case "$_rf_line" in '#'*|''|*=*) continue ;; esac
 			if is_fqdn "$_rf_line"; then
 				if resolve_fqdn "$_rf_line"; then
 					while IFS= read -r _rf_rip; do
@@ -2721,7 +2725,7 @@ refresh() {
 	for _rf_file in "$DENY_HOSTS" "$GDENY_HOSTS"; do
 		[ -f "$_rf_file" ] || continue
 		while IFS= read -r _rf_line; do
-			case "$_rf_line" in '#'*|''|*:*) continue ;; esac
+			case "$_rf_line" in '#'*|''|*=*) continue ;; esac
 			if is_fqdn "$_rf_line"; then
 				if resolve_fqdn "$_rf_line"; then
 					while IFS= read -r _rf_rip; do

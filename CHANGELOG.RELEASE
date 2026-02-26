@@ -128,6 +128,14 @@
       refresh into a stopped firewall (functions.apf)
 [Fix] Add missing local declarations to 10 functions to prevent global
       scope pollution (functions.apf)
+[Fix] Rename head() to apf_banner() to stop shadowing /usr/bin/head in
+      sourced scripts (apf)
+[Fix] Propagate cli_trust/cli_trust_temp return codes to CLI exit status;
+      apf -a/-d/-ta/-td now exit 1 on failure (apf)
+[Fix] REFRESH_TEMP now protects bare IPv6 trust entries during refresh;
+      change case filter from *:* to *=* so IPv6 addresses are not
+      excluded while advanced trust entries remain correctly skipped
+      (functions.apf)
 
   -- Changes --
 
