@@ -139,6 +139,7 @@ echo ""
 echo "Other Details:"
 if [ -d "$INSTALL_PATH.bk.last" ]; then
 	./importconf
+	. "$INSTALL_PATH/extras/get_ports"
 	echo "  Note: Please review $INSTALL_PATH/conf.apf for consistency, install default backed up to $INSTALL_PATH/conf.apf.orig"
 else
 	# Auto-detect default network interface on fresh install
@@ -147,7 +148,7 @@ else
 		sed -i "s/^IFACE_UNTRUSTED=\"eth0\"/IFACE_UNTRUSTED=\"$_detected_iface\"/" "$INSTALL_PATH/conf.apf"
 		echo "  Detected interface:   $_detected_iface (set as IFACE_UNTRUSTED)"
 	fi
-. "$INSTALL_PATH/extras/get_ports"
+	. "$INSTALL_PATH/extras/get_ports"
 	echo "  Note: These ports are not auto-configured; they are simply presented for information purposes. You must manually configure all port options."
 fi
 
