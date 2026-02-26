@@ -54,6 +54,26 @@
 
   -- Bug Fixes --
 
+[Fix] install.sh: fix chmod -R 640 breaking subdirectory traversal;
+      use find to set dirs=750, files=640, then explicit executable perms
+      (install.sh)
+[Fix] install.sh: suppress "Device does not exist" stderr from vnetgen
+      during install (install.sh)
+[Fix] importconf: guard vnet/*.rules glob to prevent "cannot stat" error
+      on fresh or non-VNET installs (importconf, files/extras/importconf)
+[Fix] importconf: suppress stderr noise from conf.apf sourcing during
+      config import (importconf, files/extras/importconf)
+[Fix] files/extras/importconf: use INSTALL_PATH variable default pattern
+      (files/extras/importconf)
+[New] install.sh: auto-detect default network interface on fresh install;
+      sets IFACE_UNTRUSTED when not eth0 (install.sh)
+[Change] importconf: clarify message on same-version reinstall
+      (importconf, files/extras/importconf)
+[Change] install.sh: optimize sed path replacement with grep -rl
+      pre-filter; skip files that don't contain /etc/apf (install.sh)
+[Change] install.sh: add error handling for mkdir and file copy
+      (install.sh)
+[Change] install.sh: remove unnecessary sleep 1 (install.sh)
 [Fix] cli_trust_remove(): anchor comment cleanup sed pattern to prevent
       over-deletion; '# added 192.0.2.1 ' no longer matches 192.0.2.10
       (functions.apf)
@@ -159,7 +179,7 @@
 [New] 11 new test files: 21-refactor-regression, 22-uid-egress,
       23-devel-fastload, 24-vnet, 25-connlimit, 26-hook-search-silent,
       27-temp-trust, 28-synflood, 29-block-escalation, 30-advanced-trust-cli,
-      31-fqdn-trust (454 tests total across 31 files)
+      31-fqdn-trust (459 tests total across 31 files)
 [New] Test parallelization: --parallel [N] flag splits across N containers;
       3x speedup (run-tests.sh, Makefile)
 

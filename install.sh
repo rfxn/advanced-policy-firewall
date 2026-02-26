@@ -15,17 +15,19 @@ cd "$(dirname "$0")" || { echo "Error: cannot cd to script directory"; exit 1; }
 [ -f "files/VERSION" ] || { echo "Error: source files not found — run install.sh from the APF source directory"; exit 1; }
 
 install() {
-        mkdir -p "$INSTALL_PATH"
-        cp -fR files/* "$INSTALL_PATH"
+        mkdir -p "$INSTALL_PATH" || { echo "Error: cannot create $INSTALL_PATH"; exit 1; }
+        cp -fR files/* "$INSTALL_PATH" || { echo "Error: file copy failed"; exit 1; }
         if [ "$INSTALL_PATH" != "/etc/apf" ]; then
-                find "$INSTALL_PATH" -type f -exec sed -i "s:/etc/apf:$INSTALL_PATH:g" {} \;
+                grep -rl '/etc/apf' "$INSTALL_PATH" 2>/dev/null | while IFS= read -r f; do
+                        sed -i "s:/etc/apf:$INSTALL_PATH:g" "$f"
+                done
         fi
-        chmod -R 640 "$INSTALL_PATH"/*
+        find "$INSTALL_PATH" -type d -exec chmod 750 {} +
+        find "$INSTALL_PATH" -type f -exec chmod 640 {} +
         chmod 750 "$INSTALL_PATH/apf"
         chmod 750 "$INSTALL_PATH/firewall"
         chmod 750 "$INSTALL_PATH/vnet/vnetgen"
 	chmod 750 "$INSTALL_PATH/extras/get_ports"
-	chmod 750 "$INSTALL_PATH"
 	cp -pf .ca.def importconf "$INSTALL_PATH/extras/"
 	mkdir -p "$INSTALL_PATH/doc"
 	cp README CHANGELOG COPYING.GPL apf.8 "$INSTALL_PATH/doc"
@@ -88,7 +90,7 @@ install() {
 		gzip -f /usr/share/man/man8/apf.8
 		chmod 644 /usr/share/man/man8/apf.8.gz
 	fi
-	"$INSTALL_PATH/vnet/vnetgen"
+	"$INSTALL_PATH/vnet/vnetgen" 2>/dev/null
 	if [ -f "/usr/bin/dialog" ] && [ -d "$INSTALL_PATH/extras/apf-m" ]; then
 		last=$(pwd)
 		cd "$INSTALL_PATH/extras/apf-m/"
@@ -96,6 +98,19 @@ install() {
 		cd "$last"
 	fi
 	chmod 750 "$INSTALL_PATH"
+}
+
+detect_iface() {
+	local iface=""
+	local ip_bin
+	ip_bin=$(command -v ip 2>/dev/null)
+	if [ -n "$ip_bin" ]; then
+		iface=$($ip_bin route show default 2>/dev/null | awk '/^default/ {for(i=1;i<=NF;i++) if($i=="dev") print $(i+1); exit}')
+	fi
+	if [ -z "$iface" ] && command -v route > /dev/null 2>&1; then
+		iface=$(route -n 2>/dev/null | awk '/^0\.0\.0\.0/ {print $NF; exit}')
+	fi
+	echo "$iface"
 }
 
 VER=$(awk '/version/ {print$2}' files/VERSION)
@@ -111,7 +126,6 @@ else
 	install
 fi
 
-sleep 1
 echo "Completed."
 echo ""
 echo "Installation Details:"
@@ -127,6 +141,12 @@ if [ -d "$INSTALL_PATH.bk.last" ]; then
 	./importconf
 	echo "  Note: Please review $INSTALL_PATH/conf.apf for consistency, install default backed up to $INSTALL_PATH/conf.apf.orig"
 else
+	# Auto-detect default network interface on fresh install
+	_detected_iface=$(detect_iface)
+	if [ -n "$_detected_iface" ] && [ "$_detected_iface" != "eth0" ]; then
+		sed -i "s/^IFACE_UNTRUSTED=\"eth0\"/IFACE_UNTRUSTED=\"$_detected_iface\"/" "$INSTALL_PATH/conf.apf"
+		echo "  Detected interface:   $_detected_iface (set as IFACE_UNTRUSTED)"
+	fi
 . "$INSTALL_PATH/extras/get_ports"
 	echo "  Note: These ports are not auto-configured; they are simply presented for information purposes. You must manually configure all port options."
 fi
