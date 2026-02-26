@@ -40,8 +40,10 @@ setup() {
     done
     iptables -F TALLOW 2>/dev/null || true
     iptables -F TDENY 2>/dev/null || true
-    ip6tables -F TALLOW 2>/dev/null || true
-    ip6tables -F TDENY 2>/dev/null || true
+    if ip6tables_available; then
+        ip6tables -F TALLOW 2>/dev/null || true
+        ip6tables -F TDENY 2>/dev/null || true
+    fi
 }
 
 # =====================================================================

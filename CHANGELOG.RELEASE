@@ -136,6 +136,10 @@
       change case filter from *:* to *=* so IPv6 addresses are not
       excluded while advanced trust entries remain correctly skipped
       (functions.apf)
+[Fix] Install FLOW document to doc/ directory alongside README; resolves
+      missing file referenced by README documentation (install.sh)
+[Fix] Migrate EG_DROP_CMD from space-separated (pre-2.0.2) to
+      comma-separated format during upgrade via importconf (importconf)
 
   -- Changes --
 

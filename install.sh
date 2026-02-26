@@ -30,7 +30,7 @@ install() {
 	chmod 750 "$INSTALL_PATH/extras/get_ports"
 	cp -pf .ca.def importconf "$INSTALL_PATH/extras/"
 	mkdir -p "$INSTALL_PATH/doc"
-	cp README CHANGELOG COPYING.GPL apf.8 "$INSTALL_PATH/doc"
+	cp README CHANGELOG COPYING.GPL apf.8 FLOW "$INSTALL_PATH/doc"
         ln -fs "$INSTALL_PATH/apf" "$BINPATH"
         ln -fs "$INSTALL_PATH/apf" "$COMPAT_BINPATH"
 	rm -f /etc/cron.hourly/fw /etc/cron.daily/fw /etc/cron.d/fwdev "$INSTALL_PATH/cron.fwdev"
