@@ -145,6 +145,11 @@
       comma-separated format during upgrade via importconf (importconf)
 [Fix] install.sh: display detected listening ports during upgrade installs;
       previously only shown on fresh installs (install.sh)
+[Fix] validate_config(): add validation for ICMP_LIM (rate format), LOG_LEVEL,
+      LOG_TARGET, LOG_RATE (integer), SYSCTL_CONNTRACK (integer); reject
+      non-numeric PERMBLOCK_COUNT/PERMBLOCK_INTERVAL (functions.apf)
+[Fix] cl_cports(): clear EG_DROP_CMD between VNET iterations; prevents
+      command-owner rules from leaking across per-IP rule files (functions.apf)
 
   -- Changes --
 

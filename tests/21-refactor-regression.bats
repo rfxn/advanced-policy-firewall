@@ -575,3 +575,110 @@ mac_module_available() {
         "$APF_DIR/internals/internals.conf"
     assert_failure  # grep returns 1 when no match found
 }
+
+# =====================================================================
+# validate_config() coverage (C-002)
+# =====================================================================
+
+@test "validate_config rejects invalid ICMP_LIM format" {
+    source /opt/tests/helpers/apf-config.sh
+    apf_set_config_safe "ICMP_LIM" "badvalue"
+    "$APF" -f 2>/dev/null || true
+
+    run "$APF" -s
+    assert_failure
+    [[ "$output" == *"ICMP_LIM"*"invalid"* ]]
+
+    apf_set_config_safe "ICMP_LIM" "30/s"
+}
+
+@test "validate_config accepts ICMP_LIM=0 (unlimited)" {
+    source /opt/tests/helpers/apf-config.sh
+    apf_set_config_safe "ICMP_LIM" "0"
+    "$APF" -f 2>/dev/null || true
+
+    run "$APF" -s
+    assert_success
+
+    apf_set_config_safe "ICMP_LIM" "30/s"
+}
+
+@test "validate_config rejects invalid LOG_LEVEL" {
+    source /opt/tests/helpers/apf-config.sh
+    apf_set_config "LOG_DROP" "1"
+    apf_set_config "LOG_LEVEL" "badlevel"
+    "$APF" -f 2>/dev/null || true
+
+    run "$APF" -s
+    assert_failure
+    [[ "$output" == *"LOG_LEVEL"*"invalid"* ]]
+
+    apf_set_config "LOG_LEVEL" "info"
+    apf_set_config "LOG_DROP" "0"
+}
+
+@test "validate_config rejects invalid LOG_TARGET" {
+    source /opt/tests/helpers/apf-config.sh
+    apf_set_config "LOG_DROP" "1"
+    apf_set_config "LOG_TARGET" "BADTARGET"
+    "$APF" -f 2>/dev/null || true
+
+    run "$APF" -s
+    assert_failure
+    [[ "$output" == *"LOG_TARGET"*"invalid"* ]]
+
+    apf_set_config "LOG_TARGET" "LOG"
+    apf_set_config "LOG_DROP" "0"
+}
+
+@test "validate_config rejects non-numeric LOG_RATE" {
+    source /opt/tests/helpers/apf-config.sh
+    apf_set_config "LOG_DROP" "1"
+    apf_set_config "LOG_RATE" "abc"
+    "$APF" -f 2>/dev/null || true
+
+    run "$APF" -s
+    assert_failure
+    [[ "$output" == *"LOG_RATE"*"invalid"* ]]
+
+    apf_set_config "LOG_RATE" "30"
+    apf_set_config "LOG_DROP" "0"
+}
+
+@test "validate_config rejects non-numeric SYSCTL_CONNTRACK" {
+    source /opt/tests/helpers/apf-config.sh
+    apf_set_config "SYSCTL_CONNTRACK" "notanum"
+    "$APF" -f 2>/dev/null || true
+
+    run "$APF" -s
+    assert_failure
+    [[ "$output" == *"SYSCTL_CONNTRACK"*"invalid"* ]]
+
+    apf_set_config "SYSCTL_CONNTRACK" "65536"
+}
+
+@test "validate_config rejects non-numeric PERMBLOCK_COUNT" {
+    source /opt/tests/helpers/apf-config.sh
+    apf_set_config "PERMBLOCK_COUNT" "abc"
+    "$APF" -f 2>/dev/null || true
+
+    run "$APF" -s
+    assert_failure
+    [[ "$output" == *"PERMBLOCK_COUNT"*"invalid"* ]]
+
+    apf_set_config "PERMBLOCK_COUNT" "0"
+}
+
+@test "validate_config rejects non-numeric PERMBLOCK_INTERVAL" {
+    source /opt/tests/helpers/apf-config.sh
+    apf_set_config "PERMBLOCK_COUNT" "3"
+    apf_set_config "PERMBLOCK_INTERVAL" "xyz"
+    "$APF" -f 2>/dev/null || true
+
+    run "$APF" -s
+    assert_failure
+    [[ "$output" == *"PERMBLOCK_INTERVAL"*"invalid"* ]]
+
+    apf_set_config "PERMBLOCK_COUNT" "0"
+    apf_set_config "PERMBLOCK_INTERVAL" "86400"
+}

@@ -344,6 +344,8 @@ check_deps() {
 
 validate_config() {
  local err=""
+ local _vc_rate='^[0-9]+/[smh]$'
+ local _vc_int='^[0-9]+$'
  # Validate stop targets
  for _vc_pair in "TCP_STOP:$TCP_STOP" "UDP_STOP:$UDP_STOP" "ALL_STOP:$ALL_STOP"; do
     local _vc_name="${_vc_pair%%:*}" _vc_val="${_vc_pair#*:}"
@@ -354,13 +356,38 @@ validate_config() {
  done
  # Validate SYNFLOOD rate/burst (only when enabled)
  if [ "$SYNFLOOD" == "1" ]; then
-    local _vc_rate='^[0-9]+/[smh]$'
     if [[ ! "$SYNFLOOD_RATE" =~ $_vc_rate ]]; then
         err="${err}SYNFLOOD_RATE='$SYNFLOOD_RATE' is invalid (must be number/s, number/m, or number/h); "
     fi
     local _vc_burst='^[0-9]+$'
     if [[ ! "$SYNFLOOD_BURST" =~ $_vc_burst ]]; then
         err="${err}SYNFLOOD_BURST='$SYNFLOOD_BURST' is invalid (must be a positive integer); "
+    fi
+ fi
+ # Validate ICMP_LIM rate format (only when set and non-zero)
+ if [ -n "$ICMP_LIM" ] && [ "$ICMP_LIM" != "0" ]; then
+    if [[ ! "$ICMP_LIM" =~ $_vc_rate ]]; then
+        err="${err}ICMP_LIM='$ICMP_LIM' is invalid (must be 0 or number/s, number/m, or number/h); "
+    fi
+ fi
+ # Validate LOG_LEVEL (only when LOG_DROP is enabled)
+ if [ "$LOG_DROP" == "1" ] && [ -n "$LOG_LEVEL" ]; then
+    case "$LOG_LEVEL" in
+        emerg|alert|crit|err|warning|notice|info|debug) ;;
+        *) err="${err}LOG_LEVEL='$LOG_LEVEL' is invalid (must be emerg, alert, crit, err, warning, notice, info, or debug); " ;;
+    esac
+ fi
+ # Validate LOG_TARGET (only when LOG_DROP is enabled)
+ if [ "$LOG_DROP" == "1" ] && [ -n "$LOG_TARGET" ]; then
+    case "$LOG_TARGET" in
+        LOG|ULOG|NFLOG) ;;
+        *) err="${err}LOG_TARGET='$LOG_TARGET' is invalid (must be LOG, ULOG, or NFLOG); " ;;
+    esac
+ fi
+ # Validate LOG_RATE (only when LOG_DROP is enabled)
+ if [ "$LOG_DROP" == "1" ] && [ -n "$LOG_RATE" ]; then
+    if [[ ! "$LOG_RATE" =~ $_vc_int ]]; then
+        err="${err}LOG_RATE='$LOG_RATE' is invalid (must be a positive integer); "
     fi
  fi
  # Validate connlimit entries
@@ -379,8 +406,21 @@ validate_config() {
  if [ "$SYSCTL_SYNCOOKIES" == "1" ] && [ "$SYSCTL_OVERFLOW" == "1" ]; then
     err="${err}SYSCTL_SYNCOOKIES and SYSCTL_OVERFLOW are both enabled (conf.apf recommends only one); "
  fi
+ # Validate SYSCTL_CONNTRACK (when set and non-empty)
+ if [ -n "$SYSCTL_CONNTRACK" ]; then
+    if [[ ! "$SYSCTL_CONNTRACK" =~ $_vc_int ]]; then
+        err="${err}SYSCTL_CONNTRACK='$SYSCTL_CONNTRACK' is invalid (must be a positive integer); "
+    fi
+ fi
  # Validate PERMBLOCK settings
- local _vc_int='^[0-9]+$'
+ if [ -n "$PERMBLOCK_COUNT" ] && [ "$PERMBLOCK_COUNT" != "0" ]; then
+    if [[ ! "$PERMBLOCK_COUNT" =~ $_vc_int ]]; then
+        err="${err}PERMBLOCK_COUNT='$PERMBLOCK_COUNT' is invalid (must be a positive integer or 0); "
+    fi
+    if [ -n "$PERMBLOCK_INTERVAL" ] && [[ ! "$PERMBLOCK_INTERVAL" =~ $_vc_int ]]; then
+        err="${err}PERMBLOCK_INTERVAL='$PERMBLOCK_INTERVAL' is invalid (must be a positive integer); "
+    fi
+ fi
  if [[ "$PERMBLOCK_COUNT" =~ $_vc_int ]] && [ "$PERMBLOCK_COUNT" -gt 0 ]; then
     if [[ "$PERMBLOCK_INTERVAL" =~ $_vc_int ]] && [ "$PERMBLOCK_INTERVAL" -lt 60 ]; then
         err="${err}PERMBLOCK_INTERVAL must be at least 60 seconds; "
@@ -2536,6 +2576,7 @@ cl_cports() {
 	SMTP_PORTS=""
 	SMTP_ALLOWUSER=""
 	SMTP_ALLOWGROUP=""
+	EG_DROP_CMD=""
 }
 
 expirebans() {
