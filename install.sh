@@ -113,6 +113,24 @@ detect_iface() {
 	echo "$iface"
 }
 
+show_iface_info() {
+	local default_iface other_ifaces ip_bin
+	default_iface=$(detect_iface)
+	ip_bin=$(command -v ip 2>/dev/null)
+	if [ -n "$default_iface" ]; then
+		echo "  Default interface:    $default_iface"
+	else
+		echo "  Default interface:    (not detected — no default route found)"
+		echo "  Note: Set IFACE_UNTRUSTED manually in $INSTALL_PATH/conf.apf"
+	fi
+	if [ -n "$ip_bin" ]; then
+		other_ifaces=$($ip_bin -o link show up 2>/dev/null | awk -F': ' '{print $2}' | sed 's/@.*//' | grep -v '^lo$' | grep -v "^${default_iface}$" | sort -u | paste -sd ',' -)
+		if [ -n "$other_ifaces" ]; then
+			echo "  Other interfaces:     $other_ifaces"
+		fi
+	fi
+}
+
 VER=$(awk '/version/ {print$2}' files/VERSION)
 if [ -d "$INSTALL_PATH" ]; then
 	DVAL=$(date +"%d%m%Y-%s")
@@ -139,6 +157,7 @@ echo ""
 echo "Other Details:"
 if [ -d "$INSTALL_PATH.bk.last" ]; then
 	./importconf
+	show_iface_info
 	. "$INSTALL_PATH/extras/get_ports"
 	echo "  Note: Please review $INSTALL_PATH/conf.apf for consistency, install default backed up to $INSTALL_PATH/conf.apf.orig"
 else
@@ -146,7 +165,10 @@ else
 	_detected_iface=$(detect_iface)
 	if [ -n "$_detected_iface" ] && [ "$_detected_iface" != "eth0" ]; then
 		sed -i "s/^IFACE_UNTRUSTED=\"eth0\"/IFACE_UNTRUSTED=\"$_detected_iface\"/" "$INSTALL_PATH/conf.apf"
-		echo "  Detected interface:   $_detected_iface (set as IFACE_UNTRUSTED)"
+	fi
+	show_iface_info
+	if [ -n "$_detected_iface" ] && [ "$_detected_iface" != "eth0" ]; then
+		echo "                        (set as IFACE_UNTRUSTED)"
 	fi
 	. "$INSTALL_PATH/extras/get_ports"
 	echo "  Note: These ports are not auto-configured; they are simply presented for information purposes. You must manually configure all port options."

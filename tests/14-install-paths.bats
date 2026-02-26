@@ -281,3 +281,21 @@ teardown_file() {
     assert_success
     rm -rf "${APF_DIR}.bk.last" "${APF_DIR}".bk[0-9]*
 }
+
+@test "fresh install shows Default interface in output" {
+    rm -rf "${APF_DIR}.bk.last" "${APF_DIR}".bk[0-9]*
+    cd /opt/apf-src
+    local output
+    output=$(INSTALL_PATH="$APF_DIR" sh install.sh 2>&1)
+    [[ "$output" =~ "Default interface:" ]]
+}
+
+@test "upgrade install shows Default interface in output" {
+    rm -rf "${APF_DIR}.bk.last" "${APF_DIR}".bk[0-9]*
+    cp -a "$APF_DIR" "${APF_DIR}.bk.last"
+    cd /opt/apf-src
+    local output
+    output=$(INSTALL_PATH="$APF_DIR" sh install.sh 2>&1)
+    [[ "$output" =~ "Default interface:" ]]
+    rm -rf "${APF_DIR}.bk.last" "${APF_DIR}".bk[0-9]*
+}

@@ -67,6 +67,9 @@
       (files/extras/importconf)
 [New] install.sh: auto-detect default network interface on fresh install;
       sets IFACE_UNTRUSTED when not eth0 (install.sh)
+[New] install.sh: show default routed interface and additional interfaces
+      during install; contextual output when no default route found
+      (install.sh)
 [Change] importconf: clarify message on same-version reinstall
       (importconf, files/extras/importconf)
 [Change] install.sh: optimize sed path replacement with grep -rl
