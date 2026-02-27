@@ -717,11 +717,13 @@ mac_module_available() {
 # download_url() test coverage (F-053)
 # =====================================================================
 
-# Helper: start a one-shot HTTP server that serves content then exits
+# Helper: start a one-shot HTTP server that serves content then exits.
+# Uses portable nc syntax (positional port, no -p/-q) + timeout for auto-cleanup.
+# Works across: netcat-openbsd (Debian/Ubuntu), nmap-ncat (Rocky/RHEL), nc-1.84 (CentOS 6).
 _dl_serve() {
     local port="$1" content="$2"
     local response="HTTP/1.0 200 OK\r\nContent-Length: ${#content}\r\n\r\n${content}"
-    printf '%b' "$response" | nc -l -p "$port" -q 1 >/dev/null 2>&1 &
+    printf '%b' "$response" | timeout 5 nc -l "$port" >/dev/null 2>&1 &
 }
 
 @test "download_url succeeds with wget" {
@@ -729,11 +731,16 @@ _dl_serve() {
     dst=$(mktemp /tmp/dl-dst-XXXXXX)
 
     _dl_serve "$port" "test-content-wget"
-    sleep 0.1
+    sleep 0.5
 
+    # Source only conf.apf + functions.apf; set CURL/WGET directly to avoid
+    # internals.conf side effects (network probing, file sourcing) that fail
+    # on deep legacy OSes
     run bash -c "
         source '$APF_DIR/conf.apf'
         source '$APF_DIR/internals/functions.apf'
+        CURL=\$(command -v curl 2>/dev/null)
+        WGET=\$(command -v wget 2>/dev/null)
         download_url 'http://127.0.0.1:$port/test' '$dst'
     "
     assert_success
@@ -762,6 +769,8 @@ _dl_serve() {
     run bash -c "
         source '$APF_DIR/conf.apf'
         source '$APF_DIR/internals/functions.apf'
+        CURL=\$(command -v curl 2>/dev/null)
+        WGET=\$(command -v wget 2>/dev/null)
         download_url 'http://127.0.0.1:1/nonexistent' '$dst'
     "
     assert_failure
@@ -774,12 +783,13 @@ _dl_serve() {
     dst=$(mktemp /tmp/dl-dst-XXXXXX)
 
     _dl_serve "$port" "fallback-content"
-    sleep 0.1
+    sleep 0.5
 
     run bash -c "
         source '$APF_DIR/conf.apf'
         source '$APF_DIR/internals/functions.apf'
         CURL=''
+        WGET=\$(command -v wget 2>/dev/null)
         download_url 'http://127.0.0.1:$port/test' '$dst'
     "
     assert_success

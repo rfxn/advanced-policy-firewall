@@ -169,16 +169,26 @@ done
 
 # Create temp dir for output
 TMPDIR_PAR="$(mktemp -d)"
-trap 'rm -rf "$TMPDIR_PAR"' EXIT
+RUN_ID="$$"
+
+# Cleanup trap: kill orphaned containers on interrupt/exit
+cleanup_parallel() {
+    for i in $(seq 0 $(( NUM_GROUPS - 1 ))); do
+        docker rm -f "apf-${OS}-${RUN_ID}-g${i}" >/dev/null 2>&1 || true
+    done
+    rm -rf "$TMPDIR_PAR"
+}
+trap cleanup_parallel EXIT INT TERM
 
 echo "Running tests on $OS (parallel: $NUM_GROUPS groups, $NUM_FILES files)..."
 START_TIME=$SECONDS
 
-# Launch containers in parallel
+# Launch named containers in parallel (--name enables cleanup on interrupt)
 PIDS=()
 for i in $(seq 0 $(( NUM_GROUPS - 1 ))); do
     # shellcheck disable=SC2086
-    docker run --rm --privileged "$IMAGE_NAME" \
+    docker run --rm --privileged --name "apf-${OS}-${RUN_ID}-g${i}" \
+        "$IMAGE_NAME" \
         bats --formatter tap ${GROUP_FILES[$i]} \
         > "$TMPDIR_PAR/group-$i.tap" 2>&1 &
     PIDS+=($!)
