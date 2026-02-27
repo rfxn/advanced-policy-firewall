@@ -226,6 +226,12 @@
       31-fqdn-trust (476 tests total across 31 files)
 [New] Test parallelization: --parallel [N] flag splits across N containers;
       3x speedup (run-tests.sh, Makefile)
+[Change] Migrate test infrastructure to batsman shared framework via git
+      submodule at tests/infra; replaces monolithic Dockerfiles with two-phase
+      base+project builds, replaces 254-line run-tests.sh and 91-line Makefile
+      with thin wrappers, replaces standalone CI with batsman reusable workflow;
+      drops untested ubuntu2204 target, adds rocky10 as EXTRA tier
+      (tests/Dockerfile*, tests/run-tests.sh, tests/Makefile, smoke-test.yml)
 
 - 2.0.1 | Feb 20 2026:
 
