@@ -150,6 +150,18 @@
       non-numeric PERMBLOCK_COUNT/PERMBLOCK_INTERVAL (functions.apf)
 [Fix] cl_cports(): clear EG_DROP_CMD between VNET iterations; prevents
       command-owner rules from leaking across per-IP rule files (functions.apf)
+[Fix] cli_trust_remove(): reject empty argument with error message; prevents
+      confusing double output when apf -u called with no host (functions.apf)
+[Fix] Quote $IFACE_UNTRUSTED in sysctl.rules redirect paths and internals.conf
+      ip addr list calls; aligns with project variable quoting convention
+      (sysctl.rules, internals.conf)
+[Fix] logrotate: add copytruncate directive to preserve log file inode for
+      external tail -f consumers (logrotate.d.apf)
+[Fix] trim(): replace mv with cat+rm to preserve file inode; prevents inode
+      change when trust files are trimmed (functions.apf)
+[Change] trust_hosts(): cache file content in single read; tighten pass 3/4
+      grep filters to target only 4-field and 5-field entries respectively;
+      eliminates redundant file reads (functions.apf)
 
   -- Changes --
 
@@ -201,6 +213,6 @@
 [New] 11 new test files: 21-refactor-regression, 22-uid-egress,
       23-devel-fastload, 24-vnet, 25-connlimit, 26-hook-search-silent,
       27-temp-trust, 28-synflood, 29-block-escalation, 30-advanced-trust-cli,
-      31-fqdn-trust (459 tests total across 31 files)
+      31-fqdn-trust (476 tests total across 31 files)
 [New] Test parallelization: --parallel [N] flag splits across N containers;
       3x speedup (run-tests.sh, Makefile)

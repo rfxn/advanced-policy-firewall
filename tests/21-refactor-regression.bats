@@ -682,3 +682,110 @@ mac_module_available() {
     apf_set_config "PERMBLOCK_COUNT" "0"
     apf_set_config "PERMBLOCK_INTERVAL" "86400"
 }
+
+# =====================================================================
+# trim() inode preservation (C-003)
+# =====================================================================
+
+@test "trim() preserves file inode after truncation" {
+    local tmpfile
+    tmpfile=$(mktemp /tmp/trim-test-XXXXXX)
+
+    # Write enough lines to trigger trimming (MAXLINES default is 2048)
+    seq 1 3000 > "$tmpfile"
+
+    local inode_before
+    inode_before=$(stat -c %i "$tmpfile")
+
+    # Source and call trim in subshell to avoid set -e issues with internals.conf
+    run bash -c "
+        source '$APF_DIR/conf.apf'
+        source '$APF_DIR/internals/functions.apf'
+        trim '$tmpfile'
+    "
+    assert_success
+
+    local inode_after
+    inode_after=$(stat -c %i "$tmpfile")
+
+    [ "$inode_before" = "$inode_after" ]
+
+    rm -f "$tmpfile"
+}
+
+# =====================================================================
+# download_url() test coverage (F-053)
+# =====================================================================
+
+# Helper: start a one-shot HTTP server that serves content then exits
+_dl_serve() {
+    local port="$1" content="$2"
+    local response="HTTP/1.0 200 OK\r\nContent-Length: ${#content}\r\n\r\n${content}"
+    printf '%b' "$response" | nc -l -p "$port" -q 1 >/dev/null 2>&1 &
+}
+
+@test "download_url succeeds with wget" {
+    local dst port=18901
+    dst=$(mktemp /tmp/dl-dst-XXXXXX)
+
+    _dl_serve "$port" "test-content-wget"
+    sleep 0.1
+
+    run bash -c "
+        source '$APF_DIR/conf.apf'
+        source '$APF_DIR/internals/functions.apf'
+        download_url 'http://127.0.0.1:$port/test' '$dst'
+    "
+    assert_success
+
+    run cat "$dst"
+    assert_output "test-content-wget"
+
+    rm -f "$dst"
+}
+
+@test "download_url fails when both curl and wget missing" {
+    run bash -c "
+        source '$APF_DIR/conf.apf'
+        source '$APF_DIR/internals/functions.apf'
+        CURL=''
+        WGET=''
+        download_url 'http://127.0.0.1:1/nonexistent' '/tmp/dl-none'
+    "
+    assert_failure
+}
+
+@test "download_url fails on unreachable URL" {
+    local dst
+    dst=$(mktemp /tmp/dl-dst-XXXXXX)
+
+    run bash -c "
+        source '$APF_DIR/conf.apf'
+        source '$APF_DIR/internals/functions.apf'
+        download_url 'http://127.0.0.1:1/nonexistent' '$dst'
+    "
+    assert_failure
+
+    rm -f "$dst"
+}
+
+@test "download_url skips curl when CURL empty and falls back to wget" {
+    local dst port=18902
+    dst=$(mktemp /tmp/dl-dst-XXXXXX)
+
+    _dl_serve "$port" "fallback-content"
+    sleep 0.1
+
+    run bash -c "
+        source '$APF_DIR/conf.apf'
+        source '$APF_DIR/internals/functions.apf'
+        CURL=''
+        download_url 'http://127.0.0.1:$port/test' '$dst'
+    "
+    assert_success
+
+    run cat "$dst"
+    assert_output "fallback-content"
+
+    rm -f "$dst"
+}

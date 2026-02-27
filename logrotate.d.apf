@@ -1,4 +1,5 @@
 /var/log/apf_log {
+    copytruncate
     weekly
     rotate 4
     compress

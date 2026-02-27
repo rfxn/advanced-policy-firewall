@@ -225,3 +225,8 @@ setup() {
         return 1
     fi
 }
+
+@test "apf -u with no argument shows error" {
+    run "$APF" -u
+    assert_output --partial "FQDN or IP address is required"
+}

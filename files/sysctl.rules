@@ -56,10 +56,10 @@ echo 1 > /proc/sys/net/ipv4/icmp_echo_ignore_broadcasts
 
 if [ "$SYSCTL_LOGMARTIANS" == "1" ]; then
 	eout "{glob} setting sysctl_logmartians enabled"
-	echo 1 > /proc/sys/net/ipv4/conf/$IFACE_UNTRUSTED/log_martians
+	echo 1 > "/proc/sys/net/ipv4/conf/$IFACE_UNTRUSTED/log_martians"
 else
         eout "{glob} setting sysctl_logmartians disabled"
-        echo 0 > /proc/sys/net/ipv4/conf/$IFACE_UNTRUSTED/log_martians
+        echo 0 > "/proc/sys/net/ipv4/conf/$IFACE_UNTRUSTED/log_martians"
 fi
 
 if [ "$SYSCTL_ECN" == "1" ]; then
@@ -122,8 +122,8 @@ fi
 # Routing Parameters
 if [ "$SYSCTL_ROUTE" == "1" ]; then
 	eout "{glob} setting sysctl_routing enabled"
-	echo 1 > /proc/sys/net/ipv4/conf/$IFACE_UNTRUSTED/rp_filter
-	echo 0 > /proc/sys/net/ipv4/conf/$IFACE_UNTRUSTED/accept_source_route
+	echo 1 > "/proc/sys/net/ipv4/conf/$IFACE_UNTRUSTED/rp_filter"
+	echo 0 > "/proc/sys/net/ipv4/conf/$IFACE_UNTRUSTED/accept_source_route"
 	echo 0 > /proc/sys/net/ipv4/conf/all/bootp_relay
 	echo 0 > /proc/sys/net/ipv4/ip_forward
 	echo 0 > /proc/sys/net/ipv4/conf/all/forwarding
@@ -144,10 +144,10 @@ if [ "$USE_IPV6" == "1" ]; then
 		echo 0 > /proc/sys/net/ipv6/conf/all/accept_redirects
 	fi
 	if [ -f "/proc/sys/net/ipv6/conf/$IFACE_UNTRUSTED/accept_source_route" ]; then
-		echo 0 > /proc/sys/net/ipv6/conf/$IFACE_UNTRUSTED/accept_source_route
+		echo 0 > "/proc/sys/net/ipv6/conf/$IFACE_UNTRUSTED/accept_source_route"
 	fi
 	if [ -f "/proc/sys/net/ipv6/conf/$IFACE_UNTRUSTED/accept_redirects" ]; then
-		echo 0 > /proc/sys/net/ipv6/conf/$IFACE_UNTRUSTED/accept_redirects
+		echo 0 > "/proc/sys/net/ipv6/conf/$IFACE_UNTRUSTED/accept_redirects"
 	fi
 	if [ "$SYSCTL_ROUTE" == "1" ]; then
 		if [ -f "/proc/sys/net/ipv6/conf/all/forwarding" ]; then
@@ -158,7 +158,7 @@ if [ "$USE_IPV6" == "1" ]; then
 		echo 0 > /proc/sys/net/ipv6/conf/all/accept_ra
 	fi
 	if [ -f "/proc/sys/net/ipv6/conf/$IFACE_UNTRUSTED/accept_ra" ]; then
-		echo 0 > /proc/sys/net/ipv6/conf/$IFACE_UNTRUSTED/accept_ra
+		echo 0 > "/proc/sys/net/ipv6/conf/$IFACE_UNTRUSTED/accept_ra"
 	fi
 	if [ -f "/proc/sys/net/ipv6/route/flush" ]; then
 		echo 1 > /proc/sys/net/ipv6/route/flush

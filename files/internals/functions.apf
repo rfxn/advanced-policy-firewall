@@ -497,7 +497,8 @@ trim() {
                         MAXLINES=$((1+$MAXLINES))
                 fi
                 tail -n "$MAXLINES" "$FILE" > "$FILE.new"
-                mv -f "$FILE.new" "$FILE"
+                cat "$FILE.new" > "$FILE"
+                rm -f "$FILE.new"
         fi
  fi
 }
@@ -716,6 +717,10 @@ trust_entry_rule() {
 
 cli_trust_remove() {
 	local DIP="$1"
+	if [ -z "$DIP" ]; then
+		echo "an FQDN or IP address is required for this option"
+		return 1
+	fi
 
 	# Advanced syntax removal
 	if [[ "$DIP" == *=* ]]; then
@@ -1669,7 +1674,9 @@ if [ -z "$file" ] || [ -z "$chain" ]; then
         exit 1
 fi
 
-if [ -n "$(grep -v "#" "$file")" ]; then
+local _th_raw
+_th_raw=$(grep -v '#' "$file")
+if [ -n "$_th_raw" ]; then
         eout "{glob} loading $file"
         #
         #
@@ -1703,7 +1710,7 @@ if [ -n "$(grep -v "#" "$file")" ]; then
                   fi
                  fi
 		fi
-        done < <(grep -v '#' "$file" | grep -v '=')
+        done < <(printf '%s\n' "$_th_raw" | grep -v '=')
         #
         #
         while IFS= read -r i; do
@@ -1753,7 +1760,7 @@ if [ -n "$(grep -v "#" "$file")" ]; then
                          fi
                         fi
                 fi
-        done < <(grep -v '#' "$file" | grep '=' | grep -vw in | grep -vw out | grep -v tcp | grep -v udp)
+        done < <(printf '%s\n' "$_th_raw" | grep '=' | grep -vw in | grep -vw out | grep -v tcp | grep -v udp)
         #
         #
         while IFS= read -r i; do
@@ -1826,7 +1833,7 @@ if [ -n "$(grep -v "#" "$file")" ]; then
                          fi
                         fi
                 fi
-        done < <(grep -v '#' "$file" | grep '=' | grep -v tcp | grep -v udp)
+        done < <(printf '%s\n' "$_th_raw" | grep '=' | grep -wE 'in|out' | grep -v tcp | grep -v udp)
         #
         #
         while IFS= read -r i; do
@@ -1916,7 +1923,7 @@ if [ -n "$(grep -v "#" "$file")" ]; then
                          fi
                         fi
                 fi
-        done < <(grep -v '#' "$file" | grep '=')
+        done < <(printf '%s\n' "$_th_raw" | grep '=' | grep -wE 'tcp|udp')
 fi
 }
 
