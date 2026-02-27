@@ -162,6 +162,16 @@
 [Change] trust_hosts(): cache file content in single read; tighten pass 3/4
       grep filters to target only 4-field and 5-field entries respectively;
       eliminates redundant file reads (functions.apf)
+[Fix] Replace deprecated -a test operator with && in OpenVZ detection
+      (internals.conf)
+[Fix] Quote all dot-source paths to prevent word splitting on paths with
+      spaces (internals.conf, firewall, conf.apf, vnetgen.def)
+[Fix] Hoist local declarations out of loops in validate_config(); remove
+      redundant _vc_burst variable (functions.apf)
+[Fix] Add -r flag to all read commands to prevent backslash interpretation
+      (apf, functions.apf, sysctl.rules, bt.rules)
+[Change] Extract inline regex patterns to named variables in validation
+      functions for portability and readability (functions.apf, gretunnel.sh)
 
   -- Changes --
 

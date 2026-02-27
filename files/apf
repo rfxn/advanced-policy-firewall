@@ -69,7 +69,7 @@ fi
 # Is our last full load more than 12h ago?
 # if so we are going to full load
 if [ -f "$INSTALL_PATH/internals/.last.full" ]; then
- read LAST_FULL < "$INSTALL_PATH/internals/.last.full"
+ read -r LAST_FULL < "$INSTALL_PATH/internals/.last.full"
  CURRENT_LOAD=$(date +"%s")
  LOAD_DIFF=$(($CURRENT_LOAD-$LAST_FULL))
  if [ ! "$LOAD_DIFF" -lt "43200" ]; then
@@ -114,7 +114,7 @@ else
 fi
 
 # check uptime is greater than 10 minutes (600s)
- read UPSEC _ < /proc/uptime; UPSEC="${UPSEC%%.*}"
+ read -r UPSEC _ < /proc/uptime; UPSEC="${UPSEC%%.*}"
  if [ "$UPSEC" -lt "601" ]; then
 	SET_FASTLOAD_UPSEC=1
  fi
@@ -127,7 +127,7 @@ if [ -z "$SKIP_FASTLOAD_FIRSTRUN" ] && [ -z "$SKIP_FASTLOAD_EXPIRED" ] && [ -z "
 		IPT_BACKEND_CURRENT="nft"
 	fi
 	if [ -f "$INSTALL_PATH/internals/.apf.restore.backend" ]; then
-		read IPT_BACKEND_SAVED < "$INSTALL_PATH/internals/.apf.restore.backend"
+		read -r IPT_BACKEND_SAVED < "$INSTALL_PATH/internals/.apf.restore.backend"
 		if [ "$IPT_BACKEND_SAVED" != "$IPT_BACKEND_CURRENT" ]; then
 			SKIP_FASTLOAD_BACKEND=1
 		fi
@@ -203,7 +203,7 @@ devm
 # start main firewall script
 "$INSTALL_PATH/firewall"
 # check for/load bandmin
-read LOAD _ < /proc/loadavg; LOAD="${LOAD%%.*}"
+read -r LOAD _ < /proc/loadavg; LOAD="${LOAD%%.*}"
  if [ ! "$LOAD" -gt "10" ]; then
 	bandmin
  fi

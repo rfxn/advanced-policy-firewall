@@ -706,4 +706,4 @@ IPT_LOCK_TIMEOUT="3"
 ##
 # Internal variable file
 CNFINT="$INSTALL_PATH/internals/internals.conf"
-. $CNFINT
+. "$CNFINT"

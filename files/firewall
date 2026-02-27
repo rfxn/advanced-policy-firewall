@@ -80,7 +80,7 @@ eout "{glob} determined (IFACE_UNTRUSTED) $IFACE_UNTRUSTED has address $NET"
 
 # Load our PREROUTE rules
 tosroute PREROUTING
-. $PRERT
+. "$PRERT"
 
 # Allow all traffic on the loopback interface
 ipt -A INPUT -i lo -j ACCEPT
@@ -254,7 +254,7 @@ ipt -A OUTPUT -p udp --dport 1024:65535 -m state --state ESTABLISHED,RELATED -j 
 
 # Clear any cport values
 cl_cports
-. $CNF
+. "$CNF"
 
 # Load our main TCP/UDP rules
 if [ "$SET_VNET" == "1" ]; then
@@ -348,7 +348,7 @@ fi
 
 # Load our POSTROUTE rules
 tosroute POSTROUTING
-. $POSTRT
+. "$POSTRT"
 
 # Default Output Policies
 if [ "$EGF" != "1" ] || [ -z "$EGF" ]; then
