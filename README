@@ -14,6 +14,7 @@ Contents:
 2.1 ........... Installation: Boot Loading
 2.2 ........... Installation: Upgrading
 2.3 ........... Key Files
+2.4 ........... Uninstallation
 3 ............. Configuration
 3.1 ........... Configuration: Basic Options
 3.2 ........... Configuration: Outbound Filtering & Rate Limiting
@@ -281,6 +282,23 @@ The following files are located under your install path (/etc/apf by default):
   /etc/cron.d/apf      Consolidated cron: daily restart, hourly ipset
                        refresh, per-minute temp trust expiry
   /var/log/apf_log     Default status log location
+
+2.4) Uninstallation
+To fully remove APF from the system, run the uninstall script from the source
+directory:
+
+sh uninstall.sh
+
+The uninstaller will:
+- Stop the firewall and flush all iptables rules
+- Remove systemd service, SysV init scripts, and rc.local entries
+- Remove cron entries (current and legacy)
+- Remove logrotate config, symlinks, and man page
+- Prompt before removing the install directory and log files
+
+To override the install path (if APF was installed to a non-default location):
+
+INSTALL_PATH=/opt/apf sh uninstall.sh
 
 3) Configuration:
 APF ships with minimal preconfigured options by design. Only port 22 (SSH) is

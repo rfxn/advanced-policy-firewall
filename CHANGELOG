@@ -218,6 +218,13 @@
 
   -- Documentation --
 
+[New] uninstall.sh: removes all system-wide artifacts; prompts before removing
+      install directory and logs (uninstall.sh)
+[New] install.sh: post-install dependency warnings for iptables, ip, modprobe;
+      non-fatal for chroot/container builds (install.sh)
+[New] README/README.md: section 2.4 Uninstallation (README, README.md)
+[Fix] .ca.def: DLIST_*_URL variables now preserve user customizations on
+      upgrade; preamble defaults + variable expansion in template (.ca.def)
 [New] Man page: apf.8 section 8, all CLI operations, trust system overview,
       configuration reference, installed to /usr/share/man/man8/ (apf.8,
       install.sh)

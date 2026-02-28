@@ -25,6 +25,11 @@ SYSCTL_CONNTRACK_HIGH="${SYSCTL_CONNTRACK_HIGH:-1048576}"
 SYSCTL_CONNTRACK_BUCKETS="${SYSCTL_CONNTRACK_BUCKETS:-16384}"
 PERMBLOCK_COUNT="${PERMBLOCK_COUNT:-0}"
 PERMBLOCK_INTERVAL="${PERMBLOCK_INTERVAL:-86400}"
+DLIST_PHP_URL="${DLIST_PHP_URL:-https://cdn.rfxn.com/downloads/php_list}"
+DLIST_SPAMHAUS_URL="${DLIST_SPAMHAUS_URL:-https://www.spamhaus.org/drop/drop.lasso}"
+DLIST_DSHIELD_URL="${DLIST_DSHIELD_URL:-https://feeds.dshield.org/top10-2.txt}"
+DLIST_RESERVED_URL="${DLIST_RESERVED_URL:-https://cdn.rfxn.com/downloads/reserved.networks}"
+DLIST_ECNSHAME_URL="${DLIST_ECNSHAME_URL:-https://cdn.rfxn.com/downloads/ecnshame.lst}"
 
 cat > .conf.apf <<EOF
 #!/bin/sh
@@ -598,21 +603,21 @@ SMTP_ALLOWGROUP="$SMTP_ALLOWGROUP"
 # addresses from websites. This list combines Harvesters, Spammers and SMTP
 # Dictionary attacks. More info: https://www.projecthoneypot.org/list_of_ips.php
 DLIST_PHP="$DLIST_PHP"
-DLIST_PHP_URL="https://cdn.rfxn.com/downloads/php_list"
+DLIST_PHP_URL="$DLIST_PHP_URL"
 
 # The Spamhaus Don't Route Or Peer List (DROP) is an advisory "drop all
 # traffic" list, consisting of stolen 'zombie' netblocks and netblocks
 # controlled entirely by professional spammers. For more information please
 # see https://www.spamhaus.org/drop/.
 DLIST_SPAMHAUS="$DLIST_SPAMHAUS"
-DLIST_SPAMHAUS_URL="https://www.spamhaus.org/drop/drop.lasso"
+DLIST_SPAMHAUS_URL="$DLIST_SPAMHAUS_URL"
 
 # DShield collects data about malicious activity from across the Internet.
 # This data is cataloged, summarized and can be used to discover trends in
 # activity, confirm widespread attacks, or assist in preparing better firewall
 # rules. This is a list of top hosts that have exhibited suspicious activity.
 DLIST_DSHIELD="$DLIST_DSHIELD"
-DLIST_DSHIELD_URL="https://feeds.dshield.org/top10-2.txt"
+DLIST_DSHIELD_URL="$DLIST_DSHIELD_URL"
 
 # The reserved networks list is addresses which ARIN has marked as reserved
 # for future assignment and have no business as valid traffic on the internet.
@@ -621,13 +626,13 @@ DLIST_DSHIELD_URL="https://feeds.dshield.org/top10-2.txt"
 # on the internet from getting blocked; this option is only important when
 # BLK_RESNET is set to enabled.
 DLIST_RESERVED="$DLIST_RESERVED"
-DLIST_RESERVED_URL="https://cdn.rfxn.com/downloads/reserved.networks"
+DLIST_RESERVED_URL="$DLIST_RESERVED_URL"
 
 # Some hosts have broken ECN implementations and drop packets from ECN-enabled
 # senders. This feature uses a list of known-broken hosts to disable ECN in
 # packets sent to them. Requires SYSCTL_ECN="1", otherwise stays disabled.
 DLIST_ECNSHAME="$DLIST_ECNSHAME"
-DLIST_ECNSHAME_URL="https://cdn.rfxn.com/downloads/ecnshame.lst"
+DLIST_ECNSHAME_URL="$DLIST_ECNSHAME_URL"
 
 ##
 # Global Trust

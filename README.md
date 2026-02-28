@@ -21,6 +21,7 @@ trust-based host management, reactive address blocking, and per-IP virtual netwo
   - [2.1 Boot Loading](#21-boot-loading)
   - [2.2 Upgrading](#22-upgrading)
   - [2.3 Key Files](#23-key-files)
+  - [2.4 Uninstallation](#24-uninstallation)
 - [3. Configuration](#3-configuration)
   - [3.1 Basic Options](#31-basic-options)
   - [3.2 Outbound Filtering & Rate Limiting](#32-outbound-filtering--rate-limiting)
@@ -262,6 +263,28 @@ The following files are located under your install path (`/etc/apf` by default):
 | `vnet/` | Per-IP virtual network policy files |
 | `/etc/cron.d/apf` | Consolidated cron: daily restart, hourly ipset refresh, per-minute temp trust expiry |
 | `/var/log/apf_log` | Default status log location |
+
+### 2.4 Uninstallation
+
+To fully remove APF from the system, run the uninstall script from the source directory:
+
+```bash
+sh uninstall.sh
+```
+
+The uninstaller will:
+
+- Stop the firewall and flush all iptables rules
+- Remove systemd service, SysV init scripts, and rc.local entries
+- Remove cron entries (current and legacy)
+- Remove logrotate config, symlinks, and man page
+- Prompt before removing the install directory and log files
+
+To override the install path (if APF was installed to a non-default location):
+
+```bash
+INSTALL_PATH=/opt/apf sh uninstall.sh
+```
 
 ---
 
