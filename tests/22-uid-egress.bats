@@ -288,6 +288,24 @@ teardown_file() {
     assert_rule_exists_ips SMTP_BLK "LOG.*SMTP_BLK"
 }
 
+@test "SMTP_BLK no LOG rule when LOG_DROP=0" {
+    [ -n "$_UID_OWNER_OK" ] || skip "--uid-owner not supported"
+    source /opt/tests/helpers/apf-config.sh
+    apf_set_config "SMTP_BLOCK" "1"
+    apf_set_config "LOG_DROP" "0"
+    "$APF" -f 2>/dev/null
+    "$APF" -s
+
+    # Chain should still exist with ACCEPT and DROP/REJECT rules
+    assert_chain_exists SMTP_BLK
+    assert_rule_exists_ips SMTP_BLK "--uid-owner [0r].*ACCEPT"
+    run iptables -S SMTP_BLK
+    assert_success
+    echo "$output" | grep -qE -- "--dports 25,465,587 -j (DROP|REJECT)"
+    # LOG rule must be absent
+    ! echo "$output" | grep -q "LOG"
+}
+
 @test "SMTP_BLOCK=1 with empty SMTP_PORTS produces no chain" {
     source /opt/tests/helpers/apf-config.sh
     apf_set_config "SMTP_BLOCK" "1"

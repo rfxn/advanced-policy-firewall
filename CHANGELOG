@@ -225,13 +225,21 @@
 [Change] conf.apf: correct DOCKER_COMPAT comment; improve IPT_LOCK docs
       (conf.apf)
 [Change] Remove untested Debian 10/11 from supported platforms list (README)
+[Fix] help() missing -st alias: add -st to status line help text to match
+      case dispatcher (functions.apf)
 
   -- Test Suite --
 
 [New] 11 new test files: 21-refactor-regression, 22-uid-egress,
       23-devel-fastload, 24-vnet, 25-connlimit, 26-hook-search-silent,
       27-temp-trust, 28-synflood, 29-block-escalation, 30-advanced-trust-cli,
-      31-fqdn-trust (476 tests total across 31 files)
+      31-fqdn-trust (482 tests total across 31 files)
+[New] LOG_DROP=0 negative tests: verify SYNFLOOD and SMTP_BLK chains omit LOG
+      rules when LOG_DROP is disabled (28-synflood.bats, 22-uid-egress.bats)
+[New] Hook execution order tests: verify hook_pre.sh runs before trust chains
+      and hook_post.sh runs after default DROP policies (26-hook-search-silent.bats)
+[New] Hook environment test: verify hooks have access to $IPT and $INSTALL_PATH
+      variables (26-hook-search-silent.bats)
 [New] Test parallelization: --parallel [N] flag splits across N containers;
       3x speedup (run-tests.sh, Makefile)
 [Change] Migrate test infrastructure to batsman shared framework via git

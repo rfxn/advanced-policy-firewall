@@ -82,6 +82,96 @@ HOOK
     chmod 640 "$APF_DIR/hook_post.sh"
 }
 
+@test "hook_pre.sh executes before trust chains" {
+    source /opt/tests/helpers/apf-config.sh
+    # Create hook_pre that adds a jump to a marker chain in INPUT
+    cat > "$APF_DIR/hook_pre.sh" <<'HOOK'
+#!/bin/bash
+$IPT $IPT_FLAGS -N HOOK_ORDER_PRE
+$IPT $IPT_FLAGS -A INPUT -j HOOK_ORDER_PRE
+HOOK
+    chmod 750 "$APF_DIR/hook_pre.sh"
+    "$APF" -f 2>/dev/null
+    "$APF" -s
+
+    # hook_pre's INPUT jump should appear before TALLOW jump
+    local rules
+    rules=$(iptables -S INPUT 2>/dev/null)
+    local pre_line tallow_line
+    pre_line=$(echo "$rules" | grep -n "HOOK_ORDER_PRE" | head -1 | cut -d: -f1)
+    tallow_line=$(echo "$rules" | grep -n "TALLOW" | head -1 | cut -d: -f1)
+
+    [ -n "$pre_line" ] || { echo "No HOOK_ORDER_PRE jump found"; echo "$rules"; return 1; }
+    [ -n "$tallow_line" ] || { echo "No TALLOW jump found"; echo "$rules"; return 1; }
+    [ "$pre_line" -lt "$tallow_line" ] || {
+        echo "hook_pre jump (line $pre_line) should appear before TALLOW (line $tallow_line)" >&2
+        echo "$rules" >&2
+        return 1
+    }
+
+    # Cleanup
+    chmod 640 "$APF_DIR/hook_pre.sh"
+}
+
+@test "hook_post.sh executes after default DROP policies" {
+    source /opt/tests/helpers/apf-config.sh
+    # Create hook_post that adds a jump to a marker chain in INPUT
+    cat > "$APF_DIR/hook_post.sh" <<'HOOK'
+#!/bin/bash
+$IPT $IPT_FLAGS -N HOOK_ORDER_POST
+$IPT $IPT_FLAGS -A INPUT -j HOOK_ORDER_POST
+HOOK
+    chmod 750 "$APF_DIR/hook_post.sh"
+    "$APF" -f 2>/dev/null
+    "$APF" -s
+
+    # hook_post's INPUT jump should appear after the default DROP policy rules
+    local rules
+    rules=$(iptables -S INPUT 2>/dev/null)
+    local post_line drop_line
+    post_line=$(echo "$rules" | grep -n "HOOK_ORDER_POST" | head -1 | cut -d: -f1)
+    # Default input policy is the last "-j DROP" in INPUT (firewall adds
+    # tcp DROP, udp DROP, then all DROP — all before hook_post).
+    # iptables -S shows "-A INPUT -j DROP" (no -p all) for the catch-all.
+    drop_line=$(echo "$rules" | grep -nE -- "-j (DROP|REJECT)$" | tail -1 | cut -d: -f1)
+
+    [ -n "$post_line" ] || { echo "No HOOK_ORDER_POST jump found"; echo "$rules"; return 1; }
+    [ -n "$drop_line" ] || { echo "No default DROP policy found"; echo "$rules"; return 1; }
+    [ "$post_line" -gt "$drop_line" ] || {
+        echo "hook_post jump (line $post_line) should appear after default DROP (line $drop_line)" >&2
+        echo "$rules" >&2
+        return 1
+    }
+
+    # Cleanup
+    chmod 640 "$APF_DIR/hook_post.sh"
+}
+
+@test "hook scripts have access to APF variables" {
+    source /opt/tests/helpers/apf-config.sh
+    # Create hook_pre that uses $IPT and $INSTALL_PATH — both set by internals.conf
+    cat > "$APF_DIR/hook_pre.sh" <<'HOOK'
+#!/bin/bash
+# Test that $IPT is available (set by internals.conf)
+$IPT $IPT_FLAGS -N HOOK_ENV_TEST
+# Test that $INSTALL_PATH is available (set by conf.apf)
+if [ -d "$INSTALL_PATH" ]; then
+    $IPT $IPT_FLAGS -A HOOK_ENV_TEST -j RETURN -m comment --comment "path_ok"
+fi
+HOOK
+    chmod 750 "$APF_DIR/hook_pre.sh"
+    "$APF" -f 2>/dev/null
+    "$APF" -s
+
+    # Chain should exist (proves $IPT was available)
+    assert_chain_exists HOOK_ENV_TEST
+    # RETURN rule with comment should exist (proves $INSTALL_PATH was available)
+    assert_rule_exists_ips HOOK_ENV_TEST "comment.*path_ok.*RETURN"
+
+    # Cleanup
+    chmod 640 "$APF_DIR/hook_pre.sh"
+}
+
 # =====================================================================
 # Silent IPs
 # =====================================================================

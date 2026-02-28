@@ -1541,7 +1541,7 @@ help() {
 	echo "-r|--restart ....................... stop (flush) & reload firewall rules"
 	echo "-f|--stop|--flush .................. stop (flush) all firewall rules"
 	echo "-l|--list .......................... list all firewall rules"
-	echo "-t|--status ........................ output firewall status log"
+	echo "-t|-st|--status .................... output firewall status log"
 	echo "-e|--refresh ....................... refresh & re-resolve FQDNs in trust rules"
 	echo "-a HOST CMT|--allow HOST COMMENT ... add host (IP/IPv6/CIDR/FQDN) to"
 	echo "                                     allow_hosts.rules and immediately"
