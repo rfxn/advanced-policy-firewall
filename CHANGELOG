@@ -256,6 +256,8 @@
       hook_pre.sh or hook_post.sh fails (26-hook-search-silent.bats)
 [New] Search special character tests: verify apf -g handles dots, brackets,
       and dash-prefixed patterns without crashing (26-hook-search-silent.bats)
+[Fix] Hook ordering test: CentOS 6 iptables 1.4.7 compat — use protocol-
+      specific DROP anchor instead of catch-all (26-hook-search-silent.bats)
 [New] Test parallelization: --parallel [N] flag splits across N containers;
       3x speedup (run-tests.sh, Makefile)
 [Change] Migrate test infrastructure to batsman shared framework via git

@@ -131,15 +131,17 @@ HOOK
     "$APF" -f 2>/dev/null
     "$APF" -s
 
-    # hook_post's INPUT jump should appear after the default DROP policy rules
+    # hook_post's INPUT jump should appear after the default DROP policy rules.
+    # Firewall adds: -A INPUT -p tcp -j DROP, -A INPUT -p udp -j DROP,
+    # then -A INPUT -j DROP (catch-all) — all before hook_post.
     local rules
     rules=$(iptables -S INPUT 2>/dev/null)
     local post_line drop_line
     post_line=$(echo "$rules" | grep -n "HOOK_ORDER_POST" | head -1 | cut -d: -f1)
-    # Default input policy is the last "-j DROP" in INPUT (firewall adds
-    # tcp DROP, udp DROP, then all DROP — all before hook_post).
-    # iptables -S shows "-A INPUT -j DROP" (no -p all) for the catch-all.
-    drop_line=$(echo "$rules" | grep -nE -- "-j (DROP|REJECT)$" | tail -1 | cut -d: -f1)
+    # Find the last protocol-specific DROP/REJECT (tcp or udp) — this is the
+    # reliable anchor across all iptables versions (CentOS 6 iptables 1.4.7
+    # may format the catch-all "-p all -j DROP" differently).
+    drop_line=$(echo "$rules" | grep -nE -- "-p (tcp|udp).*-j (DROP|REJECT)" | tail -1 | cut -d: -f1)
 
     [ -n "$post_line" ] || { echo "No HOOK_ORDER_POST jump found"; echo "$rules"; return 1; }
     [ -n "$drop_line" ] || { echo "No default DROP policy found"; echo "$rules"; return 1; }
