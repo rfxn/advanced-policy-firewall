@@ -499,7 +499,7 @@ trim() {
 	MAXLINES=0
  fi
  if [ "$MAXLINES" != "0" ] && [ -f "$FILE" ]; then
-	LINES=$(grep -vc "#" "$FILE")
+	LINES=$(grep -cvE '^(#|$)' "$FILE")
         if [ "$LINES" -gt "$MAXLINES" ]; then
                 eout "{glob} trimming $FILE to $MAXLINES lines"
                 CHK_CMT=$(tail -n "$MAXLINES" "$FILE" | grep -c "#")
@@ -2617,17 +2617,19 @@ cl_cports() {
 }
 
 expirebans() {
-local i ip date_d date_t ban_time time_diff expire_time check_time REFRESH_TIME
+local i ip date_d date_t ban_time time_diff expire_time check_time REFRESH_TIME eff_expire
 if [ -z "$SET_EXPIRE" ]; then
-        SET_EXPIRE=0
+        eff_expire=0
+else
+        eff_expire="$SET_EXPIRE"
 fi
-if [ "$SET_EXPIRE" -ge "60" ]; then
+if [ "$eff_expire" -ge "60" ]; then
  REFRESH_TIME=$(($SET_REFRESH*60))
- if [ "$SET_EXPIRE" -lt "$REFRESH_TIME" ]; then
-        SET_EXPIRE="$REFRESH_TIME"
+ if [ "$eff_expire" -lt "$REFRESH_TIME" ]; then
+        eff_expire="$REFRESH_TIME"
  fi
  if [ -f "$INSTALL_PATH/deny_hosts.rules" ]; then
-         expire_time="$SET_EXPIRE"
+         expire_time="$eff_expire"
          check_time=$(date +%s)
          while IFS='|' read -r ip date_d date_t; do
                 [ -z "$ip" ] && continue

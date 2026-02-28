@@ -302,12 +302,16 @@ case "$1" in
 	if [ "$USE_GRE" == "1" ]; then
 		mutex_lock
 		gre_init
+	else
+		echo "GRE tunnels not enabled (USE_GRE=0 in conf.apf)"
 	fi
 	;;
 --gre-down)
 	if [ "$USE_GRE" == "1" ]; then
 		mutex_lock
 		gre_teardown
+	else
+		echo "GRE tunnels not enabled (USE_GRE=0 in conf.apf)"
 	fi
 	;;
 --gre-status)

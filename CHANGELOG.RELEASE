@@ -180,6 +180,11 @@
       files in install directory on SIGTERM/SIGINT (functions.apf, apf)
 [Change] Remove unused action_all variable from trust_entry_rule()
       (functions.apf)
+[Fix] trim(): exclude blank lines from data line count (functions.apf)
+[Fix] expirebans(): use local variable instead of modifying global
+      SET_EXPIRE (functions.apf)
+[Fix] --gre-up/--gre-down report disabled state instead of silently
+      exiting (apf)
 
   -- Changes --
 
