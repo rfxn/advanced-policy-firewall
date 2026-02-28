@@ -32,6 +32,17 @@ devm() {
  fi
 }
 
+## Temp file tracking for signal-safe cleanup
+_APF_TMPFILES=""
+_apf_reg_tmp() { _APF_TMPFILES="$_APF_TMPFILES $1"; }
+_apf_cleanup_tmp() {
+	local f
+	for f in $_APF_TMPFILES; do
+		[ -f "$f" ] && rm -f "$f"
+	done
+	_APF_TMPFILES=""
+}
+
 ## Dual-stack iptables helpers
 # ipt()  — apply rule to both IPv4 and IPv6 (protocol-agnostic rules only)
 # ipt4() — IPv4 only (explicit)
@@ -659,11 +670,11 @@ valid_trust_entry() {
 # Returns 1 on parse failure.
 trust_entry_rule() {
 	local entry="$1" chain="$2" action="$3" mode="$4"
-	local action_tcp action_udp action_all
+	local action_tcp action_udp
 	if [ "$action" == "DENY" ]; then
-		action_tcp="$TCP_STOP"; action_udp="$UDP_STOP"; action_all="$ALL_STOP"
+		action_tcp="$TCP_STOP"; action_udp="$UDP_STOP"
 	else
-		action_tcp="ACCEPT"; action_udp="ACCEPT"; action_all="ACCEPT"
+		action_tcp="ACCEPT"; action_udp="ACCEPT"
 	fi
 
 	trust_protect_ipv6 "$entry"; local safe="$_TPV6_RESULT"
@@ -1960,6 +1971,7 @@ dlist_resnet() {
 if ( [ -n "$CURL" ] || [ -n "$WGET" ] ) && [ -f "$RESNET" ]; then
    local url_tmp
    url_tmp=$(mktemp "$INSTALL_PATH/.apf-XXXXXX")
+   _apf_reg_tmp "$url_tmp"
    eout "{resnet} downloading $DLIST_RESERVED_URL"
    if download_url "$DLIST_RESERVED_URL" "$url_tmp"; then
         eout "{resnet} parsing download into $RESNET"
@@ -1989,6 +2001,7 @@ if [ -f "$hosts_file" ]; then
 fi
 local url_tmp
 url_tmp=$(mktemp "$INSTALL_PATH/.apf-XXXXXX")
+_apf_reg_tmp "$url_tmp"
 eout "{$tag} downloading $url"
 if download_url "$url" "$url_tmp"; then
         eout "{$tag} parsing download into $hosts_file"
@@ -2234,6 +2247,7 @@ while IFS= read -r line; do
 	if [[ "$file_or_url" =~ $_ils_url ]]; then
 		local url_tmp
 		url_tmp=$(mktemp "$INSTALL_PATH/.apf-XXXXXX")
+		_apf_reg_tmp "$url_tmp"
 		if ! download_url "$file_or_url" "$url_tmp"; then
 			eout "{ipset} download failed for $name: $file_or_url"
 			rm -f "$url_tmp"
@@ -2265,6 +2279,7 @@ while IFS= read -r line; do
 	# Pre-filter data into ipset restore format for batch loading
 	local restore_file
 	restore_file=$(mktemp "$INSTALL_PATH/.apf-XXXXXX")
+	_apf_reg_tmp "$restore_file"
 	awk -v max="$ipset_maxelem" '
 		BEGIN { count = 0 }
 		/^[[:space:]]*#/ || /^[[:space:]]*$/ || /^;;/ { next }
@@ -2387,6 +2402,7 @@ while IFS= read -r line; do
 
 	if [[ "$file_or_url" =~ $_ius_url ]]; then
 		url_tmp=$(mktemp "$INSTALL_PATH/.apf-XXXXXX")
+		_apf_reg_tmp "$url_tmp"
 		if ! download_url "$file_or_url" "$url_tmp"; then
 			eout "{ipset} update download failed for $name: $file_or_url"
 			rm -f "$url_tmp"
@@ -2415,6 +2431,7 @@ while IFS= read -r line; do
 	# Pre-filter data into ipset restore format for batch loading
 	local restore_file
 	restore_file=$(mktemp "$INSTALL_PATH/.apf-XXXXXX")
+	_apf_reg_tmp "$restore_file"
 	awk -v max="$ipset_maxelem" '
 		BEGIN { count = 0 }
 		/^[[:space:]]*#/ || /^[[:space:]]*$/ || /^;;/ { next }
@@ -2474,6 +2491,7 @@ glob_allow_download() {
 if [ -n "$GA_URL" ] && [ "$USE_RGT" == "1" ] && ( [ -n "$CURL" ] || [ -n "$WGET" ] ); then
    local url_tmp
    url_tmp=$(mktemp "$INSTALL_PATH/.apf-XXXXXX")
+   _apf_reg_tmp "$url_tmp"
    eout "{trust} downloading $GA_URL"
    if download_url "$GA_URL" "$url_tmp"; then
         eout "{trust} parsing download into $GALLOW_HOSTS"
@@ -2501,6 +2519,7 @@ glob_deny_download() {
 if [ -n "$GD_URL" ] && [ "$USE_RGT" == "1" ] && ( [ -n "$CURL" ] || [ -n "$WGET" ] ); then
    local url_tmp
    url_tmp=$(mktemp "$INSTALL_PATH/.apf-XXXXXX")
+   _apf_reg_tmp "$url_tmp"
    eout "{trust} downloading $GD_URL"
    if download_url "$GD_URL" "$url_tmp"; then
         eout "{trust} parsing download into $GDENY_HOSTS"

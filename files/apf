@@ -33,7 +33,7 @@ if [ ! -f "$LOG_APF" ]; then
 fi
 
 # Clean up mutex lock on unexpected termination
-trap 'mutex_unlock' EXIT
+trap '_apf_cleanup_tmp; mutex_unlock' EXIT
 
 # Acquire exclusive lock for mutating operations via file-based flock.
 # Re-invokes this script under flock; child sees _APF_LOCKED=1 and skips gate.
@@ -137,17 +137,17 @@ if [ -z "$SKIP_FASTLOAD_FIRSTRUN" ] && [ -z "$SKIP_FASTLOAD_EXPIRED" ] && [ -z "
 		eout "{glob} activating firewall, fast load ($IPT_BACKEND_CURRENT)"
 		if ! $IPTR $IPT_FLAGS "$INSTALL_PATH/internals/.apf.restore" 2>/dev/null; then
 			eout "{glob} fast load failed (iptables-restore error), going full load"
-			flush
+			flush 1
 		elif [ "$USE_IPV6" == "1" ] && [ -z "$IP6TR" ]; then
 			eout "{glob} fast load incomplete (ip6tables-restore not found), going full load"
-			flush
+			flush 1
 		elif [ "$USE_IPV6" == "1" ] && [ -n "$IP6TR" ] && [ ! -f "$INSTALL_PATH/internals/.apf6.restore" ]; then
 			eout "{glob} fast load incomplete (IPv6 enabled but no IPv6 snapshot), going full load"
-			flush
+			flush 1
 		elif [ "$USE_IPV6" == "1" ] && [ -n "$IP6TR" ] && [ -f "$INSTALL_PATH/internals/.apf6.restore" ]; then
 			if ! $IP6TR $IPT_FLAGS "$INSTALL_PATH/internals/.apf6.restore" 2>/dev/null; then
 				eout "{glob} fast load failed (ip6tables-restore error), going full load"
-				flush
+				flush 1
 			else
 				eout "{glob} firewall initialized"
 				if [ "$SET_VERBOSE" == "1" ] && [ "$DEVEL_ON" == "1" ]; then
@@ -202,6 +202,12 @@ devm
 "$INSTALL_PATH/vnet/vnetgen"
 # start main firewall script
 "$INSTALL_PATH/firewall"
+fw_rc=$?
+if [ "$fw_rc" -ne 0 ]; then
+	eout "{glob} firewall script failed (exit $fw_rc)"
+	mutex_unlock
+	exit "$fw_rc"
+fi
 # check for/load bandmin
 read -r LOAD _ < /proc/loadavg; LOAD="${LOAD%%.*}"
  if [ ! "$LOAD" -gt "10" ]; then

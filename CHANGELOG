@@ -172,6 +172,14 @@
       (apf, functions.apf, sysctl.rules, bt.rules)
 [Change] Extract inline regex patterns to named variables in validation
       functions for portability and readability (functions.apf, gretunnel.sh)
+[Fix] Fast load failure now skips snapshot save to prevent overwriting
+      working snapshot with broken/partial state (apf)
+[Fix] Firewall script exit code checked; failure aborts start cleanly
+      instead of saving partial snapshot (apf)
+[Fix] Temp file cleanup on signal: global tracking prevents orphaned
+      files in install directory on SIGTERM/SIGINT (functions.apf, apf)
+[Change] Remove unused action_all variable from trust_entry_rule()
+      (functions.apf)
 
   -- Changes --
 
