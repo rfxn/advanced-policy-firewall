@@ -21,6 +21,7 @@ trust-based host management, reactive address blocking, and per-IP virtual netwo
   - [2.1 Boot Loading](#21-boot-loading)
   - [2.2 Upgrading](#22-upgrading)
   - [2.3 Key Files](#23-key-files)
+  - [2.4 Uninstallation](#24-uninstallation)
 - [3. Configuration](#3-configuration)
   - [3.1 Basic Options](#31-basic-options)
   - [3.2 Outbound Filtering & Rate Limiting](#32-outbound-filtering--rate-limiting)
@@ -193,7 +194,7 @@ If one so desires they may customize the setup of APF by editing the variables i
 
 The package includes two convenience scripts, the first is `importconf` which will import all the variable settings from your previous version of APF into the new installation. The second is `get_ports`, a script which will output the system's currently in use 'server' ports for the user during the installation process in an effort to aid in configuring port settings.
 
-All previous versions of APF are saved upon the installation of newer versions and stored in `/etc/apf.bkDDMMYY-UTIME` format (e.g., `/etc/apf.bk190226-1771538400`). In addition, there is a `/etc/apf.bk.last` sym-link created to the last version of APF you had installed.
+All previous versions of APF are saved upon the installation of newer versions and stored in `/etc/apf.bkDDMMYYYY-EPOCH` format (e.g., `/etc/apf.bk19022026-1771538400`). In addition, there is a `/etc/apf.bk.last` sym-link created to the last version of APF you had installed.
 
 After installation is completed the documentation and convenience scripts are copied to `/etc/apf/doc` and `/etc/apf/extras` respectively.
 
@@ -235,7 +236,7 @@ It is **NOT** recommended that you use multiple startup methods together.
 
 When upgrading from a previous version of APF:
 
-- `install.sh` automatically backs up your existing installation to `/etc/apf.bkDDMMYY-UTIME` before overwriting.
+- `install.sh` automatically backs up your existing installation to `/etc/apf.bkDDMMYYYY-EPOCH` before overwriting.
 - `importconf` migrates your `conf.apf` settings into the new version, preserving customized values while adding new variables.
 - New configuration variables introduced in later versions receive safe defaults from the `.ca.def` preamble, so upgrades never produce unbound variable errors.
 - Hook scripts (`hook_pre.sh`, `hook_post.sh`), `silent_ips.rules`, and trust files are preserved across upgrades via `importconf`.
@@ -262,6 +263,28 @@ The following files are located under your install path (`/etc/apf` by default):
 | `vnet/` | Per-IP virtual network policy files |
 | `/etc/cron.d/apf` | Consolidated cron: daily restart, hourly ipset refresh, per-minute temp trust expiry |
 | `/var/log/apf_log` | Default status log location |
+
+### 2.4 Uninstallation
+
+To fully remove APF from the system, run the uninstall script from the source directory:
+
+```bash
+sh uninstall.sh
+```
+
+The uninstaller will:
+
+- Stop the firewall and flush all iptables rules
+- Remove systemd service, SysV init scripts, and rc.local entries
+- Remove cron entries (current and legacy)
+- Remove logrotate config, symlinks, and man page
+- Prompt before removing the install directory and log files
+
+To override the install path (if APF was installed to a non-default location):
+
+```bash
+INSTALL_PATH=/opt/apf sh uninstall.sh
+```
 
 ---
 
@@ -633,7 +656,7 @@ usage apf [OPTION]
 -f|--stop|--flush .................. stop (flush) all firewall rules
 -l|--list .......................... list all firewall rules
 -t|--status ........................ output firewall status log
--e|--refresh ....................... refresh & resolve dns names in trust rules
+-e|--refresh ....................... refresh & re-resolve FQDNs in trust rules
 -a HOST CMT|--allow HOST COMMENT ... add host (IP/IPv6/CIDR/FQDN) to
                                      allow_hosts.rules and immediately
                                      load new rule into firewall

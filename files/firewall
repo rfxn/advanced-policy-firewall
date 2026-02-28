@@ -25,7 +25,8 @@ flush 1
 # Pre-configuration hook — runs before any iptables rules
 if [ -x "$INSTALL_PATH/hook_pre.sh" ]; then
 	eout "{glob} executing pre-configuration hook"
-	. "$INSTALL_PATH/hook_pre.sh"
+	# shellcheck disable=SC1090,SC1091
+	. "$INSTALL_PATH/hook_pre.sh" || true
 fi
 
 if [ -n "$IF" ] && [ "$VF_ROUTE" == "1" ]; then
@@ -370,5 +371,6 @@ ipt -A INPUT -p all -j $ALL_STOP
 # Post-configuration hook — runs after all rules including default policies
 if [ -x "$INSTALL_PATH/hook_post.sh" ]; then
 	eout "{glob} executing post-configuration hook"
-	. "$INSTALL_PATH/hook_post.sh"
+	# shellcheck disable=SC1090,SC1091
+	. "$INSTALL_PATH/hook_post.sh" || true
 fi

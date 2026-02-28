@@ -180,6 +180,11 @@
       files in install directory on SIGTERM/SIGINT (functions.apf, apf)
 [Change] Remove unused action_all variable from trust_entry_rule()
       (functions.apf)
+[Fix] trim(): exclude blank lines from data line count (functions.apf)
+[Fix] expirebans(): use local variable instead of modifying global
+      SET_EXPIRE (functions.apf)
+[Fix] --gre-up/--gre-down report disabled state instead of silently
+      exiting (apf)
 
   -- Changes --
 
@@ -213,6 +218,13 @@
 
   -- Documentation --
 
+[New] uninstall.sh: removes all system-wide artifacts; prompts before removing
+      install directory and logs (uninstall.sh)
+[New] install.sh: post-install dependency warnings for iptables, ip, modprobe;
+      non-fatal for chroot/container builds (install.sh)
+[New] README/README.md: section 2.4 Uninstallation (README, README.md)
+[Fix] .ca.def: DLIST_*_URL variables now preserve user customizations on
+      upgrade; preamble defaults + variable expansion in template (.ca.def)
 [New] Man page: apf.8 section 8, all CLI operations, trust system overview,
       configuration reference, installed to /usr/share/man/man8/ (apf.8,
       install.sh)
@@ -227,19 +239,37 @@
 [Change] Remove untested Debian 10/11 from supported platforms list (README)
 [Fix] help() missing -st alias: add -st to status line help text to match
       case dispatcher (functions.apf)
+[Fix] FLOW: add missing SYNFLOOD entry to INPUT chain precedence table;
+      renumber entries 23-48 to match FLOW.md (FLOW)
+[Fix] README/README.md: correct backup path format from DDMMYY-UTIME to
+      DDMMYYYY-EPOCH to match install.sh date format; sync -e/--refresh
+      description with help() wording (README, README.md)
+[Fix] .ca.def: sync IPT_LOCK_SUPPORT/IPT_LOCK_TIMEOUT comments with
+      conf.apf (includes version range and compatibility notes)
+[New] .dockerignore: exclude .git, .github, .claude, audit-output, and
+      working files from Docker build context
+[Change] Makefile: override sequential tier targets (test-all, test-modern,
+      test-legacy, test-deep-legacy) to continue on failure and report
+      combined exit code instead of stopping on first failure
 
   -- Test Suite --
 
 [New] 11 new test files: 21-refactor-regression, 22-uid-egress,
       23-devel-fastload, 24-vnet, 25-connlimit, 26-hook-search-silent,
       27-temp-trust, 28-synflood, 29-block-escalation, 30-advanced-trust-cli,
-      31-fqdn-trust (482 tests total across 31 files)
+      31-fqdn-trust (487 tests total across 31 files)
 [New] LOG_DROP=0 negative tests: verify SYNFLOOD and SMTP_BLK chains omit LOG
       rules when LOG_DROP is disabled (28-synflood.bats, 22-uid-egress.bats)
 [New] Hook execution order tests: verify hook_pre.sh runs before trust chains
       and hook_post.sh runs after default DROP policies (26-hook-search-silent.bats)
 [New] Hook environment test: verify hooks have access to $IPT and $INSTALL_PATH
       variables (26-hook-search-silent.bats)
+[New] Hook error handling tests: verify firewall continues loading when
+      hook_pre.sh or hook_post.sh fails (26-hook-search-silent.bats)
+[New] Search special character tests: verify apf -g handles dots, brackets,
+      and dash-prefixed patterns without crashing (26-hook-search-silent.bats)
+[Fix] Hook ordering test: CentOS 6 iptables 1.4.7 compat — use protocol-
+      specific DROP anchor instead of catch-all (26-hook-search-silent.bats)
 [New] Test parallelization: --parallel [N] flag splits across N containers;
       3x speedup (run-tests.sh, Makefile)
 [Change] Migrate test infrastructure to batsman shared framework via git

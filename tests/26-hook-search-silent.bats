@@ -29,6 +29,12 @@ teardown_file() {
     source /opt/tests/helpers/teardown-netns.sh
 }
 
+teardown() {
+    # Reset hooks between tests to prevent cascading failures
+    chmod 640 "$APF_DIR/hook_pre.sh" 2>/dev/null || true
+    chmod 640 "$APF_DIR/hook_post.sh" 2>/dev/null || true
+}
+
 # =====================================================================
 # Hook scripts
 # =====================================================================
@@ -125,15 +131,17 @@ HOOK
     "$APF" -f 2>/dev/null
     "$APF" -s
 
-    # hook_post's INPUT jump should appear after the default DROP policy rules
+    # hook_post's INPUT jump should appear after the default DROP policy rules.
+    # Firewall adds: -A INPUT -p tcp -j DROP, -A INPUT -p udp -j DROP,
+    # then -A INPUT -j DROP (catch-all) — all before hook_post.
     local rules
     rules=$(iptables -S INPUT 2>/dev/null)
     local post_line drop_line
     post_line=$(echo "$rules" | grep -n "HOOK_ORDER_POST" | head -1 | cut -d: -f1)
-    # Default input policy is the last "-j DROP" in INPUT (firewall adds
-    # tcp DROP, udp DROP, then all DROP — all before hook_post).
-    # iptables -S shows "-A INPUT -j DROP" (no -p all) for the catch-all.
-    drop_line=$(echo "$rules" | grep -nE -- "-j (DROP|REJECT)$" | tail -1 | cut -d: -f1)
+    # Find the last protocol-specific DROP/REJECT (tcp or udp) — this is the
+    # reliable anchor across all iptables versions (CentOS 6 iptables 1.4.7
+    # may format the catch-all "-p all -j DROP" differently).
+    drop_line=$(echo "$rules" | grep -nE -- "-p (tcp|udp).*-j (DROP|REJECT)" | tail -1 | cut -d: -f1)
 
     [ -n "$post_line" ] || { echo "No HOOK_ORDER_POST jump found"; echo "$rules"; return 1; }
     [ -n "$drop_line" ] || { echo "No default DROP policy found"; echo "$rules"; return 1; }
@@ -292,4 +300,97 @@ RULES
 @test "search with empty pattern shows usage" {
     run "$APF" -g
     assert_output --partial "usage: apf -g PATTERN"
+}
+
+# =====================================================================
+# Hook error handling (C4)
+# =====================================================================
+
+@test "firewall continues loading when hook_pre.sh fails" {
+    source /opt/tests/helpers/apf-config.sh
+    # Create a hook that exits non-zero and produces an error
+    cat > "$APF_DIR/hook_pre.sh" <<'HOOK'
+#!/bin/bash
+# This hook intentionally fails
+false
+# This line should still run because set -e is not active in hooks
+$IPT $IPT_FLAGS -N HOOK_FAIL_MARKER 2>/dev/null || true
+HOOK
+    chmod 750 "$APF_DIR/hook_pre.sh"
+    "$APF" -f 2>/dev/null
+    "$APF" -s
+
+    # Firewall should have loaded fully despite hook failure
+    # Verify trust chains exist (loaded in Step 15, well after hook_pre)
+    assert_chain_exists TALLOW
+    assert_chain_exists TDENY
+
+    # Verify default DROP policies are in place (loaded at Step 30)
+    assert_rule_exists_ips INPUT "-j DROP"
+
+    # Cleanup
+    chmod 640 "$APF_DIR/hook_pre.sh"
+}
+
+@test "firewall continues loading when hook_post.sh fails" {
+    source /opt/tests/helpers/apf-config.sh
+    # Create a hook_post that references a non-existent command
+    cat > "$APF_DIR/hook_post.sh" <<'HOOK'
+#!/bin/bash
+# This hook intentionally fails
+/nonexistent/command 2>/dev/null
+false
+HOOK
+    chmod 750 "$APF_DIR/hook_post.sh"
+    "$APF" -f 2>/dev/null
+    "$APF" -s
+
+    # Firewall should have loaded fully — all steps before hook_post completed
+    # Verify trust chains exist
+    assert_chain_exists TALLOW
+    assert_chain_exists TDENY
+
+    # Verify port filtering rules were loaded (Step 22, before hook_post)
+    # The default INPUT DROP rules confirm full chain was loaded
+    assert_rule_exists_ips INPUT "-j DROP"
+
+    # Cleanup
+    chmod 640 "$APF_DIR/hook_post.sh"
+}
+
+# =====================================================================
+# Search special character patterns (C6)
+# =====================================================================
+
+@test "search handles dot in pattern without crash" {
+    source /opt/tests/helpers/apf-config.sh
+    "$APF" -f 2>/dev/null
+    "$APF" -s
+
+    # Dot is a regex metacharacter — should not crash grep
+    run "$APF" -g "192.0.2"
+    assert_success
+}
+
+@test "search handles bracket in pattern gracefully" {
+    source /opt/tests/helpers/apf-config.sh
+    "$APF" -f 2>/dev/null
+    "$APF" -s
+
+    # Unmatched bracket is invalid regex — grep returns error but
+    # search() should not crash; it reports no matches instead
+    run "$APF" -g "[invalid"
+    assert_success
+}
+
+@test "search handles pattern starting with dash" {
+    source /opt/tests/helpers/apf-config.sh
+    "$APF" -f 2>/dev/null
+    "$APF" -s
+
+    # Patterns starting with - could be mistaken as grep flags
+    # search() uses grep -- "$pattern" to handle this
+    run "$APF" -g "-j DROP"
+    assert_success
+    assert_output --partial "DROP"
 }

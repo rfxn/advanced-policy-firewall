@@ -174,4 +174,49 @@ else
 	echo "  Note: These ports are not auto-configured; they are simply presented for information purposes. You must manually configure all port options."
 fi
 
+# Post-install dependency warnings (non-fatal for chroot/container builds)
+_dep_warn=0
+if ! command -v iptables > /dev/null 2>&1; then
+	_dep_warn=1
+	echo ""
+	echo "  WARNING: iptables not found in PATH"
+	if command -v apt-get > /dev/null 2>&1; then
+		echo "           Install with: apt-get install iptables"
+	elif command -v dnf > /dev/null 2>&1; then
+		echo "           Install with: dnf install iptables"
+	elif command -v yum > /dev/null 2>&1; then
+		echo "           Install with: yum install iptables"
+	fi
+fi
+if ! command -v ip > /dev/null 2>&1; then
+	_dep_warn=1
+	echo ""
+	echo "  WARNING: ip (iproute2) not found in PATH"
+	if command -v apt-get > /dev/null 2>&1; then
+		echo "           Install with: apt-get install iproute2"
+	elif command -v dnf > /dev/null 2>&1; then
+		echo "           Install with: dnf install iproute"
+	elif command -v yum > /dev/null 2>&1; then
+		echo "           Install with: yum install iproute"
+	fi
+fi
+if ! command -v modprobe > /dev/null 2>&1; then
+	_dep_warn=1
+	echo ""
+	echo "  WARNING: modprobe (kmod) not found in PATH"
+	if command -v apt-get > /dev/null 2>&1; then
+		echo "           Install with: apt-get install kmod"
+	elif command -v dnf > /dev/null 2>&1; then
+		echo "           Install with: dnf install kmod"
+	elif command -v yum > /dev/null 2>&1; then
+		echo "           Install with: yum install kmod"
+	fi
+fi
+if [ "$_dep_warn" = "1" ]; then
+	echo ""
+	echo "  Note: Missing dependencies must be installed before running APF."
+	echo "        This is expected in chroot/container builds where binaries"
+	echo "        will be available at runtime."
+fi
+
 rm -f .conf.apf

@@ -8,7 +8,7 @@ on:
 
 jobs:
   smoke-test:
-    uses: rfxn/batsman/.github/workflows/test.yml@v1.0.1
+    uses: rfxn/batsman/.github/workflows/test.yml@v1.0.2
     with:
       project-name: apf
       os-matrix: '["debian12","centos6","centos7","rocky8","rocky9","ubuntu1204","ubuntu2004","ubuntu2404"]'
