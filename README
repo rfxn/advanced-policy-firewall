@@ -201,8 +201,8 @@ systems currently in use 'server' ports for the user during the installation
 process in an effort to aid in configuring port settings.
 
 All previous versions of APF are saved upon the installation of newer
-versions and stored in /etc/apf.bkDDMMYY-UTIME format (e.g.,
-/etc/apf.bk190226-1771538400). In addition, there is a /etc/apf.bk.last
+versions and stored in /etc/apf.bkDDMMYYYY-EPOCH format (e.g.,
+/etc/apf.bk19022026-1771538400). In addition, there is a /etc/apf.bk.last
 sym-link created to the last version of APF you had installed.
 
 After installation is completed the documentation and convenience scripts are
@@ -251,7 +251,7 @@ is, enable it with the 'apf -s' command when desired and disable it with the
 When upgrading from a previous version of APF:
 
 - install.sh automatically backs up your existing installation to
-  /etc/apf.bkDDMMYY-UTIME before overwriting.
+  /etc/apf.bkDDMMYYYY-EPOCH before overwriting.
 - importconf migrates your conf.apf settings into the new version,
   preserving customized values while adding new variables.
 - New configuration variables introduced in later versions receive safe
@@ -769,7 +769,7 @@ usage apf [OPTION]
 -f|--stop|--flush .................. stop (flush) all firewall rules
 -l|--list .......................... list all firewall rules
 -t|--status ........................ output firewall status log
--e|--refresh ....................... refresh & resolve dns names in trust rules
+-e|--refresh ....................... refresh & re-resolve FQDNs in trust rules
 -a HOST CMT|--allow HOST COMMENT ... add host (IP/IPv6/CIDR/FQDN) to
                                      allow_hosts.rules and immediately
                                      load new rule into firewall
