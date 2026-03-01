@@ -41,3 +41,10 @@ apf_set_ports() {
         apf_set_config "EG_UDP_CPORTS" "$4"
     fi
 }
+
+# Set a URL config variable (uses % delimiter to avoid sed / conflicts)
+# Usage: apf_set_url VAR VALUE
+apf_set_url() {
+    local var="$1" val="$2"
+    sed -i "s%^${var}=.*%${var}=\"${val}\"%" "${APF_INSTALL:-/opt/apf}/conf.apf"
+}

@@ -1,6 +1,10 @@
 #!/usr/bin/env bats
 #
-# 08: Fast load — snapshot creation, backend marker
+# 08: Fast load — snapshot format, backend marker, IPv6 snapshot
+#
+# Fast load lifecycle tests (restore, config change detection, edge cases)
+# are in 23-devel-fastload.bats. This file covers snapshot format validation
+# and backend marker correctness.
 
 load '/usr/local/lib/bats/bats-support/load'
 load '/usr/local/lib/bats/bats-assert/load'
@@ -16,24 +20,12 @@ setup_file() {
     apf_set_interface "veth-pub" ""
     apf_set_config "SET_FASTLOAD" "0"
     "$APF" -f 2>/dev/null || true
+    "$APF" -s
 }
 
 teardown_file() {
     "$APF" -f 2>/dev/null || true
     source /opt/tests/helpers/teardown-netns.sh
-}
-
-@test "full load creates .apf.restore snapshot" {
-    "$APF" -s
-    [ -f "$APF_DIR/internals/.apf.restore" ]
-}
-
-@test "full load creates .last.full timestamp" {
-    [ -f "$APF_DIR/internals/.last.full" ]
-    # Content should be a unix timestamp
-    local ts
-    ts=$(cat "$APF_DIR/internals/.last.full")
-    [[ "$ts" =~ ^[0-9]+$ ]]
 }
 
 @test "full load creates .apf.restore.backend marker" {
@@ -82,60 +74,4 @@ teardown_file() {
 
     apf_set_config "USE_IPV6" "0"
     "$APF" -f 2>/dev/null || true
-}
-
-@test "fast load restores rules from snapshot" {
-    source /opt/tests/helpers/apf-config.sh
-    apf_set_config "SET_FASTLOAD" "1"
-    # First: do a full load to create the snapshot
-    "$APF" -f 2>/dev/null
-    "$APF" -s
-    # Verify chains exist after full load
-    run iptables -L TALLOW -n
-    assert_success
-    # Flush all rules
-    "$APF" -f 2>/dev/null
-    # Verify chains are gone after flush
-    run iptables -L TALLOW -n 2>/dev/null
-    assert_failure
-    # Restart — should take fast load path (snapshot exists, no config change)
-    "$APF" -s
-    # Verify chains are restored from snapshot
-    run iptables -L TALLOW -n
-    assert_success
-    run iptables -L TDENY -n
-    assert_success
-    # Verify the log confirms fast load was used
-    run grep "fast load" /var/log/apf_log
-    assert_success
-    # Cleanup
-    apf_set_config "SET_FASTLOAD" "0"
-    "$APF" -f 2>/dev/null
-}
-
-@test "config change forces full load when fastload enabled" {
-    source /opt/tests/helpers/apf-config.sh
-    apf_set_config "SET_FASTLOAD" "1"
-    "$APF" -f 2>/dev/null
-    "$APF" -s
-
-    # Record the .last.full timestamp
-    local ts1
-    ts1=$(cat "$APF_DIR/internals/.last.full")
-
-    # Change a config value
-    sleep 1
-    apf_set_config "IG_TCP_CPORTS" "22,80,443,8080"
-    "$APF" -f 2>/dev/null
-    "$APF" -s
-
-    # Should have a new timestamp (full load happened)
-    local ts2
-    ts2=$(cat "$APF_DIR/internals/.last.full")
-    [ "$ts2" -ge "$ts1" ]
-
-    # Cleanup
-    apf_set_config "SET_FASTLOAD" "0"
-    apf_set_config "IG_TCP_CPORTS" "22,80,443"
-    "$APF" -f 2>/dev/null
 }

@@ -211,6 +211,11 @@ if [ "$RAB" == "1" ]; then
   ;;
   3)
   RAB_PSCAN_PORTS="$RAB_PSCAN_LEVEL_3"
+  ;;
+  *)
+  eout "{rab} warning: RAB_PSCAN_LEVEL='$RAB_PSCAN_LEVEL' invalid, defaulting to level 1"
+  RAB_PSCAN_PORTS="$RAB_PSCAN_LEVEL_1"
+  ;;
   esac
   eout "{rab} RAB_PSCAN monitored ports $RAB_PSCAN_PORTS"
   ipt -N RABPSCAN

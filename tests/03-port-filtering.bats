@@ -55,7 +55,7 @@ teardown_file() {
     echo "$last_rules" | grep -q "ACCEPT.*0.0.0.0/0.*0.0.0.0/0"
 }
 
-@test "EGF=1 creates egress port rules" {
+@test "EGF=1 creates egress port rules and OUTPUT ends with DROP" {
     source /opt/tests/helpers/apf-config.sh
     apf_set_config "EGF" "1"
     "$APF" -f 2>/dev/null
@@ -64,23 +64,12 @@ teardown_file() {
     # Egress TCP port 80 should be open
     assert_rule_exists OUTPUT "ACCEPT.*tcp.*dpt:80"
 
-    # Cleanup: restore EGF=0
-    apf_set_config "EGF" "0"
-    "$APF" -f 2>/dev/null
-    "$APF" -s
-}
-
-@test "EGF=1 OUTPUT ends with DROP" {
-    source /opt/tests/helpers/apf-config.sh
-    apf_set_config "EGF" "1"
-    "$APF" -f 2>/dev/null
-    "$APF" -s
-
+    # OUTPUT should end with DROP
     local last_rules
     last_rules=$(iptables -L OUTPUT -n | tail -3)
     echo "$last_rules" | grep -q "DROP"
 
-    # Cleanup
+    # Cleanup: restore EGF=0
     apf_set_config "EGF" "0"
     "$APF" -f 2>/dev/null
     "$APF" -s

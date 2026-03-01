@@ -51,6 +51,26 @@
       removal without DNS; refresh (apf -e) re-resolves FQDNs; works in
       CLI (-a/-d/-ta/-td/-u) and bulk load (functions.apf, conf.apf,
       internals.conf, .ca.def; 20 tests)
+[New] --rules: dump active iptables rules to stdout for piping/scripting;
+      uses -S format consistent across nft/legacy backends; includes IPv6
+      when USE_IPV6=1 (apf, functions.apf)
+[New] --info: firewall status summary with sections for status (active state,
+      rules, chains), trust system (allow/deny/temp counts, ban expiry, block
+      escalation, FQDN resolution), filtering (stop targets, inbound/outbound
+      ports, packet sanity, connlimit, SYN flood, SMTP blocking), subsystems
+      (fast load, RAB, VNET, Docker compat, ipset, GRE, remote block lists),
+      and logging (log file, log drops, trim, recent entries)
+      (apf, functions.apf)
+[New] --lookup HOST: check if host exists in trust files (allow, deny, global
+      allow, global deny) without searching iptables/ipset rules; exits 0 if
+      found, 1 if not found (apf, functions.apf)
+[New] -h/--help: explicit help handler exits 0; previously no args exited 1
+      (apf)
+[New] --validate/--check: validate config without starting firewall; checks
+      stop targets, rate formats, connlimit syntax (apf, functions.apf)
+[New] --list-allow/--list-deny (--la/--ld): display trust file entries with
+      comments and blank lines stripped (apf, functions.apf)
+[New] --dump-config: self-documenting alias for -o/--ovars (apf)
 
   -- Bug Fixes --
 
@@ -148,6 +168,10 @@
 [Fix] validate_config(): add validation for ICMP_LIM (rate format), LOG_LEVEL,
       LOG_TARGET, LOG_RATE (integer), SYSCTL_CONNTRACK (integer); reject
       non-numeric PERMBLOCK_COUNT/PERMBLOCK_INTERVAL (functions.apf)
+[Fix] validate_config(): reject empty IFACE_UNTRUSTED, invalid RAB_PSCAN_LEVEL,
+      non-numeric RAB_HITCOUNT/RAB_TIMER, RAB_TIMER=0, SYNFLOOD_BURST=0, and
+      LOG_RATE=0; RAB checks gated on RAB=1; defense-in-depth default branch
+      in firewall RAB_PSCAN_LEVEL case (functions.apf, firewall)
 [Fix] cl_cports(): clear EG_DROP_CMD between VNET iterations; prevents
       command-owner rules from leaking across per-IP rule files (functions.apf)
 [Fix] cli_trust_remove(): reject empty argument with error message; prevents
@@ -210,11 +234,25 @@
 [Change] VNET: replace fork-heavy parsing with builtins and glob patterns;
       fix ifconfig detection; add variable quoting; use conditional default
       for INSTALL_PATH (main.vnet, vnetgen)
-[Change] help(): show all CLI aliases, normalize alignment (functions.apf)
+[Change] help() pass 2: remove silent options (-st, --temp-expire) from display;
+      show readable names (--temp-list, --dump-config, --list-allow) over
+      cryptic aliases (--templ, --ovars, --la); add --rules, --info, --lookup;
+      update -l description to "view in editor"; all hidden aliases still work
+      in dispatcher (functions.apf, apf.8, README, README.md)
 [Change] cl_cports(): reset SMTP and connlimit variables for VNET per-IP
       consistency (functions.apf)
 [Change] Drop Ubuntu 22.04 from CI matrix; redundant with 20.04+24.04
       (smoke-test.yml)
+[Change] trust_hosts: replace four-pass grep cascade with single-pass loop
+      and delegate advanced syntax to trust_entry_rule(); eliminates ~210
+      lines of duplicated field extraction and iptables logic (C-002)
+      (functions.apf)
+[Fix] trust_hosts: anchor comment filter to line start (grep -v '^#')
+      preventing false matches on entries containing '#' (F-019)
+      (functions.apf)
+[Fix] trust_hosts: eliminate grep -v tcp/udp classification that could
+      misclassify entries containing protocol substrings (F-020)
+      (functions.apf)
 
   -- Documentation --
 
@@ -268,6 +306,8 @@
       hook_pre.sh or hook_post.sh fails (26-hook-search-silent.bats)
 [New] Search special character tests: verify apf -g handles dots, brackets,
       and dash-prefixed patterns without crashing (26-hook-search-silent.bats)
+[New] 32-cli-help.bats: tests for -h/--help, --dump-config, --validate/--check,
+      --la/--ld, section headers in help output (32-cli-help.bats)
 [Fix] Hook ordering test: CentOS 6 iptables 1.4.7 compat — use protocol-
       specific DROP anchor instead of catch-all (26-hook-search-silent.bats)
 [New] Test parallelization: --parallel [N] flag splits across N containers;

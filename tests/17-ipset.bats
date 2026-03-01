@@ -7,6 +7,7 @@
 load '/usr/local/lib/bats/bats-support/load'
 load '/usr/local/lib/bats/bats-assert/load'
 source /opt/tests/helpers/assert-iptables.bash
+source /opt/tests/helpers/capability-detect.bash
 
 APF="/opt/apf/apf"
 APF_DIR="/opt/apf"
@@ -23,13 +24,8 @@ assert_ipset_entry_count() {
     fi
 }
 
-# Check if ipset is usable (binary + kernel support)
-ipset_available() {
-    command -v ipset >/dev/null 2>&1 || return 1
-    # Try to create and destroy a probe set to verify kernel module
-    ipset create _apf_probe hash:ip 2>/dev/null || return 1
-    ipset destroy _apf_probe 2>/dev/null
-    return 0
+setup() {
+    if ! ipset_available; then skip "ipset not available"; fi
 }
 
 # Create a test blocklist file with RFC 5737 test IPs
@@ -116,9 +112,6 @@ teardown_file() {
 }
 
 @test "ipset set created with correct entry count" {
-    if ! ipset_available; then
-        skip "ipset not available"
-    fi
     run ipset list test_block
     assert_success
     # Should contain 3 entries (count members for old ipset compatibility)
@@ -126,23 +119,14 @@ teardown_file() {
 }
 
 @test "IPSET_test_block iptables chain exists" {
-    if ! ipset_available; then
-        skip "ipset not available"
-    fi
     assert_chain_exists IPSET_test_block
 }
 
 @test "IPSET_test_block chain has set match rule" {
-    if ! ipset_available; then
-        skip "ipset not available"
-    fi
     assert_rule_exists_ips IPSET_test_block "match-set test_block src"
 }
 
 @test "ipset set contains test IPs" {
-    if ! ipset_available; then
-        skip "ipset not available"
-    fi
     run ipset test test_block 192.0.2.10
     assert_success
     run ipset test test_block 192.0.2.11
@@ -152,9 +136,6 @@ teardown_file() {
 }
 
 @test "USE_IPSET=0 creates no ipset sets" {
-    if ! ipset_available; then
-        skip "ipset not available"
-    fi
     # Flush, reconfigure with USE_IPSET=0, restart
     "$APF" -f 2>/dev/null || true
     ipset destroy test_block 2>/dev/null || true
@@ -174,9 +155,6 @@ teardown_file() {
 }
 
 @test "--ipset-update refreshes set contents" {
-    if ! ipset_available; then
-        skip "ipset not available"
-    fi
     # Add new entry to blocklist
     echo "192.0.2.99" >> "$APF_DIR/test_blocklist.txt"
 
@@ -193,9 +171,6 @@ teardown_file() {
 }
 
 @test "apf -f destroys ipset sets" {
-    if ! ipset_available; then
-        skip "ipset not available"
-    fi
     "$APF" -f
     run ipset list test_block 2>/dev/null
     assert_failure
@@ -205,9 +180,6 @@ teardown_file() {
 }
 
 @test "empty blocklist skipped without error" {
-    if ! ipset_available; then
-        skip "ipset not available"
-    fi
     "$APF" -f 2>/dev/null || true
     ipset destroy test_block 2>/dev/null || true
 
@@ -234,25 +206,16 @@ ISEOF
 }
 
 @test "per-rule log:1 with LOG_DROP=1 creates log rule" {
-    if ! ipset_available; then
-        skip "ipset not available"
-    fi
     # test_block has log=1 and LOG_DROP=1 is set
     assert_rule_exists_ips IPSET_test_block "LOG.*IPSET_test_block"
 }
 
 @test "comment lines in blocklist ignored" {
-    if ! ipset_available; then
-        skip "ipset not available"
-    fi
     # The test blocklist has a comment line — verify only 3 IPs loaded
     assert_ipset_entry_count test_block 3
 }
 
 @test "CIDR entries accepted in hash:net set" {
-    if ! ipset_available; then
-        skip "ipset not available"
-    fi
     "$APF" -f 2>/dev/null || true
     ipset destroy test_block 2>/dev/null || true
 
@@ -280,18 +243,12 @@ ISEOF
 }
 
 @test "IPSET_test_block chain attached to INPUT" {
-    if ! ipset_available; then
-        skip "ipset not available"
-    fi
     assert_rule_exists_ips INPUT "IPSET_test_block"
 }
 
 # --- Legacy format migration tests ---
 
 @test "legacy 4-field local path migrated to 7-field" {
-    if ! ipset_available; then
-        skip "ipset not available"
-    fi
     "$APF" -f 2>/dev/null || true
     ipset destroy test_block 2>/dev/null || true
 
@@ -321,9 +278,6 @@ ISEOF
 }
 
 @test "legacy 4-field URL entry migrated to 7-field" {
-    if ! ipset_available; then
-        skip "ipset not available"
-    fi
     "$APF" -f 2>/dev/null || true
     ipset destroy test_block 2>/dev/null || true
 
@@ -349,9 +303,6 @@ ISEOF
 }
 
 @test "7-field entry not modified by migration" {
-    if ! ipset_available; then
-        skip "ipset not available"
-    fi
     "$APF" -f 2>/dev/null || true
     ipset destroy test_block 2>/dev/null || true
 
@@ -380,9 +331,6 @@ ISEOF
 # --- 5-field migration tests ---
 
 @test "legacy 5-field local path migrated to 7-field" {
-    if ! ipset_available; then
-        skip "ipset not available"
-    fi
     "$APF" -f 2>/dev/null || true
     ipset destroy test_block 2>/dev/null || true
 
@@ -405,9 +353,6 @@ ISEOF
 }
 
 @test "legacy 5-field URL entry migrated to 7-field" {
-    if ! ipset_available; then
-        skip "ipset not available"
-    fi
     "$APF" -f 2>/dev/null || true
     ipset destroy test_url 2>/dev/null || true
 
@@ -434,9 +379,6 @@ ISEOF
 # --- maxelem tests ---
 
 @test "maxelem limits entries loaded into ipset" {
-    if ! ipset_available; then
-        skip "ipset not available"
-    fi
     "$APF" -f 2>/dev/null || true
     ipset destroy test_block 2>/dev/null || true
     ipset destroy test_maxelem 2>/dev/null || true
@@ -467,9 +409,6 @@ ISEOF
 # --- timestamp tests ---
 
 @test "timestamp file created during ipset_load" {
-    if ! ipset_available; then
-        skip "ipset not available"
-    fi
     # Timestamp file should exist after setup_file started the firewall
     [ -f "$APF_DIR/internals/.ipset.timestamps" ]
     run grep "^test_block:" "$APF_DIR/internals/.ipset.timestamps"
@@ -477,9 +416,6 @@ ISEOF
 }
 
 @test "ipset flush removes timestamp file" {
-    if ! ipset_available; then
-        skip "ipset not available"
-    fi
     "$APF" -f
     [ ! -f "$APF_DIR/internals/.ipset.timestamps" ]
 
@@ -488,9 +424,6 @@ ISEOF
 }
 
 @test "per-list interval skips recent updates" {
-    if ! ipset_available; then
-        skip "ipset not available"
-    fi
     # Set a long interval so update is skipped
     cat > "$APF_DIR/ipset.rules" <<'ISEOF'
 test_block:src:ip:1:86400:0:/opt/apf/test_blocklist.txt
@@ -515,9 +448,6 @@ ISEOF
 }
 
 @test "per-list interval triggers update after elapsed" {
-    if ! ipset_available; then
-        skip "ipset not available"
-    fi
     # Set a short interval
     cat > "$APF_DIR/ipset.rules" <<'ISEOF'
 test_block:src:ip:1:1:0:/opt/apf/test_blocklist.txt

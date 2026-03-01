@@ -14,12 +14,6 @@ source /opt/tests/helpers/assert-iptables.bash
 APF="/opt/apf/apf"
 APF_DIR="/opt/apf"
 
-# Set a DLIST URL config variable (uses % delimiter to avoid sed / conflicts)
-apf_set_url() {
-    local var="$1" val="$2"
-    sed -i "s%^${var}=.*%${var}=\"${val}\"%" "$APF_DIR/conf.apf"
-}
-
 setup_file() {
     source /opt/tests/helpers/setup-netns.sh
     source /opt/tests/helpers/reset-apf.sh

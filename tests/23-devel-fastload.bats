@@ -45,20 +45,21 @@ teardown_file() {
 }
 
 @test "DEVEL_MODE=1 creates cron flush job" {
+    if [ ! -d /etc/cron.d ]; then skip "no /etc/cron.d directory"; fi
     source /opt/tests/helpers/apf-config.sh
     apf_set_config "DEVEL_MODE" "1"
     "$APF" -f 2>/dev/null
     "$APF" -s
 
-    # devm() should have created a cron entry (at or crontab)
-    # Check via crontab -l or /var/spool/cron
-    # The cron entry flushes the firewall periodically in dev mode
-    run grep "DEVELOPMENT MODE ENABLED" /var/log/apf_log
+    # devm() creates /etc/cron.d/apf_develmode with a 5-minute flush entry
+    [ -f /etc/cron.d/apf_develmode ]
+    run grep "apf -f" /etc/cron.d/apf_develmode
     assert_success
 
     # Cleanup
     apf_set_config "DEVEL_MODE" "0"
     "$APF" -f 2>/dev/null
+    rm -f /etc/cron.d/apf_develmode
 }
 
 @test "DEVEL_MODE=1 forces full load (skips fast load)" {

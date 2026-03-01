@@ -359,6 +359,10 @@ validate_config() {
  local _vc_rate='^[0-9]+/[smh]$'
  local _vc_int='^[0-9]+$'
  local _vc_name _vc_val _vc_burst _vc_entry
+ # Validate IFACE_UNTRUSTED is set
+ if [ -z "$IFACE_UNTRUSTED" ]; then
+    err="${err}IFACE_UNTRUSTED is not set (conf.apf must define the untrusted network interface); "
+ fi
  # Validate stop targets
  for _vc_pair in "TCP_STOP:$TCP_STOP" "UDP_STOP:$UDP_STOP" "ALL_STOP:$ALL_STOP"; do
     _vc_name="${_vc_pair%%:*}"; _vc_val="${_vc_pair#*:}"
@@ -374,6 +378,23 @@ validate_config() {
     fi
     if [[ ! "$SYNFLOOD_BURST" =~ $_vc_int ]]; then
         err="${err}SYNFLOOD_BURST='$SYNFLOOD_BURST' is invalid (must be a positive integer); "
+    elif [ "$SYNFLOOD_BURST" == "0" ]; then
+        err="${err}SYNFLOOD_BURST='0' is invalid (must be greater than 0); "
+    fi
+ fi
+ # Validate RAB settings (only when RAB is enabled)
+ if [ "$RAB" == "1" ]; then
+    case "$RAB_PSCAN_LEVEL" in
+        0|1|2|3) ;;
+        *) err="${err}RAB_PSCAN_LEVEL='$RAB_PSCAN_LEVEL' is invalid (must be 0, 1, 2, or 3); " ;;
+    esac
+    if [[ ! "$RAB_HITCOUNT" =~ $_vc_int ]]; then
+        err="${err}RAB_HITCOUNT='$RAB_HITCOUNT' is invalid (must be a non-negative integer); "
+    fi
+    if [[ ! "$RAB_TIMER" =~ $_vc_int ]]; then
+        err="${err}RAB_TIMER='$RAB_TIMER' is invalid (must be a positive integer); "
+    elif [ "$RAB_TIMER" == "0" ]; then
+        err="${err}RAB_TIMER='0' is invalid (must be greater than 0); "
     fi
  fi
  # Validate ICMP_LIM rate format (only when set and non-zero)
@@ -400,6 +421,8 @@ validate_config() {
  if [ "$LOG_DROP" == "1" ] && [ -n "$LOG_RATE" ]; then
     if [[ ! "$LOG_RATE" =~ $_vc_int ]]; then
         err="${err}LOG_RATE='$LOG_RATE' is invalid (must be a positive integer); "
+    elif [ "$LOG_RATE" == "0" ]; then
+        err="${err}LOG_RATE='0' is invalid (must be greater than 0); "
     fi
  fi
  # Validate connlimit entries
@@ -717,6 +740,7 @@ trust_entry_rule() {
 	local flow_desc
 	if [ "$pflow" == "d" ]; then flow_desc="to"; else flow_desc="from"; fi
 	_TER_DESC="${dir_desc}${proto_desc}${pip} ${flow_desc} port ${port}"
+	_TER_DIR="$dir"
 
 	# Apply rule(s)
 	if [ -n "$proto" ]; then
@@ -1530,47 +1554,248 @@ fi
 rm -f "$iptc"
 }
 
+rules() {
+	$IPT $IPT_FLAGS -S 2>/dev/null
+	if [ "$USE_IPV6" == "1" ] && [ -n "$IP6T" ]; then
+		echo ""
+		echo "# === IPv6 ==="
+		$IP6T $IPT_FLAGS -S 2>/dev/null
+	fi
+}
+
+firewall_info() {
+	local running="no" rule_count=0 ipv6_count=0 chain_count=0
+
+	# Check if firewall has rules loaded
+	local fw_rules
+	fw_rules=$($IPT $IPT_FLAGS -S 2>/dev/null)
+	rule_count=$(echo "$fw_rules" | grep -c '^-A')
+	if [ "$rule_count" -gt 0 ]; then
+		running="yes"
+		chain_count=$(echo "$fw_rules" | grep -c '^-N')
+	fi
+	if [ "$USE_IPV6" == "1" ] && [ -n "$IP6T" ]; then
+		ipv6_count=$($IP6T $IPT_FLAGS -S 2>/dev/null | grep -c '^-A')
+		[ "$ipv6_count" -gt 0 ] 2>/dev/null || ipv6_count=0
+	fi
+
+	# --- Status ---
+	echo "APF v$VER — Firewall Status"
+	echo ""
+	echo "  Active:           $running"
+	echo "  Interface:        ${IFACE_UNTRUSTED:-none}"
+	if [ -n "$IFACE_TRUSTED" ]; then
+		echo "  Trusted iface:    $IFACE_TRUSTED"
+	fi
+	echo "  IPv6:             $([ "$USE_IPV6" == "1" ] && echo "enabled" || echo "disabled")"
+	echo "  IPv4 rules:       $rule_count (${chain_count} custom chains)"
+	if [ "$USE_IPV6" == "1" ]; then
+		echo "  IPv6 rules:       $ipv6_count"
+	fi
+	echo "  DEVEL_MODE:       $([ "$DEVEL_MODE" == "1" ] && echo "ON (auto-flush every 5m)" || echo "off")"
+
+	# --- Trust ---
+	echo ""
+	echo "Trust System:"
+	local allow_count=0 deny_count=0 temp_count=0
+	if [ -f "$ALLOW_HOSTS" ]; then
+		allow_count=$(grep -cv '^#\|^[[:space:]]*$' "$ALLOW_HOSTS" 2>/dev/null)
+		[ "$allow_count" -gt 0 ] 2>/dev/null || allow_count=0
+	fi
+	if [ -f "$DENY_HOSTS" ]; then
+		deny_count=$(grep -cv '^#\|^[[:space:]]*$' "$DENY_HOSTS" 2>/dev/null)
+		[ "$deny_count" -gt 0 ] 2>/dev/null || deny_count=0
+	fi
+	if [ -f "$ALLOW_HOSTS" ] || [ -f "$DENY_HOSTS" ]; then
+		temp_count=$(cat "$ALLOW_HOSTS" "$DENY_HOSTS" 2>/dev/null | grep -c 'ttl=.*expire=')
+		[ "$temp_count" -gt 0 ] 2>/dev/null || temp_count=0
+	fi
+	echo "  Allow entries:    $allow_count"
+	echo "  Deny entries:     $deny_count"
+	echo "  Temp entries:     $temp_count"
+	if [ -n "$SET_EXPIRE" ] && [ "$SET_EXPIRE" != "0" ]; then
+		echo "  Ban expiry:       ${SET_EXPIRE}s"
+	fi
+	if [ -n "$PERMBLOCK_COUNT" ] && [ "$PERMBLOCK_COUNT" != "0" ]; then
+		echo "  Block escalation: ${PERMBLOCK_COUNT} repeats in ${PERMBLOCK_INTERVAL}s"
+	fi
+	echo "  FQDN resolution:  $([ -n "$GETENT" ] && echo "enabled (timeout=${FQDN_TIMEOUT:-10}s)" || echo "disabled (getent not found)")"
+
+	# --- Filtering ---
+	echo ""
+	echo "Filtering:"
+	echo "  TCP stop:         ${TCP_STOP:-DROP}"
+	echo "  UDP stop:         ${UDP_STOP:-DROP}"
+	echo "  Inbound TCP:      ${IG_TCP_CPORTS:-(none)}"
+	echo "  Inbound UDP:      ${IG_UDP_CPORTS:-(none)}"
+	if [ "$EGF" == "1" ]; then
+		echo "  Outbound TCP:     ${EG_TCP_CPORTS:-(none)}"
+		echo "  Outbound UDP:     ${EG_UDP_CPORTS:-(none)}"
+	else
+		echo "  Outbound filter:  disabled (EGF=0)"
+	fi
+	echo "  Packet sanity:    $([ "$PKT_SANITY" == "1" ] && echo "enabled" || echo "disabled")"
+	if [ -n "$IG_TCP_CLIMIT" ]; then
+		echo "  Connlimit:        $IG_TCP_CLIMIT"
+	fi
+	echo "  SYN flood:        $([ "$SYNFLOOD" == "1" ] && echo "enabled (${SYNFLOOD_RATE} burst=${SYNFLOOD_BURST})" || echo "disabled")"
+	echo "  SMTP blocking:    $([ "$SMTP_BLOCK" == "1" ] && echo "enabled" || echo "disabled")"
+
+	# --- Subsystems ---
+	echo ""
+	echo "Subsystems:"
+	echo "  Fast load:        $([ "$SET_FASTLOAD" == "1" ] && echo "enabled" || echo "disabled")"
+	echo "  RAB:              $([ "$RAB" == "1" ] && echo "enabled" || echo "disabled")"
+	echo "  VNET:             $([ "$SET_VNET" == "1" ] && echo "enabled" || echo "disabled")"
+	if [ "$DOCKER_COMPAT" == "1" ]; then
+		echo "  Docker compat:    enabled"
+	fi
+	if [ "$USE_IPSET" == "1" ]; then
+		local ipset_count=0
+		if command -v ipset > /dev/null 2>&1; then
+			ipset_count=$(ipset list -n 2>/dev/null | grep -c .)
+			[ "$ipset_count" -gt 0 ] 2>/dev/null || ipset_count=0
+		fi
+		echo "  ipset:            enabled ($ipset_count active lists)"
+	else
+		echo "  ipset:            disabled"
+	fi
+	if [ "$USE_GRE" == "1" ]; then
+		echo "  GRE tunnels:      enabled"
+	fi
+
+	# Remote block lists
+	local dlists=""
+	[ "$DLIST_DSHIELD" == "1" ] && dlists="${dlists}dshield "
+	[ "$DLIST_SPAMHAUS" == "1" ] && dlists="${dlists}spamhaus "
+	[ "$DLIST_PHP" == "1" ] && dlists="${dlists}php "
+	[ "$DLIST_RESERVED" == "1" ] && dlists="${dlists}reserved "
+	[ "$DLIST_ECNSHAME" == "1" ] && dlists="${dlists}ecn "
+	if [ -n "$dlists" ]; then
+		echo "  Remote lists:     $dlists"
+	else
+		echo "  Remote lists:     none"
+	fi
+
+	# --- Logging ---
+	echo ""
+	echo "Logging:"
+	echo "  Log file:         ${LOG_APF:-/var/log/apf_log}"
+	echo "  Log drops:        $([ "$LOG_DROP" == "1" ] && echo "enabled" || echo "disabled")"
+	echo "  Log target:       ${LOG_TARGET:-LOG}"
+	if [ -n "$SET_TRIM" ] && [ "$SET_TRIM" != "0" ]; then
+		echo "  Log trim:         ${SET_TRIM} lines"
+	fi
+
+	echo ""
+	echo "Recent log:"
+	if [ -f "$LOG_APF" ]; then
+		local log_lines
+		log_lines=$(tail -5 "$LOG_APF" 2>/dev/null)
+		if [ -n "$log_lines" ]; then
+			echo "$log_lines"
+		else
+			echo "  (log empty)"
+		fi
+	else
+		echo "  (log file not found)"
+	fi
+}
+
+trust_lookup() {
+	local host="$1"
+	if [ -z "$host" ]; then
+		echo "usage: apf --lookup HOST"
+		return 1
+	fi
+	local found=0
+	local label file matches
+
+	for pair in "ALLOW:$ALLOW_HOSTS" "DENY:$DENY_HOSTS" "GLOBAL ALLOW:$GALLOW_HOSTS" "GLOBAL DENY:$GDENY_HOSTS"; do
+		label="${pair%%:*}"
+		file="${pair#*:}"
+		[ -f "$file" ] || continue
+		matches=$(grep -in -- "$host" "$file" 2>/dev/null)
+		if [ -n "$matches" ]; then
+			echo "${label} (${file##*/}):"
+			echo "$matches"
+			echo ""
+			found=1
+		fi
+	done
+
+	if [ "$found" -eq 0 ]; then
+		echo "$host not found in any trust file."
+		return 1
+	fi
+}
+
 status() {
 echo "$NAME Status Log:"
 tac "$LOG_APF" | ${PAGER:-more}
 }
 
+cli_validate() {
+    validate_config
+    echo "Configuration validated successfully."
+}
+
+list_trust_file() {
+    local file="$1" label="$2" content
+    if [ ! -f "$file" ]; then
+        echo "No ${label} found."
+        return 1
+    fi
+    content=$(grep -v '^#' "$file" | grep -v '^[[:space:]]*$')
+    if [ -z "$content" ]; then
+        echo "No entries in ${label}."
+        return 0
+    fi
+    echo "$content"
+}
+
 help() {
-	echo "usage apf [OPTION]"
-	echo "-s|--start ......................... load all firewall rules"
-	echo "-r|--restart ....................... stop (flush) & reload firewall rules"
-	echo "-f|--stop|--flush .................. stop (flush) all firewall rules"
-	echo "-l|--list .......................... list all firewall rules"
-	echo "-t|-st|--status .................... output firewall status log"
-	echo "-e|--refresh ....................... refresh & re-resolve FQDNs in trust rules"
-	echo "-a HOST CMT|--allow HOST COMMENT ... add host (IP/IPv6/CIDR/FQDN) to"
-	echo "                                     allow_hosts.rules and immediately"
-	echo "                                     load new rule into firewall"
-	echo "                                     also accepts advanced trust syntax:"
-	echo "                                       apf -a \"tcp:in:d=22:s=192.168.1.0/24\""
-	echo "                                       apf -a \"d=3306:s=10.0.0.5\""
-	echo "-d HOST CMT|--deny HOST COMMENT .... add host (IP/IPv6/CIDR/FQDN) to"
-	echo "                                     deny_hosts.rules and immediately"
-	echo "                                     load new rule into firewall"
-	echo "                                     also accepts advanced trust syntax"
-	echo "-u|--remove|--unban HOST ........... remove host from [glob]*_hosts.rules"
-	echo "                                     and immediately remove rule from firewall"
-	echo "                                     also removes advanced trust entries"
-	echo "-g|--search PATTERN ................ search iptables/ipset rules and trust files"
-	echo "-ta HOST TTL [CMT]|--temp-allow .... temporarily allow host with TTL"
-	echo "                                     (TTL: seconds, or 5m, 1h, 7d)"
-	echo "                                     also accepts advanced trust syntax"
-	echo "-td HOST TTL [CMT]|--temp-deny ..... temporarily deny host with TTL"
-	echo "                                     also accepts advanced trust syntax"
-	echo "--templ|--temp-list ................ list temp entries with remaining TTL"
-	echo "--tempf|--temp-flush ............... remove all temporary entries"
-	echo "--temp-expire ...................... expire temporary entries (runs from cron)"
-	echo "-o|--ovars ......................... output all configuration options"
-	echo "-v|--version ....................... output version number"
-	echo "--ipset-update ..................... hot-reload ipset block lists from ipset.rules"
-	echo "--gre-up ........................... bring up GRE tunnels from gre.rules"
-	echo "--gre-down ......................... tear down GRE tunnels"
-	echo "--gre-status ....................... show GRE tunnel status"
+	echo "usage: apf [OPTION]"
+	echo ""
+	echo "Firewall Control:"
+	echo "  -s, --start ................. load all firewall rules"
+	echo "  -r, --restart ............... flush & reload all firewall rules"
+	echo "  -f, --stop, --flush ......... flush all firewall rules"
+	echo "  --rules ..................... dump active rules to stdout"
+	echo "  -l, --list .................. view all firewall rules in editor"
+	echo "  --info ...................... show firewall status summary"
+	echo "  -t, --status ................ page through full status log"
+	echo "  -e, --refresh ............... refresh & re-resolve DNS in trust rules"
+	echo ""
+	echo "Trust Management:"
+	echo "  -a HOST [CMT], --allow ...... add host to allow list and load rule"
+	echo "  -d HOST [CMT], --deny ....... add host to deny list and load rule"
+	echo "  -u HOST, --remove ........... remove host from all trust files"
+	echo "  --list-allow ................ display allow list entries"
+	echo "  --list-deny ................. display deny list entries"
+	echo "  --lookup HOST ............... check if host exists in trust system"
+	echo ""
+	echo "  Advanced trust syntax:  apf -a \"tcp:in:d=22:s=10.0.0.0/8\""
+	echo "                          apf -d \"d=3306:s=192.168.1.5\""
+	echo ""
+	echo "Temporary Trust:"
+	echo "  -ta HOST TTL [CMT] .......... temporarily allow host (5m, 1h, 7d)"
+	echo "  -td HOST TTL [CMT] .......... temporarily deny host"
+	echo "  --temp-list ................. list temp entries with remaining TTL"
+	echo "  --temp-flush ................ remove all temporary entries"
+	echo ""
+	echo "Diagnostics:"
+	echo "  -g PATTERN, --search ........ search iptables/ipset rules & trust files"
+	echo "  --validate, --check ......... validate config without starting firewall"
+	echo "  --dump-config ............... output all configuration variables"
+	echo "  -v, --version ............... output version number"
+	echo "  -h, --help .................. show this help message"
+	echo ""
+	echo "Subsystems:"
+	echo "  --ipset-update .............. hot-reload ipset block lists"
+	echo "  --gre-up .................... bring up GRE tunnels"
+	echo "  --gre-down .................. tear down GRE tunnels"
+	echo "  --gre-status ................ show GRE tunnel status"
 }
 
 tosroute() {
@@ -1678,11 +1903,91 @@ search() {
  fi
 }
 
+_trust_local_addr_blocked() {
+	# Check if advanced trust entry would create a self-referencing allow rule.
+	# Only applies when direction is present; 3-field entries (no direction)
+	# never trigger this. Returns 0 (blocked) or 1 (not blocked).
+	# Args: $1=verb $2=ipflow(s/d) $3=dir(in/out) $4=ip
+	local verb="$1" ipflow="$2" dir="$3" pip="$4"
+	[ "$verb" != "allow" ] && return 1
+	[ -z "$dir" ] && return 1
+	if [ "$ipflow" == "s" ] && [ "$dir" == "in" ] && is_local_addr "$pip"; then
+		return 0
+	fi
+	if [ "$ipflow" == "d" ] && [ "$dir" == "out" ] && is_local_addr "$pip"; then
+		return 0
+	fi
+	return 1
+}
+
+_trust_hosts_advanced() {
+	# Process an advanced trust entry (contains '=') during bulk file loading.
+	# Pre-parses to extract IP (for FQDN detection) and direction+ipflow
+	# (for local-addr protection), then delegates rule creation to
+	# trust_entry_rule() — single source of truth for iptables commands.
+	# Args: $1=entry $2=chain $3=action(ALLOW/DENY) $4=verb(allow/deny)
+	local entry="$1" chain="$2" ter_action="$3" verb="$4"
+
+	# Pre-parse: extract fields needed for FQDN and local-addr checks
+	trust_protect_ipv6 "$entry"; local safe="$_TPV6_RESULT"
+	trust_parse_fields "$safe"
+	local dir="" pflow="" port="" ipflow="" pip=""
+	case "$_TF_COUNT" in
+		4)  # 3-field: pflow=port:ipflow=ip
+			pflow="$_TF1"; port="$_TF2"; ipflow="$_TF3"
+			trust_restore_ipv6 "$_TF4"; pip="$_TRV6_RESULT"
+			;;
+		5)  # 4-field: dir:pflow=port:ipflow=ip
+			dir="$_TF1"; pflow="$_TF2"; port="$_TF3"; ipflow="$_TF4"
+			trust_restore_ipv6 "$_TF5"; pip="$_TRV6_RESULT"
+			;;
+		6)  # 5-field: proto:dir:pflow=port:ipflow=ip
+			dir="$_TF2"; pflow="$_TF3"; port="$_TF4"; ipflow="$_TF5"
+			trust_restore_ipv6 "$_TF6"; pip="$_TRV6_RESULT"
+			;;
+		*)  return 1 ;;
+	esac
+
+	# Build description fragments for local-addr blocked log messages
+	expand_port "$port"; port="$_PORT"
+	local dir_desc="" pflow_desc=""
+	[ "$dir" == "in" ] && dir_desc="inbound "
+	[ "$dir" == "out" ] && dir_desc="outbound "
+	if [ "$pflow" == "d" ]; then pflow_desc="to"; else pflow_desc="from"; fi
+
+	if is_fqdn "$pip"; then
+		if ! resolve_fqdn "$pip"; then
+			eout "{trust} failed to resolve FQDN $pip, skipping"
+			return 1
+		fi
+		local _tha_rip _tha_resolved_entry
+		while IFS= read -r _tha_rip; do
+			if _trust_local_addr_blocked "$verb" "$ipflow" "$dir" "$_tha_rip"; then
+				eout "{trust} ignored local ip $verb rule '${dir_desc}$_tha_rip $pflow_desc port $port'"
+			else
+				_tha_resolved_entry="${entry//$pip/$_tha_rip}"
+				if trust_entry_rule "$_tha_resolved_entry" "$chain" "$ter_action" "-A"; then
+					eout "{trust} $verb $_TER_DESC (resolved from $pip)"
+				fi
+			fi
+		done <<< "$_RESOLVED_IPS"
+	else
+		if _trust_local_addr_blocked "$verb" "$ipflow" "$dir" "$pip"; then
+			eout "{trust} ignored local ip $verb rule '${dir_desc}$pip $pflow_desc port $port'"
+			return 0
+		fi
+		if trust_entry_rule "$entry" "$chain" "$ter_action" "-A"; then
+			eout "{trust} $verb $_TER_DESC"
+		fi
+	fi
+	return 0
+}
+
 trust_hosts() {
 local file="$1"
 local chain="$2"
 local action_all="$3" action_tcp="$4" action_udp="$5" verb="$6"
-local i PFLOW PFLOW_T PPORT IPFLOW PIP NFLOW NFLOW_T PTYPE
+local i
 load_local_addrs
 if [ -z "$file" ] || [ -z "$chain" ]; then
         eout "{trust} could not process trust_hosts $file $chain, fatal error, aborting!"
@@ -1692,255 +1997,48 @@ if [ -z "$file" ] || [ -z "$chain" ]; then
 fi
 
 local _th_raw
-_th_raw=$(grep -v '#' "$file")
+_th_raw=$(grep -v '^#' "$file" | grep -v '^[[:space:]]*$')
 if [ -n "$_th_raw" ]; then
         eout "{glob} loading $file"
-        #
-        #
+        local ter_action
+        if [ "$verb" == "allow" ]; then ter_action="ALLOW"; else ter_action="DENY"; fi
         while IFS= read -r i; do
                 [ -z "$i" ] && continue
-                if ! valid_host "$i"; then
-                        eout "{trust} skipping invalid entry in $file: $i"
-                        continue
-                fi
-                if is_fqdn "$i"; then
-                 if resolve_fqdn "$i"; then
-                  local _th_rip
-                  while IFS= read -r _th_rip; do
-                   if ! is_local_addr "$_th_rip"; then
-                    if ipt_for_host "$_th_rip"; then
-                        eout "{trust} $verb all to/from $i (resolved: $_th_rip)"
-                        $IPT_H $IPT_FLAGS -A $chain -s "$_th_rip" -d $ANY_ADDR -j $action_all
-                        $IPT_H $IPT_FLAGS -A $chain -d "$_th_rip" -s $ANY_ADDR -j $action_all
-                    fi
-                   fi
-                  done <<< "$_RESOLVED_IPS"
-                 else
-                  eout "{trust} failed to resolve FQDN $i, skipping"
-                 fi
-                elif ! is_local_addr "$i"; then
-                 if [ -f "$file" ]; then
-                  if ipt_for_host "$i"; then
-                        eout "{trust} $verb all to/from $i"
-                        $IPT_H $IPT_FLAGS -A $chain -s $i -d $ANY_ADDR -j $action_all
-                        $IPT_H $IPT_FLAGS -A $chain -d $i -s $ANY_ADDR -j $action_all
-                  fi
-                 fi
-		fi
-        done < <(printf '%s\n' "$_th_raw" | grep -v '=')
-        #
-        #
-        while IFS= read -r i; do
-                if [ -n "$i" ] && [ -f "$file" ]; then
-                        trust_protect_ipv6 "$i"; i="$_TPV6_RESULT"
-                        trust_parse_fields "$i"
-
-                        PFLOW="$_TF1"
-                if [ "$PFLOW" == "s" ]; then
-                                PFLOW="sport"
-                                PFLOW_T="from"
-                        elif [ "$PFLOW" == "d" ]; then
-                                PFLOW="dport"
-                                PFLOW_T="to"
-                        fi
-                        PPORT="$_TF2"
-                        expand_port "$PPORT"; PPORT="$_PORT"
-
-                        IPFLOW="$_TF3"
-                        if [ "$IPFLOW" == "s" ]; then
-                                IPFLOW="s"
-                        elif [ "$IPFLOW" == "d" ]; then
-                                IPFLOW="d"
-                        else
+                if [[ "$i" != *=* ]]; then
+                        # Bare host (IP/CIDR/FQDN)
+                        if ! valid_host "$i"; then
+                                eout "{trust} skipping invalid entry in $file: $i"
                                 continue
                         fi
-                        trust_restore_ipv6 "$_TF4"; PIP="$_TRV6_RESULT"
-
-                        if [ -n "$IPFLOW" ] && [ -n "$PIP" ] && [ -n "$PFLOW" ] && [ -n "$PPORT" ]; then
-                         if is_fqdn "$PIP"; then
-                          if resolve_fqdn "$PIP"; then
-                           local _th_rip
-                           while IFS= read -r _th_rip; do
+                        if is_fqdn "$i"; then
+                         if resolve_fqdn "$i"; then
+                          local _th_rip
+                          while IFS= read -r _th_rip; do
+                           if ! is_local_addr "$_th_rip"; then
                             if ipt_for_host "$_th_rip"; then
-                                eout "{trust} $verb $_th_rip $PFLOW_T port $PPORT (resolved from $PIP)"
-                                $IPT_H $IPT_FLAGS -A $chain -p tcp -m multiport -$IPFLOW "$_th_rip" --$PFLOW $PPORT -j $action_tcp
-                                $IPT_H $IPT_FLAGS -A $chain -p udp -m multiport -$IPFLOW "$_th_rip" --$PFLOW $PPORT -j $action_udp
+                                eout "{trust} $verb all to/from $i (resolved: $_th_rip)"
+                                $IPT_H $IPT_FLAGS -A $chain -s "$_th_rip" -d $ANY_ADDR -j $action_all
+                                $IPT_H $IPT_FLAGS -A $chain -d "$_th_rip" -s $ANY_ADDR -j $action_all
                             fi
-                           done <<< "$_RESOLVED_IPS"
-                          else
-                           eout "{trust} failed to resolve FQDN $PIP, skipping"
+                           fi
+                          done <<< "$_RESOLVED_IPS"
+                         else
+                          eout "{trust} failed to resolve FQDN $i, skipping"
+                         fi
+                        elif ! is_local_addr "$i"; then
+                         if [ -f "$file" ]; then
+                          if ipt_for_host "$i"; then
+                                eout "{trust} $verb all to/from $i"
+                                $IPT_H $IPT_FLAGS -A $chain -s $i -d $ANY_ADDR -j $action_all
+                                $IPT_H $IPT_FLAGS -A $chain -d $i -s $ANY_ADDR -j $action_all
                           fi
-                         elif ipt_for_host "$PIP"; then
-                                eout "{trust} $verb $PIP $PFLOW_T port $PPORT"
-                                $IPT_H $IPT_FLAGS -A $chain -p tcp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j $action_tcp
-                                $IPT_H $IPT_FLAGS -A $chain -p udp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j $action_udp
                          fi
                         fi
+                else
+                        # Advanced syntax (contains '=')
+                        _trust_hosts_advanced "$i" "$chain" "$ter_action" "$verb"
                 fi
-        done < <(printf '%s\n' "$_th_raw" | grep '=' | grep -vw in | grep -vw out | grep -v tcp | grep -v udp)
-        #
-        #
-        while IFS= read -r i; do
-                if [ -n "$i" ] && [ -f "$file" ]; then
-                        trust_protect_ipv6 "$i"; i="$_TPV6_RESULT"
-
-                        trust_parse_fields "$i"
-
-                        NFLOW="$_TF1"
-                        if [ "$NFLOW" == "in" ]; then
-                                NFLOW="INPUT"
-                                NFLOW_T="inbound"
-                        elif [ "$NFLOW" == "out" ]; then
-                                NFLOW="OUTPUT"
-                                NFLOW_T="outbound"
-                        else
-                                continue
-                        fi
-
-                        PFLOW="$_TF2"
-                        if [ "$PFLOW" == "s" ]; then
-                                PFLOW="sport"
-                                PFLOW_T="from"
-                        elif [ "$PFLOW" == "d" ]; then
-                                PFLOW="dport"
-                                PFLOW_T="to"
-                        else
-                                continue
-                        fi
-
-                        PPORT="$_TF3"
-                        expand_port "$PPORT"; PPORT="$_PORT"
-
-                        IPFLOW="$_TF4"
-                        if [ "$IPFLOW" == "s" ]; then
-                                IPFLOW="s"
-                        elif [ "$IPFLOW" == "d" ]; then
-                                IPFLOW="d"
-                        else
-                                continue
-                        fi
-                        trust_restore_ipv6 "$_TF5"; PIP="$_TRV6_RESULT"
-
-                        if [ -n "$NFLOW" ] && [ -n "$IPFLOW" ] && [ -n "$PIP" ] && [ -n "$PFLOW" ] && [ -n "$PPORT" ]; then
-                         if is_fqdn "$PIP"; then
-                          if resolve_fqdn "$PIP"; then
-                           local _th_rip
-                           while IFS= read -r _th_rip; do
-                            if [ "$verb" == "allow" ] && [ "$IPFLOW" == "s" ] && [ "$NFLOW" == "INPUT" ] && is_local_addr "$_th_rip"; then
-                                eout "{trust} ignored local ip $verb rule '$NFLOW_T $_th_rip $PFLOW_T port $PPORT'"
-                            elif [ "$verb" == "allow" ] && [ "$IPFLOW" == "d" ] && [ "$NFLOW" == "OUTPUT" ] && is_local_addr "$_th_rip"; then
-                                eout "{trust} ignored local ip $verb rule '$NFLOW_T $_th_rip $PFLOW_T port $PPORT'"
-                            elif ipt_for_host "$_th_rip"; then
-                                eout "{trust} $verb $NFLOW_T $_th_rip $PFLOW_T port $PPORT (resolved from $PIP)"
-                                $IPT_H $IPT_FLAGS -A $chain -p tcp -m multiport -$IPFLOW "$_th_rip" --$PFLOW $PPORT -j $action_tcp
-                                $IPT_H $IPT_FLAGS -A $chain -p udp -m multiport -$IPFLOW "$_th_rip" --$PFLOW $PPORT -j $action_udp
-                            fi
-                           done <<< "$_RESOLVED_IPS"
-                          else
-                           eout "{trust} failed to resolve FQDN $PIP, skipping"
-                          fi
-                         elif [ "$verb" == "allow" ] && [ "$IPFLOW" == "s" ] && [ "$NFLOW" == "INPUT" ] && is_local_addr "$PIP"; then
-                                eout "{trust} ignored local ip $verb rule '$NFLOW_T $PIP $PFLOW_T port $PPORT'"
-                         elif [ "$verb" == "allow" ] && [ "$IPFLOW" == "d" ] && [ "$NFLOW" == "OUTPUT" ] && is_local_addr "$PIP"; then
-                                eout "{trust} ignored local ip $verb rule '$NFLOW_T $PIP $PFLOW_T port $PPORT'"
-                         elif ipt_for_host "$PIP"; then
-                                eout "{trust} $verb $NFLOW_T $PIP $PFLOW_T port $PPORT"
-                                $IPT_H $IPT_FLAGS -A $chain -p tcp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j $action_tcp
-                                $IPT_H $IPT_FLAGS -A $chain -p udp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j $action_udp
-                         fi
-                        fi
-                fi
-        done < <(printf '%s\n' "$_th_raw" | grep '=' | grep -wE 'in|out' | grep -v tcp | grep -v udp)
-        #
-        #
-        while IFS= read -r i; do
-                if [ -n "$i" ] && [ -f "$file" ]; then
-                        trust_protect_ipv6 "$i"; i="$_TPV6_RESULT"
-
-                        trust_parse_fields "$i"
-
-                        PTYPE="$_TF1"
-                        if [ "$PTYPE" == "tcp" ]; then
-                                PTYPE="tcp"
-                        elif [ "$PTYPE" == "udp" ]; then
-                                PTYPE="udp"
-                        else
-                                continue
-                        fi
-
-                        NFLOW="$_TF2"
-                        if [ "$NFLOW" == "in" ]; then
-                                NFLOW="INPUT"
-                                NFLOW_T="inbound"
-                        elif [ "$NFLOW" == "out" ]; then
-                                NFLOW="OUTPUT"
-                                NFLOW_T="outbound"
-                        else
-                                continue
-                        fi
-
-                        PFLOW="$_TF3"
-                        if [ "$PFLOW" == "s" ]; then
-                                PFLOW="sport"
-                                PFLOW_T="from"
-                        elif [ "$PFLOW" == "d" ]; then
-                                PFLOW="dport"
-                                PFLOW_T="to"
-                        else
-                                continue
-                        fi
-
-                        PPORT="$_TF4"
-                        expand_port "$PPORT"; PPORT="$_PORT"
-
-                        IPFLOW="$_TF5"
-                        if [ "$IPFLOW" == "s" ]; then
-                                IPFLOW="s"
-                        elif [ "$IPFLOW" == "d" ]; then
-                                IPFLOW="d"
-                        else
-                                continue
-                        fi
-                        trust_restore_ipv6 "$_TF6"; PIP="$_TRV6_RESULT"
-
-                        if [ -n "$PTYPE" ] && [ -n "$NFLOW" ] && [ -n "$IPFLOW" ] && [ -n "$PIP" ] && [ -n "$PFLOW" ] && [ -n "$PPORT" ]; then
-                         if is_fqdn "$PIP"; then
-                          if resolve_fqdn "$PIP"; then
-                           local _th_rip
-                           while IFS= read -r _th_rip; do
-                            if [ "$verb" == "allow" ] && [ "$IPFLOW" == "s" ] && [ "$NFLOW" == "INPUT" ] && is_local_addr "$_th_rip"; then
-                                eout "{trust} ignored local ip $verb rule '$NFLOW_T $_th_rip $PFLOW_T port $PPORT'"
-                            elif [ "$verb" == "allow" ] && [ "$IPFLOW" == "d" ] && [ "$NFLOW" == "OUTPUT" ] && is_local_addr "$_th_rip"; then
-                                eout "{trust} ignored local ip $verb rule '$NFLOW_T $_th_rip $PFLOW_T port $PPORT'"
-                            elif ipt_for_host "$_th_rip"; then
-                                if [ "$PTYPE" == "tcp" ]; then
-                                        eout "{trust} $verb $NFLOW_T $PTYPE $_th_rip $PFLOW_T port $PPORT (resolved from $PIP)"
-                                        $IPT_H $IPT_FLAGS -A $chain -p $PTYPE -m multiport -$IPFLOW "$_th_rip" --$PFLOW $PPORT -j $action_tcp
-                                elif [ "$PTYPE" == "udp" ]; then
-                                        eout "{trust} $verb $NFLOW_T $PTYPE $_th_rip $PFLOW_T port $PPORT (resolved from $PIP)"
-                                        $IPT_H $IPT_FLAGS -A $chain -p $PTYPE -m multiport -$IPFLOW "$_th_rip" --$PFLOW $PPORT -j $action_udp
-                                fi
-                            fi
-                           done <<< "$_RESOLVED_IPS"
-                          else
-                           eout "{trust} failed to resolve FQDN $PIP, skipping"
-                          fi
-                         elif [ "$verb" == "allow" ] && [ "$IPFLOW" == "s" ] && [ "$NFLOW" == "INPUT" ] && is_local_addr "$PIP"; then
-                                eout "{trust} ignored local ip $verb rule '$NFLOW_T $PIP $PFLOW_T port $PPORT'"
-                         elif [ "$verb" == "allow" ] && [ "$IPFLOW" == "d" ] && [ "$NFLOW" == "OUTPUT" ] && is_local_addr "$PIP"; then
-                                eout "{trust} ignored local ip $verb rule '$NFLOW_T $PIP $PFLOW_T port $PPORT'"
-                         elif ipt_for_host "$PIP"; then
-                                if [ "$PTYPE" == "tcp" ]; then
-                                        eout "{trust} $verb $NFLOW_T $PTYPE $PIP $PFLOW_T port $PPORT"
-                                        $IPT_H $IPT_FLAGS -A $chain -p $PTYPE -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j $action_tcp
-                                elif [ "$PTYPE" == "udp" ]; then
-                                        eout "{trust} $verb $NFLOW_T $PTYPE $PIP $PFLOW_T port $PPORT"
-                                        $IPT_H $IPT_FLAGS -A $chain -p $PTYPE -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j $action_udp
-                                fi
-                         fi
-                        fi
-                fi
-        done < <(printf '%s\n' "$_th_raw" | grep '=' | grep -wE 'tcp|udp')
+        done <<< "$_th_raw"
 fi
 }
 

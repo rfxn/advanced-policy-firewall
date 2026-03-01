@@ -5,6 +5,7 @@
 load '/usr/local/lib/bats/bats-support/load'
 load '/usr/local/lib/bats/bats-assert/load'
 source /opt/tests/helpers/assert-iptables.bash
+source /opt/tests/helpers/capability-detect.bash
 
 APF="/opt/apf/apf"
 APF_DIR="/opt/apf"
@@ -27,21 +28,8 @@ teardown_file() {
 }
 
 setup() {
-    # Direct cleanup — more reliable than apf -u in container
-    # Remove all lines mentioning test IPs (entries + comments)
-    for host in 192.0.2.50 192.0.2.51 192.0.2.55 "198.51.100.0/24" "198.51.100.1/32" "2001:db8::50" "2001:db8::51"; do
-        local escaped
-        escaped=$(echo "$host" | sed 's/[.\/\:]/\\&/g')
-        sed -i "/${escaped}/d" "$APF_DIR/allow_hosts.rules" 2>/dev/null || true
-        sed -i "/${escaped}/d" "$APF_DIR/deny_hosts.rules" 2>/dev/null || true
-    done
-    # Flush trust chains so stale iptables rules don't interfere
-    iptables -F TALLOW 2>/dev/null || true
-    iptables -F TDENY 2>/dev/null || true
-    if ip6tables_available; then
-        ip6tables -F TALLOW 2>/dev/null || true
-        ip6tables -F TDENY 2>/dev/null || true
-    fi
+    clean_trust_entries 192.0.2.50 192.0.2.51 192.0.2.55 \
+        "198.51.100.0/24" "198.51.100.1/32" "2001:db8::50" "2001:db8::51"
 }
 
 @test "apf -a adds host to allow_hosts.rules file" {
