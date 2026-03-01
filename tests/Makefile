@@ -4,6 +4,7 @@ BATSMAN_OS_DEEP   := centos6 ubuntu1204
 BATSMAN_OS_EXTRA  := rocky10
 BATSMAN_OS_ALL    := $(BATSMAN_OS_MODERN) $(BATSMAN_OS_LEGACY) $(BATSMAN_OS_DEEP) $(BATSMAN_OS_EXTRA)
 BATSMAN_RUN_TESTS := ./run-tests.sh
+BATSMAN_PROJECT   := apf
 
 include infra/include/Makefile.tests
 
