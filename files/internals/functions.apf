@@ -1535,42 +1535,67 @@ echo "$NAME Status Log:"
 tac "$LOG_APF" | ${PAGER:-more}
 }
 
+cli_validate() {
+    validate_config
+    echo "Configuration validated successfully."
+}
+
+list_trust_file() {
+    local file="$1" label="$2" content
+    if [ ! -f "$file" ]; then
+        echo "No ${label} found."
+        return 1
+    fi
+    content=$(grep -v '^#' "$file" | grep -v '^[[:space:]]*$')
+    if [ -z "$content" ]; then
+        echo "No entries in ${label}."
+        return 0
+    fi
+    echo "$content"
+}
+
 help() {
-	echo "usage apf [OPTION]"
-	echo "-s|--start ......................... load all firewall rules"
-	echo "-r|--restart ....................... stop (flush) & reload firewall rules"
-	echo "-f|--stop|--flush .................. stop (flush) all firewall rules"
-	echo "-l|--list .......................... list all firewall rules"
-	echo "-t|-st|--status .................... output firewall status log"
-	echo "-e|--refresh ....................... refresh & re-resolve FQDNs in trust rules"
-	echo "-a HOST CMT|--allow HOST COMMENT ... add host (IP/IPv6/CIDR/FQDN) to"
-	echo "                                     allow_hosts.rules and immediately"
-	echo "                                     load new rule into firewall"
-	echo "                                     also accepts advanced trust syntax:"
-	echo "                                       apf -a \"tcp:in:d=22:s=192.168.1.0/24\""
-	echo "                                       apf -a \"d=3306:s=10.0.0.5\""
-	echo "-d HOST CMT|--deny HOST COMMENT .... add host (IP/IPv6/CIDR/FQDN) to"
-	echo "                                     deny_hosts.rules and immediately"
-	echo "                                     load new rule into firewall"
-	echo "                                     also accepts advanced trust syntax"
-	echo "-u|--remove|--unban HOST ........... remove host from [glob]*_hosts.rules"
-	echo "                                     and immediately remove rule from firewall"
-	echo "                                     also removes advanced trust entries"
-	echo "-g|--search PATTERN ................ search iptables/ipset rules and trust files"
-	echo "-ta HOST TTL [CMT]|--temp-allow .... temporarily allow host with TTL"
-	echo "                                     (TTL: seconds, or 5m, 1h, 7d)"
-	echo "                                     also accepts advanced trust syntax"
-	echo "-td HOST TTL [CMT]|--temp-deny ..... temporarily deny host with TTL"
-	echo "                                     also accepts advanced trust syntax"
-	echo "--templ|--temp-list ................ list temp entries with remaining TTL"
-	echo "--tempf|--temp-flush ............... remove all temporary entries"
-	echo "--temp-expire ...................... expire temporary entries (runs from cron)"
-	echo "-o|--ovars ......................... output all configuration options"
-	echo "-v|--version ....................... output version number"
-	echo "--ipset-update ..................... hot-reload ipset block lists from ipset.rules"
-	echo "--gre-up ........................... bring up GRE tunnels from gre.rules"
-	echo "--gre-down ......................... tear down GRE tunnels"
-	echo "--gre-status ....................... show GRE tunnel status"
+	echo "usage: apf [OPTION]"
+	echo ""
+	echo "Firewall Control:"
+	echo "  -s, --start ................. load all firewall rules"
+	echo "  -r, --restart ............... flush & reload all firewall rules"
+	echo "  -f, --stop, --flush ......... flush all firewall rules"
+	echo "  -l, --list .................. list all firewall rules (IPv4 + IPv6)"
+	echo "  -t, -st, --status ........... firewall status log"
+	echo "  -e, --refresh ............... refresh & re-resolve DNS in trust rules"
+	echo ""
+	echo "Trust Management:"
+	echo "  -a HOST [CMT], --allow ...... add host to allow list and load rule"
+	echo "  -d HOST [CMT], --deny ....... add host to deny list and load rule"
+	echo "  -u HOST, --remove ........... remove host from all trust files"
+	echo "  --la, --list-allow .......... display allow list entries"
+	echo "  --ld, --list-deny ........... display deny list entries"
+	echo ""
+	echo "  Advanced trust syntax:  apf -a \"tcp:in:d=22:s=10.0.0.0/8\""
+	echo "                          apf -d \"d=3306:s=192.168.1.5\""
+	echo ""
+	echo "Temporary Trust:"
+	echo "  -ta HOST TTL [CMT] .......... temporarily allow host (5m, 1h, 7d)"
+	echo "  -td HOST TTL [CMT] .......... temporarily deny host"
+	echo "  --templ, --temp-list ........ list temp entries with remaining TTL"
+	echo "  --tempf, --temp-flush ....... remove all temporary entries"
+	echo ""
+	echo "Diagnostics:"
+	echo "  -g PATTERN, --search ........ search iptables/ipset rules & trust files"
+	echo "  --validate, --check ......... validate config without starting firewall"
+	echo "  -o, --ovars, --dump-config .. output all configuration variables"
+	echo "  -v, --version ............... output version number"
+	echo "  -h, --help .................. show this help message"
+	echo ""
+	echo "Subsystems:"
+	echo "  --ipset-update .............. hot-reload ipset block lists"
+	echo "  --gre-up .................... bring up GRE tunnels"
+	echo "  --gre-down .................. tear down GRE tunnels"
+	echo "  --gre-status ................ show GRE tunnel status"
+	echo ""
+	echo "Internal:"
+	echo "  --temp-expire ............... expire temp entries (called from cron)"
 }
 
 tosroute() {

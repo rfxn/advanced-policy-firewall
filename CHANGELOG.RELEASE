@@ -51,6 +51,13 @@
       removal without DNS; refresh (apf -e) re-resolves FQDNs; works in
       CLI (-a/-d/-ta/-td/-u) and bulk load (functions.apf, conf.apf,
       internals.conf, .ca.def; 20 tests)
+[New] -h/--help: explicit help handler exits 0; previously no args exited 1
+      (apf)
+[New] --validate/--check: validate config without starting firewall; checks
+      stop targets, rate formats, connlimit syntax (apf, functions.apf)
+[New] --list-allow/--list-deny (--la/--ld): display trust file entries with
+      comments and blank lines stripped (apf, functions.apf)
+[New] --dump-config: self-documenting alias for -o/--ovars (apf)
 
   -- Bug Fixes --
 
@@ -210,7 +217,10 @@
 [Change] VNET: replace fork-heavy parsing with builtins and glob patterns;
       fix ifconfig detection; add variable quoting; use conditional default
       for INSTALL_PATH (main.vnet, vnetgen)
-[Change] help(): show all CLI aliases, normalize alignment (functions.apf)
+[Change] help(): restructure with section headers (Firewall Control, Trust
+      Management, Temporary Trust, Diagnostics, Subsystems, Internal);
+      --temp-expire moved to Internal section (functions.apf, apf.8, README,
+      README.md)
 [Change] cl_cports(): reset SMTP and connlimit variables for VNET per-IP
       consistency (functions.apf)
 [Change] Drop Ubuntu 22.04 from CI matrix; redundant with 20.04+24.04
@@ -268,6 +278,8 @@
       hook_pre.sh or hook_post.sh fails (26-hook-search-silent.bats)
 [New] Search special character tests: verify apf -g handles dots, brackets,
       and dash-prefixed patterns without crashing (26-hook-search-silent.bats)
+[New] 32-cli-help.bats: tests for -h/--help, --dump-config, --validate/--check,
+      --la/--ld, section headers in help output (32-cli-help.bats)
 [Fix] Hook ordering test: CentOS 6 iptables 1.4.7 compat — use protocol-
       specific DROP anchor instead of catch-all (26-hook-search-silent.bats)
 [New] Test parallelization: --parallel [N] flag splits across N containers;

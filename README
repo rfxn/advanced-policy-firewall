@@ -781,34 +781,47 @@ order — see the FLOW document (also installed as /etc/apf/doc/FLOW).
 The /usr/local/sbin/apf command has a number of options that will ease the
 day-to-day use of your firewall. Here is a quick snap-shot of the options:
 
-usage apf [OPTION]
--s|--start ......................... load all firewall rules
--r|--restart ....................... stop (flush) & reload firewall rules
--f|--stop|--flush .................. stop (flush) all firewall rules
--l|--list .......................... list all firewall rules
--t|--status ........................ output firewall status log
--e|--refresh ....................... refresh & re-resolve FQDNs in trust rules
--a HOST CMT|--allow HOST COMMENT ... add host (IP/IPv6/CIDR/FQDN) to
-                                     allow_hosts.rules and immediately
-                                     load new rule into firewall
--d HOST CMT|--deny HOST COMMENT .... add host (IP/IPv6/CIDR/FQDN) to
-                                     deny_hosts.rules and immediately
-                                     load new rule into firewall
--u|--remove|--unban HOST ........... remove host from [glob]*_hosts.rules
-                                     and immediately remove rule from firewall
--g|--search PATTERN ................ search iptables/ipset rules and trust files
--ta HOST TTL [CMT]|--temp-allow .... temporarily allow host with TTL
-                                     (TTL: seconds, or 5m, 1h, 7d)
--td HOST TTL [CMT]|--temp-deny ..... temporarily deny host with TTL
---templ|--temp-list ................ list temp entries with remaining TTL
---tempf|--temp-flush ............... remove all temporary entries
---temp-expire ...................... expire temporary entries (runs from cron)
--o|--ovars ......................... output all configuration options
--v|--version ....................... output version number
---ipset-update ..................... hot-reload ipset block lists from ipset.rules
---gre-up ........................... bring up GRE tunnels from gre.rules
---gre-down ......................... tear down GRE tunnels
---gre-status ....................... show GRE tunnel status
+usage: apf [OPTION]
+
+Firewall Control:
+  -s, --start ................. load all firewall rules
+  -r, --restart ............... flush & reload all firewall rules
+  -f, --stop, --flush ......... flush all firewall rules
+  -l, --list .................. list all firewall rules (IPv4 + IPv6)
+  -t, -st, --status ........... firewall status log
+  -e, --refresh ............... refresh & re-resolve DNS in trust rules
+
+Trust Management:
+  -a HOST [CMT], --allow ...... add host to allow list and load rule
+  -d HOST [CMT], --deny ....... add host to deny list and load rule
+  -u HOST, --remove ........... remove host from all trust files
+  --la, --list-allow .......... display allow list entries
+  --ld, --list-deny ........... display deny list entries
+
+  Advanced trust syntax:  apf -a "tcp:in:d=22:s=10.0.0.0/8"
+                          apf -d "d=3306:s=192.168.1.5"
+
+Temporary Trust:
+  -ta HOST TTL [CMT] .......... temporarily allow host (5m, 1h, 7d)
+  -td HOST TTL [CMT] .......... temporarily deny host
+  --templ, --temp-list ........ list temp entries with remaining TTL
+  --tempf, --temp-flush ....... remove all temporary entries
+
+Diagnostics:
+  -g PATTERN, --search ........ search iptables/ipset rules & trust files
+  --validate, --check ......... validate config without starting firewall
+  -o, --ovars, --dump-config .. output all configuration variables
+  -v, --version ............... output version number
+  -h, --help .................. show this help message
+
+Subsystems:
+  --ipset-update .............. hot-reload ipset block lists
+  --gre-up .................... bring up GRE tunnels
+  --gre-down .................. tear down GRE tunnels
+  --gre-status ................ show GRE tunnel status
+
+Internal:
+  --temp-expire ............... expire temp entries (called from cron)
 
 The -l|--list option shows all loaded iptables rules. The -t|--status option
 pages through the APF status log at /var/log/apf_log.
@@ -830,8 +843,14 @@ or chain name. Examples:
   apf -g DROP
   apf -g :443
 
-The -o|--ovars option outputs all configured variables and their values — useful
-for troubleshooting or when reporting problems (see section 6).
+The -o|--ovars|--dump-config option outputs all configured variables and their
+values — useful for troubleshooting or when reporting problems (see section 6).
+
+The --validate|--check option validates the configuration without starting the
+firewall. Useful for verifying changes before a restart.
+
+The --la|--list-allow and --ld|--list-deny options display the contents of the
+allow and deny trust files (comments and blank lines excluded).
 
 4.1) General Usage: Trust System:
 The trust system in APF is a very traditional setup with two basic trust levels;

@@ -8,7 +8,7 @@
 apf \- Advanced Policy Firewall
 .SH SYNOPSIS
 .B apf
-.RB [ \-s | \-r | \-f | \-l | \-t | \-e | \-o | \-v ]
+.RB [ \-s | \-r | \-f | \-l | \-t | \-e | \-o | \-v | \-h ]
 .br
 .B apf
 .RB { \-a | \-d }
@@ -48,7 +48,7 @@ Stop (flush) all firewall rules and reset chains to ACCEPT.
 .BR \-l ", " \-\-list
 List all active iptables rules.
 .TP
-.BR \-t ", " \-\-status
+.BR \-t ", " \-st ", " \-\-status
 Display the firewall status log.
 .TP
 .BR \-e ", " \-\-refresh
@@ -87,6 +87,16 @@ from all trust files (allow, deny, global) and immediately remove
 matching rules from the live firewall.
 Accepts both bare hosts and advanced trust syntax.
 Removing a bare IP also removes any advanced trust entries containing that IP.
+.TP
+.BR \-\-la ", " \-\-list\-allow
+Display entries in
+.IR allow_hosts.rules
+(comments and blank lines excluded).
+.TP
+.BR \-\-ld ", " \-\-list\-deny
+Display entries in
+.IR deny_hosts.rules
+(comments and blank lines excluded).
 .SS Temporary Trust
 .TP
 .BR \-ta " \fIHOST\fR \fITTL\fR [\fICOMMENT\fR], " \-\-temp\-allow " \fIHOST\fR \fITTL\fR [\fICOMMENT\fR]"
@@ -113,8 +123,8 @@ List all temporary trust entries with remaining TTL.
 Remove all temporary trust entries.
 .TP
 .B \-\-temp\-expire
-Expire temporary entries whose TTL has elapsed.
-Normally run from cron every minute.
+Expire temporary entries whose TTL has elapsed (internal; called from cron
+every minute).
 .SS Diagnostics
 .TP
 .BR \-g " \fIPATTERN\fR, " \-\-search " \fIPATTERN\fR"
@@ -122,11 +132,19 @@ Search iptables rules (IPv4 and IPv6), ipset sets, and trust files for
 .IR PATTERN .
 Case\-insensitive.
 .TP
-.BR \-o ", " \-\-ovars
+.BR \-\-validate ", " \-\-check
+Validate configuration without starting the firewall.
+Checks stop targets, rate formats, connlimit syntax, and other settings.
+Exits 0 on success, 1 on error with a diagnostic message.
+.TP
+.BR \-o ", " \-\-ovars ", " \-\-dump\-config
 Output all configuration variables.
 .TP
 .BR \-v ", " \-\-version
 Output the version number.
+.TP
+.BR \-h ", " \-\-help
+Show usage help and exit.
 .SS ipset Block Lists
 .TP
 .B \-\-ipset\-update
