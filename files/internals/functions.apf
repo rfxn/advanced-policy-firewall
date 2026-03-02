@@ -1551,51 +1551,131 @@ firewall_info() {
 		chain_count=$(echo "$fw_rules" | grep -c '^-N')
 	fi
 	if [ "$USE_IPV6" == "1" ] && [ -n "$IP6T" ]; then
-		ipv6_count=$($IP6T $IPT_FLAGS -S 2>/dev/null | grep -c '^-A' || echo 0)
+		ipv6_count=$($IP6T $IPT_FLAGS -S 2>/dev/null | grep -c '^-A')
+		[ "$ipv6_count" -gt 0 ] 2>/dev/null || ipv6_count=0
 	fi
 
+	# --- Status ---
 	echo "APF v$VER — Firewall Status"
-	echo "  Active:         $running"
-	echo "  Interface:      ${IFACE_UNTRUSTED:-none}"
+	echo ""
+	echo "  Active:           $running"
+	echo "  Interface:        ${IFACE_UNTRUSTED:-none}"
 	if [ -n "$IFACE_TRUSTED" ]; then
-		echo "  Trusted iface:  $IFACE_TRUSTED"
+		echo "  Trusted iface:    $IFACE_TRUSTED"
 	fi
-	echo "  IPv6:           $([ "$USE_IPV6" == "1" ] && echo "enabled" || echo "disabled")"
-	echo "  IPv4 rules:     $rule_count (${chain_count} custom chains)"
+	echo "  IPv6:             $([ "$USE_IPV6" == "1" ] && echo "enabled" || echo "disabled")"
+	echo "  IPv4 rules:       $rule_count (${chain_count} custom chains)"
 	if [ "$USE_IPV6" == "1" ]; then
-		echo "  IPv6 rules:     $ipv6_count"
+		echo "  IPv6 rules:       $ipv6_count"
 	fi
-	echo "  Fast load:      $([ "$SET_FASTLOAD" == "1" ] && echo "enabled" || echo "disabled")"
-	echo "  DEVEL_MODE:     $([ "$DEVEL_MODE" == "1" ] && echo "ON (auto-flush every 5m)" || echo "off")"
-	if [ "$DOCKER_COMPAT" == "1" ]; then
-		echo "  Docker compat:  enabled"
-	fi
+	echo "  DEVEL_MODE:       $([ "$DEVEL_MODE" == "1" ] && echo "ON (auto-flush every 5m)" || echo "off")"
 
-	# Trust file stats
+	# --- Trust ---
+	echo ""
+	echo "Trust System:"
 	local allow_count=0 deny_count=0 temp_count=0
 	if [ -f "$ALLOW_HOSTS" ]; then
-		allow_count=$(grep -cv '^#\|^[[:space:]]*$' "$ALLOW_HOSTS" 2>/dev/null || echo 0)
+		allow_count=$(grep -cv '^#\|^[[:space:]]*$' "$ALLOW_HOSTS" 2>/dev/null)
+		[ "$allow_count" -gt 0 ] 2>/dev/null || allow_count=0
 	fi
 	if [ -f "$DENY_HOSTS" ]; then
-		deny_count=$(grep -cv '^#\|^[[:space:]]*$' "$DENY_HOSTS" 2>/dev/null || echo 0)
+		deny_count=$(grep -cv '^#\|^[[:space:]]*$' "$DENY_HOSTS" 2>/dev/null)
+		[ "$deny_count" -gt 0 ] 2>/dev/null || deny_count=0
 	fi
-	temp_count=$(grep -c 'ttl=.*expire=' "$ALLOW_HOSTS" "$DENY_HOSTS" 2>/dev/null || echo 0)
-	echo "  Allow entries:  $allow_count"
-	echo "  Deny entries:   $deny_count"
-	echo "  Temp entries:   $temp_count"
+	if [ -f "$ALLOW_HOSTS" ] || [ -f "$DENY_HOSTS" ]; then
+		temp_count=$(cat "$ALLOW_HOSTS" "$DENY_HOSTS" 2>/dev/null | grep -c 'ttl=.*expire=')
+		[ "$temp_count" -gt 0 ] 2>/dev/null || temp_count=0
+	fi
+	echo "  Allow entries:    $allow_count"
+	echo "  Deny entries:     $deny_count"
+	echo "  Temp entries:     $temp_count"
+	if [ -n "$SET_EXPIRE" ] && [ "$SET_EXPIRE" != "0" ]; then
+		echo "  Ban expiry:       ${SET_EXPIRE}s"
+	fi
+	if [ -n "$PERMBLOCK_COUNT" ] && [ "$PERMBLOCK_COUNT" != "0" ]; then
+		echo "  Block escalation: ${PERMBLOCK_COUNT} repeats in ${PERMBLOCK_INTERVAL}s"
+	fi
+	echo "  FQDN resolution:  $([ -n "$GETENT" ] && echo "enabled (timeout=${FQDN_TIMEOUT:-10}s)" || echo "disabled (getent not found)")"
 
-	if [ "$USE_IPSET" == "1" ] && command -v ipset > /dev/null 2>&1; then
-		local ipset_count
-		ipset_count=$(ipset list -n 2>/dev/null | grep -c . || echo 0)
-		echo "  ipset lists:    $ipset_count"
+	# --- Filtering ---
+	echo ""
+	echo "Filtering:"
+	echo "  TCP stop:         ${TCP_STOP:-DROP}"
+	echo "  UDP stop:         ${UDP_STOP:-DROP}"
+	echo "  Inbound TCP:      ${IG_TCP_CPORTS:-(none)}"
+	echo "  Inbound UDP:      ${IG_UDP_CPORTS:-(none)}"
+	if [ "$EGF" == "1" ]; then
+		echo "  Outbound TCP:     ${EG_TCP_CPORTS:-(none)}"
+		echo "  Outbound UDP:     ${EG_UDP_CPORTS:-(none)}"
+	else
+		echo "  Outbound filter:  disabled (EGF=0)"
+	fi
+	echo "  Packet sanity:    $([ "$PKT_SANITY" == "1" ] && echo "enabled" || echo "disabled")"
+	if [ -n "$IG_TCP_CLIMIT" ]; then
+		echo "  Connlimit:        $IG_TCP_CLIMIT"
+	fi
+	echo "  SYN flood:        $([ "$SYNFLOOD" == "1" ] && echo "enabled (${SYNFLOOD_RATE} burst=${SYNFLOOD_BURST})" || echo "disabled")"
+	echo "  SMTP blocking:    $([ "$SMTP_BLOCK" == "1" ] && echo "enabled" || echo "disabled")"
+
+	# --- Subsystems ---
+	echo ""
+	echo "Subsystems:"
+	echo "  Fast load:        $([ "$SET_FASTLOAD" == "1" ] && echo "enabled" || echo "disabled")"
+	echo "  RAB:              $([ "$RAB" == "1" ] && echo "enabled" || echo "disabled")"
+	echo "  VNET:             $([ "$SET_VNET" == "1" ] && echo "enabled" || echo "disabled")"
+	if [ "$DOCKER_COMPAT" == "1" ]; then
+		echo "  Docker compat:    enabled"
+	fi
+	if [ "$USE_IPSET" == "1" ]; then
+		local ipset_count=0
+		if command -v ipset > /dev/null 2>&1; then
+			ipset_count=$(ipset list -n 2>/dev/null | grep -c .)
+			[ "$ipset_count" -gt 0 ] 2>/dev/null || ipset_count=0
+		fi
+		echo "  ipset:            enabled ($ipset_count active lists)"
+	else
+		echo "  ipset:            disabled"
 	fi
 	if [ "$USE_GRE" == "1" ]; then
-		echo "  GRE tunnels:    enabled"
+		echo "  GRE tunnels:      enabled"
+	fi
+
+	# Remote block lists
+	local dlists=""
+	[ "$DLIST_DSHIELD" == "1" ] && dlists="${dlists}dshield "
+	[ "$DLIST_SPAMHAUS" == "1" ] && dlists="${dlists}spamhaus "
+	[ "$DLIST_PHP" == "1" ] && dlists="${dlists}php "
+	[ "$DLIST_RESERVED" == "1" ] && dlists="${dlists}reserved "
+	[ "$DLIST_ECNSHAME" == "1" ] && dlists="${dlists}ecn "
+	if [ -n "$dlists" ]; then
+		echo "  Remote lists:     $dlists"
+	else
+		echo "  Remote lists:     none"
+	fi
+
+	# --- Logging ---
+	echo ""
+	echo "Logging:"
+	echo "  Log file:         ${LOG_APF:-/var/log/apf_log}"
+	echo "  Log drops:        $([ "$LOG_DROP" == "1" ] && echo "enabled" || echo "disabled")"
+	echo "  Log target:       ${LOG_TARGET:-LOG}"
+	if [ -n "$SET_TRIM" ] && [ "$SET_TRIM" != "0" ]; then
+		echo "  Log trim:         ${SET_TRIM} lines"
 	fi
 
 	echo ""
 	echo "Recent log:"
-	tail -5 "$LOG_APF" 2>/dev/null || echo "  (no log)"
+	if [ -f "$LOG_APF" ]; then
+		local log_lines
+		log_lines=$(tail -5 "$LOG_APF" 2>/dev/null)
+		if [ -n "$log_lines" ]; then
+			echo "$log_lines"
+		else
+			echo "  (log empty)"
+		fi
+	else
+		echo "  (log file not found)"
+	fi
 }
 
 trust_lookup() {

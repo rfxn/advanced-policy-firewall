@@ -189,13 +189,15 @@ teardown_file() {
     assert_output --partial "IPv6:"
 }
 
-@test "apf --info shows trust entry counts" {
+@test "apf --info shows trust section with counts" {
     "$APF" -s 2>/dev/null || true
     run "$APF" --info
     assert_success
+    assert_output --partial "Trust System:"
     assert_output --partial "Allow entries:"
     assert_output --partial "Deny entries:"
     assert_output --partial "Temp entries:"
+    assert_output --partial "FQDN resolution:"
 }
 
 @test "apf --info shows DEVEL_MODE status" {
@@ -205,10 +207,37 @@ teardown_file() {
     assert_output --partial "DEVEL_MODE:"
 }
 
-@test "apf --info shows recent log lines" {
+@test "apf --info shows filtering section" {
     "$APF" -s 2>/dev/null || true
     run "$APF" --info
     assert_success
+    assert_output --partial "Filtering:"
+    assert_output --partial "TCP stop:"
+    assert_output --partial "Inbound TCP:"
+    assert_output --partial "Packet sanity:"
+    assert_output --partial "SYN flood:"
+    assert_output --partial "SMTP blocking:"
+}
+
+@test "apf --info shows subsystems section" {
+    "$APF" -s 2>/dev/null || true
+    run "$APF" --info
+    assert_success
+    assert_output --partial "Subsystems:"
+    assert_output --partial "Fast load:"
+    assert_output --partial "RAB:"
+    assert_output --partial "VNET:"
+    assert_output --partial "ipset:"
+    assert_output --partial "Remote lists:"
+}
+
+@test "apf --info shows logging and recent log" {
+    "$APF" -s 2>/dev/null || true
+    run "$APF" --info
+    assert_success
+    assert_output --partial "Logging:"
+    assert_output --partial "Log file:"
+    assert_output --partial "Log drops:"
     assert_output --partial "Recent log:"
 }
 

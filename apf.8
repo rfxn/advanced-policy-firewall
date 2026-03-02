@@ -56,8 +56,12 @@ Output is suitable for piping and scripting:
 View all firewall rules in an editor (pico, nano, vi).
 .TP
 .B \-\-info
-Show a one\-screen firewall status summary: active state, rule counts,
-trust entry statistics, enabled subsystems, and recent log lines.
+Show firewall status summary: active state, rule/chain counts, trust
+system statistics (allow/deny/temp entries, ban expiry, block escalation,
+FQDN resolution), filtering configuration (stop targets, port lists,
+packet sanity, connlimit, SYN flood, SMTP blocking), subsystem status
+(fast load, RAB, VNET, Docker compat, ipset, GRE, remote block lists),
+logging settings, and recent log entries.
 .TP
 .BR \-t ", " \-\-status
 Page through the full firewall status log.

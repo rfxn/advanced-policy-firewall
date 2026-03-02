@@ -54,9 +54,13 @@
 [New] --rules: dump active iptables rules to stdout for piping/scripting;
       uses -S format consistent across nft/legacy backends; includes IPv6
       when USE_IPV6=1 (apf, functions.apf)
-[New] --info: firewall status summary showing active state, rule counts, trust
-      entries, enabled subsystems (ipset, GRE, Docker compat), DEVEL_MODE
-      warning, and recent log lines (apf, functions.apf)
+[New] --info: firewall status summary with sections for status (active state,
+      rules, chains), trust system (allow/deny/temp counts, ban expiry, block
+      escalation, FQDN resolution), filtering (stop targets, inbound/outbound
+      ports, packet sanity, connlimit, SYN flood, SMTP blocking), subsystems
+      (fast load, RAB, VNET, Docker compat, ipset, GRE, remote block lists),
+      and logging (log file, log drops, trim, recent entries)
+      (apf, functions.apf)
 [New] --lookup HOST: check if host exists in trust files (allow, deny, global
       allow, global deny) without searching iptables/ipset rules; exits 0 if
       found, 1 if not found (apf, functions.apf)
