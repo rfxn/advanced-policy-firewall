@@ -75,3 +75,92 @@ teardown_file() {
     apf_set_config "USE_IPV6" "0"
     "$APF" -f 2>/dev/null || true
 }
+
+@test "empty snapshot does not prevent firewall start" {
+    source /opt/tests/helpers/apf-config.sh
+    apf_set_config "SET_FASTLOAD" "1"
+
+    # Full load to create snapshot
+    "$APF" -f 2>/dev/null || true
+    "$APF" -s
+
+    # Flush, then truncate snapshot
+    "$APF" -f 2>/dev/null || true
+    : > "$APF_DIR/internals/.apf.restore"
+
+    # Start — should fall back to full load despite empty snapshot
+    "$APF" -s
+
+    # Verify full load ran (chains should exist)
+    assert_chain_exists TALLOW
+    assert_chain_exists TDENY
+
+    apf_set_config "SET_FASTLOAD" "0"
+}
+
+@test "garbage snapshot does not prevent firewall start" {
+    source /opt/tests/helpers/apf-config.sh
+    apf_set_config "SET_FASTLOAD" "1"
+
+    # Full load to create snapshot
+    "$APF" -f 2>/dev/null || true
+    "$APF" -s
+
+    # Flush, then corrupt snapshot with garbage
+    "$APF" -f 2>/dev/null || true
+    echo "garbage data without table markers" > "$APF_DIR/internals/.apf.restore"
+
+    # Start — should fall back to full load despite corrupt snapshot
+    "$APF" -s
+
+    # Verify full load ran
+    assert_chain_exists TALLOW
+    assert_chain_exists TDENY
+
+    apf_set_config "SET_FASTLOAD" "0"
+}
+
+@test "flush also saves backend marker via snapshot_save" {
+    source /opt/tests/helpers/apf-config.sh
+    apf_set_config "SET_FASTLOAD" "1"
+
+    # Remove existing marker
+    rm -f "$APF_DIR/internals/.apf.restore.backend"
+
+    # Full load + normal flush (not flush 1 / internal)
+    "$APF" -s
+    "$APF" -f
+
+    # Flush should have called snapshot_save which writes the backend marker
+    [ -f "$APF_DIR/internals/.apf.restore.backend" ]
+    local marker
+    marker=$(cat "$APF_DIR/internals/.apf.restore.backend")
+    [[ "$marker" == "legacy" || "$marker" == "nft" ]]
+
+    apf_set_config "SET_FASTLOAD" "0"
+}
+
+@test "empty IPv6 snapshot does not prevent firewall start" {
+    if ! ip6tables_available; then skip "ip6tables not available"; fi
+    source /opt/tests/helpers/apf-config.sh
+    apf_set_config "USE_IPV6" "1"
+    apf_set_config "SET_FASTLOAD" "1"
+
+    # Full load to create snapshots
+    "$APF" -f 2>/dev/null || true
+    "$APF" -s
+
+    # Flush, then truncate IPv6 snapshot
+    "$APF" -f 2>/dev/null || true
+    : > "$APF_DIR/internals/.apf6.restore"
+
+    # Start — should fall back to full load despite empty IPv6 snapshot
+    "$APF" -s
+
+    # Verify full load ran
+    assert_chain_exists TALLOW
+
+    apf_set_config "USE_IPV6" "0"
+    apf_set_config "SET_FASTLOAD" "0"
+    "$APF" -f 2>/dev/null || true
+}

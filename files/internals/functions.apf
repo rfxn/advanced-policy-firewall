@@ -43,6 +43,60 @@ _apf_cleanup_tmp() {
 	_APF_TMPFILES=""
 }
 
+## Snapshot save: atomic write with integrity validation
+# Writes iptables-save output to temp file, validates it, then atomically
+# moves into place. Handles both IPv4 and IPv6 (when USE_IPV6=1).
+# Also writes the backend marker (.apf.restore.backend).
+# Returns 0 on success, 1 on failure (IPv4 failure is fatal to caller;
+# IPv6 failure logs warning but does not fail the function).
+snapshot_save() {
+	local snap_dir="$INSTALL_PATH/internals"
+	local snap_tmp snap_rc
+
+	# IPv4 snapshot
+	snap_tmp=$(mktemp "$snap_dir/.apf.restore.XXXXXX")
+	_apf_reg_tmp "$snap_tmp"
+	$IPTS > "$snap_tmp" 2>/dev/null
+	snap_rc=$?
+	if [ "$snap_rc" -ne 0 ]; then
+		eout "{glob} snapshot save failed (iptables-save exit $snap_rc)"
+		rm -f "$snap_tmp"
+		return 1
+	fi
+	if [ ! -s "$snap_tmp" ] || ! grep -q '^\*' "$snap_tmp"; then
+		eout "{glob} snapshot save failed (empty or invalid output)"
+		rm -f "$snap_tmp"
+		return 1
+	fi
+	mv -f "$snap_tmp" "$snap_dir/.apf.restore"
+
+	# IPv6 snapshot (non-fatal — IPv4 snapshot survives if this fails)
+	if [ "$USE_IPV6" == "1" ] && [ -n "$IP6TS" ]; then
+		snap_tmp=$(mktemp "$snap_dir/.apf6.restore.XXXXXX")
+		_apf_reg_tmp "$snap_tmp"
+		$IP6TS > "$snap_tmp" 2>/dev/null
+		snap_rc=$?
+		if [ "$snap_rc" -ne 0 ]; then
+			eout "{glob} IPv6 snapshot save failed (ip6tables-save exit $snap_rc)"
+			rm -f "$snap_tmp"
+		elif [ ! -s "$snap_tmp" ] || ! grep -q '^\*' "$snap_tmp"; then
+			eout "{glob} IPv6 snapshot save failed (empty or invalid output)"
+			rm -f "$snap_tmp"
+		else
+			mv -f "$snap_tmp" "$snap_dir/.apf6.restore"
+		fi
+	fi
+
+	# Backend marker
+	local _ss_backend="legacy"
+	if $IPT --version 2>&1 | grep -q nf_tables; then
+		_ss_backend="nft"
+	fi
+	echo "$_ss_backend" > "$snap_dir/.apf.restore.backend"
+	eout "{glob} fast load snapshot saved (backend: $_ss_backend)"
+	return 0
+}
+
 ## Dual-stack iptables helpers
 # ipt()  — apply rule to both IPv4 and IPv6 (protocol-agnostic rules only)
 # ipt4() — IPv4 only (explicit)
@@ -987,14 +1041,15 @@ cli_trust() {
 		done <<< "$_RESOLVED_IPS"
 		if [ "$_ct_skip" == "0" ]; then
 			TIME=$(date +"%D %H:%M:%S")
+			ADDED_EPOCH=$(date +%s)
 			CMT="${CMT//$'\n'/ }"
 			CMT="${CMT//$'\r'/}"
 			CMT="${CMT//$'\t'/ }"
 			local _ct_csv="${_RESOLVED_IPS//$'\n'/,}"
 			if [ -n "$CMT" ]; then
-				echo "# added $HOST on $TIME resolved=$_ct_csv with comment: $CMT" >> "$FILE"
+				echo "# added $HOST on $TIME addedtime=$ADDED_EPOCH resolved=$_ct_csv with comment: $CMT" >> "$FILE"
 			else
-				echo "# added $HOST on $TIME resolved=$_ct_csv" >> "$FILE"
+				echo "# added $HOST on $TIME addedtime=$ADDED_EPOCH resolved=$_ct_csv" >> "$FILE"
 			fi
 			echo "$HOST" >> "$FILE"
 			local _ct_resolved_entry
@@ -1013,13 +1068,14 @@ cli_trust() {
 		echo "$_VTE_IP is a local address and can not be added to the trust system"
 	else
 		TIME=$(date +"%D %H:%M:%S")
+		ADDED_EPOCH=$(date +%s)
 		CMT="${CMT//$'\n'/ }"
 		CMT="${CMT//$'\r'/}"
 		CMT="${CMT//$'\t'/ }"
 		if [ -n "$CMT" ]; then
-			echo "# added $HOST on $TIME with comment: $CMT" >> "$FILE"
+			echo "# added $HOST on $TIME addedtime=$ADDED_EPOCH with comment: $CMT" >> "$FILE"
 		else
-			echo "# added $HOST on $TIME" >> "$FILE"
+			echo "# added $HOST on $TIME addedtime=$ADDED_EPOCH" >> "$FILE"
 		fi
 		echo "$HOST" >> "$FILE"
 		if trust_entry_rule "$HOST" "$CHAIN" "$ACTION" "-I"; then
@@ -1065,6 +1121,7 @@ cli_trust() {
 	done <<< "$_RESOLVED_IPS"
 	if [ "$_ct_skip" == "0" ]; then
 		TIME=$(date +"%D %H:%M:%S")
+		ADDED_EPOCH=$(date +%s)
 		CMT="${CMT//$'\n'/ }"
 		CMT="${CMT//$'\r'/}"
 		CMT="${CMT//$'\t'/ }"
@@ -1075,9 +1132,9 @@ cli_trust() {
 			JACTION="ACCEPT"
 		fi
 		if [ "$CMT" ]; then
-			echo "# added $HOST on $TIME resolved=$_ct_csv with comment: $CMT" >> "$FILE"
+			echo "# added $HOST on $TIME addedtime=$ADDED_EPOCH resolved=$_ct_csv with comment: $CMT" >> "$FILE"
 		else
-			echo "# added $HOST on $TIME resolved=$_ct_csv" >> "$FILE"
+			echo "# added $HOST on $TIME addedtime=$ADDED_EPOCH resolved=$_ct_csv" >> "$FILE"
 		fi
 		echo "$HOST" >> "$FILE"
 		while IFS= read -r _ct_rip; do
@@ -1097,13 +1154,14 @@ cli_trust() {
          echo "$HOST appears to be IPv6 but USE_IPV6 is not enabled"
  else
          TIME=$(date +"%D %H:%M:%S")
+	ADDED_EPOCH=$(date +%s)
 	CMT="${CMT//$'\n'/ }"
 	CMT="${CMT//$'\r'/}"
 	CMT="${CMT//$'\t'/ }"
 	if [ "$CMT" ]; then
-		echo "# added $HOST on $TIME with comment: $CMT" >> "$FILE"
+		echo "# added $HOST on $TIME addedtime=$ADDED_EPOCH with comment: $CMT" >> "$FILE"
 	else
-		echo "# added $HOST on $TIME" >> "$FILE"
+		echo "# added $HOST on $TIME addedtime=$ADDED_EPOCH" >> "$FILE"
 	fi
          echo "$HOST" >> "$FILE"
 	if [ "$ACTION" == "DENY" ]; then
@@ -1351,7 +1409,7 @@ escalate_to_permanent() {
 	sed -i "\%^${escaped_ip}$%d" "$DENY_HOSTS"
 
 	# Add as permanent with static noexpire markers
-	echo "# added $ip on $(date +"%D %H:%M:%S") static noexpire with comment: auto-escalated from temp deny (PERMBLOCK)" >> "$DENY_HOSTS"
+	echo "# added $ip on $(date +"%D %H:%M:%S") addedtime=$(date +%s) static noexpire with comment: auto-escalated from temp deny (PERMBLOCK)" >> "$DENY_HOSTS"
 	echo "$ip" >> "$DENY_HOSTS"
 
 	eout "{trust} $ip auto-escalated to permanent deny (PERMBLOCK_COUNT=$PERMBLOCK_COUNT reached)"
@@ -1475,11 +1533,7 @@ flush_apf_chains() {
 flush() {
 firewall_on=$($IPT $IPT_FLAGS -L --numeric | grep -vE "Chain|destination")
 if [ "$SET_FASTLOAD" == "1" ] && [ "$DOCKER_COMPAT" != "1" ] && [ "$1" != "1" ] && [ "$DEVEL_ON" != "1" ] && [ -n "$firewall_on" ]; then
-	$IPTS > "$INSTALL_PATH/internals/.apf.restore"
-	if [ "$USE_IPV6" == "1" ] && [ -n "$IP6TS" ]; then
-		$IP6TS > "$INSTALL_PATH/internals/.apf6.restore"
-	fi
-	eout "{glob} fast load snapshot saved"
+	snapshot_save
 fi
 
 if [ "$DOCKER_COMPAT" == "1" ]; then
@@ -2715,7 +2769,8 @@ cl_cports() {
 }
 
 expirebans() {
-local i ip date_d date_t ban_time time_diff expire_time check_time REFRESH_TIME eff_expire
+local ip ban_time time_diff expire_time check_time REFRESH_TIME eff_expire line
+local _eb_date_str
 if [ -z "$SET_EXPIRE" ]; then
         eff_expire=0
 else
@@ -2729,18 +2784,40 @@ if [ "$eff_expire" -ge "60" ]; then
  if [ -f "$INSTALL_PATH/deny_hosts.rules" ]; then
          expire_time="$eff_expire"
          check_time=$(date +%s)
-         while IFS='|' read -r ip date_d date_t; do
+         while IFS= read -r line; do
+                # Extract IP: "# added IP on ..."
+                ip="${line#\# added }"
+                ip="${ip%% *}"
                 [ -z "$ip" ] && continue
-                ban_time=$(date --date "$date_d $date_t" +%s 2>/dev/null)
+
+                # Prefer structured addedtime= marker
+                if [[ "$line" == *addedtime=* ]]; then
+                        ban_time="${line#*addedtime=}"
+                        ban_time="${ban_time%% *}"
+                else
+                        # Legacy fallback: extract date/time after "on "
+                        _eb_date_str="${line#*on }"
+                        # Trim everything after the timestamp (space-delimited)
+                        _eb_date_str="${_eb_date_str%% addedtime=*}"
+                        _eb_date_str="${_eb_date_str%% resolved=*}"
+                        _eb_date_str="${_eb_date_str%% with comment:*}"
+                        # _eb_date_str is now "MM/DD/YY HH:MM:SS"
+                        ban_time=$(date --date "$_eb_date_str" +%s 2>/dev/null)
+                fi
+                # Validate numeric
+                case "$ban_time" in *[!0-9]*) continue ;; esac
                 [ -z "$ban_time" ] && continue
+
                 time_diff=$(($check_time-$ban_time))
                 if [ "$time_diff" -ge "$expire_time" ]; then
                         eout "{trust} removed expired ban for $ip (${time_diff}s/${expire_time}s)"
                         local escaped_ip="${ip//./\\.}"
-                        sed -i "\%^${escaped_ip}\b%d" "$INSTALL_PATH/deny_hosts.rules"
+                        # Remove both the comment line and the bare IP line
+                        sed -i "\%# added ${escaped_ip} %d" "$INSTALL_PATH/deny_hosts.rules"
+                        sed -i "\%^${escaped_ip}$%d" "$INSTALL_PATH/deny_hosts.rules"
                         cli_trust_remove "$ip" >> /dev/null 2>&1
                 fi
-         done < <(grep -vE "static|noexpire|ttl=" "$INSTALL_PATH/deny_hosts.rules" | grep -iE "# added.*on.*" | awk '{print$3"|"$5"|"$6}')
+         done < <(grep -vE "static|noexpire|ttl=" "$INSTALL_PATH/deny_hosts.rules" | grep -E "# added .* on ")
  fi
 fi
 }

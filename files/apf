@@ -133,6 +133,10 @@ if [ -z "$SKIP_FASTLOAD_FIRSTRUN" ] && [ -z "$SKIP_FASTLOAD_EXPIRED" ] && [ -z "
 		fi
 	fi
 	if [ "$SKIP_FASTLOAD_BACKEND" != "1" ]; then
+		# Pre-validate IPv4 snapshot before attempting restore
+		if [ ! -s "$INSTALL_PATH/internals/.apf.restore" ] || ! grep -q '^\*' "$INSTALL_PATH/internals/.apf.restore"; then
+			eout "{glob} fast load snapshot empty or invalid, going full load"
+		else
 		devm
 		eout "{glob} activating firewall, fast load ($IPT_BACKEND_CURRENT)"
 		if ! $IPTR $IPT_FLAGS "$INSTALL_PATH/internals/.apf.restore" 2>/dev/null; then
@@ -145,7 +149,10 @@ if [ -z "$SKIP_FASTLOAD_FIRSTRUN" ] && [ -z "$SKIP_FASTLOAD_EXPIRED" ] && [ -z "
 			eout "{glob} fast load incomplete (IPv6 enabled but no IPv6 snapshot), going full load"
 			flush 1
 		elif [ "$USE_IPV6" == "1" ] && [ -n "$IP6TR" ] && [ -f "$INSTALL_PATH/internals/.apf6.restore" ]; then
-			if ! $IP6TR $IPT_FLAGS "$INSTALL_PATH/internals/.apf6.restore" 2>/dev/null; then
+			if [ ! -s "$INSTALL_PATH/internals/.apf6.restore" ] || ! grep -q '^\*' "$INSTALL_PATH/internals/.apf6.restore"; then
+				eout "{glob} IPv6 snapshot empty or invalid, going full load"
+				flush 1
+			elif ! $IP6TR $IPT_FLAGS "$INSTALL_PATH/internals/.apf6.restore" 2>/dev/null; then
 				eout "{glob} fast load failed (ip6tables-restore error), going full load"
 				flush 1
 			else
@@ -164,6 +171,7 @@ if [ -z "$SKIP_FASTLOAD_FIRSTRUN" ] && [ -z "$SKIP_FASTLOAD_EXPIRED" ] && [ -z "
 			mutex_unlock
 			exit 0
 		fi
+		fi # snapshot validation
 	else
 		eout "{glob} fast load snapshot backend mismatch ($IPT_BACKEND_SAVED vs $IPT_BACKEND_CURRENT), going full load"
 	fi
@@ -220,17 +228,7 @@ fi
 
 firewall_on=$($IPT $IPT_FLAGS -L --numeric | grep -vE "Chain|destination")
 if [ "$DEVEL_ON" != "1" ] && [ "$DOCKER_COMPAT" != "1" ] && [ -n "$firewall_on" ]; then
-	$IPTS > "$INSTALL_PATH/internals/.apf.restore"
-	if [ "$USE_IPV6" == "1" ] && [ -n "$IP6TS" ]; then
-		$IP6TS > "$INSTALL_PATH/internals/.apf6.restore"
-	fi
-	# Save backend marker for snapshot compatibility detection
-	IPT_BACKEND_CURRENT="legacy"
-	if $IPT --version 2>&1 | grep -q nf_tables; then
-		IPT_BACKEND_CURRENT="nft"
-	fi
-	echo "$IPT_BACKEND_CURRENT" > "$INSTALL_PATH/internals/.apf.restore.backend"
-	eout "{glob} fast load snapshot saved (backend: $IPT_BACKEND_CURRENT)"
+	snapshot_save
 fi
 if [ "$SET_VERBOSE" == "1" ] && [ "$DEVEL_ON" == "1" ]; then
 	eout "{glob} !!DEVELOPMENT MODE ENABLED!! - firewall will flush every 5 minutes."
