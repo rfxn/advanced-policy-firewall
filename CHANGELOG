@@ -318,6 +318,10 @@
       chain creation, valid_ip_cidr validation, LOG+DROP rules, and
       INPUT/OUTPUT attachment; dlist_php_hosts, dlist_dshield_hosts,
       dlist_spamhaus_hosts become one-line wrappers (functions.apf)
+[Change] pkt_sanity: extract pkt_sanity_flags() helper to replace ~170
+      lines of unrolled TCP flag pair checks with loop calls; unifies
+      IPv4 IN/OUT_SANITY and IPv6 IN/OUT_SANITY6; preserves RAB
+      integration and LOG behavior (functions.apf, bt.rules)
 
   -- Test Suite --
 

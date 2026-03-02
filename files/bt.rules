@@ -36,153 +36,13 @@ else
 fi
 if [ "$PKT_SANITY" == "1" ]; then
 	eout "{pkt_sanity} set active PKT_SANITY"
-	# Drop packets With invalid flag order
-        eout "{pkt_sanity} deny inbound tcp-flag pairs ALL NONE"
-        eout "{pkt_sanity} deny inbound tcp-flag pairs SYN,FIN SYN,FIN"
-        eout "{pkt_sanity} deny inbound tcp-flag pairs SYN,RST SYN,RST"
-        eout "{pkt_sanity} deny inbound tcp-flag pairs FIN,RST FIN,RST"
-        eout "{pkt_sanity} deny inbound tcp-flag pairs ACK,FIN FIN"
-        eout "{pkt_sanity} deny inbound tcp-flag pairs ACK,URG URG"
-        eout "{pkt_sanity} deny inbound tcp-flag pairs ACK,PSH PSH"
-        eout "{pkt_sanity} deny inbound tcp-flag pairs ALL FIN,URG,PSH"
-        eout "{pkt_sanity} deny inbound tcp-flag pairs ALL SYN,RST,ACK,FIN,URG"
-        eout "{pkt_sanity} deny inbound tcp-flag pairs ALL ALL"
-        eout "{pkt_sanity} deny inbound tcp-flag pairs ALL FIN"
-        ipt4 -N IN_SANITY
-        if [ "$LOG_DROP" == "1" ]; then
-         ipt4 -A IN_SANITY  -p tcp --tcp-flags ALL NONE -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** SANITY ** "
-	fi
-        if [ "$RAB_LOG_HIT" == "1" ]; then
-         ipt4 -A IN_SANITY  -p tcp --tcp-flags ALL NONE -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** RABHIT ** "
-	fi
-        ipt4 -A IN_SANITY  -p tcp --tcp-flags ALL NONE $RAB_SANITY_FLAGS -j $TCP_STOP
-        if [ "$LOG_DROP" == "1" ]; then
-         ipt4 -A IN_SANITY  -p tcp --tcp-flags SYN,FIN SYN,FIN -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** SANITY ** "
-	fi
-        if [ "$RAB_LOG_HIT" == "1" ]; then
-         ipt4 -A IN_SANITY  -p tcp --tcp-flags SYN,FIN SYN,FIN -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** RABHIT ** "
-	fi
-        ipt4 -A IN_SANITY  -p tcp --tcp-flags SYN,FIN SYN,FIN $RAB_SANITY_FLAGS -j $TCP_STOP
-        if [ "$LOG_DROP" == "1" ]; then
-         ipt4 -A IN_SANITY  -p tcp --tcp-flags SYN,RST SYN,RST -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** SANITY ** "
-	fi
-        if [ "$RAB_LOG_HIT" == "1" ]; then
-         ipt4 -A IN_SANITY  -p tcp --tcp-flags SYN,RST SYN,RST -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** RABHIT ** "
-	fi
-        ipt4 -A IN_SANITY  -p tcp --tcp-flags SYN,RST SYN,RST $RAB_SANITY_FLAGS -j $TCP_STOP
-        if [ "$LOG_DROP" == "1" ]; then
-         ipt4 -A IN_SANITY  -p tcp --tcp-flags FIN,RST FIN,RST -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** SANITY ** "
-	fi
-        if [ "$RAB_LOG_HIT" == "1" ]; then
-         ipt4 -A IN_SANITY  -p tcp --tcp-flags FIN,RST FIN,RST -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** RABHIT ** "
-	fi
-        ipt4 -A IN_SANITY  -p tcp --tcp-flags FIN,RST FIN,RST $RAB_SANITY_FLAGS -j $TCP_STOP
-        if [ "$LOG_DROP" == "1" ]; then
-         ipt4 -A IN_SANITY  -p tcp --tcp-flags ACK,FIN FIN -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** SANITY ** "
-	fi
-        if [ "$RAB_LOG_HIT" == "1" ]; then
-         ipt4 -A IN_SANITY  -p tcp --tcp-flags ACK,FIN FIN -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** RABHIT ** "
-	fi
-        ipt4 -A IN_SANITY  -p tcp --tcp-flags ACK,FIN FIN $RAB_SANITY_FLAGS -j $TCP_STOP
-        if [ "$LOG_DROP" == "1" ]; then
-         ipt4 -A IN_SANITY  -p tcp --tcp-flags ACK,URG URG -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** SANITY ** "
-	fi
-        if [ "$RAB_LOG_HIT" == "1" ]; then
-         ipt4 -A IN_SANITY  -p tcp --tcp-flags ACK,URG URG -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** RABHIT ** "
-	fi
-        ipt4 -A IN_SANITY  -p tcp --tcp-flags ACK,URG URG $RAB_SANITY_FLAGS -j $TCP_STOP
-        if [ "$LOG_DROP" == "1" ]; then
-         ipt4 -A IN_SANITY  -p tcp --tcp-flags ACK,PSH PSH -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** SANITY ** "
-	fi
-        if [ "$RAB_LOG_HIT" == "1" ]; then
-         ipt4 -A IN_SANITY  -p tcp --tcp-flags ACK,PSH PSH -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** RABHIT ** "
-	fi
-        ipt4 -A IN_SANITY  -p tcp --tcp-flags ACK,PSH PSH $RAB_SANITY_FLAGS -j $TCP_STOP
-        if [ "$LOG_DROP" == "1" ]; then
-         ipt4 -A IN_SANITY  -p tcp --tcp-flags ALL FIN,URG,PSH -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** SANITY ** "
-	fi
-        if [ "$RAB_LOG_HIT" == "1" ]; then
-         ipt4 -A IN_SANITY  -p tcp --tcp-flags ALL FIN,URG,PSH -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** RABHIT ** "
-	fi
-        ipt4 -A IN_SANITY  -p tcp --tcp-flags ALL FIN,URG,PSH $RAB_SANITY_FLAGS -j $TCP_STOP
-        if [ "$LOG_DROP" == "1" ]; then
-         ipt4 -A IN_SANITY  -p tcp --tcp-flags ALL SYN,RST,ACK,FIN,URG -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** SANITY ** "
-	fi
-        if [ "$RAB_LOG_HIT" == "1" ]; then
-         ipt4 -A IN_SANITY  -p tcp --tcp-flags ALL SYN,RST,ACK,FIN,URG -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** RABHIT ** "
-	fi
-        ipt4 -A IN_SANITY  -p tcp --tcp-flags ALL SYN,RST,ACK,FIN,URG $RAB_SANITY_FLAGS -j $TCP_STOP
-        if [ "$LOG_DROP" == "1" ]; then
-         ipt4 -A IN_SANITY  -p tcp --tcp-flags ALL ALL -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** SANITY ** "
-	fi
-        if [ "$RAB_LOG_HIT" == "1" ]; then
-         ipt4 -A IN_SANITY  -p tcp --tcp-flags ALL ALL -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** RABHIT ** "
-	fi
-        ipt4 -A IN_SANITY  -p tcp --tcp-flags ALL ALL $RAB_SANITY_FLAGS -j $TCP_STOP
-        if [ "$LOG_DROP" == "1" ]; then
-         ipt4 -A IN_SANITY  -p tcp --tcp-flags ALL FIN -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** SANITY ** "
-	fi
-        if [ "$RAB_LOG_HIT" == "1" ]; then
-         ipt4 -A IN_SANITY  -p tcp --tcp-flags ALL FIN -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** RABHIT ** "
-	fi
-        ipt4 -A IN_SANITY  -p tcp --tcp-flags ALL FIN $RAB_SANITY_FLAGS -j $TCP_STOP
+	eout "{pkt_sanity} deny inbound tcp-flag pairs (11 pairs)"
+	ipt4 -N IN_SANITY
+	pkt_sanity_flags IN_SANITY ipt4 "SANITY" "RABHIT" 1
 
-        eout "{pkt_sanity} deny outbound tcp-flag pairs ALL NONE"
-        eout "{pkt_sanity} deny outbound tcp-flag pairs SYN,FIN SYN,FIN"
-        eout "{pkt_sanity} deny outbound tcp-flag pairs SYN,RST SYN,RST"
-        eout "{pkt_sanity} deny outbound tcp-flag pairs FIN,RST FIN,RST"
-        eout "{pkt_sanity} deny outbound tcp-flag pairs ACK,FIN FIN"
-        eout "{pkt_sanity} deny outbound tcp-flag pairs ACK,PSH PSH"
-        eout "{pkt_sanity} deny outbound tcp-flag pairs ACK,URG URG"
-        eout "{pkt_sanity} deny outbound tcp-flag pairs ALL FIN,URG,PSH"
-        eout "{pkt_sanity} deny outbound tcp-flag pairs ALL SYN,RST,ACK,FIN,URG"
-        eout "{pkt_sanity} deny outbound tcp-flag pairs ALL ALL"
-        eout "{pkt_sanity} deny outbound tcp-flag pairs ALL FIN"
+	eout "{pkt_sanity} deny outbound tcp-flag pairs (11 pairs)"
 	ipt4 -N OUT_SANITY
-        if [ "$LOG_DROP" == "1" ]; then
-	 ipt4 -A OUT_SANITY  -p tcp --tcp-flags ALL NONE -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** SANITY ** "
-	fi
-	ipt4 -A OUT_SANITY  -p tcp --tcp-flags ALL NONE -j $TCP_STOP
-        if [ "$LOG_DROP" == "1" ]; then
-	 ipt4 -A OUT_SANITY  -p tcp --tcp-flags SYN,FIN SYN,FIN -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** SANITY ** "
-	fi
-	ipt4 -A OUT_SANITY  -p tcp --tcp-flags SYN,FIN SYN,FIN -j $TCP_STOP
-        if [ "$LOG_DROP" == "1" ]; then
-	 ipt4 -A OUT_SANITY  -p tcp --tcp-flags SYN,RST SYN,RST -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** SANITY ** "
-	fi
-	ipt4 -A OUT_SANITY  -p tcp --tcp-flags SYN,RST SYN,RST -j $TCP_STOP
-        if [ "$LOG_DROP" == "1" ]; then
-	 ipt4 -A OUT_SANITY  -p tcp --tcp-flags FIN,RST FIN,RST -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** SANITY ** "
-	fi
-	ipt4 -A OUT_SANITY  -p tcp --tcp-flags FIN,RST FIN,RST -j $TCP_STOP
-        if [ "$LOG_DROP" == "1" ]; then
-	 ipt4 -A OUT_SANITY  -p tcp --tcp-flags ACK,FIN FIN -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** SANITY ** "
-	fi
-	ipt4 -A OUT_SANITY  -p tcp --tcp-flags ACK,FIN FIN -j $TCP_STOP
-        if [ "$LOG_DROP" == "1" ]; then
-	 ipt4 -A OUT_SANITY  -p tcp --tcp-flags ACK,PSH PSH -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** SANITY ** "
-	fi
-	ipt4 -A OUT_SANITY -p tcp --tcp-flags ACK,PSH PSH -j $TCP_STOP
-        if [ "$LOG_DROP" == "1" ]; then
-	 ipt4 -A OUT_SANITY -p tcp --tcp-flags ACK,URG URG -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** SANITY ** "
-	fi
-	ipt4 -A OUT_SANITY -p tcp --tcp-flags ACK,URG URG -j $TCP_STOP
-        if [ "$LOG_DROP" == "1" ]; then
-	 ipt4 -A OUT_SANITY -p tcp --tcp-flags ALL FIN,URG,PSH -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** SANITY ** "
-	fi
-	ipt4 -A OUT_SANITY -p tcp --tcp-flags ALL FIN,URG,PSH -j $TCP_STOP
-        if [ "$LOG_DROP" == "1" ]; then
-	 ipt4 -A OUT_SANITY -p tcp --tcp-flags ALL SYN,RST,ACK,FIN,URG -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** SANITY ** "
-	fi
-	ipt4 -A OUT_SANITY -p tcp --tcp-flags ALL SYN,RST,ACK,FIN,URG -j $TCP_STOP
-        if [ "$LOG_DROP" == "1" ]; then
-	 ipt4 -A OUT_SANITY -p tcp --tcp-flags ALL ALL -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** SANITY ** "
-	fi
-	ipt4 -A OUT_SANITY -p tcp --tcp-flags ALL ALL -j $TCP_STOP
-        if [ "$LOG_DROP" == "1" ]; then
-	 ipt4 -A OUT_SANITY -p tcp --tcp-flags ALL FIN -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** SANITY ** "
-	fi
-	ipt4 -A OUT_SANITY -p tcp --tcp-flags ALL FIN -j $TCP_STOP
+	pkt_sanity_flags OUT_SANITY ipt4 "SANITY" "" 0
 
 	if [ "$PKT_SANITY_INV" == "1" ]; then
 	# Block INVALID connection states and unusual TCP options
@@ -270,29 +130,10 @@ fi
 if [ "$PKT_SANITY" == "1" ] && [ "$USE_IPV6" == "1" ]; then
 	eout "{pkt_sanity} set active PKT_SANITY (IPv6)"
 	ipt6 -N IN_SANITY6
-	for flags in "ALL NONE" "SYN,FIN SYN,FIN" "SYN,RST SYN,RST" "FIN,RST FIN,RST" \
-		     "ACK,FIN FIN" "ACK,URG URG" "ACK,PSH PSH" "ALL FIN,URG,PSH" \
-		     "ALL SYN,RST,ACK,FIN,URG" "ALL ALL" "ALL FIN"; do
-		read -r mask comp <<< "$flags"
-		if [ "$LOG_DROP" == "1" ]; then
-			ipt6 -A IN_SANITY6 -p tcp --tcp-flags $mask $comp -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** SANITY6 ** "
-		fi
-		if [ "$RAB_LOG_HIT" == "1" ]; then
-			ipt6 -A IN_SANITY6 -p tcp --tcp-flags $mask $comp -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** RABHIT6 ** "
-		fi
-		ipt6 -A IN_SANITY6 -p tcp --tcp-flags $mask $comp $RAB_SANITY_FLAGS -j $TCP_STOP
-	done
+	pkt_sanity_flags IN_SANITY6 ipt6 "SANITY6" "RABHIT6" 1
 
 	ipt6 -N OUT_SANITY6
-	for flags in "ALL NONE" "SYN,FIN SYN,FIN" "SYN,RST SYN,RST" "FIN,RST FIN,RST" \
-		     "ACK,FIN FIN" "ACK,PSH PSH" "ACK,URG URG" "ALL FIN,URG,PSH" \
-		     "ALL SYN,RST,ACK,FIN,URG" "ALL ALL" "ALL FIN"; do
-		read -r mask comp <<< "$flags"
-		if [ "$LOG_DROP" == "1" ]; then
-			ipt6 -A OUT_SANITY6 -p tcp --tcp-flags $mask $comp -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** SANITY6 ** "
-		fi
-		ipt6 -A OUT_SANITY6 -p tcp --tcp-flags $mask $comp -j $TCP_STOP
-	done
+	pkt_sanity_flags OUT_SANITY6 ipt6 "SANITY6" "" 0
 
 	if [ "$PKT_SANITY_INV" == "1" ]; then
 		if [ "$LOG_DROP" == "1" ]; then

@@ -2958,6 +2958,35 @@ refresh() {
         ipt -F REFRESH_TEMP
 }
 
+## Packet sanity TCP flag checks — shared loop for IN/OUT chains.
+# Usage: pkt_sanity_flags chain ipt_fn log_prefix rab_prefix rab_mode
+# Iterates canonical flag pairs, applying LOG (if LOG_DROP), RAB LOG
+# (if rab_mode=1 and RAB_LOG_HIT), and DROP rules for each pair.
+pkt_sanity_flags() {
+	local chain="$1" ipt_fn="$2" log_prefix="$3" rab_prefix="$4" rab_mode="$5"
+	local flags mask comp
+	for flags in "ALL NONE" "SYN,FIN SYN,FIN" "SYN,RST SYN,RST" "FIN,RST FIN,RST" \
+		     "ACK,FIN FIN" "ACK,URG URG" "ACK,PSH PSH" "ALL FIN,URG,PSH" \
+		     "ALL SYN,RST,ACK,FIN,URG" "ALL ALL" "ALL FIN"; do
+		read -r mask comp <<< "$flags"
+		if [ "$LOG_DROP" == "1" ]; then
+			$ipt_fn -A "$chain" -p tcp --tcp-flags $mask $comp \
+				-m limit --limit=$LOG_RATE/minute -j $LOG_TARGET \
+				--log-level=$LOG_LEVEL $LEXT --log-prefix="** $log_prefix ** "
+		fi
+		if [ "$rab_mode" == "1" ] && [ "$RAB_LOG_HIT" == "1" ]; then
+			$ipt_fn -A "$chain" -p tcp --tcp-flags $mask $comp \
+				-m limit --limit=$LOG_RATE/minute -j $LOG_TARGET \
+				--log-level=$LOG_LEVEL $LEXT --log-prefix="** $rab_prefix ** "
+		fi
+		if [ "$rab_mode" == "1" ]; then
+			$ipt_fn -A "$chain" -p tcp --tcp-flags $mask $comp $RAB_SANITY_FLAGS -j $TCP_STOP
+		else
+			$ipt_fn -A "$chain" -p tcp --tcp-flags $mask $comp -j $TCP_STOP
+		fi
+	done
+}
+
 cron_refresh() {
 if [ "$SET_REFRESH" != "0" ] && [ -n "$SET_REFRESH" ]; then
 cat<<EOF > "$INSTALL_PATH/internals/cron.refresh"
