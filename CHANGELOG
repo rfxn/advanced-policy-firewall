@@ -322,6 +322,10 @@
       lines of unrolled TCP flag pair checks with loop calls; unifies
       IPv4 IN/OUT_SANITY and IPv6 IN/OUT_SANITY6; preserves RAB
       integration and LOG behavior (functions.apf, bt.rules)
+[Change] ipset: extract ipset_populate_set() to deduplicate awk filter,
+      restore, and count logic between ipset_load() and ipset_update();
+      uses awk set variable instead of shell interpolation in awk body;
+      sets _IPSET_COUNT global to avoid subshell (functions.apf)
 
   -- Test Suite --
 
