@@ -43,6 +43,16 @@ _apf_cleanup_tmp() {
 	_APF_TMPFILES=""
 }
 
+## Detect iptables backend (nft vs legacy)
+# Sets global IPT_BACKEND to "nft" or "legacy" based on iptables --version output.
+# Called by snapshot_save() and fast load path to avoid duplicated detection.
+detect_ipt_backend() {
+	IPT_BACKEND="legacy"
+	if $IPT --version 2>&1 | grep -q nf_tables; then
+		IPT_BACKEND="nft"
+	fi
+}
+
 ## Snapshot save: atomic write with integrity validation
 # Writes iptables-save output to temp file, validates it, then atomically
 # moves into place. Handles both IPv4 and IPv6 (when USE_IPV6=1).
@@ -88,12 +98,9 @@ snapshot_save() {
 	fi
 
 	# Backend marker
-	local _ss_backend="legacy"
-	if $IPT --version 2>&1 | grep -q nf_tables; then
-		_ss_backend="nft"
-	fi
-	echo "$_ss_backend" > "$snap_dir/.apf.restore.backend"
-	eout "{glob} fast load snapshot saved (backend: $_ss_backend)"
+	detect_ipt_backend
+	echo "$IPT_BACKEND" > "$snap_dir/.apf.restore.backend"
+	eout "{glob} fast load snapshot saved (backend: $IPT_BACKEND)"
 	return 0
 }
 

@@ -304,6 +304,9 @@
 [Change] Makefile: override sequential tier targets (test-all, test-modern,
       test-legacy, test-deep-legacy) to continue on failure and report
       combined exit code instead of stopping on first failure
+[Change] nft backend detection: extract detect_ipt_backend() to eliminate
+      duplicated iptables --version parsing in snapshot_save() and fast
+      load path; sets global IPT_BACKEND (functions.apf, apf)
 
   -- Test Suite --
 

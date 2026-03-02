@@ -122,13 +122,10 @@ fi
 # check if we are flagged to skip fast load, otherwise off we go
 if [ -z "$SKIP_FASTLOAD_FIRSTRUN" ] && [ -z "$SKIP_FASTLOAD_EXPIRED" ] && [ -z "$SKIP_FASTLOAD_VARS" ] && [ -z "$SET_FASTLOAD_UPSEC" ]; then
 	# Verify snapshot backend matches current iptables backend
-	IPT_BACKEND_CURRENT="legacy"
-	if $IPT --version 2>&1 | grep -q nf_tables; then
-		IPT_BACKEND_CURRENT="nft"
-	fi
+	detect_ipt_backend
 	if [ -f "$INSTALL_PATH/internals/.apf.restore.backend" ]; then
 		read -r IPT_BACKEND_SAVED < "$INSTALL_PATH/internals/.apf.restore.backend"
-		if [ "$IPT_BACKEND_SAVED" != "$IPT_BACKEND_CURRENT" ]; then
+		if [ "$IPT_BACKEND_SAVED" != "$IPT_BACKEND" ]; then
 			SKIP_FASTLOAD_BACKEND=1
 		fi
 	fi
@@ -138,7 +135,7 @@ if [ -z "$SKIP_FASTLOAD_FIRSTRUN" ] && [ -z "$SKIP_FASTLOAD_EXPIRED" ] && [ -z "
 			eout "{glob} fast load snapshot empty or invalid, going full load"
 		else
 		devm
-		eout "{glob} activating firewall, fast load ($IPT_BACKEND_CURRENT)"
+		eout "{glob} activating firewall, fast load ($IPT_BACKEND)"
 		if ! $IPTR $IPT_FLAGS "$INSTALL_PATH/internals/.apf.restore" 2>/dev/null; then
 			eout "{glob} fast load failed (iptables-restore error), going full load"
 			flush 1
@@ -173,7 +170,7 @@ if [ -z "$SKIP_FASTLOAD_FIRSTRUN" ] && [ -z "$SKIP_FASTLOAD_EXPIRED" ] && [ -z "
 		fi
 		fi # snapshot validation
 	else
-		eout "{glob} fast load snapshot backend mismatch ($IPT_BACKEND_SAVED vs $IPT_BACKEND_CURRENT), going full load"
+		eout "{glob} fast load snapshot backend mismatch ($IPT_BACKEND_SAVED vs $IPT_BACKEND), going full load"
 	fi
  elif [ "$SKIP_FASTLOAD_FIRSTRUN" == "1" ]; then
 	eout "{glob} first run? fast load skipped [internals/.last.full not present]"
