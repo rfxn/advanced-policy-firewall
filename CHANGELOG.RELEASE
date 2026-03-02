@@ -217,6 +217,13 @@
 [Fix] Fast load restore validates snapshot before iptables-restore:
       empty or invalid snapshots (missing *table markers) fall back to
       full load instead of silently loading no rules (apf)
+[Change] expirebans(): prefer structured addedtime=EPOCH markers over
+      positional awk date extraction; legacy fallback for pre-2.0.2
+      entries without addedtime=; fix orphaned comment lines left behind
+      when bare IP was removed (functions.apf)
+[New] cli_trust permanent entries now include addedtime=EPOCH marker in
+      comment lines for reliable ban expiry; consistent with temp trust
+      expire= pattern; backward compatible (functions.apf)
 
   -- Changes --
 

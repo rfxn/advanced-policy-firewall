@@ -168,3 +168,89 @@ teardown() {
     # Advanced trust entry should also survive (reloaded from trust file)
     assert_rule_exists_ips TALLOW "192.0.2.60"
 }
+
+@test "expirebans removes expired entry with addedtime= marker" {
+    # Add a deny entry with addedtime= from 2 days ago
+    local old_epoch
+    old_epoch=$(($(date +%s) - 172800))
+    echo "# added 192.0.2.70 on 01/01/20 00:00:00 addedtime=$old_epoch" >> "$APF_DIR/deny_hosts.rules"
+    echo "192.0.2.70" >> "$APF_DIR/deny_hosts.rules"
+
+    "$APF" -f 2>/dev/null || true
+    "$APF" -s
+    "$APF" -e
+
+    # Both the IP line and comment line should be removed
+    run grep "192.0.2.70" "$APF_DIR/deny_hosts.rules"
+    assert_failure
+}
+
+@test "expirebans preserves non-expired entry with addedtime=" {
+    # Add a deny entry with current addedtime=
+    local now_epoch
+    now_epoch=$(date +%s)
+    echo "# added 192.0.2.71 on $(date +"%D %H:%M:%S") addedtime=$now_epoch" >> "$APF_DIR/deny_hosts.rules"
+    echo "192.0.2.71" >> "$APF_DIR/deny_hosts.rules"
+
+    "$APF" -f 2>/dev/null || true
+    "$APF" -s
+    "$APF" -e
+
+    # Entry should still exist (not expired)
+    run grep "^192.0.2.71" "$APF_DIR/deny_hosts.rules"
+    assert_success
+}
+
+@test "expirebans handles legacy entry without addedtime=" {
+    # Add an old-format entry (no addedtime= marker) from 2 days ago
+    local old_date
+    old_date=$(date -d "2 days ago" +"%D %H:%M:%S" 2>/dev/null || date -v-2d +"%D %H:%M:%S" 2>/dev/null)
+    if [ -z "$old_date" ]; then
+        skip "date -d not supported on this platform"
+    fi
+    echo "# added 192.0.2.72 on $old_date" >> "$APF_DIR/deny_hosts.rules"
+    echo "192.0.2.72" >> "$APF_DIR/deny_hosts.rules"
+
+    "$APF" -f 2>/dev/null || true
+    "$APF" -s
+    "$APF" -e
+
+    # Entry should be removed via legacy date --date fallback
+    run grep "192.0.2.72" "$APF_DIR/deny_hosts.rules"
+    assert_failure
+}
+
+@test "expirebans removes comment line alongside IP line" {
+    # Add a deny entry with both comment and IP lines
+    local old_epoch
+    old_epoch=$(($(date +%s) - 172800))
+    echo "# added 192.0.2.73 on 01/01/20 00:00:00 addedtime=$old_epoch with comment: test entry" >> "$APF_DIR/deny_hosts.rules"
+    echo "192.0.2.73" >> "$APF_DIR/deny_hosts.rules"
+
+    "$APF" -f 2>/dev/null || true
+    "$APF" -s
+    "$APF" -e
+
+    # Both the comment and bare IP should be gone
+    run grep "# added 192.0.2.73" "$APF_DIR/deny_hosts.rules"
+    assert_failure
+    run grep "^192.0.2.73$" "$APF_DIR/deny_hosts.rules"
+    assert_failure
+}
+
+@test "cli_trust -d writes addedtime= marker" {
+    "$APF" -f 2>/dev/null || true
+    "$APF" -s
+
+    "$APF" -d 192.0.2.74 "test addedtime marker"
+
+    # Verify addedtime= marker is present and numeric
+    run grep "addedtime=" "$APF_DIR/deny_hosts.rules"
+    assert_success
+    # Extract the epoch value and verify it's numeric
+    local epoch_val
+    epoch_val=$(grep "192.0.2.74" "$APF_DIR/deny_hosts.rules" | grep -o 'addedtime=[0-9]*' | head -1 | cut -d= -f2)
+    [ -n "$epoch_val" ]
+    # Verify it's a reasonable epoch (after year 2020)
+    [ "$epoch_val" -gt 1577836800 ]
+}

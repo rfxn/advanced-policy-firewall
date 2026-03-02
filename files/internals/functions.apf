@@ -1041,14 +1041,15 @@ cli_trust() {
 		done <<< "$_RESOLVED_IPS"
 		if [ "$_ct_skip" == "0" ]; then
 			TIME=$(date +"%D %H:%M:%S")
+			ADDED_EPOCH=$(date +%s)
 			CMT="${CMT//$'\n'/ }"
 			CMT="${CMT//$'\r'/}"
 			CMT="${CMT//$'\t'/ }"
 			local _ct_csv="${_RESOLVED_IPS//$'\n'/,}"
 			if [ -n "$CMT" ]; then
-				echo "# added $HOST on $TIME resolved=$_ct_csv with comment: $CMT" >> "$FILE"
+				echo "# added $HOST on $TIME addedtime=$ADDED_EPOCH resolved=$_ct_csv with comment: $CMT" >> "$FILE"
 			else
-				echo "# added $HOST on $TIME resolved=$_ct_csv" >> "$FILE"
+				echo "# added $HOST on $TIME addedtime=$ADDED_EPOCH resolved=$_ct_csv" >> "$FILE"
 			fi
 			echo "$HOST" >> "$FILE"
 			local _ct_resolved_entry
@@ -1067,13 +1068,14 @@ cli_trust() {
 		echo "$_VTE_IP is a local address and can not be added to the trust system"
 	else
 		TIME=$(date +"%D %H:%M:%S")
+		ADDED_EPOCH=$(date +%s)
 		CMT="${CMT//$'\n'/ }"
 		CMT="${CMT//$'\r'/}"
 		CMT="${CMT//$'\t'/ }"
 		if [ -n "$CMT" ]; then
-			echo "# added $HOST on $TIME with comment: $CMT" >> "$FILE"
+			echo "# added $HOST on $TIME addedtime=$ADDED_EPOCH with comment: $CMT" >> "$FILE"
 		else
-			echo "# added $HOST on $TIME" >> "$FILE"
+			echo "# added $HOST on $TIME addedtime=$ADDED_EPOCH" >> "$FILE"
 		fi
 		echo "$HOST" >> "$FILE"
 		if trust_entry_rule "$HOST" "$CHAIN" "$ACTION" "-I"; then
@@ -1119,6 +1121,7 @@ cli_trust() {
 	done <<< "$_RESOLVED_IPS"
 	if [ "$_ct_skip" == "0" ]; then
 		TIME=$(date +"%D %H:%M:%S")
+		ADDED_EPOCH=$(date +%s)
 		CMT="${CMT//$'\n'/ }"
 		CMT="${CMT//$'\r'/}"
 		CMT="${CMT//$'\t'/ }"
@@ -1129,9 +1132,9 @@ cli_trust() {
 			JACTION="ACCEPT"
 		fi
 		if [ "$CMT" ]; then
-			echo "# added $HOST on $TIME resolved=$_ct_csv with comment: $CMT" >> "$FILE"
+			echo "# added $HOST on $TIME addedtime=$ADDED_EPOCH resolved=$_ct_csv with comment: $CMT" >> "$FILE"
 		else
-			echo "# added $HOST on $TIME resolved=$_ct_csv" >> "$FILE"
+			echo "# added $HOST on $TIME addedtime=$ADDED_EPOCH resolved=$_ct_csv" >> "$FILE"
 		fi
 		echo "$HOST" >> "$FILE"
 		while IFS= read -r _ct_rip; do
@@ -1151,13 +1154,14 @@ cli_trust() {
          echo "$HOST appears to be IPv6 but USE_IPV6 is not enabled"
  else
          TIME=$(date +"%D %H:%M:%S")
+	ADDED_EPOCH=$(date +%s)
 	CMT="${CMT//$'\n'/ }"
 	CMT="${CMT//$'\r'/}"
 	CMT="${CMT//$'\t'/ }"
 	if [ "$CMT" ]; then
-		echo "# added $HOST on $TIME with comment: $CMT" >> "$FILE"
+		echo "# added $HOST on $TIME addedtime=$ADDED_EPOCH with comment: $CMT" >> "$FILE"
 	else
-		echo "# added $HOST on $TIME" >> "$FILE"
+		echo "# added $HOST on $TIME addedtime=$ADDED_EPOCH" >> "$FILE"
 	fi
          echo "$HOST" >> "$FILE"
 	if [ "$ACTION" == "DENY" ]; then
@@ -1405,7 +1409,7 @@ escalate_to_permanent() {
 	sed -i "\%^${escaped_ip}$%d" "$DENY_HOSTS"
 
 	# Add as permanent with static noexpire markers
-	echo "# added $ip on $(date +"%D %H:%M:%S") static noexpire with comment: auto-escalated from temp deny (PERMBLOCK)" >> "$DENY_HOSTS"
+	echo "# added $ip on $(date +"%D %H:%M:%S") addedtime=$(date +%s) static noexpire with comment: auto-escalated from temp deny (PERMBLOCK)" >> "$DENY_HOSTS"
 	echo "$ip" >> "$DENY_HOSTS"
 
 	eout "{trust} $ip auto-escalated to permanent deny (PERMBLOCK_COUNT=$PERMBLOCK_COUNT reached)"
@@ -2765,7 +2769,8 @@ cl_cports() {
 }
 
 expirebans() {
-local i ip date_d date_t ban_time time_diff expire_time check_time REFRESH_TIME eff_expire
+local ip ban_time time_diff expire_time check_time REFRESH_TIME eff_expire line
+local _eb_date_str
 if [ -z "$SET_EXPIRE" ]; then
         eff_expire=0
 else
@@ -2779,18 +2784,40 @@ if [ "$eff_expire" -ge "60" ]; then
  if [ -f "$INSTALL_PATH/deny_hosts.rules" ]; then
          expire_time="$eff_expire"
          check_time=$(date +%s)
-         while IFS='|' read -r ip date_d date_t; do
+         while IFS= read -r line; do
+                # Extract IP: "# added IP on ..."
+                ip="${line#\# added }"
+                ip="${ip%% *}"
                 [ -z "$ip" ] && continue
-                ban_time=$(date --date "$date_d $date_t" +%s 2>/dev/null)
+
+                # Prefer structured addedtime= marker
+                if [[ "$line" == *addedtime=* ]]; then
+                        ban_time="${line#*addedtime=}"
+                        ban_time="${ban_time%% *}"
+                else
+                        # Legacy fallback: extract date/time after "on "
+                        _eb_date_str="${line#*on }"
+                        # Trim everything after the timestamp (space-delimited)
+                        _eb_date_str="${_eb_date_str%% addedtime=*}"
+                        _eb_date_str="${_eb_date_str%% resolved=*}"
+                        _eb_date_str="${_eb_date_str%% with comment:*}"
+                        # _eb_date_str is now "MM/DD/YY HH:MM:SS"
+                        ban_time=$(date --date "$_eb_date_str" +%s 2>/dev/null)
+                fi
+                # Validate numeric
+                case "$ban_time" in *[!0-9]*) continue ;; esac
                 [ -z "$ban_time" ] && continue
+
                 time_diff=$(($check_time-$ban_time))
                 if [ "$time_diff" -ge "$expire_time" ]; then
                         eout "{trust} removed expired ban for $ip (${time_diff}s/${expire_time}s)"
                         local escaped_ip="${ip//./\\.}"
-                        sed -i "\%^${escaped_ip}\b%d" "$INSTALL_PATH/deny_hosts.rules"
+                        # Remove both the comment line and the bare IP line
+                        sed -i "\%# added ${escaped_ip} %d" "$INSTALL_PATH/deny_hosts.rules"
+                        sed -i "\%^${escaped_ip}$%d" "$INSTALL_PATH/deny_hosts.rules"
                         cli_trust_remove "$ip" >> /dev/null 2>&1
                 fi
-         done < <(grep -vE "static|noexpire|ttl=" "$INSTALL_PATH/deny_hosts.rules" | grep -iE "# added.*on.*" | awk '{print$3"|"$5"|"$6}')
+         done < <(grep -vE "static|noexpire|ttl=" "$INSTALL_PATH/deny_hosts.rules" | grep -E "# added .* on ")
  fi
 fi
 }
