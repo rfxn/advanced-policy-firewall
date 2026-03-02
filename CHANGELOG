@@ -243,6 +243,16 @@
       consistency (functions.apf)
 [Change] Drop Ubuntu 22.04 from CI matrix; redundant with 20.04+24.04
       (smoke-test.yml)
+[Change] trust_hosts: replace four-pass grep cascade with single-pass loop
+      and delegate advanced syntax to trust_entry_rule(); eliminates ~210
+      lines of duplicated field extraction and iptables logic (C-002)
+      (functions.apf)
+[Fix] trust_hosts: anchor comment filter to line start (grep -v '^#')
+      preventing false matches on entries containing '#' (F-019)
+      (functions.apf)
+[Fix] trust_hosts: eliminate grep -v tcp/udp classification that could
+      misclassify entries containing protocol substrings (F-020)
+      (functions.apf)
 
   -- Documentation --
 

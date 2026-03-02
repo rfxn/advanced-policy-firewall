@@ -740,6 +740,7 @@ trust_entry_rule() {
 	local flow_desc
 	if [ "$pflow" == "d" ]; then flow_desc="to"; else flow_desc="from"; fi
 	_TER_DESC="${dir_desc}${proto_desc}${pip} ${flow_desc} port ${port}"
+	_TER_DIR="$dir"
 
 	# Apply rule(s)
 	if [ -n "$proto" ]; then
@@ -1902,11 +1903,91 @@ search() {
  fi
 }
 
+_trust_local_addr_blocked() {
+	# Check if advanced trust entry would create a self-referencing allow rule.
+	# Only applies when direction is present; 3-field entries (no direction)
+	# never trigger this. Returns 0 (blocked) or 1 (not blocked).
+	# Args: $1=verb $2=ipflow(s/d) $3=dir(in/out) $4=ip
+	local verb="$1" ipflow="$2" dir="$3" pip="$4"
+	[ "$verb" != "allow" ] && return 1
+	[ -z "$dir" ] && return 1
+	if [ "$ipflow" == "s" ] && [ "$dir" == "in" ] && is_local_addr "$pip"; then
+		return 0
+	fi
+	if [ "$ipflow" == "d" ] && [ "$dir" == "out" ] && is_local_addr "$pip"; then
+		return 0
+	fi
+	return 1
+}
+
+_trust_hosts_advanced() {
+	# Process an advanced trust entry (contains '=') during bulk file loading.
+	# Pre-parses to extract IP (for FQDN detection) and direction+ipflow
+	# (for local-addr protection), then delegates rule creation to
+	# trust_entry_rule() — single source of truth for iptables commands.
+	# Args: $1=entry $2=chain $3=action(ALLOW/DENY) $4=verb(allow/deny)
+	local entry="$1" chain="$2" ter_action="$3" verb="$4"
+
+	# Pre-parse: extract fields needed for FQDN and local-addr checks
+	trust_protect_ipv6 "$entry"; local safe="$_TPV6_RESULT"
+	trust_parse_fields "$safe"
+	local dir="" pflow="" port="" ipflow="" pip=""
+	case "$_TF_COUNT" in
+		4)  # 3-field: pflow=port:ipflow=ip
+			pflow="$_TF1"; port="$_TF2"; ipflow="$_TF3"
+			trust_restore_ipv6 "$_TF4"; pip="$_TRV6_RESULT"
+			;;
+		5)  # 4-field: dir:pflow=port:ipflow=ip
+			dir="$_TF1"; pflow="$_TF2"; port="$_TF3"; ipflow="$_TF4"
+			trust_restore_ipv6 "$_TF5"; pip="$_TRV6_RESULT"
+			;;
+		6)  # 5-field: proto:dir:pflow=port:ipflow=ip
+			dir="$_TF2"; pflow="$_TF3"; port="$_TF4"; ipflow="$_TF5"
+			trust_restore_ipv6 "$_TF6"; pip="$_TRV6_RESULT"
+			;;
+		*)  return 1 ;;
+	esac
+
+	# Build description fragments for local-addr blocked log messages
+	expand_port "$port"; port="$_PORT"
+	local dir_desc="" pflow_desc=""
+	[ "$dir" == "in" ] && dir_desc="inbound "
+	[ "$dir" == "out" ] && dir_desc="outbound "
+	if [ "$pflow" == "d" ]; then pflow_desc="to"; else pflow_desc="from"; fi
+
+	if is_fqdn "$pip"; then
+		if ! resolve_fqdn "$pip"; then
+			eout "{trust} failed to resolve FQDN $pip, skipping"
+			return 1
+		fi
+		local _tha_rip _tha_resolved_entry
+		while IFS= read -r _tha_rip; do
+			if _trust_local_addr_blocked "$verb" "$ipflow" "$dir" "$_tha_rip"; then
+				eout "{trust} ignored local ip $verb rule '${dir_desc}$_tha_rip $pflow_desc port $port'"
+			else
+				_tha_resolved_entry="${entry//$pip/$_tha_rip}"
+				if trust_entry_rule "$_tha_resolved_entry" "$chain" "$ter_action" "-A"; then
+					eout "{trust} $verb $_TER_DESC (resolved from $pip)"
+				fi
+			fi
+		done <<< "$_RESOLVED_IPS"
+	else
+		if _trust_local_addr_blocked "$verb" "$ipflow" "$dir" "$pip"; then
+			eout "{trust} ignored local ip $verb rule '${dir_desc}$pip $pflow_desc port $port'"
+			return 0
+		fi
+		if trust_entry_rule "$entry" "$chain" "$ter_action" "-A"; then
+			eout "{trust} $verb $_TER_DESC"
+		fi
+	fi
+	return 0
+}
+
 trust_hosts() {
 local file="$1"
 local chain="$2"
 local action_all="$3" action_tcp="$4" action_udp="$5" verb="$6"
-local i PFLOW PFLOW_T PPORT IPFLOW PIP NFLOW NFLOW_T PTYPE
+local i
 load_local_addrs
 if [ -z "$file" ] || [ -z "$chain" ]; then
         eout "{trust} could not process trust_hosts $file $chain, fatal error, aborting!"
@@ -1916,255 +1997,48 @@ if [ -z "$file" ] || [ -z "$chain" ]; then
 fi
 
 local _th_raw
-_th_raw=$(grep -v '#' "$file")
+_th_raw=$(grep -v '^#' "$file" | grep -v '^[[:space:]]*$')
 if [ -n "$_th_raw" ]; then
         eout "{glob} loading $file"
-        #
-        #
+        local ter_action
+        if [ "$verb" == "allow" ]; then ter_action="ALLOW"; else ter_action="DENY"; fi
         while IFS= read -r i; do
                 [ -z "$i" ] && continue
-                if ! valid_host "$i"; then
-                        eout "{trust} skipping invalid entry in $file: $i"
-                        continue
-                fi
-                if is_fqdn "$i"; then
-                 if resolve_fqdn "$i"; then
-                  local _th_rip
-                  while IFS= read -r _th_rip; do
-                   if ! is_local_addr "$_th_rip"; then
-                    if ipt_for_host "$_th_rip"; then
-                        eout "{trust} $verb all to/from $i (resolved: $_th_rip)"
-                        $IPT_H $IPT_FLAGS -A $chain -s "$_th_rip" -d $ANY_ADDR -j $action_all
-                        $IPT_H $IPT_FLAGS -A $chain -d "$_th_rip" -s $ANY_ADDR -j $action_all
-                    fi
-                   fi
-                  done <<< "$_RESOLVED_IPS"
-                 else
-                  eout "{trust} failed to resolve FQDN $i, skipping"
-                 fi
-                elif ! is_local_addr "$i"; then
-                 if [ -f "$file" ]; then
-                  if ipt_for_host "$i"; then
-                        eout "{trust} $verb all to/from $i"
-                        $IPT_H $IPT_FLAGS -A $chain -s $i -d $ANY_ADDR -j $action_all
-                        $IPT_H $IPT_FLAGS -A $chain -d $i -s $ANY_ADDR -j $action_all
-                  fi
-                 fi
-		fi
-        done < <(printf '%s\n' "$_th_raw" | grep -v '=')
-        #
-        #
-        while IFS= read -r i; do
-                if [ -n "$i" ] && [ -f "$file" ]; then
-                        trust_protect_ipv6 "$i"; i="$_TPV6_RESULT"
-                        trust_parse_fields "$i"
-
-                        PFLOW="$_TF1"
-                if [ "$PFLOW" == "s" ]; then
-                                PFLOW="sport"
-                                PFLOW_T="from"
-                        elif [ "$PFLOW" == "d" ]; then
-                                PFLOW="dport"
-                                PFLOW_T="to"
-                        fi
-                        PPORT="$_TF2"
-                        expand_port "$PPORT"; PPORT="$_PORT"
-
-                        IPFLOW="$_TF3"
-                        if [ "$IPFLOW" == "s" ]; then
-                                IPFLOW="s"
-                        elif [ "$IPFLOW" == "d" ]; then
-                                IPFLOW="d"
-                        else
+                if [[ "$i" != *=* ]]; then
+                        # Bare host (IP/CIDR/FQDN)
+                        if ! valid_host "$i"; then
+                                eout "{trust} skipping invalid entry in $file: $i"
                                 continue
                         fi
-                        trust_restore_ipv6 "$_TF4"; PIP="$_TRV6_RESULT"
-
-                        if [ -n "$IPFLOW" ] && [ -n "$PIP" ] && [ -n "$PFLOW" ] && [ -n "$PPORT" ]; then
-                         if is_fqdn "$PIP"; then
-                          if resolve_fqdn "$PIP"; then
-                           local _th_rip
-                           while IFS= read -r _th_rip; do
+                        if is_fqdn "$i"; then
+                         if resolve_fqdn "$i"; then
+                          local _th_rip
+                          while IFS= read -r _th_rip; do
+                           if ! is_local_addr "$_th_rip"; then
                             if ipt_for_host "$_th_rip"; then
-                                eout "{trust} $verb $_th_rip $PFLOW_T port $PPORT (resolved from $PIP)"
-                                $IPT_H $IPT_FLAGS -A $chain -p tcp -m multiport -$IPFLOW "$_th_rip" --$PFLOW $PPORT -j $action_tcp
-                                $IPT_H $IPT_FLAGS -A $chain -p udp -m multiport -$IPFLOW "$_th_rip" --$PFLOW $PPORT -j $action_udp
+                                eout "{trust} $verb all to/from $i (resolved: $_th_rip)"
+                                $IPT_H $IPT_FLAGS -A $chain -s "$_th_rip" -d $ANY_ADDR -j $action_all
+                                $IPT_H $IPT_FLAGS -A $chain -d "$_th_rip" -s $ANY_ADDR -j $action_all
                             fi
-                           done <<< "$_RESOLVED_IPS"
-                          else
-                           eout "{trust} failed to resolve FQDN $PIP, skipping"
+                           fi
+                          done <<< "$_RESOLVED_IPS"
+                         else
+                          eout "{trust} failed to resolve FQDN $i, skipping"
+                         fi
+                        elif ! is_local_addr "$i"; then
+                         if [ -f "$file" ]; then
+                          if ipt_for_host "$i"; then
+                                eout "{trust} $verb all to/from $i"
+                                $IPT_H $IPT_FLAGS -A $chain -s $i -d $ANY_ADDR -j $action_all
+                                $IPT_H $IPT_FLAGS -A $chain -d $i -s $ANY_ADDR -j $action_all
                           fi
-                         elif ipt_for_host "$PIP"; then
-                                eout "{trust} $verb $PIP $PFLOW_T port $PPORT"
-                                $IPT_H $IPT_FLAGS -A $chain -p tcp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j $action_tcp
-                                $IPT_H $IPT_FLAGS -A $chain -p udp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j $action_udp
                          fi
                         fi
+                else
+                        # Advanced syntax (contains '=')
+                        _trust_hosts_advanced "$i" "$chain" "$ter_action" "$verb"
                 fi
-        done < <(printf '%s\n' "$_th_raw" | grep '=' | grep -vw in | grep -vw out | grep -v tcp | grep -v udp)
-        #
-        #
-        while IFS= read -r i; do
-                if [ -n "$i" ] && [ -f "$file" ]; then
-                        trust_protect_ipv6 "$i"; i="$_TPV6_RESULT"
-
-                        trust_parse_fields "$i"
-
-                        NFLOW="$_TF1"
-                        if [ "$NFLOW" == "in" ]; then
-                                NFLOW="INPUT"
-                                NFLOW_T="inbound"
-                        elif [ "$NFLOW" == "out" ]; then
-                                NFLOW="OUTPUT"
-                                NFLOW_T="outbound"
-                        else
-                                continue
-                        fi
-
-                        PFLOW="$_TF2"
-                        if [ "$PFLOW" == "s" ]; then
-                                PFLOW="sport"
-                                PFLOW_T="from"
-                        elif [ "$PFLOW" == "d" ]; then
-                                PFLOW="dport"
-                                PFLOW_T="to"
-                        else
-                                continue
-                        fi
-
-                        PPORT="$_TF3"
-                        expand_port "$PPORT"; PPORT="$_PORT"
-
-                        IPFLOW="$_TF4"
-                        if [ "$IPFLOW" == "s" ]; then
-                                IPFLOW="s"
-                        elif [ "$IPFLOW" == "d" ]; then
-                                IPFLOW="d"
-                        else
-                                continue
-                        fi
-                        trust_restore_ipv6 "$_TF5"; PIP="$_TRV6_RESULT"
-
-                        if [ -n "$NFLOW" ] && [ -n "$IPFLOW" ] && [ -n "$PIP" ] && [ -n "$PFLOW" ] && [ -n "$PPORT" ]; then
-                         if is_fqdn "$PIP"; then
-                          if resolve_fqdn "$PIP"; then
-                           local _th_rip
-                           while IFS= read -r _th_rip; do
-                            if [ "$verb" == "allow" ] && [ "$IPFLOW" == "s" ] && [ "$NFLOW" == "INPUT" ] && is_local_addr "$_th_rip"; then
-                                eout "{trust} ignored local ip $verb rule '$NFLOW_T $_th_rip $PFLOW_T port $PPORT'"
-                            elif [ "$verb" == "allow" ] && [ "$IPFLOW" == "d" ] && [ "$NFLOW" == "OUTPUT" ] && is_local_addr "$_th_rip"; then
-                                eout "{trust} ignored local ip $verb rule '$NFLOW_T $_th_rip $PFLOW_T port $PPORT'"
-                            elif ipt_for_host "$_th_rip"; then
-                                eout "{trust} $verb $NFLOW_T $_th_rip $PFLOW_T port $PPORT (resolved from $PIP)"
-                                $IPT_H $IPT_FLAGS -A $chain -p tcp -m multiport -$IPFLOW "$_th_rip" --$PFLOW $PPORT -j $action_tcp
-                                $IPT_H $IPT_FLAGS -A $chain -p udp -m multiport -$IPFLOW "$_th_rip" --$PFLOW $PPORT -j $action_udp
-                            fi
-                           done <<< "$_RESOLVED_IPS"
-                          else
-                           eout "{trust} failed to resolve FQDN $PIP, skipping"
-                          fi
-                         elif [ "$verb" == "allow" ] && [ "$IPFLOW" == "s" ] && [ "$NFLOW" == "INPUT" ] && is_local_addr "$PIP"; then
-                                eout "{trust} ignored local ip $verb rule '$NFLOW_T $PIP $PFLOW_T port $PPORT'"
-                         elif [ "$verb" == "allow" ] && [ "$IPFLOW" == "d" ] && [ "$NFLOW" == "OUTPUT" ] && is_local_addr "$PIP"; then
-                                eout "{trust} ignored local ip $verb rule '$NFLOW_T $PIP $PFLOW_T port $PPORT'"
-                         elif ipt_for_host "$PIP"; then
-                                eout "{trust} $verb $NFLOW_T $PIP $PFLOW_T port $PPORT"
-                                $IPT_H $IPT_FLAGS -A $chain -p tcp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j $action_tcp
-                                $IPT_H $IPT_FLAGS -A $chain -p udp -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j $action_udp
-                         fi
-                        fi
-                fi
-        done < <(printf '%s\n' "$_th_raw" | grep '=' | grep -wE 'in|out' | grep -v tcp | grep -v udp)
-        #
-        #
-        while IFS= read -r i; do
-                if [ -n "$i" ] && [ -f "$file" ]; then
-                        trust_protect_ipv6 "$i"; i="$_TPV6_RESULT"
-
-                        trust_parse_fields "$i"
-
-                        PTYPE="$_TF1"
-                        if [ "$PTYPE" == "tcp" ]; then
-                                PTYPE="tcp"
-                        elif [ "$PTYPE" == "udp" ]; then
-                                PTYPE="udp"
-                        else
-                                continue
-                        fi
-
-                        NFLOW="$_TF2"
-                        if [ "$NFLOW" == "in" ]; then
-                                NFLOW="INPUT"
-                                NFLOW_T="inbound"
-                        elif [ "$NFLOW" == "out" ]; then
-                                NFLOW="OUTPUT"
-                                NFLOW_T="outbound"
-                        else
-                                continue
-                        fi
-
-                        PFLOW="$_TF3"
-                        if [ "$PFLOW" == "s" ]; then
-                                PFLOW="sport"
-                                PFLOW_T="from"
-                        elif [ "$PFLOW" == "d" ]; then
-                                PFLOW="dport"
-                                PFLOW_T="to"
-                        else
-                                continue
-                        fi
-
-                        PPORT="$_TF4"
-                        expand_port "$PPORT"; PPORT="$_PORT"
-
-                        IPFLOW="$_TF5"
-                        if [ "$IPFLOW" == "s" ]; then
-                                IPFLOW="s"
-                        elif [ "$IPFLOW" == "d" ]; then
-                                IPFLOW="d"
-                        else
-                                continue
-                        fi
-                        trust_restore_ipv6 "$_TF6"; PIP="$_TRV6_RESULT"
-
-                        if [ -n "$PTYPE" ] && [ -n "$NFLOW" ] && [ -n "$IPFLOW" ] && [ -n "$PIP" ] && [ -n "$PFLOW" ] && [ -n "$PPORT" ]; then
-                         if is_fqdn "$PIP"; then
-                          if resolve_fqdn "$PIP"; then
-                           local _th_rip
-                           while IFS= read -r _th_rip; do
-                            if [ "$verb" == "allow" ] && [ "$IPFLOW" == "s" ] && [ "$NFLOW" == "INPUT" ] && is_local_addr "$_th_rip"; then
-                                eout "{trust} ignored local ip $verb rule '$NFLOW_T $_th_rip $PFLOW_T port $PPORT'"
-                            elif [ "$verb" == "allow" ] && [ "$IPFLOW" == "d" ] && [ "$NFLOW" == "OUTPUT" ] && is_local_addr "$_th_rip"; then
-                                eout "{trust} ignored local ip $verb rule '$NFLOW_T $_th_rip $PFLOW_T port $PPORT'"
-                            elif ipt_for_host "$_th_rip"; then
-                                if [ "$PTYPE" == "tcp" ]; then
-                                        eout "{trust} $verb $NFLOW_T $PTYPE $_th_rip $PFLOW_T port $PPORT (resolved from $PIP)"
-                                        $IPT_H $IPT_FLAGS -A $chain -p $PTYPE -m multiport -$IPFLOW "$_th_rip" --$PFLOW $PPORT -j $action_tcp
-                                elif [ "$PTYPE" == "udp" ]; then
-                                        eout "{trust} $verb $NFLOW_T $PTYPE $_th_rip $PFLOW_T port $PPORT (resolved from $PIP)"
-                                        $IPT_H $IPT_FLAGS -A $chain -p $PTYPE -m multiport -$IPFLOW "$_th_rip" --$PFLOW $PPORT -j $action_udp
-                                fi
-                            fi
-                           done <<< "$_RESOLVED_IPS"
-                          else
-                           eout "{trust} failed to resolve FQDN $PIP, skipping"
-                          fi
-                         elif [ "$verb" == "allow" ] && [ "$IPFLOW" == "s" ] && [ "$NFLOW" == "INPUT" ] && is_local_addr "$PIP"; then
-                                eout "{trust} ignored local ip $verb rule '$NFLOW_T $PIP $PFLOW_T port $PPORT'"
-                         elif [ "$verb" == "allow" ] && [ "$IPFLOW" == "d" ] && [ "$NFLOW" == "OUTPUT" ] && is_local_addr "$PIP"; then
-                                eout "{trust} ignored local ip $verb rule '$NFLOW_T $PIP $PFLOW_T port $PPORT'"
-                         elif ipt_for_host "$PIP"; then
-                                if [ "$PTYPE" == "tcp" ]; then
-                                        eout "{trust} $verb $NFLOW_T $PTYPE $PIP $PFLOW_T port $PPORT"
-                                        $IPT_H $IPT_FLAGS -A $chain -p $PTYPE -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j $action_tcp
-                                elif [ "$PTYPE" == "udp" ]; then
-                                        eout "{trust} $verb $NFLOW_T $PTYPE $PIP $PFLOW_T port $PPORT"
-                                        $IPT_H $IPT_FLAGS -A $chain -p $PTYPE -m multiport -$IPFLOW $PIP --$PFLOW $PPORT -j $action_udp
-                                fi
-                         fi
-                        fi
-                fi
-        done < <(printf '%s\n' "$_th_raw" | grep '=' | grep -wE 'tcp|udp')
+        done <<< "$_th_raw"
 fi
 }
 
