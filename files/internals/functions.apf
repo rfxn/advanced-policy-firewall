@@ -43,6 +43,16 @@ _apf_cleanup_tmp() {
 	_APF_TMPFILES=""
 }
 
+## Detect iptables backend (nft vs legacy)
+# Sets global IPT_BACKEND to "nft" or "legacy" based on iptables --version output.
+# Called by snapshot_save() and fast load path to avoid duplicated detection.
+detect_ipt_backend() {
+	IPT_BACKEND="legacy"
+	if $IPT --version 2>&1 | grep -q nf_tables; then
+		IPT_BACKEND="nft"
+	fi
+}
+
 ## Snapshot save: atomic write with integrity validation
 # Writes iptables-save output to temp file, validates it, then atomically
 # moves into place. Handles both IPv4 and IPv6 (when USE_IPV6=1).
@@ -88,12 +98,9 @@ snapshot_save() {
 	fi
 
 	# Backend marker
-	local _ss_backend="legacy"
-	if $IPT --version 2>&1 | grep -q nf_tables; then
-		_ss_backend="nft"
-	fi
-	echo "$_ss_backend" > "$snap_dir/.apf.restore.backend"
-	eout "{glob} fast load snapshot saved (backend: $_ss_backend)"
+	detect_ipt_backend
+	echo "$IPT_BACKEND" > "$snap_dir/.apf.restore.backend"
+	eout "{glob} fast load snapshot saved (backend: $IPT_BACKEND)"
 	return 0
 }
 
@@ -120,7 +127,7 @@ ipt6() {
 # both stacks apply without address restriction (0/0 is the default).
 ipt_dst() {
 	if [ -n "$VNET" ] && [ "$VNET" != "0/0" ]; then
-		ipt4 -d $VNET "$@"
+		ipt4 -d "$VNET" "$@"
 		ipt6 "$@"
 	else
 		ipt "$@"
@@ -128,7 +135,7 @@ ipt_dst() {
 }
 ipt_src() {
 	if [ -n "$VNET" ] && [ "$VNET" != "0/0" ]; then
-		ipt4 -s $VNET "$@"
+		ipt4 -s "$VNET" "$@"
 		ipt6 "$@"
 	else
 		ipt "$@"
@@ -515,6 +522,26 @@ validate_config() {
         err="${err}PERMBLOCK_INTERVAL must be at least 60 seconds; "
     fi
  fi
+ # Validate SET_EXPIRE (non-negative integer; 0 = disabled)
+ if [ -n "$SET_EXPIRE" ]; then
+    if [[ ! "$SET_EXPIRE" =~ $_vc_int ]]; then
+        err="${err}SET_EXPIRE='$SET_EXPIRE' is invalid (must be a non-negative integer); "
+    fi
+ fi
+ # Validate FQDN_TIMEOUT (positive integer; passed to timeout command)
+ if [ -n "$FQDN_TIMEOUT" ]; then
+    if [[ ! "$FQDN_TIMEOUT" =~ $_vc_int ]]; then
+        err="${err}FQDN_TIMEOUT='$FQDN_TIMEOUT' is invalid (must be a positive integer); "
+    elif [ "$FQDN_TIMEOUT" == "0" ]; then
+        err="${err}FQDN_TIMEOUT='0' is invalid (must be greater than 0); "
+    fi
+ fi
+ # Validate SET_REFRESH (non-negative integer; 0 = disabled)
+ if [ -n "$SET_REFRESH" ]; then
+    if [[ ! "$SET_REFRESH" =~ $_vc_int ]]; then
+        err="${err}SET_REFRESH='$SET_REFRESH' is invalid (must be a non-negative integer); "
+    fi
+ fi
  if [ -n "$err" ]; then
     eout "{glob} configuration error: $err"
     [ "$SET_VERBOSE" != "1" ] && echo "apf($$): configuration error: $err"
@@ -585,9 +612,12 @@ trim() {
                 if [ -z "$CHK_SCMT" ]; then
                         MAXLINES=$((1+$MAXLINES))
                 fi
-                tail -n "$MAXLINES" "$FILE" > "$FILE.new"
-                cat "$FILE.new" > "$FILE"
-                rm -f "$FILE.new"
+                local _trim_tmp
+                _trim_tmp=$(mktemp "$(dirname "$FILE")/.trim.XXXXXX")
+                _apf_reg_tmp "$_trim_tmp"
+                tail -n "$MAXLINES" "$FILE" > "$_trim_tmp"
+                cat "$_trim_tmp" > "$FILE"
+                rm -f "$_trim_tmp"
         fi
  fi
 }
@@ -810,47 +840,94 @@ trust_entry_rule() {
 	return 0
 }
 
+# Resolve FQDN to IPs using trust file metadata or live resolution.
+# Sets global: _FQDN_RESOLVED_IPS (comma-separated)
+_resolve_fqdn_metadata() {
+	local fqdn="$1"
+	_FQDN_RESOLVED_IPS=""
+	local _rfm_rline
+	for f in "$ALLOW_HOSTS" "$DENY_HOSTS" "$GALLOW_HOSTS" "$GDENY_HOSTS"; do
+		[ -f "$f" ] || continue
+		_rfm_rline=$(grep -F "resolved=" "$f" 2>/dev/null | grep -F "$fqdn" | head -n1)
+		if [ -n "$_rfm_rline" ]; then
+			_FQDN_RESOLVED_IPS="${_rfm_rline##*resolved=}"
+			_FQDN_RESOLVED_IPS="${_FQDN_RESOLVED_IPS%% *}"
+			return 0
+		fi
+	done
+	if resolve_fqdn "$fqdn"; then
+		_FQDN_RESOLVED_IPS="${_RESOLVED_IPS//$'\n'/,}"
+		return 0
+	fi
+	return 1
+}
+
+# Delete iptables rules for a specific IP across all trust chains.
+# Modifies caller's `found` variable (set to 1 when any rule is deleted).
+_trust_remove_ip_rules() {
+	local ip="$1"
+	if ! ipt_for_host "$ip"; then return; fi
+	$IPT_H $IPT_FLAGS -D INPUT -s "$ip" -j ACCEPT 2>/dev/null && found=1
+	$IPT_H $IPT_FLAGS -D OUTPUT -d "$ip" -j ACCEPT 2>/dev/null && found=1
+	$IPT_H $IPT_FLAGS -D INPUT -s "$ip" -j $ALL_STOP 2>/dev/null && found=1
+	$IPT_H $IPT_FLAGS -D OUTPUT -d "$ip" -j $ALL_STOP 2>/dev/null && found=1
+	$IPT_H $IPT_FLAGS -D TALLOW -s "$ip" -j ACCEPT 2>/dev/null && found=1
+	$IPT_H $IPT_FLAGS -D TALLOW -d "$ip" -j ACCEPT 2>/dev/null && found=1
+	$IPT_H $IPT_FLAGS -D TDENY -s "$ip" -j $ALL_STOP 2>/dev/null && found=1
+	$IPT_H $IPT_FLAGS -D TDENY -d "$ip" -j $ALL_STOP 2>/dev/null && found=1
+	$IPT_H $IPT_FLAGS -D TGALLOW -s "$ip" -j ACCEPT 2>/dev/null && found=1
+	$IPT_H $IPT_FLAGS -D TGALLOW -d "$ip" -j ACCEPT 2>/dev/null && found=1
+	$IPT_H $IPT_FLAGS -D TGDENY -s "$ip" -j $ALL_STOP 2>/dev/null && found=1
+	$IPT_H $IPT_FLAGS -D TGDENY -d "$ip" -j $ALL_STOP 2>/dev/null && found=1
+	# Spec-based cleanup for any remaining rules referencing this IP
+	local _ctr_chain _ctr_rule _ctr_spec
+	for _ctr_chain in INPUT OUTPUT TALLOW TDENY TGALLOW TGDENY; do
+		while IFS= read -r _ctr_rule; do
+			[ -z "$_ctr_rule" ] && continue
+			_ctr_spec="${_ctr_rule#-A $_ctr_chain }"
+			# shellcheck disable=SC2086
+			$IPT_H $IPT_FLAGS -D "$_ctr_chain" $_ctr_spec 2>/dev/null && found=1
+		done < <($IPT_H $IPT_FLAGS -S "$_ctr_chain" 2>/dev/null | grep -w -- "$ip")
+	done
+}
+
+# Remove advanced trust entries containing a host and their iptables rules.
+# Modifies caller's `found` variable.
+_trust_remove_advanced_entries() {
+	local host="$1"
+	local _ctr_adv_entry
+	for f in "$ALLOW_HOSTS" "$DENY_HOSTS" "$GALLOW_HOSTS" "$GDENY_HOSTS"; do
+		[ -f "$f" ] || continue
+		while IFS= read -r _ctr_adv_entry; do
+			[ -z "$_ctr_adv_entry" ] && continue
+			cli_trust_remove "$_ctr_adv_entry" >> /dev/null 2>&1 && found=1
+		done < <(grep -v '^#' "$f" | grep '=' | grep -Fw "$host")
+	done
+}
+
 cli_trust_remove() {
 	local DIP="$1"
 	if [ -z "$DIP" ]; then
-		echo "an FQDN or IP address is required for this option"
+		echo "an FQDN or IP address is required for this option" >&2
 		return 1
 	fi
 
 	# Advanced syntax removal
 	if [[ "$DIP" == *=* ]]; then
 		if ! valid_trust_entry "$DIP"; then
-			echo "Invalid trust entry '$DIP'"
+			echo "Invalid trust entry '$DIP'" >&2
 			return 1
 		fi
 		local found=0
 		if is_fqdn "$_VTE_IP"; then
-			# Advanced entry with FQDN — resolve to get IPs for iptables deletion
-			local _ctr_fqdn_ips="" _ctr_rline
-			for f in "$ALLOW_HOSTS" "$DENY_HOSTS" "$GALLOW_HOSTS" "$GDENY_HOSTS"; do
-				[ -f "$f" ] || continue
-				_ctr_rline=$(grep -F "resolved=" "$f" 2>/dev/null | grep -F "$_VTE_IP" | command head -n1)
-				if [ -n "$_ctr_rline" ]; then
-					_ctr_fqdn_ips="${_ctr_rline##*resolved=}"
-					_ctr_fqdn_ips="${_ctr_fqdn_ips%% *}"
-					break
-				fi
-			done
-			if [ -z "$_ctr_fqdn_ips" ]; then
-				# No metadata — live re-resolution
-				if resolve_fqdn "$_VTE_IP"; then
-					_ctr_fqdn_ips="${_RESOLVED_IPS//$'\n'/,}"
-				fi
-			fi
-			# Delete iptables rules for each resolved IP
+			_resolve_fqdn_metadata "$_VTE_IP"
 			local _ctr_rip _ctr_resolved_entry
-			for _ctr_rip in ${_ctr_fqdn_ips//,/ }; do
+			for _ctr_rip in ${_FQDN_RESOLVED_IPS//,/ }; do
 				_ctr_resolved_entry="${DIP//$_VTE_IP/$_ctr_rip}"
 				trust_entry_rule "$_ctr_resolved_entry" "TALLOW" "ALLOW" "-D" 2>/dev/null && found=1
 				trust_entry_rule "$_ctr_resolved_entry" "TDENY" "DENY" "-D" 2>/dev/null && found=1
 			done
 		else
-			# Remove iptables rules via trust_entry_rule in delete mode
 			trust_entry_rule "$DIP" "TALLOW" "ALLOW" "-D" 2>/dev/null && found=1
 			trust_entry_rule "$DIP" "TDENY" "DENY" "-D" 2>/dev/null && found=1
 		fi
@@ -872,57 +949,17 @@ cli_trust_remove() {
 	fi
 
 	if ! valid_host "$DIP"; then
-		echo "Invalid host '$DIP': must be a valid IP/IPv6 address, CIDR block, or FQDN"
+		echo "Invalid host '$DIP': must be a valid IP/IPv6 address, CIDR block, or FQDN" >&2
 		return 1
 	fi
 
 	local found=0
 
 	if is_fqdn "$DIP"; then
-		# FQDN removal — get resolved IPs from metadata or live resolution
-		local _ctr_fqdn_ips="" _ctr_rline
-		for f in "$ALLOW_HOSTS" "$DENY_HOSTS" "$GALLOW_HOSTS" "$GDENY_HOSTS"; do
-			[ -f "$f" ] || continue
-			_ctr_rline=$(grep -F "resolved=" "$f" 2>/dev/null | grep -F "$DIP" | command head -n1)
-			if [ -n "$_ctr_rline" ]; then
-				_ctr_fqdn_ips="${_ctr_rline##*resolved=}"
-				_ctr_fqdn_ips="${_ctr_fqdn_ips%% *}"
-				break
-			fi
-		done
-		if [ -z "$_ctr_fqdn_ips" ]; then
-			# No metadata — live re-resolution
-			if resolve_fqdn "$DIP"; then
-				_ctr_fqdn_ips="${_RESOLVED_IPS//$'\n'/,}"
-			fi
-		fi
-		# Delete iptables rules for each resolved IP
+		_resolve_fqdn_metadata "$DIP"
 		local _ctr_rip
-		for _ctr_rip in ${_ctr_fqdn_ips//,/ }; do
-			if ipt_for_host "$_ctr_rip"; then
-				$IPT_H $IPT_FLAGS -D INPUT -s "$_ctr_rip" -j ACCEPT 2>/dev/null && found=1
-				$IPT_H $IPT_FLAGS -D OUTPUT -d "$_ctr_rip" -j ACCEPT 2>/dev/null && found=1
-				$IPT_H $IPT_FLAGS -D INPUT -s "$_ctr_rip" -j $ALL_STOP 2>/dev/null && found=1
-				$IPT_H $IPT_FLAGS -D OUTPUT -d "$_ctr_rip" -j $ALL_STOP 2>/dev/null && found=1
-				$IPT_H $IPT_FLAGS -D TALLOW -s "$_ctr_rip" -j ACCEPT 2>/dev/null && found=1
-				$IPT_H $IPT_FLAGS -D TALLOW -d "$_ctr_rip" -j ACCEPT 2>/dev/null && found=1
-				$IPT_H $IPT_FLAGS -D TDENY -s "$_ctr_rip" -j $ALL_STOP 2>/dev/null && found=1
-				$IPT_H $IPT_FLAGS -D TDENY -d "$_ctr_rip" -j $ALL_STOP 2>/dev/null && found=1
-				$IPT_H $IPT_FLAGS -D TGALLOW -s "$_ctr_rip" -j ACCEPT 2>/dev/null && found=1
-				$IPT_H $IPT_FLAGS -D TGALLOW -d "$_ctr_rip" -j ACCEPT 2>/dev/null && found=1
-				$IPT_H $IPT_FLAGS -D TGDENY -s "$_ctr_rip" -j $ALL_STOP 2>/dev/null && found=1
-				$IPT_H $IPT_FLAGS -D TGDENY -d "$_ctr_rip" -j $ALL_STOP 2>/dev/null && found=1
-				# Spec-based cleanup for this resolved IP
-				local _ctr_chain _ctr_rule _ctr_spec
-				for _ctr_chain in INPUT OUTPUT TALLOW TDENY TGALLOW TGDENY; do
-					while IFS= read -r _ctr_rule; do
-						[ -z "$_ctr_rule" ] && continue
-						_ctr_spec="${_ctr_rule#-A $_ctr_chain }"
-						# shellcheck disable=SC2086
-						$IPT_H $IPT_FLAGS -D "$_ctr_chain" $_ctr_spec 2>/dev/null && found=1
-					done < <($IPT_H $IPT_FLAGS -S "$_ctr_chain" 2>/dev/null | grep -w -- "$_ctr_rip")
-				done
-			fi
+		for _ctr_rip in ${_FQDN_RESOLVED_IPS//,/ }; do
+			_trust_remove_ip_rules "$_ctr_rip"
 		done
 		# Remove FQDN + comment from trust files
 		local escaped_fqdn="${DIP//./\\.}"
@@ -931,66 +968,21 @@ cli_trust_remove() {
 		fi
 		sed -i "\%# added ${escaped_fqdn} %d" "$ALLOW_HOSTS" "$DENY_HOSTS" "$GALLOW_HOSTS" "$GDENY_HOSTS"
 		sed -i "\%^${escaped_fqdn}$%d" "$ALLOW_HOSTS" "$DENY_HOSTS" "$GALLOW_HOSTS" "$GDENY_HOSTS"
-		# Also remove advanced trust entries containing this FQDN
-		local _ctr_adv_entry
-		for f in "$ALLOW_HOSTS" "$DENY_HOSTS" "$GALLOW_HOSTS" "$GDENY_HOSTS"; do
-			[ -f "$f" ] || continue
-			while IFS= read -r _ctr_adv_entry; do
-				[ -z "$_ctr_adv_entry" ] && continue
-				cli_trust_remove "$_ctr_adv_entry" >> /dev/null 2>&1 && found=1
-			done < <(grep -v '^#' "$f" | grep '=' | grep -Fw "$DIP")
-		done
+		_trust_remove_advanced_entries "$DIP"
 	else
-		# IP/CIDR removal (existing path)
+		# IP/CIDR removal
 		if ! ipt_for_host "$DIP"; then
-			echo "Cannot remove '$DIP': IPv6 address but USE_IPV6 is not enabled"
+			echo "Cannot remove '$DIP': IPv6 address but USE_IPV6 is not enabled" >&2
 			return 1
 		fi
-
-		# Remove known rule specs directly (race-free)
-		$IPT_H $IPT_FLAGS -D INPUT -s $DIP -j ACCEPT 2>/dev/null && found=1
-		$IPT_H $IPT_FLAGS -D OUTPUT -d $DIP -j ACCEPT 2>/dev/null && found=1
-		$IPT_H $IPT_FLAGS -D INPUT -s $DIP -j $ALL_STOP 2>/dev/null && found=1
-		$IPT_H $IPT_FLAGS -D OUTPUT -d $DIP -j $ALL_STOP 2>/dev/null && found=1
-
-		$IPT_H $IPT_FLAGS -D TALLOW -s $DIP -j ACCEPT 2>/dev/null && found=1
-		$IPT_H $IPT_FLAGS -D TALLOW -d $DIP -j ACCEPT 2>/dev/null && found=1
-		$IPT_H $IPT_FLAGS -D TDENY -s $DIP -j $ALL_STOP 2>/dev/null && found=1
-		$IPT_H $IPT_FLAGS -D TDENY -d $DIP -j $ALL_STOP 2>/dev/null && found=1
-
-		$IPT_H $IPT_FLAGS -D TGALLOW -s $DIP -j ACCEPT 2>/dev/null && found=1
-		$IPT_H $IPT_FLAGS -D TGALLOW -d $DIP -j ACCEPT 2>/dev/null && found=1
-		$IPT_H $IPT_FLAGS -D TGDENY -s $DIP -j $ALL_STOP 2>/dev/null && found=1
-		$IPT_H $IPT_FLAGS -D TGDENY -d $DIP -j $ALL_STOP 2>/dev/null && found=1
-
+		_trust_remove_ip_rules "$DIP"
 		# Check trust files for entry before removing
 		local escaped_ip="${DIP//./\\.}"
 		if grep -q -- "^${escaped_ip}\b" "$ALLOW_HOSTS" "$DENY_HOSTS" "$GALLOW_HOSTS" "$GDENY_HOSTS" 2>/dev/null; then
 			found=1
 		fi
 		sed -i "\%^${escaped_ip}\b%d" "$ALLOW_HOSTS" "$DENY_HOSTS" "$GALLOW_HOSTS" "$GDENY_HOSTS"
-
-		# Also remove advanced trust entries containing this bare IP
-		local _ctr_adv_entry
-		for f in "$ALLOW_HOSTS" "$DENY_HOSTS" "$GALLOW_HOSTS" "$GDENY_HOSTS"; do
-			[ -f "$f" ] || continue
-			while IFS= read -r _ctr_adv_entry; do
-				[ -z "$_ctr_adv_entry" ] && continue
-				cli_trust_remove "$_ctr_adv_entry" >> /dev/null 2>&1 && found=1
-			done < <(grep -v '^#' "$f" | grep '=' | grep -Fw "$DIP")
-		done
-
-		# Spec-based cleanup: extract full rule specs from iptables -S and delete
-		# by spec (race-free; no line-number shifting between list and delete)
-		local _ctr_chain _ctr_rule _ctr_spec
-		for _ctr_chain in INPUT OUTPUT TALLOW TDENY TGALLOW TGDENY; do
-			while IFS= read -r _ctr_rule; do
-				[ -z "$_ctr_rule" ] && continue
-				_ctr_spec="${_ctr_rule#-A $_ctr_chain }"
-				# shellcheck disable=SC2086
-				$IPT_H $IPT_FLAGS -D "$_ctr_chain" $_ctr_spec 2>/dev/null && found=1
-			done < <($IPT_H $IPT_FLAGS -S "$_ctr_chain" 2>/dev/null | grep -w -- "$DIP")
-		done
+		_trust_remove_advanced_entries "$DIP"
 	fi
 
 	# Remove comment lines referencing the FQDN/IP (covers resolved= metadata)
@@ -1003,18 +995,34 @@ cli_trust_remove() {
 	return 0
 }
 
+# Strip control characters from trust comment field (caller's CMT variable)
+_sanitize_comment() {
+	CMT="${CMT//$'\n'/ }"
+	CMT="${CMT//$'\r'/}"
+	CMT="${CMT//$'\t'/ }"
+}
+
+# Set JACTION from ACTION (DENY→ALL_STOP, ALLOW→ACCEPT) in caller scope
+_trust_action_target() {
+	if [ "$ACTION" == "DENY" ]; then
+		JACTION="$ALL_STOP"
+	elif [ "$ACTION" == "ALLOW" ]; then
+		JACTION="ACCEPT"
+	fi
+}
+
 cli_trust() {
  local CHAIN="$1" ACTION="$2" FILE="$3" HOST="$4" CMT="$5"
  local tlist f valtrust TIME JACTION
  if [ -z "$HOST" ]; then
-        echo "an FQDN or IP address is required for this option"
+        echo "an FQDN or IP address is required for this option" >&2
         return 1
  fi
 
  # Advanced trust syntax (contains '=')
  if [[ "$HOST" == *=* ]]; then
 	if ! valid_trust_entry "$HOST"; then
-		echo "Invalid trust entry '$HOST'"
+		echo "Invalid trust entry '$HOST'" >&2
 		return 1
 	fi
 	tlist=""
@@ -1029,22 +1037,20 @@ cli_trust() {
 	elif is_fqdn "$_VTE_IP"; then
 		# Advanced syntax with FQDN — resolve before iptables
 		if ! resolve_fqdn "$_VTE_IP"; then
-			echo "Failed to resolve FQDN '$_VTE_IP'"
+			echo "Failed to resolve FQDN '$_VTE_IP'" >&2
 			return 1
 		fi
 		local _ct_rip _ct_skip=0
 		while IFS= read -r _ct_rip; do
 			if is_local_addr "$_ct_rip"; then
-				echo "$_VTE_IP resolves to local address $_ct_rip and can not be added to the trust system"
+				echo "$_VTE_IP resolves to local address $_ct_rip and can not be added to the trust system" >&2
 				_ct_skip=1; break
 			fi
 		done <<< "$_RESOLVED_IPS"
 		if [ "$_ct_skip" == "0" ]; then
 			TIME=$(date +"%D %H:%M:%S")
 			ADDED_EPOCH=$(date +%s)
-			CMT="${CMT//$'\n'/ }"
-			CMT="${CMT//$'\r'/}"
-			CMT="${CMT//$'\t'/ }"
+			_sanitize_comment
 			local _ct_csv="${_RESOLVED_IPS//$'\n'/,}"
 			if [ -n "$CMT" ]; then
 				echo "# added $HOST on $TIME addedtime=$ADDED_EPOCH resolved=$_ct_csv with comment: $CMT" >> "$FILE"
@@ -1065,13 +1071,11 @@ cli_trust() {
 			done <<< "$_RESOLVED_IPS"
 		fi
 	elif is_local_addr "$_VTE_IP"; then
-		echo "$_VTE_IP is a local address and can not be added to the trust system"
+		echo "$_VTE_IP is a local address and can not be added to the trust system" >&2
 	else
 		TIME=$(date +"%D %H:%M:%S")
 		ADDED_EPOCH=$(date +%s)
-		CMT="${CMT//$'\n'/ }"
-		CMT="${CMT//$'\r'/}"
-		CMT="${CMT//$'\t'/ }"
+		_sanitize_comment
 		if [ -n "$CMT" ]; then
 			echo "# added $HOST on $TIME addedtime=$ADDED_EPOCH with comment: $CMT" >> "$FILE"
 		else
@@ -1084,7 +1088,7 @@ cli_trust() {
 				echo "Inserted into firewall: $ACTION $_TER_DESC"
 			fi
 		else
-			echo "Failed to insert rule for '$HOST'"
+			echo "Failed to insert rule for '$HOST'" >&2
 			return 1
 		fi
 	fi
@@ -1093,7 +1097,7 @@ cli_trust() {
 
  # Bare host path (IP/CIDR/FQDN)
  if ! valid_host "$HOST"; then
-	echo "Invalid host '$HOST': must be a valid IP/IPv6 address, CIDR block, or FQDN"
+	echo "Invalid host '$HOST': must be a valid IP/IPv6 address, CIDR block, or FQDN" >&2
 	return 1
  fi
  tlist=""
@@ -1109,28 +1113,22 @@ cli_trust() {
  elif is_fqdn "$HOST"; then
 	# FQDN — resolve before iptables
 	if ! resolve_fqdn "$HOST"; then
-		echo "Failed to resolve FQDN '$HOST'"
+		echo "Failed to resolve FQDN '$HOST'" >&2
 		return 1
 	fi
 	local _ct_rip _ct_skip=0
 	while IFS= read -r _ct_rip; do
 		if is_local_addr "$_ct_rip"; then
-			echo "$HOST resolves to local address $_ct_rip and can not be added to the trust system"
+			echo "$HOST resolves to local address $_ct_rip and can not be added to the trust system" >&2
 			_ct_skip=1; break
 		fi
 	done <<< "$_RESOLVED_IPS"
 	if [ "$_ct_skip" == "0" ]; then
 		TIME=$(date +"%D %H:%M:%S")
 		ADDED_EPOCH=$(date +%s)
-		CMT="${CMT//$'\n'/ }"
-		CMT="${CMT//$'\r'/}"
-		CMT="${CMT//$'\t'/ }"
+		_sanitize_comment
 		local _ct_csv="${_RESOLVED_IPS//$'\n'/,}"
-		if [ "$ACTION" == "DENY" ]; then
-			JACTION="$ALL_STOP"
-		elif [ "$ACTION" == "ALLOW" ]; then
-			JACTION="ACCEPT"
-		fi
+		_trust_action_target
 		if [ "$CMT" ]; then
 			echo "# added $HOST on $TIME addedtime=$ADDED_EPOCH resolved=$_ct_csv with comment: $CMT" >> "$FILE"
 		else
@@ -1149,28 +1147,22 @@ cli_trust() {
 		fi
 	fi
  elif is_local_addr "$HOST"; then
-         echo "$HOST is a local address and can not be added to the trust system"
+         echo "$HOST is a local address and can not be added to the trust system" >&2
  elif ! ipt_for_host "$HOST"; then
-         echo "$HOST appears to be IPv6 but USE_IPV6 is not enabled"
+         echo "$HOST appears to be IPv6 but USE_IPV6 is not enabled" >&2
  else
          TIME=$(date +"%D %H:%M:%S")
 	ADDED_EPOCH=$(date +%s)
-	CMT="${CMT//$'\n'/ }"
-	CMT="${CMT//$'\r'/}"
-	CMT="${CMT//$'\t'/ }"
+	_sanitize_comment
 	if [ "$CMT" ]; then
 		echo "# added $HOST on $TIME addedtime=$ADDED_EPOCH with comment: $CMT" >> "$FILE"
 	else
 		echo "# added $HOST on $TIME addedtime=$ADDED_EPOCH" >> "$FILE"
 	fi
          echo "$HOST" >> "$FILE"
-	if [ "$ACTION" == "DENY" ]; then
-		JACTION="$ALL_STOP"
-	elif [ "$ACTION" == "ALLOW" ]; then
-		JACTION="ACCEPT"
-	fi
-         $IPT_H $IPT_FLAGS -I $CHAIN -s $HOST -j $JACTION
-        	$IPT_H $IPT_FLAGS -I $CHAIN -d $HOST -j $JACTION
+	_trust_action_target
+         $IPT_H $IPT_FLAGS -I $CHAIN -s "$HOST" -j $JACTION
+        	$IPT_H $IPT_FLAGS -I $CHAIN -d "$HOST" -j $JACTION
          eout "{trust} added $ACTION all to/from $HOST"
          if [ "$SET_VERBOSE" != "1" ]; then
 	        echo "Inserted into firewall: $ACTION all to/from $HOST"
@@ -1182,30 +1174,30 @@ cli_trust_temp() {
  local CHAIN="$1" ACTION="$2" FILE="$3" HOST="$4" TTL_STR="$5" CMT="$6"
  local tlist f valtrust TIME EXPIRE_EPOCH JACTION EXPIRE_DISP
  if [ -z "$HOST" ]; then
-	echo "an FQDN or IP address is required for this option"
+	echo "an FQDN or IP address is required for this option" >&2
 	return 1
  fi
 
  # Validate entry (advanced or bare)
  if [[ "$HOST" == *=* ]]; then
 	if ! valid_trust_entry "$HOST"; then
-		echo "Invalid trust entry '$HOST'"
+		echo "Invalid trust entry '$HOST'" >&2
 		return 1
 	fi
  else
 	if ! valid_host "$HOST"; then
-		echo "Invalid host '$HOST': must be a valid IP/IPv6 address, CIDR block, or FQDN"
+		echo "Invalid host '$HOST': must be a valid IP/IPv6 address, CIDR block, or FQDN" >&2
 		return 1
 	fi
 	_VTE_IP="$HOST"
  fi
 
  if [ -z "$TTL_STR" ]; then
-	echo "a TTL value is required (e.g., 300, 5m, 1h, 7d)"
+	echo "a TTL value is required (e.g., 300, 5m, 1h, 7d)" >&2
 	return 1
  fi
  if ! parse_ttl "$TTL_STR"; then
-	echo "Invalid TTL '$TTL_STR': must be a positive number with optional suffix (s/m/h/d)"
+	echo "Invalid TTL '$TTL_STR': must be a positive number with optional suffix (s/m/h/d)" >&2
 	return 1
  fi
  tlist=""
@@ -1221,21 +1213,19 @@ cli_trust_temp() {
  elif is_fqdn "$_VTE_IP"; then
 	# FQDN (bare or in advanced syntax) — resolve before iptables
 	if ! resolve_fqdn "$_VTE_IP"; then
-		echo "Failed to resolve FQDN '$_VTE_IP'"
+		echo "Failed to resolve FQDN '$_VTE_IP'" >&2
 		return 1
 	fi
 	local _ctt_rip _ctt_skip=0
 	while IFS= read -r _ctt_rip; do
 		if is_local_addr "$_ctt_rip"; then
-			echo "$_VTE_IP resolves to local address $_ctt_rip and can not be added to the trust system"
+			echo "$_VTE_IP resolves to local address $_ctt_rip and can not be added to the trust system" >&2
 			_ctt_skip=1; break
 		fi
 	done <<< "$_RESOLVED_IPS"
 	if [ "$_ctt_skip" == "0" ]; then
 		TIME=$(date +"%D %H:%M:%S")
-		CMT="${CMT//$'\n'/ }"
-		CMT="${CMT//$'\r'/}"
-		CMT="${CMT//$'\t'/ }"
+		_sanitize_comment
 		EXPIRE_EPOCH=$(($(date +%s) + _TTL_SECONDS))
 		local _ctt_csv="${_RESOLVED_IPS//$'\n'/,}"
 		if [ -n "$CMT" ]; then
@@ -1266,11 +1256,7 @@ cli_trust_temp() {
 			done <<< "$_RESOLVED_IPS"
 		else
 			# Bare FQDN
-			if [ "$ACTION" == "DENY" ]; then
-				JACTION="$ALL_STOP"
-			elif [ "$ACTION" == "ALLOW" ]; then
-				JACTION="ACCEPT"
-			fi
+			_trust_action_target
 			while IFS= read -r _ctt_rip; do
 				if ipt_for_host "$_ctt_rip"; then
 					$IPT_H $IPT_FLAGS -I $CHAIN -s "$_ctt_rip" -j $JACTION
@@ -1291,12 +1277,10 @@ cli_trust_temp() {
 		fi
 	fi
  elif is_local_addr "$_VTE_IP"; then
-	echo "$_VTE_IP is a local address and can not be added to the trust system"
+	echo "$_VTE_IP is a local address and can not be added to the trust system" >&2
  else
 	TIME=$(date +"%D %H:%M:%S")
-	CMT="${CMT//$'\n'/ }"
-	CMT="${CMT//$'\r'/}"
-	CMT="${CMT//$'\t'/ }"
+	_sanitize_comment
 	EXPIRE_EPOCH=$(($(date +%s) + _TTL_SECONDS))
 	if [ -n "$CMT" ]; then
 		echo "# added $HOST on $TIME ttl=$_TTL_SECONDS expire=$EXPIRE_EPOCH with comment: $CMT" >> "$FILE"
@@ -1308,7 +1292,7 @@ cli_trust_temp() {
 	if [[ "$HOST" == *=* ]]; then
 		# Advanced syntax — use trust_entry_rule for iptables insertion
 		if ! trust_entry_rule "$HOST" "$CHAIN" "$ACTION" "-I"; then
-			echo "Failed to insert rule for '$HOST'"
+			echo "Failed to insert rule for '$HOST'" >&2
 			return 1
 		fi
 		EXPIRE_DISP=$(date -d "@$EXPIRE_EPOCH" +"%D %H:%M:%S")
@@ -1326,16 +1310,12 @@ cli_trust_temp() {
 	else
 		# Bare host path
 		if ! ipt_for_host "$HOST"; then
-			echo "$HOST appears to be IPv6 but USE_IPV6 is not enabled"
+			echo "$HOST appears to be IPv6 but USE_IPV6 is not enabled" >&2
 			return 1
 		fi
-		if [ "$ACTION" == "DENY" ]; then
-			JACTION="$ALL_STOP"
-		elif [ "$ACTION" == "ALLOW" ]; then
-			JACTION="ACCEPT"
-		fi
-		$IPT_H $IPT_FLAGS -I $CHAIN -s $HOST -j $JACTION
-		$IPT_H $IPT_FLAGS -I $CHAIN -d $HOST -j $JACTION
+		_trust_action_target
+		$IPT_H $IPT_FLAGS -I $CHAIN -s "$HOST" -j $JACTION
+		$IPT_H $IPT_FLAGS -I $CHAIN -d "$HOST" -j $JACTION
 		EXPIRE_DISP=$(date -d "@$EXPIRE_EPOCH" +"%D %H:%M:%S")
 		eout "{trust} added temporary $ACTION all to/from $HOST (ttl=${_TTL_SECONDS}s, expires $EXPIRE_DISP)"
 		if [ "$SET_VERBOSE" != "1" ]; then
@@ -1436,6 +1416,8 @@ save_external_baseline() {
 restore_external_baseline() {
 	local bdir="$INSTALL_PATH/internals"
 	local f rule
+	# Suppress: baseline rules may reference non-APF chains (Docker, k8s)
+	# that no longer exist after a selective flush
 	for f in "$bdir/.apf.input.baseline" "$bdir/.apf.output.baseline"; do
 		[ -f "$f" ] || continue
 		while IFS= read -r rule; do
@@ -1470,6 +1452,7 @@ flush_apf_chains() {
 		RESET PROHIBIT RABPSCAN TELNET_LOG SSH_LOG
 		IDENT P2P DEG SMTP_BLK SYNFLOOD IN_SANITY OUT_SANITY FRAG_UDP
 		PZERO MCAST LMAC PHP DSHIELD SDROP"
+	# Suppress: chain may not exist if not created during this load cycle
 	for chain in $apf_chains; do
 		if $IPT $IPT_FLAGS -L "$chain" -n >/dev/null 2>&1; then
 			ipt4 -F "$chain"
@@ -1483,6 +1466,7 @@ flush_apf_chains() {
 			RESET PROHIBIT RABPSCAN TELNET_LOG SSH_LOG
 			IDENT P2P PHP DSHIELD SDROP SMTP_BLK SYNFLOOD IN_SANITY6 OUT_SANITY6
 			FRAG_UDP6 PZERO6 MCAST6"
+		# Suppress: chain may not exist if not created during this load cycle
 		for chain in $apf_chains6; do
 			if $IP6T $IPT_FLAGS -L "$chain" -n >/dev/null 2>&1; then
 				ipt6 -F "$chain"
@@ -1585,6 +1569,7 @@ fi
 list() {
 echo "Loading iptables rules..."
 iptc=$(mktemp "$INSTALL_PATH/.iptrules.XXXXXX")
+_apf_reg_tmp "$iptc"
 chmod 600 "$iptc"
 $IPT $IPT_FLAGS --verbose --numeric --line-numbers --list >> "$iptc"
 if [ "$USE_IPV6" == "1" ] && [ -n "$IP6T" ]; then
@@ -1593,17 +1578,24 @@ if [ "$USE_IPV6" == "1" ] && [ -n "$IP6T" ]; then
 	echo "" >> "$iptc"
 	$IP6T $IPT_FLAGS --verbose --numeric --line-numbers --list >> "$iptc"
 fi
-echo "Opening editor"
 EDITOR_CMD=""
-for ed in pico nano vi vim; do
-	if command -v "$ed" > /dev/null 2>&1; then
-		EDITOR_CMD=$(command -v "$ed")
-		break
-	fi
-done
+if [ -n "$EDITOR" ] && command -v "$EDITOR" > /dev/null 2>&1; then
+	EDITOR_CMD=$(command -v "$EDITOR")
+else
+	for ed in pico nano vi vim; do
+		if command -v "$ed" > /dev/null 2>&1; then
+			EDITOR_CMD=$(command -v "$ed")
+			break
+		fi
+	done
+fi
 if [ -n "$EDITOR_CMD" ]; then
+	echo "Opening editor"
 	$EDITOR_CMD "$iptc"
 	command -v clear > /dev/null 2>&1 && clear
+else
+	echo "No editor found; displaying rules with pager"
+	${PAGER:-more} "$iptc"
 fi
 rm -f "$iptc"
 }
@@ -1779,7 +1771,7 @@ trust_lookup() {
 	done
 
 	if [ "$found" -eq 0 ]; then
-		echo "$host not found in any trust file."
+		echo "$host not found in any trust file." >&2
 		return 1
 	fi
 }
@@ -1841,7 +1833,7 @@ help() {
 	echo "Diagnostics:"
 	echo "  -g PATTERN, --search ........ search iptables/ipset rules & trust files"
 	echo "  --validate, --check ......... validate config without starting firewall"
-	echo "  --dump-config ............... output all configuration variables"
+	echo "  -o, --dump-config ........... output all configuration variables"
 	echo "  -v, --version ............... output version number"
 	echo "  -h, --help .................. show this help message"
 	echo ""
@@ -1897,7 +1889,7 @@ ovars() {
 search() {
  local pattern="$1"
  if [ -z "$pattern" ]; then
-  echo "usage: apf -g PATTERN"
+  echo "usage: apf -g PATTERN" >&2
   return 1
  fi
  local found=0
@@ -2083,8 +2075,8 @@ if [ -n "$_th_raw" ]; then
                          if [ -f "$file" ]; then
                           if ipt_for_host "$i"; then
                                 eout "{trust} $verb all to/from $i"
-                                $IPT_H $IPT_FLAGS -A $chain -s $i -d $ANY_ADDR -j $action_all
-                                $IPT_H $IPT_FLAGS -A $chain -d $i -s $ANY_ADDR -j $action_all
+                                $IPT_H $IPT_FLAGS -A $chain -s "$i" -d "$ANY_ADDR" -j $action_all
+                                $IPT_H $IPT_FLAGS -A $chain -d "$i" -s "$ANY_ADDR" -j $action_all
                           fi
                          fi
                         fi
@@ -2112,6 +2104,7 @@ download_url() {
     if [ -n "$WGET" ]; then
         $WGET -q -t 3 -T 10 -O "$output" "$url" >> /dev/null 2>&1 && return 0
     fi
+    eout "{glob} download failed for $url (check TLS support on legacy systems)"
     return 1
 }
 
@@ -2172,6 +2165,7 @@ if download_url "$url" "$url_tmp"; then
                 fi
         done < "$url_tmp"
 else
+        # Error policy: dlist restores from backup to preserve data
         eout "{$tag} download of $url failed"
         if [ -f "$hosts_file.bk" ]; then
             cp "$hosts_file.bk" "$hosts_file"
@@ -2189,29 +2183,36 @@ else
 fi
 }
 
-dlist_php_hosts() {
-if [ -n "$(grep -v "#" "$PHP_HOSTS")" ]; then
-        eout "{php} loading php_hosts.rules"
-        ipt -N PHP
-        while IFS= read -r i; do
-                [[ "$i" == \#* || -z "$i" ]] && continue
-                if [ -f "$PHP_HOSTS" ]; then
+## Shared dlist chain loading helper.
+# Usage: dlist_load_hosts chain_name hosts_file tag log_prefix
+# Creates iptables chain, loads validated entries with LOG+DROP, attaches
+# to INPUT and OUTPUT chains.
+dlist_load_hosts() {
+local _dlh_chain="$1" _dlh_file="$2" _dlh_tag="$3" _dlh_prefix="$4"
+if [ -n "$(grep -v "#" "$_dlh_file")" ]; then
+	eout "{$_dlh_tag} loading ${_dlh_file##*/}"
+	ipt -N "$_dlh_chain"
+	while IFS= read -r i; do
+		[[ "$i" == \#* || -z "$i" ]] && continue
+		if [ -f "$_dlh_file" ]; then
 			if ! valid_ip_cidr "$i"; then
-				eout "{php} skipping invalid entry: $i"
+				eout "{$_dlh_tag} skipping invalid entry: $i"
 				continue
 			fi
 			if ipt_for_host "$i"; then
-			  if [ "$LOG_DROP" == "1" ]; then
-                           $IPT_H $IPT_FLAGS -A PHP -s $i -d $ANY_ADDR -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** PHP ** "
-			  fi
-                          $IPT_H $IPT_FLAGS -A PHP -s $i -d $ANY_ADDR -j $ALL_STOP
+				if [ "$LOG_DROP" == "1" ]; then
+					$IPT_H $IPT_FLAGS -A "$_dlh_chain" -s "$i" -d "$ANY_ADDR" -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** $_dlh_prefix ** "
+				fi
+				$IPT_H $IPT_FLAGS -A "$_dlh_chain" -s "$i" -d "$ANY_ADDR" -j $ALL_STOP
 			fi
-                fi
-        done < "$PHP_HOSTS"
-        ipt -A INPUT -j PHP
-        ipt -A OUTPUT -j PHP
+		fi
+	done < "$_dlh_file"
+	ipt -A INPUT -j "$_dlh_chain"
+	ipt -A OUTPUT -j "$_dlh_chain"
 fi
 }
+
+dlist_php_hosts()      { dlist_load_hosts "PHP"     "$PHP_HOSTS"  "php"     "PHP"; }
 
 dlist_dshield() {
 if [ -n "$DLIST_DSHIELD_URL" ] && [ "$DLIST_DSHIELD" == "1" ] && ( [ -n "$CURL" ] || [ -n "$WGET" ] ); then
@@ -2221,29 +2222,7 @@ else
 fi
 }
 
-dlist_dshield_hosts() {
-if [ -n "$(grep -v "#" "$DS_HOSTS")" ]; then
-        eout "{dshield} loading ds_hosts.rules"
-        ipt -N DSHIELD
-        while IFS= read -r i; do
-                [[ "$i" == \#* || -z "$i" ]] && continue
-                if [ -f "$DS_HOSTS" ]; then
-			if ! valid_ip_cidr "$i"; then
-				eout "{dshield} skipping invalid entry: $i"
-				continue
-			fi
-			if ipt_for_host "$i"; then
-			  if [ "$LOG_DROP" == "1" ]; then
-                           $IPT_H $IPT_FLAGS -A DSHIELD -s $i -d $ANY_ADDR -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** DSHIELD ** "
-			  fi
-                          $IPT_H $IPT_FLAGS -A DSHIELD -s $i -d $ANY_ADDR -j $ALL_STOP
-			fi
-                fi
-        done < "$DS_HOSTS"
-        ipt -A INPUT -j DSHIELD
-        ipt -A OUTPUT -j DSHIELD
-fi
-}
+dlist_dshield_hosts()  { dlist_load_hosts "DSHIELD" "$DS_HOSTS"   "dshield" "DSHIELD"; }
 
 dlist_spamhaus() {
 if [ -n "$DLIST_SPAMHAUS_URL" ] && [ "$DLIST_SPAMHAUS" == "1" ] && ( [ -n "$CURL" ] || [ -n "$WGET" ] ); then
@@ -2253,30 +2232,7 @@ else
 fi
 }
 
-
-dlist_spamhaus_hosts() {
-if [ -n "$(grep -v "#" "$DROP_HOSTS")" ]; then
-        eout "{sdrop} loading sdrop_hosts.rules"
-        ipt -N SDROP
-        while IFS= read -r i; do
-                [[ "$i" == \#* || -z "$i" ]] && continue
-                if [ -f "$DROP_HOSTS" ]; then
-			if ! valid_ip_cidr "$i"; then
-				eout "{sdrop} skipping invalid entry: $i"
-				continue
-			fi
-			if ipt_for_host "$i"; then
-			  if [ "$LOG_DROP" == "1" ]; then
-                           $IPT_H $IPT_FLAGS -A SDROP -s $i -d $ANY_ADDR -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** SDROP ** "
-			  fi
-                          $IPT_H $IPT_FLAGS -A SDROP -s $i -d $ANY_ADDR -j $ALL_STOP
-			fi
-                fi
-        done < "$DROP_HOSTS"
-        ipt -A INPUT -j SDROP
-        ipt -A OUTPUT -j SDROP
-fi
-}
+dlist_spamhaus_hosts() { dlist_load_hosts "SDROP"   "$DROP_HOSTS" "sdrop"   "SDROP"; }
 
 dlist_ecnshame() {
 if [ -n "$DLIST_ECNSHAME_URL" ] && [ "$DLIST_ECNSHAME" == "1" ] && ( [ -n "$CURL" ] || [ -n "$WGET" ] ); then
@@ -2297,7 +2253,7 @@ if [ -n "$(grep -v "#" "$ECNSHAME_HOSTS")" ]; then
 				continue
 			fi
 			if ipt_for_host "$i"; then
-				$IPT_H $IPT_FLAGS -t mangle -A POSTROUTING -p tcp -d $i -j ECN --ecn-tcp-remove
+				$IPT_H $IPT_FLAGS -t mangle -A POSTROUTING -p tcp -d "$i" -j ECN --ecn-tcp-remove
 			fi
                 fi
         done < "$ECNSHAME_HOSTS"
@@ -2346,93 +2302,15 @@ fi
 rm -f "$tmp"
 }
 
-ipset_load() {
-if [ "$USE_IPSET" != "1" ] || [ -z "$IPSET" ]; then
-	return
-fi
-local _ils_int='^[0-9]+$'
-local _ils_url='^https?://'
-local ipset_rules="$INSTALL_PATH/ipset.rules"
-if [ ! -f "$ipset_rules" ]; then
-	return
-fi
-ipset_migrate_rules
-eout "{ipset} loading ipset block lists"
-while IFS= read -r line; do
-	# Skip comments and blank lines
-	case "$line" in
-		\#*|"") continue ;;
-	esac
-
-	local name flow iptype logflag interval maxelem file_or_url _rest
-	IFS=: read -r name flow iptype logflag interval maxelem _rest <<< "$line"
-	# _rest contains field 7+ (may include colons in URLs)
-	file_or_url="$_rest"
-	# Default non-numeric interval/maxelem to 0
-	[[ "$interval" =~ $_ils_int ]] || interval=0
-	[[ "$maxelem" =~ $_ils_int ]] || maxelem=0
-
-	# Validate fields
-	if [ -z "$name" ] || [ -z "$flow" ] || [ -z "$iptype" ] || [ -z "$logflag" ] || [ -z "$file_or_url" ]; then
-		eout "{ipset} skipping malformed entry: $line"
-		continue
-	fi
-	if [ "$flow" != "src" ] && [ "$flow" != "dst" ]; then
-		eout "{ipset} invalid flow '$flow' in entry: $name"
-		continue
-	fi
-	if [ "$iptype" != "ip" ] && [ "$iptype" != "net" ]; then
-		eout "{ipset} invalid type '$iptype' in entry: $name"
-		continue
-	fi
-	if [ "$logflag" != "0" ] && [ "$logflag" != "1" ]; then
-		eout "{ipset} invalid log value '$logflag' in entry: $name"
-		continue
-	fi
-
-	local hash_type="hash:$iptype"
-	local data_file=""
-
-	eout "{ipset} loading set $name from $file_or_url"
-
-	# Resolve file_or_url to a local file
-	if [[ "$file_or_url" =~ $_ils_url ]]; then
-		local url_tmp
-		url_tmp=$(mktemp "$INSTALL_PATH/.apf-XXXXXX")
-		_apf_reg_tmp "$url_tmp"
-		if ! download_url "$file_or_url" "$url_tmp"; then
-			eout "{ipset} download failed for $name: $file_or_url"
-			rm -f "$url_tmp"
-			continue
-		fi
-		data_file="$url_tmp"
-	else
-		data_file="$file_or_url"
-	fi
-
-	if [ ! -f "$data_file" ] || [ ! -s "$data_file" ]; then
-		eout "{ipset} empty or missing data for $name"
-		[ -n "$url_tmp" ] && rm -f "$url_tmp"
-		continue
-	fi
-
-	# Determine effective maxelem
-	local ipset_maxelem=1048576
-	if [ "$maxelem" -gt 0 ]; then
-		ipset_maxelem="$maxelem"
-		[ "$ipset_maxelem" -gt 1048576 ] && ipset_maxelem=1048576
-	fi
-
-	# Create sets and populate with atomic swap
-	$IPSET create "$name" "$hash_type" maxelem "$ipset_maxelem" 2>/dev/null || true
-	$IPSET create "${name}-tmp" "$hash_type" maxelem "$ipset_maxelem" 2>/dev/null || true
-	$IPSET flush "${name}-tmp"
-
-	# Pre-filter data into ipset restore format for batch loading
-	local restore_file
-	restore_file=$(mktemp "$INSTALL_PATH/.apf-XXXXXX")
-	_apf_reg_tmp "$restore_file"
-	awk -v max="$ipset_maxelem" '
+## Shared ipset populate helper: filter data file into restore format and load.
+# Usage: ipset_populate_set set_name ipset_maxelem data_file
+# Sets _IPSET_COUNT global with the number of entries loaded (avoids subshell).
+ipset_populate_set() {
+	local _ips_set="$1" _ips_max="$2" _ips_data="$3"
+	local _ips_restore
+	_ips_restore=$(mktemp "$INSTALL_PATH/.apf-XXXXXX")
+	_apf_reg_tmp "$_ips_restore"
+	awk -v max="$_ips_max" '
 		BEGIN { count = 0 }
 		/^[[:space:]]*#/ || /^[[:space:]]*$/ || /^;;/ { next }
 		{
@@ -2441,42 +2319,135 @@ while IFS= read -r line; do
 			if (entry ~ /^[0-9]+\.[0-9]+\.[0-9]+\./) {
 				count++
 				if (count > max) next
-				print "add '"${name}"'-tmp " entry
+				print "add " set "-tmp " entry
 			}
 		}
-	' "$data_file" > "$restore_file"
-
-	local count
-	count=$(wc -l < "$restore_file")
-
-	if [ "$count" -gt 0 ]; then
-		$IPSET restore -exist < "$restore_file" 2>/dev/null
+	' set="$_ips_set" "$_ips_data" > "$_ips_restore"
+	_IPSET_COUNT=$(wc -l < "$_ips_restore")
+	if [ "$_IPSET_COUNT" -gt 0 ]; then
+		$IPSET restore -exist < "$_ips_restore" 2>/dev/null
 	fi
-	rm -f "$restore_file"
+	rm -f "$_ips_restore"
+}
 
-	[ -n "$url_tmp" ] && rm -f "$url_tmp"
+# Parse and validate an ipset.rules entry line.
+# Sets: _IPE_NAME, _IPE_FLOW, _IPE_IPTYPE, _IPE_LOGFLAG, _IPE_INTERVAL,
+#       _IPE_MAXELEM, _IPE_FILE_OR_URL
+# Returns: 0 on valid entry, 1 on skip
+_ipset_parse_entry() {
+	local line="$1"
+	local _ipe_int='^[0-9]+$'
+	local _rest
+	IFS=: read -r _IPE_NAME _IPE_FLOW _IPE_IPTYPE _IPE_LOGFLAG _IPE_INTERVAL _IPE_MAXELEM _rest <<< "$line"
+	_IPE_FILE_OR_URL="$_rest"
+	[[ "$_IPE_INTERVAL" =~ $_ipe_int ]] || _IPE_INTERVAL=0
+	[[ "$_IPE_MAXELEM" =~ $_ipe_int ]] || _IPE_MAXELEM=0
+	if [ -z "$_IPE_NAME" ] || [ -z "$_IPE_FLOW" ] || [ -z "$_IPE_IPTYPE" ] || [ -z "$_IPE_LOGFLAG" ] || [ -z "$_IPE_FILE_OR_URL" ]; then
+		eout "{ipset} skipping malformed entry: $line"
+		return 1
+	fi
+	if [ "$_IPE_FLOW" != "src" ] && [ "$_IPE_FLOW" != "dst" ]; then
+		eout "{ipset} invalid flow '$_IPE_FLOW' in entry: $_IPE_NAME"
+		return 1
+	fi
+	if [ "$_IPE_IPTYPE" != "ip" ] && [ "$_IPE_IPTYPE" != "net" ]; then
+		eout "{ipset} invalid type '$_IPE_IPTYPE' in entry: $_IPE_NAME"
+		return 1
+	fi
+	if [ "$_IPE_LOGFLAG" != "0" ] && [ "$_IPE_LOGFLAG" != "1" ]; then
+		eout "{ipset} invalid log value '$_IPE_LOGFLAG' in entry: $_IPE_NAME"
+		return 1
+	fi
+	return 0
+}
+
+# Download URL (if needed), validate data file, compute maxelem.
+# Uses: _IPE_NAME, _IPE_FILE_OR_URL, _IPE_MAXELEM, _IPE_IPTYPE
+# Sets: _IPE_DATA_FILE, _IPE_URL_TMP, _IPE_HASH_TYPE, _IPE_IPSET_MAXELEM
+# Returns: 0 on success, 1 on failure (cleans up tmp on error)
+_ipset_resolve_data() {
+	local _ipe_url='^https?://'
+	_IPE_DATA_FILE=""
+	_IPE_URL_TMP=""
+	_IPE_HASH_TYPE="hash:$_IPE_IPTYPE"
+	if [[ "$_IPE_FILE_OR_URL" =~ $_ipe_url ]]; then
+		_IPE_URL_TMP=$(mktemp "$INSTALL_PATH/.apf-XXXXXX")
+		_apf_reg_tmp "$_IPE_URL_TMP"
+		# Error policy: ipset continues with next entry (non-blocking)
+		if ! download_url "$_IPE_FILE_OR_URL" "$_IPE_URL_TMP"; then
+			eout "{ipset} download failed for $_IPE_NAME: $_IPE_FILE_OR_URL"
+			rm -f "$_IPE_URL_TMP"
+			_IPE_URL_TMP=""
+			return 1
+		fi
+		_IPE_DATA_FILE="$_IPE_URL_TMP"
+	else
+		_IPE_DATA_FILE="$_IPE_FILE_OR_URL"
+	fi
+	if [ ! -f "$_IPE_DATA_FILE" ] || [ ! -s "$_IPE_DATA_FILE" ]; then
+		eout "{ipset} empty or missing data for $_IPE_NAME"
+		[ -n "$_IPE_URL_TMP" ] && rm -f "$_IPE_URL_TMP"
+		_IPE_URL_TMP=""
+		return 1
+	fi
+	_IPE_IPSET_MAXELEM=1048576
+	if [ "$_IPE_MAXELEM" -gt 0 ]; then
+		_IPE_IPSET_MAXELEM="$_IPE_MAXELEM"
+		[ "$_IPE_IPSET_MAXELEM" -gt 1048576 ] && _IPE_IPSET_MAXELEM=1048576
+	fi
+	return 0
+}
+
+ipset_load() {
+if [ "$USE_IPSET" != "1" ] || [ -z "$IPSET" ]; then
+	return
+fi
+local ipset_rules="$INSTALL_PATH/ipset.rules"
+if [ ! -f "$ipset_rules" ]; then
+	return
+fi
+ipset_migrate_rules
+eout "{ipset} loading ipset block lists"
+while IFS= read -r line; do
+	case "$line" in
+		\#*|"") continue ;;
+	esac
+
+	_ipset_parse_entry "$line" || continue
+	eout "{ipset} loading set $_IPE_NAME from $_IPE_FILE_OR_URL"
+	_ipset_resolve_data || continue
+
+	# Create sets and populate with atomic swap
+	$IPSET create "$_IPE_NAME" "$_IPE_HASH_TYPE" maxelem "$_IPE_IPSET_MAXELEM" 2>/dev/null || true
+	$IPSET create "${_IPE_NAME}-tmp" "$_IPE_HASH_TYPE" maxelem "$_IPE_IPSET_MAXELEM" 2>/dev/null || true
+	$IPSET flush "${_IPE_NAME}-tmp"
+
+	ipset_populate_set "$_IPE_NAME" "$_IPE_IPSET_MAXELEM" "$_IPE_DATA_FILE"
+	local count="$_IPSET_COUNT"
+
+	[ -n "$_IPE_URL_TMP" ] && rm -f "$_IPE_URL_TMP"
 
 	if [ "$count" -eq 0 ]; then
-		eout "{ipset} no valid entries for $name, skipping"
-		$IPSET destroy "${name}-tmp" 2>/dev/null
-		$IPSET destroy "$name" 2>/dev/null
+		eout "{ipset} no valid entries for $_IPE_NAME, skipping"
+		$IPSET destroy "${_IPE_NAME}-tmp" 2>/dev/null
+		$IPSET destroy "$_IPE_NAME" 2>/dev/null
 		continue
 	fi
 
-	$IPSET swap "${name}-tmp" "$name"
-	$IPSET flush "${name}-tmp"
-	$IPSET destroy "${name}-tmp" 2>/dev/null
-	eout "{ipset} loaded $count entries into $name ($hash_type)"
-	ipset_update_timestamp "$name" "$(date +%s)"
+	$IPSET swap "${_IPE_NAME}-tmp" "$_IPE_NAME"
+	$IPSET flush "${_IPE_NAME}-tmp"
+	$IPSET destroy "${_IPE_NAME}-tmp" 2>/dev/null
+	eout "{ipset} loaded $count entries into $_IPE_NAME ($_IPE_HASH_TYPE)"
+	ipset_update_timestamp "$_IPE_NAME" "$(date +%s)"
 
 	# Create iptables chain (IPv4 only — ipset entries are IPv4-filtered)
-	ipt4 -N "IPSET_${name}" 2>/dev/null
-	if [ "$logflag" == "1" ] && [ "$LOG_DROP" == "1" ]; then
-		ipt4 -A "IPSET_${name}" -m set --match-set "$name" "$flow" -m limit --limit="${IPSET_LOG_RATE}/minute" -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** IPSET_${name} ** "
+	ipt4 -N "IPSET_${_IPE_NAME}" 2>/dev/null
+	if [ "$_IPE_LOGFLAG" == "1" ] && [ "$LOG_DROP" == "1" ]; then
+		ipt4 -A "IPSET_${_IPE_NAME}" -m set --match-set "$_IPE_NAME" "$_IPE_FLOW" -m limit --limit="${IPSET_LOG_RATE}/minute" -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** IPSET_${_IPE_NAME} ** "
 	fi
-	ipt4 -A "IPSET_${name}" -m set --match-set "$name" "$flow" -j $ALL_STOP
-	ipt4 -A INPUT -j "IPSET_${name}"
-	ipt4 -A OUTPUT -j "IPSET_${name}"
+	ipt4 -A "IPSET_${_IPE_NAME}" -m set --match-set "$_IPE_NAME" "$_IPE_FLOW" -j $ALL_STOP
+	ipt4 -A INPUT -j "IPSET_${_IPE_NAME}"
+	ipt4 -A OUTPUT -j "IPSET_${_IPE_NAME}"
 done < "$ipset_rules"
 }
 
@@ -2499,8 +2470,6 @@ ipset_update() {
 if [ "$USE_IPSET" != "1" ] || [ -z "$IPSET" ]; then
 	return
 fi
-local _ius_int='^[0-9]+$'
-local _ius_url='^https?://'
 local ipset_rules="$INSTALL_PATH/ipset.rules"
 if [ ! -f "$ipset_rules" ]; then
 	return
@@ -2511,110 +2480,50 @@ while IFS= read -r line; do
 		\#*|"") continue ;;
 	esac
 
-	local name flow iptype logflag interval maxelem file_or_url _rest
-	IFS=: read -r name flow iptype logflag interval maxelem _rest <<< "$line"
-	file_or_url="$_rest"
-	# Default non-numeric interval/maxelem to 0
-	[[ "$interval" =~ $_ius_int ]] || interval=0
-	[[ "$maxelem" =~ $_ius_int ]] || maxelem=0
-
-	if [ -z "$name" ] || [ -z "$file_or_url" ]; then
-		continue
-	fi
+	_ipset_parse_entry "$line" || continue
 
 	# Only update sets that already exist (created during full load)
-	if ! $IPSET list "$name" > /dev/null 2>&1; then
+	if ! $IPSET list "$_IPE_NAME" > /dev/null 2>&1; then
 		continue
 	fi
 
 	# Check per-list interval before downloading
-	local eff_interval="$interval"
+	local eff_interval="$_IPE_INTERVAL"
 	[ "$eff_interval" -eq 0 ] && eff_interval="${IPSET_REFRESH:-21600}"
 	local ts_file="$INSTALL_PATH/internals/.ipset.timestamps"
 	if [ -f "$ts_file" ]; then
 		local last_ts
-		last_ts=$(grep "^${name}:" "$ts_file" 2>/dev/null | tail -1)
+		last_ts=$(grep "^${_IPE_NAME}:" "$ts_file" 2>/dev/null | tail -1)
 		if [ -n "$last_ts" ]; then
 			local last_epoch="${last_ts#*:}"
 			local now_epoch
 			now_epoch=$(date +%s)
 			local elapsed=$((now_epoch - last_epoch))
 			if [ "$elapsed" -lt "$eff_interval" ]; then
-				eout "{ipset} skipping $name (refreshes in $((eff_interval - elapsed))s)"
+				eout "{ipset} skipping $_IPE_NAME (refreshes in $((eff_interval - elapsed))s)"
 				continue
 			fi
 		fi
 	fi
 
-	local hash_type="hash:$iptype"
-	local data_file=""
-	local url_tmp=""
+	eout "{ipset} updating set $_IPE_NAME from $_IPE_FILE_OR_URL"
+	_ipset_resolve_data || continue
 
-	eout "{ipset} updating set $name from $file_or_url"
+	$IPSET create "${_IPE_NAME}-tmp" "$_IPE_HASH_TYPE" maxelem "$_IPE_IPSET_MAXELEM" 2>/dev/null || true
+	$IPSET flush "${_IPE_NAME}-tmp"
 
-	if [[ "$file_or_url" =~ $_ius_url ]]; then
-		url_tmp=$(mktemp "$INSTALL_PATH/.apf-XXXXXX")
-		_apf_reg_tmp "$url_tmp"
-		if ! download_url "$file_or_url" "$url_tmp"; then
-			eout "{ipset} update download failed for $name: $file_or_url"
-			rm -f "$url_tmp"
-			continue
-		fi
-		data_file="$url_tmp"
-	else
-		data_file="$file_or_url"
-	fi
+	ipset_populate_set "$_IPE_NAME" "$_IPE_IPSET_MAXELEM" "$_IPE_DATA_FILE"
+	local count="$_IPSET_COUNT"
 
-	if [ ! -f "$data_file" ] || [ ! -s "$data_file" ]; then
-		[ -n "$url_tmp" ] && rm -f "$url_tmp"
-		continue
-	fi
-
-	# Determine effective maxelem
-	local ipset_maxelem=1048576
-	if [ "$maxelem" -gt 0 ]; then
-		ipset_maxelem="$maxelem"
-		[ "$ipset_maxelem" -gt 1048576 ] && ipset_maxelem=1048576
-	fi
-
-	$IPSET create "${name}-tmp" "$hash_type" maxelem "$ipset_maxelem" 2>/dev/null || true
-	$IPSET flush "${name}-tmp"
-
-	# Pre-filter data into ipset restore format for batch loading
-	local restore_file
-	restore_file=$(mktemp "$INSTALL_PATH/.apf-XXXXXX")
-	_apf_reg_tmp "$restore_file"
-	awk -v max="$ipset_maxelem" '
-		BEGIN { count = 0 }
-		/^[[:space:]]*#/ || /^[[:space:]]*$/ || /^;;/ { next }
-		{
-			entry = $1
-			gsub(/;/, "", entry)
-			if (entry ~ /^[0-9]+\.[0-9]+\.[0-9]+\./) {
-				count++
-				if (count > max) next
-				print "add '"${name}"'-tmp " entry
-			}
-		}
-	' "$data_file" > "$restore_file"
-
-	local count
-	count=$(wc -l < "$restore_file")
+	[ -n "$_IPE_URL_TMP" ] && rm -f "$_IPE_URL_TMP"
 
 	if [ "$count" -gt 0 ]; then
-		$IPSET restore -exist < "$restore_file" 2>/dev/null
+		$IPSET swap "${_IPE_NAME}-tmp" "$_IPE_NAME"
+		eout "{ipset} updated $_IPE_NAME with $count entries"
+		ipset_update_timestamp "$_IPE_NAME" "$(date +%s)"
 	fi
-	rm -f "$restore_file"
-
-	[ -n "$url_tmp" ] && rm -f "$url_tmp"
-
-	if [ "$count" -gt 0 ]; then
-		$IPSET swap "${name}-tmp" "$name"
-		eout "{ipset} updated $name with $count entries"
-		ipset_update_timestamp "$name" "$(date +%s)"
-	fi
-	$IPSET flush "${name}-tmp" 2>/dev/null
-	$IPSET destroy "${name}-tmp" 2>/dev/null
+	$IPSET flush "${_IPE_NAME}-tmp" 2>/dev/null
+	$IPSET destroy "${_IPE_NAME}-tmp" 2>/dev/null
 done < "$ipset_rules"
 }
 
@@ -2639,61 +2548,41 @@ done < "$ipset_rules"
 rm -f "$INSTALL_PATH/internals/.ipset.timestamps"
 }
 
-glob_allow_download() {
-if [ -n "$GA_URL" ] && [ "$USE_RGT" == "1" ] && ( [ -n "$CURL" ] || [ -n "$WGET" ] ); then
+## Shared helper for glob trust file downloads.
+# Usage: glob_trust_download url hosts_file
+# Downloads URL, parses entries through valid_host(), writes to hosts_file.
+# If URL or prerequisites missing, resets hosts_file to empty.
+glob_trust_download() {
+local _gtd_url="$1" _gtd_hosts="$2"
+if [ -n "$_gtd_url" ] && [ "$USE_RGT" == "1" ] && ( [ -n "$CURL" ] || [ -n "$WGET" ] ); then
    local url_tmp
    url_tmp=$(mktemp "$INSTALL_PATH/.apf-XXXXXX")
    _apf_reg_tmp "$url_tmp"
-   eout "{trust} downloading $GA_URL"
-   if download_url "$GA_URL" "$url_tmp"; then
-        eout "{trust} parsing download into $GALLOW_HOSTS"
+   eout "{trust} downloading $_gtd_url"
+   if download_url "$_gtd_url" "$url_tmp"; then
+        eout "{trust} parsing download into $_gtd_hosts"
         local _entry
-        :> "$GALLOW_HOSTS"
+        :> "$_gtd_hosts"
         while IFS= read -r _entry; do
             case "$_entry" in \#*|"") continue ;; esac
             read -r _entry _ <<< "$_entry"
             if [ -n "$_entry" ] && valid_host "$_entry"; then
-                echo "$_entry" >> "$GALLOW_HOSTS"
+                echo "$_entry" >> "$_gtd_hosts"
             fi
         done < "$url_tmp"
    else
-        eout "{trust} download of $GA_URL failed"
+        eout "{trust} download of $_gtd_url failed"
    fi
    rm -f "$url_tmp"
 else
-   rm -f "$GALLOW_HOSTS"
-   touch "$GALLOW_HOSTS"
-   chmod 600 "$GALLOW_HOSTS"
+   rm -f "$_gtd_hosts"
+   touch "$_gtd_hosts"
+   chmod 600 "$_gtd_hosts"
 fi
 }
 
-glob_deny_download() {
-if [ -n "$GD_URL" ] && [ "$USE_RGT" == "1" ] && ( [ -n "$CURL" ] || [ -n "$WGET" ] ); then
-   local url_tmp
-   url_tmp=$(mktemp "$INSTALL_PATH/.apf-XXXXXX")
-   _apf_reg_tmp "$url_tmp"
-   eout "{trust} downloading $GD_URL"
-   if download_url "$GD_URL" "$url_tmp"; then
-        eout "{trust} parsing download into $GDENY_HOSTS"
-        local _entry
-        :> "$GDENY_HOSTS"
-        while IFS= read -r _entry; do
-            case "$_entry" in \#*|"") continue ;; esac
-            read -r _entry _ <<< "$_entry"
-            if [ -n "$_entry" ] && valid_host "$_entry"; then
-                echo "$_entry" >> "$GDENY_HOSTS"
-            fi
-        done < "$url_tmp"
-   else
-        eout "{trust} download of $GD_URL failed"
-   fi
-   rm -f "$url_tmp"
-else
-   rm -f "$GDENY_HOSTS"
-   touch "$GDENY_HOSTS"
-   chmod 600 "$GDENY_HOSTS"
-fi
-}
+glob_allow_download() { glob_trust_download "$GA_URL" "$GALLOW_HOSTS"; }
+glob_deny_download() { glob_trust_download "$GD_URL" "$GDENY_HOSTS"; }
 
 dnet() {
 FILE="$1"
@@ -2703,17 +2592,22 @@ eout "{glob} loading $FNAME"
  while IFS= read -r i; do
   [[ "$i" == \#* || -z "$i" ]] && continue
   if ipt_for_host "$i"; then
-        $IPT_H $IPT_FLAGS -A INPUT -s $i -j $ALL_STOP
-	$IPT_H $IPT_FLAGS -A OUTPUT -d $i -j $ALL_STOP
+        $IPT_H $IPT_FLAGS -A INPUT -s "$i" -j $ALL_STOP
+	$IPT_H $IPT_FLAGS -A OUTPUT -d "$i" -j $ALL_STOP
   fi
  done < "$FILE"
 fi
 }
 
 bandmin() {
-if [ -f "/usr/local/bandmin/bandmin" ]; then
-        /usr/local/bandmin/bandmin >> /dev/null 2>&1
-        /usr/local/bandmin/ipaddrmap >> /dev/null 2>&1
+local _bm
+_bm=$(command -v bandmin 2>/dev/null)
+if [ -n "$_bm" ]; then
+        "$_bm" >> /dev/null 2>&1
+        local _bmdir="${_bm%/*}"
+        if [ -x "$_bmdir/ipaddrmap" ]; then
+                "$_bmdir/ipaddrmap" >> /dev/null 2>&1
+        fi
 fi
 }
 
@@ -2768,9 +2662,45 @@ cl_cports() {
 	EG_DROP_CMD=""
 }
 
+# Log-then-drop helper: optional LOG rule followed by action rule.
+# Usage: _log_drop ipt_fn chain match_args log_prefix action [extra_action_flags]
+# shellcheck disable=SC2086
+_log_drop() {
+	local ipt_fn="$1" chain="$2" match="$3" prefix="$4" action="$5" extra="$6"
+	if [ "$LOG_DROP" == "1" ]; then
+		$ipt_fn -A "$chain" $match -m limit --limit=$LOG_RATE/minute \
+			-j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "$prefix"
+	fi
+	$ipt_fn -A "$chain" $match $extra -j "$action"
+}
+
+# RAB hit log helper: emits LOG rule when RAB_LOG_HIT is enabled.
+# Usage: _rab_log ipt_fn chain match_args log_prefix
+# shellcheck disable=SC2086
+_rab_log() {
+	local ipt_fn="$1" chain="$2" match="$3" prefix="$4"
+	if [ "$RAB_LOG_HIT" == "1" ]; then
+		$ipt_fn -A "$chain" $match -m limit --limit=$LOG_RATE/minute \
+			-j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "$prefix"
+	fi
+}
+
+# Parse temp trust comment line: "# added IP on ... ttl=N expire=E ..."
+# Sets: _PTC_IP, _PTC_TTL, _PTC_EPOCH
+_parse_temp_comment() {
+	local line="$1"
+	_PTC_IP="${line#\# added }"
+	_PTC_IP="${_PTC_IP%% *}"
+	_PTC_TTL="${line#*ttl=}"
+	_PTC_TTL="${_PTC_TTL%% *}"
+	_PTC_EPOCH="${line#*expire=}"
+	_PTC_EPOCH="${_PTC_EPOCH%% *}"
+}
+
 expirebans() {
 local ip ban_time time_diff expire_time check_time REFRESH_TIME eff_expire line
 local _eb_date_str
+local -a _eb_expired=()
 if [ -z "$SET_EXPIRE" ]; then
         eff_expire=0
 else
@@ -2790,7 +2720,8 @@ if [ "$eff_expire" -ge "60" ]; then
                 ip="${ip%% *}"
                 [ -z "$ip" ] && continue
 
-                # Prefer structured addedtime= marker
+                # Dual-track: structured addedtime= marker preferred;
+                # legacy date --date fallback for pre-2.0.2 entries
                 if [[ "$line" == *addedtime=* ]]; then
                         ban_time="${line#*addedtime=}"
                         ban_time="${ban_time%% *}"
@@ -2811,35 +2742,38 @@ if [ "$eff_expire" -ge "60" ]; then
                 time_diff=$(($check_time-$ban_time))
                 if [ "$time_diff" -ge "$expire_time" ]; then
                         eout "{trust} removed expired ban for $ip (${time_diff}s/${expire_time}s)"
-                        local escaped_ip="${ip//./\\.}"
-                        # Remove both the comment line and the bare IP line
-                        sed -i "\%# added ${escaped_ip} %d" "$INSTALL_PATH/deny_hosts.rules"
-                        sed -i "\%^${escaped_ip}$%d" "$INSTALL_PATH/deny_hosts.rules"
-                        cli_trust_remove "$ip" >> /dev/null 2>&1
+                        _eb_expired+=("$ip")
                 fi
          done < <(grep -vE "static|noexpire|ttl=" "$INSTALL_PATH/deny_hosts.rules" | grep -E "# added .* on ")
+         # Deferred removal: avoids modifying deny_hosts.rules while iterating;
+         # cli_trust_remove handles both iptables rules and file cleanup
+         for ip in "${_eb_expired[@]}"; do
+                cli_trust_remove "$ip" >> /dev/null 2>&1
+         done
  fi
 fi
 }
 
 expire_temp_entries() {
-	local current_time file ip epoch line count=0
+	local current_time file line count=0
+	local -a _et_expired=()
 	current_time=$(date +%s)
 	for file in "$ALLOW_HOSTS" "$DENY_HOSTS"; do
 		[ -f "$file" ] || continue
 		while IFS= read -r line; do
-			ip="${line#\# added }"
-			ip="${ip%% *}"
-			epoch="${line#*expire=}"
-			epoch="${epoch%% *}"
-			if [ "$current_time" -ge "$epoch" ] 2>/dev/null; then
-				local escaped_ip="${ip//./\\.}"
-				sed -i "\%# added ${escaped_ip} .*ttl=.*expire=%d" "$file"
-				cli_trust_remove "$ip" >> /dev/null 2>&1
-				eout "{trust} removed expired temp entry for $ip"
+			_parse_temp_comment "$line"
+			if [ "$current_time" -ge "$_PTC_EPOCH" ] 2>/dev/null; then
+				eout "{trust} removed expired temp entry for $_PTC_IP"
+				_et_expired+=("$_PTC_IP")
 				count=$(($count + 1))
 			fi
 		done < <(grep "ttl=.*expire=" "$file")
+	done
+	# Deferred removal: avoids modifying trust files while iterating;
+	# cli_trust_remove handles both iptables rules and file cleanup
+	local _et_ip
+	for _et_ip in "${_et_expired[@]}"; do
+		cli_trust_remove "$_et_ip" >> /dev/null 2>&1
 	done
 	if [ "$count" -gt 0 ]; then
 		eout "{trust} expired $count temporary trust entries"
@@ -2847,7 +2781,7 @@ expire_temp_entries() {
 }
 
 list_temp_entries() {
-	local current_time file type ip ttl epoch cmt remaining line found=0
+	local current_time file type cmt remaining line found=0
 	current_time=$(date +%s)
 	for file in "$ALLOW_HOSTS" "$DENY_HOSTS"; do
 		[ -f "$file" ] || continue
@@ -2857,18 +2791,13 @@ list_temp_entries() {
 			type="DENY"
 		fi
 		while IFS= read -r line; do
-			ip="${line#\# added }"
-			ip="${ip%% *}"
-			ttl="${line#*ttl=}"
-			ttl="${ttl%% *}"
-			epoch="${line#*expire=}"
-			epoch="${epoch%% *}"
+			_parse_temp_comment "$line"
 			if [[ "$line" == *"with comment: "* ]]; then
 				cmt="${line#*with comment: }"
 			else
 				cmt=""
 			fi
-			remaining=$(($epoch - $current_time))
+			remaining=$(($_PTC_EPOCH - $current_time))
 			if [ "$remaining" -lt 0 ]; then
 				remaining=0
 			fi
@@ -2882,7 +2811,7 @@ list_temp_entries() {
 			else
 				disp="${remaining}s"
 			fi
-			echo "$type $ip ttl=${ttl}s remains=${disp} $cmt"
+			echo "$type $_PTC_IP ttl=${_PTC_TTL}s remains=${disp} $cmt"
 			found=1
 		done < <(grep "ttl=.*expire=" "$file")
 	done
@@ -2892,17 +2821,25 @@ list_temp_entries() {
 }
 
 flush_temp_entries() {
-	local file ip line count=0
+	local file line count=0
+	local -a _ft_expired=()
 	for file in "$ALLOW_HOSTS" "$DENY_HOSTS"; do
 		[ -f "$file" ] || continue
 		while IFS= read -r line; do
-			ip="${line#\# added }"
-			ip="${ip%% *}"
-			cli_trust_remove "$ip" >> /dev/null 2>&1
+			_parse_temp_comment "$line"
+			_ft_expired+=("$_PTC_IP")
 			count=$(($count + 1))
 		done < <(grep "ttl=.*expire=" "$file")
-		# Remove orphaned ttl= comment lines
+		# Safety net: remove any orphaned ttl= comment lines not cleaned
+		# by per-IP cli_trust_remove (e.g., partial flush after restart)
 		sed -i '/ttl=.*expire=/d' "$file"
+	done
+	# Deferred removal: avoids modifying trust files while iterating;
+	# cli_trust_remove handles both iptables rules and file cleanup
+	local _ft_ip
+	for _ft_ip in "${_ft_expired[@]}"; do
+		# Suppress errors: iptables rules may not exist after firewall restart
+		cli_trust_remove "$_ft_ip" >> /dev/null 2>&1
 	done
 	eout "{trust} flushed $count temporary trust entries"
 	if [ "$SET_VERBOSE" != "1" ]; then
@@ -2938,7 +2875,7 @@ refresh() {
 		        eout "{glob} trust rules unchanged since last refresh, doing nothing."
 	                echo "$trusts_md5" > "$INSTALL_PATH/internals/.trusts.md5"
 		        mutex_unlock
-			exit 1
+			exit 0
 		else
 	                echo "$trusts_md5" > "$INSTALL_PATH/internals/.trusts.md5"
 		fi
@@ -3007,6 +2944,35 @@ refresh() {
 	deny_hosts $GDENY_HOSTS TGDENY
 	deny_hosts $DENY_HOSTS TDENY
         ipt -F REFRESH_TEMP
+}
+
+## Packet sanity TCP flag checks — shared loop for IN/OUT chains.
+# Usage: pkt_sanity_flags chain ipt_fn log_prefix rab_prefix rab_mode
+# Iterates canonical flag pairs, applying LOG (if LOG_DROP), RAB LOG
+# (if rab_mode=1 and RAB_LOG_HIT), and DROP rules for each pair.
+pkt_sanity_flags() {
+	local chain="$1" ipt_fn="$2" log_prefix="$3" rab_prefix="$4" rab_mode="$5"
+	local flags mask comp
+	for flags in "ALL NONE" "SYN,FIN SYN,FIN" "SYN,RST SYN,RST" "FIN,RST FIN,RST" \
+		     "ACK,FIN FIN" "ACK,URG URG" "ACK,PSH PSH" "ALL FIN,URG,PSH" \
+		     "ALL SYN,RST,ACK,FIN,URG" "ALL ALL" "ALL FIN"; do
+		read -r mask comp <<< "$flags"
+		if [ "$LOG_DROP" == "1" ]; then
+			$ipt_fn -A "$chain" -p tcp --tcp-flags $mask $comp \
+				-m limit --limit=$LOG_RATE/minute -j $LOG_TARGET \
+				--log-level=$LOG_LEVEL $LEXT --log-prefix="** $log_prefix ** "
+		fi
+		if [ "$rab_mode" == "1" ] && [ "$RAB_LOG_HIT" == "1" ]; then
+			$ipt_fn -A "$chain" -p tcp --tcp-flags $mask $comp \
+				-m limit --limit=$LOG_RATE/minute -j $LOG_TARGET \
+				--log-level=$LOG_LEVEL $LEXT --log-prefix="** $rab_prefix ** "
+		fi
+		if [ "$rab_mode" == "1" ]; then
+			$ipt_fn -A "$chain" -p tcp --tcp-flags $mask $comp $RAB_SANITY_FLAGS -j $TCP_STOP
+		else
+			$ipt_fn -A "$chain" -p tcp --tcp-flags $mask $comp -j $TCP_STOP
+		fi
+	done
 }
 
 cron_refresh() {

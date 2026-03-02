@@ -254,3 +254,42 @@ teardown() {
     # Verify it's a reasonable epoch (after year 2020)
     [ "$epoch_val" -gt 1577836800 ]
 }
+
+# =====================================================================
+# Cron lifecycle tests (C-004)
+# =====================================================================
+
+@test "cron_refresh creates refresh.apf when SET_REFRESH enabled" {
+    if [ ! -d "/etc/cron.d" ]; then
+        skip "cron.d not available"
+    fi
+    rm -f /etc/cron.d/refresh.apf
+    source /opt/tests/helpers/apf-config.sh
+    apf_set_config "SET_REFRESH" "10"
+    "$APF" -f 2>/dev/null || true
+    "$APF" -s
+    [ -f "/etc/cron.d/refresh.apf" ]
+}
+
+@test "cron_refresh removes refresh.apf when SET_REFRESH=0" {
+    if [ ! -d "/etc/cron.d" ]; then
+        skip "cron.d not available"
+    fi
+    # Create a stale refresh cron to verify cleanup
+    echo "*/10 * * * * root /opt/apf/apf --refresh >> /dev/null 2>&1 &" > /etc/cron.d/refresh.apf
+    source /opt/tests/helpers/apf-config.sh
+    apf_set_config "SET_REFRESH" "0"
+    "$APF" -f 2>/dev/null || true
+    "$APF" -s
+    [ ! -f "/etc/cron.d/refresh.apf" ]
+}
+
+@test "flush removes refresh.apf" {
+    if [ ! -d "/etc/cron.d" ]; then
+        skip "cron.d not available"
+    fi
+    # Create refresh cron then flush
+    echo "*/10 * * * * root /opt/apf/apf --refresh >> /dev/null 2>&1 &" > /etc/cron.d/refresh.apf
+    "$APF" -f
+    [ ! -f "/etc/cron.d/refresh.apf" ]
+}

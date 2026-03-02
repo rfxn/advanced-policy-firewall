@@ -29,43 +29,36 @@ if [ -x "$INSTALL_PATH/hook_pre.sh" ]; then
 	. "$INSTALL_PATH/hook_pre.sh" || true
 fi
 
-if [ -n "$IF" ] && [ "$VF_ROUTE" == "1" ]; then
- for i in $IF; do
-  if [ -n "$ip" ]; then
-	VAL_IF=$($ip route show dev "$i" 2>/dev/null)
-  elif command -v route > /dev/null 2>&1; then
-	VAL_IF=$(route -n | grep -w "$i")
-  else
-	eout "{glob} neither ip nor route found; cannot verify interface $i"
-	exit 1
-  fi
-	if [ -z "$VAL_IF" ]; then
-		eout "{glob} could not verify that interface $i is routed to a network, aborting."
-	        if [ "$SET_VERBOSE" != "1" ]; then
-			echo "could not verify that interface $i is routed to a network, aborting."
+# Verify that an interface has a route to a network; abort if not.
+_verify_iface_route() {
+	local iface="$1"
+	local val=""
+	if [ -n "$ip" ]; then
+		val=$($ip route show dev "$iface" 2>/dev/null)
+	elif command -v route > /dev/null 2>&1; then
+		val=$(route -n | grep -w "$iface")
+	else
+		eout "{glob} neither ip nor route found; cannot verify interface $iface"
+		exit 1
+	fi
+	if [ -z "$val" ]; then
+		eout "{glob} could not verify that interface $iface is routed to a network, aborting."
+		if [ "$SET_VERBOSE" != "1" ]; then
+			echo "could not verify that interface $iface is routed to a network, aborting."
 		fi
 		exit 1
 	fi
- done
+}
+
+if [ -n "$IF" ] && [ "$VF_ROUTE" == "1" ]; then
+	for i in $IF; do
+		_verify_iface_route "$i"
+	done
 fi
 if [ -n "$IFACE_TRUSTED" ] && [ "$VF_ROUTE" == "1" ]; then
- for i in ${IFACE_TRUSTED//,/ }; do
-  if [ -n "$ip" ]; then
-	VAL_IFACE_TRUSTED=$($ip route show dev "$i" 2>/dev/null)
-  elif command -v route > /dev/null 2>&1; then
-	VAL_IFACE_TRUSTED=$(route -n | grep -w "$i")
-  else
-	eout "{glob} neither ip nor route found; cannot verify interface $i"
-	exit 1
-  fi
-        if [ -z "$VAL_IFACE_TRUSTED" ]; then
-                eout "{glob} could not verify that interface $i is routed to a network, aborting."
-	        if [ "$SET_VERBOSE" != "1" ]; then
-			echo "could not verify that interface $i is routed to a network, aborting."
-		fi
-                exit 1
-        fi
- done
+	for i in ${IFACE_TRUSTED//,/ }; do
+		_verify_iface_route "$i"
+	done
 fi
 
 $ip addr list "$IFACE_UNTRUSTED" | grep -w inet | grep -v inet6 | tr '/' ' ' | awk '{print$2}' > "$INSTALL_PATH/internals/.localaddrs"
@@ -96,8 +89,8 @@ if [ -n "$IFACE_TRUSTED" ]; then
         eout "{glob} unable to verify status of interface $i; assuming untrusted"
  else
         eout "{glob} allow all to/from trusted interface $i"
-        ipt -A INPUT -i $i -j ACCEPT
-        ipt -A OUTPUT -o $i -j ACCEPT
+        ipt -A INPUT -i "$i" -j ACCEPT
+        ipt -A OUTPUT -o "$i" -j ACCEPT
  fi
  done
 fi
@@ -223,7 +216,7 @@ if [ "$RAB" == "1" ]; then
   if [ "$LDNS" ]; then
 	for i in $LDNS; do
 		if ipt_for_host "$i"; then
-			$IPT_H $IPT_FLAGS -I RABPSCAN -s $i -j RETURN
+			$IPT_H $IPT_FLAGS -I RABPSCAN -s "$i" -j RETURN
 		fi
 	done
   fi
@@ -282,17 +275,17 @@ LDNS=$(grep -v "#" /etc/resolv.conf | grep -w nameserver | awk '{print$2}' | gre
         if [[ "$i" == *:* ]]; then
                 # IPv6 nameserver
                 if [ "$USE_IPV6" == "1" ]; then
-                ipt6 -A INPUT -p udp -s $i --sport 53 --dport 1024:65535 -m state --state ESTABLISHED,RELATED -j ACCEPT
-                ipt6 -A INPUT -p tcp -s $i --sport 53 --dport 1024:65535 -m state --state ESTABLISHED,RELATED -j ACCEPT
-                ipt6 -A OUTPUT -p udp -d $i --dport 53 --sport 1024:65535 -j ACCEPT
-                ipt6 -A OUTPUT -p tcp -d $i --dport 53 --sport 1024:65535 -j ACCEPT
+                ipt6 -A INPUT -p udp -s "$i" --sport 53 --dport 1024:65535 -m state --state ESTABLISHED,RELATED -j ACCEPT
+                ipt6 -A INPUT -p tcp -s "$i" --sport 53 --dport 1024:65535 -m state --state ESTABLISHED,RELATED -j ACCEPT
+                ipt6 -A OUTPUT -p udp -d "$i" --dport 53 --sport 1024:65535 -j ACCEPT
+                ipt6 -A OUTPUT -p tcp -d "$i" --dport 53 --sport 1024:65535 -j ACCEPT
                 fi
         else
                 # IPv4 nameserver
-                ipt4 -A INPUT -p udp -s $i --sport 53 --dport 1024:65535 -m state --state ESTABLISHED,RELATED -j ACCEPT
-                ipt4 -A INPUT -p tcp -s $i --sport 53 --dport 1024:65535 -m state --state ESTABLISHED,RELATED -j ACCEPT
-                ipt4 -A OUTPUT -p udp -d $i --dport 53 --sport 1024:65535 -j ACCEPT
-                ipt4 -A OUTPUT -p tcp -d $i --dport 53 --sport 1024:65535 -j ACCEPT
+                ipt4 -A INPUT -p udp -s "$i" --sport 53 --dport 1024:65535 -m state --state ESTABLISHED,RELATED -j ACCEPT
+                ipt4 -A INPUT -p tcp -s "$i" --sport 53 --dport 1024:65535 -m state --state ESTABLISHED,RELATED -j ACCEPT
+                ipt4 -A OUTPUT -p udp -d "$i" --dport 53 --sport 1024:65535 -j ACCEPT
+                ipt4 -A OUTPUT -p tcp -d "$i" --dport 53 --sport 1024:65535 -j ACCEPT
         fi
         done
         if [ "$RESV_DNS_DROP" == "1" ]; then
@@ -357,14 +350,14 @@ tosroute POSTROUTING
 . "$POSTRT"
 
 # Default Output Policies
-if [ "$EGF" != "1" ] || [ -z "$EGF" ]; then
-        ipt -A OUTPUT -j ACCEPT
-        eout "{glob} default (egress) output accept"
-elif [ "$EGF" == "1" ]; then
+if [ "$EGF" == "1" ]; then
 	ipt -A OUTPUT -p tcp -j $TCP_STOP
 	ipt -A OUTPUT -p udp -j $UDP_STOP
-        ipt -A OUTPUT -p all -j $ALL_STOP
-        eout "{glob} default (egress) output drop"
+	ipt -A OUTPUT -p all -j $ALL_STOP
+	eout "{glob} default (egress) output drop"
+else
+	ipt -A OUTPUT -j ACCEPT
+	eout "{glob} default (egress) output accept"
 fi
 
 # Default Input Policies

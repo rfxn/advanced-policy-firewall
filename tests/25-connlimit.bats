@@ -42,6 +42,16 @@ teardown_file() {
     source /opt/tests/helpers/teardown-netns.sh
 }
 
+teardown() {
+    "$APF" -f 2>/dev/null || true
+    ip addr del "$VNET_IP/24" dev veth-pub 2>/dev/null || true
+    rm -f "$APF_DIR/vnet/$VNET_IP.rules"
+    source /opt/tests/helpers/reset-apf.sh
+    source /opt/tests/helpers/apf-config.sh
+    apf_set_interface "veth-pub" ""
+    apf_set_ports "22,80,443" "53" "" ""
+}
+
 # =====================================================================
 # Empty config — no connlimit rules
 # =====================================================================

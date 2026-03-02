@@ -116,6 +116,33 @@ teardown_file() {
     true
 }
 
+@test "secure_redirects disabled when SYSCTL_ROUTE=1" {
+    if [ ! -f /proc/sys/net/ipv4/conf/all/secure_redirects ]; then
+        skip "secure_redirects not available"
+    fi
+    local val
+    val=$(cat /proc/sys/net/ipv4/conf/all/secure_redirects)
+    [ "$val" -eq 0 ]
+}
+
+@test "send_redirects disabled when SYSCTL_ROUTE=1" {
+    if [ ! -f /proc/sys/net/ipv4/conf/all/send_redirects ]; then
+        skip "send_redirects not available"
+    fi
+    local val
+    val=$(cat /proc/sys/net/ipv4/conf/all/send_redirects)
+    [ "$val" -eq 0 ]
+}
+
+@test "proxy_arp disabled when SYSCTL_ROUTE=1" {
+    if [ ! -f /proc/sys/net/ipv4/conf/all/proxy_arp ]; then
+        skip "proxy_arp not available"
+    fi
+    local val
+    val=$(cat /proc/sys/net/ipv4/conf/all/proxy_arp)
+    [ "$val" -eq 0 ]
+}
+
 @test "IPv6 sysctl: accept_source_route disabled when USE_IPV6=1" {
     source /opt/tests/helpers/apf-config.sh
     apf_set_config "USE_IPV6" "1"

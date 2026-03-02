@@ -105,9 +105,10 @@ teardown_file() {
     ipset destroy test_block 2>/dev/null || true
     ipset destroy test_cidr 2>/dev/null || true
     ipset destroy test_maxelem 2>/dev/null || true
+    ipset destroy test_mixed 2>/dev/null || true
     # Remove test files
     rm -f "$APF_DIR/test_blocklist.txt" "$APF_DIR/test_blocklist_cidr.txt" \
-          "$APF_DIR/test_blocklist_large.txt"
+          "$APF_DIR/test_blocklist_large.txt" "$APF_DIR/test_blocklist2.txt"
     source /opt/tests/helpers/teardown-netns.sh 2>/dev/null || true
 }
 
@@ -370,6 +371,90 @@ ISEOF
     # Restore original ipset.rules
     "$APF" -f 2>/dev/null || true
     ipset destroy test_url 2>/dev/null || true
+    cat > "$APF_DIR/ipset.rules" <<'ISEOF'
+test_block:src:ip:1:0:0:/opt/apf/test_blocklist.txt
+ISEOF
+    "$APF" -s
+}
+
+# --- Migration edge-case tests ---
+
+@test "migration handles missing ipset.rules without error" {
+    "$APF" -f 2>/dev/null || true
+    ipset destroy test_block 2>/dev/null || true
+
+    # Remove ipset.rules entirely — migration should return cleanly
+    rm -f "$APF_DIR/ipset.rules"
+
+    run "$APF" -s
+    assert_success
+
+    # Restore
+    "$APF" -f 2>/dev/null || true
+    cat > "$APF_DIR/ipset.rules" <<'ISEOF'
+test_block:src:ip:1:0:0:/opt/apf/test_blocklist.txt
+ISEOF
+    "$APF" -s
+}
+
+@test "migration preserves comments in mixed-format file" {
+    "$APF" -f 2>/dev/null || true
+    ipset destroy test_block 2>/dev/null || true
+
+    create_test_blocklist
+
+    # Write a file with comment header and 4-field data line
+    cat > "$APF_DIR/ipset.rules" <<'ISEOF'
+# Main blocklist (header comment)
+test_block:src:ip:/opt/apf/test_blocklist.txt
+ISEOF
+
+    "$APF" -s
+
+    # Comment should be preserved, data line migrated
+    run cat "$APF_DIR/ipset.rules"
+    assert_line "# Main blocklist (header comment)"
+    assert_line "test_block:src:ip:0:0:0:/opt/apf/test_blocklist.txt"
+
+    # Restore
+    "$APF" -f 2>/dev/null || true
+    ipset destroy test_block 2>/dev/null || true
+    cat > "$APF_DIR/ipset.rules" <<'ISEOF'
+test_block:src:ip:1:0:0:/opt/apf/test_blocklist.txt
+ISEOF
+    "$APF" -s
+}
+
+@test "migration converts mixed 4-field and 5-field entries in one pass" {
+    "$APF" -f 2>/dev/null || true
+    ipset destroy test_block 2>/dev/null || true
+    ipset destroy test_mixed 2>/dev/null || true
+
+    create_test_blocklist
+
+    # Create a second blocklist for the second set
+    cp "$APF_DIR/test_blocklist.txt" "$APF_DIR/test_blocklist2.txt"
+
+    # Mixed file: one 4-field, one 5-field, one already 7-field
+    cat > "$APF_DIR/ipset.rules" <<'ISEOF'
+# mixed format test
+test_block:src:ip:/opt/apf/test_blocklist.txt
+test_mixed:src:ip:1:/opt/apf/test_blocklist2.txt
+ISEOF
+
+    "$APF" -s 2>/dev/null || true
+
+    # Both should be migrated to 7-field
+    run cat "$APF_DIR/ipset.rules"
+    assert_line --index 0 "# mixed format test"
+    assert_line --index 1 "test_block:src:ip:0:0:0:/opt/apf/test_blocklist.txt"
+    assert_line --index 2 "test_mixed:src:ip:1:0:0:/opt/apf/test_blocklist2.txt"
+
+    # Restore
+    "$APF" -f 2>/dev/null || true
+    ipset destroy test_block 2>/dev/null || true
+    ipset destroy test_mixed 2>/dev/null || true
+    rm -f "$APF_DIR/test_blocklist2.txt"
     cat > "$APF_DIR/ipset.rules" <<'ISEOF'
 test_block:src:ip:1:0:0:/opt/apf/test_blocklist.txt
 ISEOF

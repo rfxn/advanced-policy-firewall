@@ -14,7 +14,7 @@ apf_banner() {
 	echo "Advanced Policy Firewall (APF) v$VER <proj@rfxn.com>"
 	echo "      Copyright (C) 2002-2026, R-fx Networks <proj@rfxn.com>"
 	echo "      Copyright (C) 2026, Ryan MacDonald <ryan@rfxn.com>"
-	echo "This program may be freely redistributed under the terms of the GNU GPL"
+	echo "This program may be freely redistributed under the terms of the GNU GPL v2"
 	echo ""
 }
 
@@ -22,13 +22,13 @@ if [ -f "$CNF" ] && [ -n "$CNF" ]; then
    source "$CNF"
 else
    apf_banner
-   echo "\$CNF not found, aborting."
+   echo "\$CNF not found, aborting." >&2
    exit 1
 fi
 
 if [ ! -f "$LOG_APF" ]; then
         touch "$LOG_APF"
-        chmod 600 "$LOG_APF"
+        chmod 640 "$LOG_APF"
         eout "{glob} status log not found, created"
 fi
 
@@ -122,13 +122,10 @@ fi
 # check if we are flagged to skip fast load, otherwise off we go
 if [ -z "$SKIP_FASTLOAD_FIRSTRUN" ] && [ -z "$SKIP_FASTLOAD_EXPIRED" ] && [ -z "$SKIP_FASTLOAD_VARS" ] && [ -z "$SET_FASTLOAD_UPSEC" ]; then
 	# Verify snapshot backend matches current iptables backend
-	IPT_BACKEND_CURRENT="legacy"
-	if $IPT --version 2>&1 | grep -q nf_tables; then
-		IPT_BACKEND_CURRENT="nft"
-	fi
+	detect_ipt_backend
 	if [ -f "$INSTALL_PATH/internals/.apf.restore.backend" ]; then
 		read -r IPT_BACKEND_SAVED < "$INSTALL_PATH/internals/.apf.restore.backend"
-		if [ "$IPT_BACKEND_SAVED" != "$IPT_BACKEND_CURRENT" ]; then
+		if [ "$IPT_BACKEND_SAVED" != "$IPT_BACKEND" ]; then
 			SKIP_FASTLOAD_BACKEND=1
 		fi
 	fi
@@ -138,7 +135,7 @@ if [ -z "$SKIP_FASTLOAD_FIRSTRUN" ] && [ -z "$SKIP_FASTLOAD_EXPIRED" ] && [ -z "
 			eout "{glob} fast load snapshot empty or invalid, going full load"
 		else
 		devm
-		eout "{glob} activating firewall, fast load ($IPT_BACKEND_CURRENT)"
+		eout "{glob} activating firewall, fast load ($IPT_BACKEND)"
 		if ! $IPTR $IPT_FLAGS "$INSTALL_PATH/internals/.apf.restore" 2>/dev/null; then
 			eout "{glob} fast load failed (iptables-restore error), going full load"
 			flush 1
@@ -173,7 +170,7 @@ if [ -z "$SKIP_FASTLOAD_FIRSTRUN" ] && [ -z "$SKIP_FASTLOAD_EXPIRED" ] && [ -z "
 		fi
 		fi # snapshot validation
 	else
-		eout "{glob} fast load snapshot backend mismatch ($IPT_BACKEND_SAVED vs $IPT_BACKEND_CURRENT), going full load"
+		eout "{glob} fast load snapshot backend mismatch ($IPT_BACKEND_SAVED vs $IPT_BACKEND), going full load"
 	fi
  elif [ "$SKIP_FASTLOAD_FIRSTRUN" == "1" ]; then
 	eout "{glob} first run? fast load skipped [internals/.last.full not present]"
@@ -194,15 +191,15 @@ eout "{glob} activating firewall"
 date +"%s" > "$INSTALL_PATH/internals/.last.full"
 if [ ! -f "$DS_HOSTS" ]; then
 	touch "$DS_HOSTS"
-	chmod 600 "$DS_HOSTS"
+	chmod 640 "$DS_HOSTS"
 fi
 if [ ! -f "$DENY_HOSTS" ]; then
         touch "$DENY_HOSTS"
-        chmod 600 "$DENY_HOSTS"
+        chmod 640 "$DENY_HOSTS"
 fi
 if [ ! -f "$ALLOW_HOSTS" ]; then
         touch "$ALLOW_HOSTS"
-        chmod 600 "$ALLOW_HOSTS"
+        chmod 640 "$ALLOW_HOSTS"
 fi
 # check dev mode
 devm
@@ -261,9 +258,11 @@ case "$1" in
 	$0 --start
 	;;
 -a|--allow)
+	# Propagate exit code: invalid host, duplicate, or rule failure → exit 1
 	cli_trust "TALLOW" "ALLOW" "$ALLOW_HOSTS" "$2" "$3" || exit 1
 	;;
 -d|--deny)
+	# Propagate exit code: invalid host, duplicate, or rule failure → exit 1
 	cli_trust "TDENY" "DENY" "$DENY_HOSTS" "$2" "$3" || exit 1
 	;;
 -u|--remove|--unban)
@@ -275,7 +274,7 @@ case "$1" in
 	else
 		eout "{trust} $2 not found in trust system"
 		if [ "$SET_VERBOSE" != "1" ]; then
-			echo "$2 not found in trust system."
+			echo "$2 not found in trust system." >&2
 		fi
 	fi
 	;;
@@ -294,6 +293,8 @@ case "$1" in
 	if [ "$USE_IPSET" == "1" ]; then
 		mutex_lock
 		ipset_update
+	else
+		echo "ipset not enabled (USE_IPSET=0 in conf.apf)"
 	fi
 	;;
 --gre-up)

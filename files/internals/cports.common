@@ -1,3 +1,31 @@
+# Helper: port filter loop
+# Args: ports proto ipt_fn chain direction
+# shellcheck disable=SC2086
+_port_filter_loop() {
+	local ports="$1" proto="$2" ipt_fn="$3" chain="$4" direction="$5"
+	local i
+	for i in ${ports//,/ }; do
+		expand_port "$i"; i="$_PORT"
+		$ipt_fn -A "$chain" -p "$proto" --dport "$i" -j ACCEPT
+		eout "{glob} opening $direction $proto port $i on $VNET"
+	done
+}
+
+# Helper: UID-based port filter loop
+# Args: entries proto
+# shellcheck disable=SC2086
+_uid_filter_loop() {
+	local entries="$1" proto="$2"
+	local i uid port
+	for i in ${entries//,/ }; do
+		uid="${i%%:*}"
+		port="${i#*:}"
+		expand_port "$port"; port="$_PORT"
+		ipt_src -A OUTPUT -p "$proto" --dport "$port" --match owner --uid-owner "$uid" -j ACCEPT
+		eout "{glob} opening outbound $proto port $port for uid $uid from $VNET"
+	done
+}
+
 # Per-port connection limiting (connlimit) — must precede ACCEPT rules
 if [ -n "$IG_TCP_CLIMIT" ]; then
 for i in ${IG_TCP_CLIMIT//,/ }; do
@@ -19,45 +47,9 @@ for i in ${IG_UDP_CLIMIT//,/ }; do
 done
 fi
 
-if [ -n "$IG_TCP_CPORTS" ]; then
-PROTO="tcp"
-for i in ${IG_TCP_CPORTS//,/ }; do
-        expand_port "$i"; i="$_PORT"
-        ipt_dst -A INPUT -p $PROTO --dport $i -j ACCEPT
-        eout "{glob} opening inbound $PROTO port $i on $VNET"
-done
-fi
-
-if [ -n "$IG_UDP_CPORTS" ]; then
-PROTO="udp"
-for i in ${IG_UDP_CPORTS//,/ }; do
-        expand_port "$i"; i="$_PORT"
-        ipt_dst -A INPUT -p $PROTO --dport $i -j ACCEPT
-        eout "{glob} opening inbound $PROTO port $i on $VNET"
-done
-fi
-
-if [ "$EGF" == "1" ]; then
-if [ -n "$EG_TCP_CPORTS" ]; then
-PROTO="tcp"
-for i in ${EG_TCP_CPORTS//,/ }; do
-        expand_port "$i"; i="$_PORT"
-        ipt_src -A OUTPUT -p $PROTO --dport $i -j ACCEPT
-        eout "{glob} opening outbound $PROTO port $i on $VNET"
-done
-fi
-fi
-
-if [ "$EGF" == "1" ]; then
-if [ -n "$EG_UDP_CPORTS" ]; then
-PROTO="udp"
-for i in ${EG_UDP_CPORTS//,/ }; do
-        expand_port "$i"; i="$_PORT"
-        ipt_src -A OUTPUT -p $PROTO --dport $i -j ACCEPT
-        eout "{glob} opening outbound $PROTO port $i on $VNET"
-done
-fi
-fi
+# Inbound port filtering
+[ -n "$IG_TCP_CPORTS" ] && _port_filter_loop "$IG_TCP_CPORTS" tcp ipt_dst INPUT inbound
+[ -n "$IG_UDP_CPORTS" ] && _port_filter_loop "$IG_UDP_CPORTS" udp ipt_dst INPUT inbound
 
 # Helper: apply ICMP/ICMPv6 type filtering rules
 # Args: types ipt_fn chain proto type_flag direction [addr_arg]
@@ -84,58 +76,37 @@ _icmp_filter() {
 	done
 }
 
+# Inbound ICMP
 _icmp_filter "$IG_ICMP_TYPES" ipt4 INPUT icmp --icmp-type inbound "-d $VNET"
 
+# Inbound IPv6 NDP + ICMPv6
 if [ "$USE_IPV6" == "1" ]; then
-# NDP types 133-136 must always be permitted for IPv6 connectivity
-for t in 133 134 135 136; do
+for t in $NDP_TYPES; do
 	ipt6 -A INPUT -p ipv6-icmp --icmpv6-type $t -j ACCEPT
 done
 eout "{glob} opening inbound ipv6-icmp NDP types 133-136"
 _icmp_filter "$IG_ICMPV6_TYPES" ipt6 INPUT ipv6-icmp --icmpv6-type inbound
 fi
 
+# Outbound filtering
 if [ "$EGF" == "1" ]; then
-_icmp_filter "$EG_ICMP_TYPES" ipt4 OUTPUT icmp --icmp-type outbound "-s $VNET"
-fi
+[ -n "$EG_TCP_CPORTS" ] && _port_filter_loop "$EG_TCP_CPORTS" tcp ipt_src OUTPUT outbound
+[ -n "$EG_UDP_CPORTS" ] && _port_filter_loop "$EG_UDP_CPORTS" udp ipt_src OUTPUT outbound
 
-if [ "$USE_IPV6" == "1" ] && [ "$EGF" == "1" ]; then
-# NDP types 133-136 must always be permitted for IPv6 connectivity
-for t in 133 134 135 136; do
+_icmp_filter "$EG_ICMP_TYPES" ipt4 OUTPUT icmp --icmp-type outbound "-s $VNET"
+
+if [ "$USE_IPV6" == "1" ]; then
+for t in $NDP_TYPES; do
 	ipt6 -A OUTPUT -p ipv6-icmp --icmpv6-type $t -j ACCEPT
 done
 eout "{glob} opening outbound ipv6-icmp NDP types 133-136"
 _icmp_filter "$EG_ICMPV6_TYPES" ipt6 OUTPUT ipv6-icmp --icmpv6-type outbound
 fi
 
-if [ "$EGF" == "1" ]; then
-if [ -n "$EG_TCP_UID" ]; then
-PROTO="tcp"
-for i in ${EG_TCP_UID//,/ }; do
-uid="${i%%:*}"
-port="${i#*:}"
-        expand_port "$port"; port="$_PORT"
-        ipt_src -A OUTPUT -p $PROTO --dport $port --match owner --uid-owner $uid -j ACCEPT
-        eout "{glob} opening outbound $PROTO port $port for uid $uid from $VNET"
-done
-fi
-fi
+[ -n "$EG_TCP_UID" ] && _uid_filter_loop "$EG_TCP_UID" tcp
+[ -n "$EG_UDP_UID" ] && _uid_filter_loop "$EG_UDP_UID" udp
 
-if [ "$EGF" == "1" ]; then
-if [ -n "$EG_UDP_UID" ]; then
-PROTO="udp"
-for i in ${EG_UDP_UID//,/ }; do
-uid="${i%%:*}"
-port="${i#*:}"
-        expand_port "$port"; port="$_PORT"
-        ipt_src -A OUTPUT -p $PROTO --dport $port --match owner --uid-owner $uid -j ACCEPT
-        eout "{glob} opening outbound $PROTO port $port for uid $uid from $VNET"
-done
-fi
-fi
-
-if [ "$EGF" == "1" ]; then
- if [ -n "$EG_DROP_CMD" ]; then
+if [ -n "$EG_DROP_CMD" ]; then
 	# --cmd-owner was removed from iptables in kernel 3.x; detect support
 	if ipt4 -N _DEG_TEST >> /dev/null 2>&1 && \
 	   ipt4 -A _DEG_TEST -m owner --cmd-owner=_test -j DROP >> /dev/null 2>&1; then
@@ -155,7 +126,7 @@ if [ "$EGF" == "1" ]; then
 		ipt4 -X _DEG_TEST >> /dev/null 2>&1
 		eout "{glob} WARNING: EG_DROP_CMD set but --cmd-owner not supported by this kernel; skipping"
 	fi
- fi
+fi
 fi
 
 # SMTP outbound blocking — independent of EGF

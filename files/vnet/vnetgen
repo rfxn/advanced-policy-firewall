@@ -46,8 +46,8 @@ elif [ -n "$ip" ]; then
   _vnet_create_rule "$addr"
  done < <($ip -o addr show "$IF" 2>/dev/null | grep -w inet)
 elif [ -n "$ifconfig" ]; then
-for iface in $($ifconfig | grep -w "$IF" | awk '{print$1}'); do
-  for addr in $($ifconfig "$iface" | grep -w inet | tr ':' ' ' | grep -vw "$NET" | awk '{print$3}'); do
+$ifconfig | grep -w "$IF" | awk '{print$1}' | while IFS= read -r iface; do
+  $ifconfig "$iface" | grep -w inet | tr ':' ' ' | grep -vw "$NET" | awk '{print$3}' | while IFS= read -r addr; do
     _vnet_create_rule "$addr"
   done
 done
@@ -57,7 +57,7 @@ fi
 if [ "$SET_ADDIFACE" == "1" ]; then
  ## associate a vnet rule for ip's on additional interfaces other than the main
  if [ -n "$ip" ]; then
-  for anet in $($ip -o link show 2>/dev/null | awk -F': ' '{print $2}' | grep -vwE "lo|$IFACE_UNTRUSTED"); do
+  $ip -o link show 2>/dev/null | awk -F': ' '{print $2}' | sed 's/@.*//' | grep -vwE "lo|$IFACE_UNTRUSTED" | while IFS= read -r anet; do
    valtif=""; [[ ",$IFACE_TRUSTED," == *,"$anet",* ]] && valtif="$anet"
    if [ -z "$valtif" ]; then
     while IFS=' ' read -r _ _ _ addr _; do
@@ -69,11 +69,11 @@ if [ "$SET_ADDIFACE" == "1" ]; then
    fi
   done
  elif [ -n "$ifconfig" ]; then
-  for anet in $($ifconfig | grep -E '^[a-zA-Z0-9]' | awk '{print$1}' | tr -d ':' | grep -vwE "lo|$IFACE_UNTRUSTED"); do
-   for iface in $($ifconfig | grep -w "$anet" | awk '{print$1}'); do
+  $ifconfig | grep -E '^[a-zA-Z0-9]' | awk '{print$1}' | tr -d ':' | grep -vwE "lo|$IFACE_UNTRUSTED" | while IFS= read -r anet; do
+   $ifconfig | grep -w "$anet" | awk '{print$1}' | while IFS= read -r iface; do
     valtif=""; [[ ",$IFACE_TRUSTED," == *,"$anet",* ]] && valtif="$anet"
     if [ -z "$valtif" ]; then
-     for addr in $($ifconfig "$iface" | grep -w inet | tr ':' ' ' | grep -vw "$NET" | awk '{print$3}'); do
+     $ifconfig "$iface" | grep -w inet | tr ':' ' ' | grep -vw "$NET" | awk '{print$3}' | while IFS= read -r addr; do
       _vnet_create_rule "$addr"
      done
     fi

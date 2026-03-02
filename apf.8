@@ -8,19 +8,29 @@
 apf \- Advanced Policy Firewall
 .SH SYNOPSIS
 .B apf
-.RB [ \-s | \-r | \-f | \-l | \-t | \-e | \-v | \-h | \-\-rules | \-\-info | \-\-lookup ]
+.RB [ \-s | \-r | \-f | \-l | \-t | \-e | \-o | \-v | \-h | \-\-rules | \-\-info | \-\-validate ]
 .br
 .B apf
 .RB { \-a | \-d }
 .IR HOST\  [ COMMENT ]
 .br
 .B apf
+.B \-u
+.I HOST
+.br
+.B apf
 .RB { \-ta | \-td }
 .IR HOST\  TTL\  [ COMMENT ]
 .br
 .B apf
-.B \-g
+.RB [ \-\-templ | \-\-tempf ]
+.br
+.B apf
+.RB { \-\-lookup | \-g }
 .I PATTERN
+.br
+.B apf
+.RB [ \-\-ipset\-update | \-\-gre\-up | \-\-gre\-down | \-\-gre\-status ]
 .SH DESCRIPTION
 Advanced Policy Firewall (APF) is an iptables/netfilter\-based firewall
 management system for Linux servers.
@@ -47,7 +57,8 @@ Stop (flush) all firewall rules and reset chains to ACCEPT.
 .TP
 .B \-\-rules
 Dump all active iptables rules to stdout in
-.BR iptables\-save (8)
+.BR iptables (8)
+.B \-S
 format (IPv4 + IPv6 when USE_IPV6=1).
 Output is suitable for piping and scripting:
 .B apf \-\-rules | grep DROP
@@ -248,7 +259,8 @@ UID\-based egress, command\-owner blocking, SMTP outbound restrictions.
 DShield, Spamhaus DROP, Project Honey Pot, ECN, global trust, ipset lists, GRE.
 .TP
 .B Logging & Kernel Tuning
-Log targets, rate limits, sysctl tunables, conntrack, helper chains.
+Log targets (LOG, NFLOG, or deprecated ULOG), rate limits, sysctl tunables,
+conntrack, helper chains.
 .SH FILES
 .TP
 .I /etc/apf/conf.apf

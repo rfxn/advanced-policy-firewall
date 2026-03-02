@@ -56,17 +56,19 @@ fi
 if [ -f "/etc/rc.local" ]; then
 	if grep -q "apf" /etc/rc.local 2>/dev/null; then
 		echo "Removing rc.local entry..."
-		grep -v "apf" /etc/rc.local > /tmp/.apf_rclocal_clean
-		cat /tmp/.apf_rclocal_clean > /etc/rc.local
-		rm -f /tmp/.apf_rclocal_clean
+		_tmp=$(mktemp /tmp/.apf_rclocal.XXXXXX)
+		grep -v "apf" /etc/rc.local > "$_tmp"
+		cat "$_tmp" > /etc/rc.local
+		rm -f "$_tmp"
 	fi
 fi
 
-# Remove cron entries (current + all legacy variants)
+# Remove cron entries (current + all legacy + runtime-created variants)
 echo "Removing cron entries..."
 rm -f /etc/cron.d/apf /etc/cron.d/apf_ipset /etc/cron.d/apf_temp
 rm -f /etc/cron.d/fwdev /etc/cron.daily/apf /etc/cron.daily/fw
 rm -f /etc/cron.hourly/fw
+rm -f /etc/cron.d/refresh.apf /etc/cron.d/apf_develmode
 
 # Remove logrotate config
 if [ -f "/etc/logrotate.d/apf" ]; then
