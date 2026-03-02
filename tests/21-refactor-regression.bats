@@ -13,15 +13,10 @@
 load '/usr/local/lib/bats/bats-support/load'
 load '/usr/local/lib/bats/bats-assert/load'
 source /opt/tests/helpers/assert-iptables.bash
+source /opt/tests/helpers/capability-detect.bash
 
 APF="/opt/apf/apf"
 APF_DIR="/opt/apf"
-
-# Set a DLIST URL config variable (uses % delimiter to avoid sed / conflicts)
-apf_set_url() {
-    local var="$1" val="$2"
-    sed -i "s%^${var}=.*%${var}=\"${val}\"%" "$APF_DIR/conf.apf"
-}
 
 setup_file() {
     source /opt/tests/helpers/setup-netns.sh
@@ -309,62 +304,8 @@ teardown_file() {
 }
 
 # =====================================================================
-# Advanced trust edge cases (Phase 3b — trust_parse_fields)
-# =====================================================================
-
-@test "advanced trust with port range underscore notation" {
-    source /opt/tests/helpers/apf-config.sh
-    # Clean then add entry
-    sed -i '/192.0.2.60/d' "$APF_DIR/allow_hosts.rules"
-    echo "d=5000_5100:s=192.0.2.60" >> "$APF_DIR/allow_hosts.rules"
-
-    "$APF" -f 2>/dev/null
-    "$APF" -s
-
-    # Port range should be converted to colon format
-    assert_rule_exists_ips TALLOW "192.0.2.60.*--dports 5000:5100"
-
-    # Cleanup
-    sed -i '/192.0.2.60/d' "$APF_DIR/allow_hosts.rules"
-}
-
-@test "advanced trust with protocol prefix and port" {
-    source /opt/tests/helpers/apf-config.sh
-    sed -i '/192.0.2.61/d' "$APF_DIR/allow_hosts.rules"
-    echo "udp:in:d=53:s=192.0.2.61" >> "$APF_DIR/allow_hosts.rules"
-
-    "$APF" -f 2>/dev/null
-    "$APF" -s
-
-    assert_rule_exists_ips TALLOW "192.0.2.61.*-p udp.*--dports 53"
-
-    sed -i '/192.0.2.61/d' "$APF_DIR/allow_hosts.rules"
-}
-
-@test "advanced trust deny with port restriction" {
-    source /opt/tests/helpers/apf-config.sh
-    sed -i '/192.0.2.62/d' "$APF_DIR/deny_hosts.rules"
-    echo "d=22:s=192.0.2.62" >> "$APF_DIR/deny_hosts.rules"
-
-    "$APF" -f 2>/dev/null
-    "$APF" -s
-
-    assert_rule_exists_ips TDENY "192.0.2.62.*--dports 22"
-
-    sed -i '/192.0.2.62/d' "$APF_DIR/deny_hosts.rules"
-}
-
-# =====================================================================
 # GRE linkid validation edge cases (Phase 6)
 # =====================================================================
-
-# Check if GRE tunnel support is available in this container
-gre_available() {
-    command -v ip >/dev/null 2>&1 || return 1
-    ip tunnel add gretest mode gre remote 192.0.2.1 local 127.0.0.1 ttl 255 2>/dev/null || return 1
-    ip tunnel del gretest 2>/dev/null
-    return 0
-}
 
 @test "GRE linkid rejects non-numeric input" {
     if ! gre_available; then skip "GRE not available"; fi

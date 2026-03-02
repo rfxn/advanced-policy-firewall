@@ -8,6 +8,7 @@
 load '/usr/local/lib/bats/bats-support/load'
 load '/usr/local/lib/bats/bats-assert/load'
 source /opt/tests/helpers/assert-iptables.bash
+source /opt/tests/helpers/capability-detect.bash
 
 APF="/opt/apf/apf"
 APF_DIR="/opt/apf"
@@ -63,20 +64,8 @@ teardown_file() {
 }
 
 setup() {
-    # Clean up test entries from trust files and iptables chains
-    for host in "$FQDN_SINGLE" "$FQDN_MULTI" "$FQDN_V6" "$FQDN_LOCAL" \
-                "$IP_SINGLE" "$IP_MULTI_1" "$IP_MULTI_2" "$IP_V6"; do
-        local escaped
-        escaped=$(echo "$host" | sed 's/[.\/\:]/\\&/g')
-        sed -i "/${escaped}/d" "$APF_DIR/allow_hosts.rules" 2>/dev/null || true
-        sed -i "/${escaped}/d" "$APF_DIR/deny_hosts.rules" 2>/dev/null || true
-    done
-    iptables -F TALLOW 2>/dev/null || true
-    iptables -F TDENY 2>/dev/null || true
-    if ip6tables_available; then
-        ip6tables -F TALLOW 2>/dev/null || true
-        ip6tables -F TDENY 2>/dev/null || true
-    fi
+    clean_trust_entries "$FQDN_SINGLE" "$FQDN_MULTI" "$FQDN_V6" "$FQDN_LOCAL" \
+        "$IP_SINGLE" "$IP_MULTI_1" "$IP_MULTI_2" "$IP_V6"
 }
 
 hide_bin() {

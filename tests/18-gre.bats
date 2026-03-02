@@ -8,17 +8,10 @@
 load '/usr/local/lib/bats/bats-support/load'
 load '/usr/local/lib/bats/bats-assert/load'
 source /opt/tests/helpers/assert-iptables.bash
+source /opt/tests/helpers/capability-detect.bash
 
 APF="/opt/apf/apf"
 APF_DIR="/opt/apf"
-
-# Check if GRE tunnel support is available in this container
-gre_available() {
-    command -v ip >/dev/null 2>&1 || return 1
-    ip tunnel add gretest mode gre remote 192.0.2.1 local 127.0.0.1 ttl 255 2>/dev/null || return 1
-    ip tunnel del gretest 2>/dev/null
-    return 0
-}
 
 setup_file() {
     if ! gre_available; then

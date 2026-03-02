@@ -9,6 +9,7 @@
 load '/usr/local/lib/bats/bats-support/load'
 load '/usr/local/lib/bats/bats-assert/load'
 source /opt/tests/helpers/assert-iptables.bash
+source /opt/tests/helpers/capability-detect.bash
 
 APF="/opt/apf/apf"
 APF_DIR="/opt/apf"
@@ -29,19 +30,7 @@ teardown_file() {
 
 setup() {
     source /opt/tests/helpers/apf-config.sh
-    # Clean up test IPs from trust files and iptables
-    for host in 192.0.2.60 192.0.2.61 192.0.2.62 192.0.2.63 "2001:db8::60"; do
-        local escaped
-        escaped=$(echo "$host" | sed 's/[.\/\:]/\\&/g')
-        sed -i "/${escaped}/d" "$APF_DIR/allow_hosts.rules" 2>/dev/null || true
-        sed -i "/${escaped}/d" "$APF_DIR/deny_hosts.rules" 2>/dev/null || true
-    done
-    iptables -F TALLOW 2>/dev/null || true
-    iptables -F TDENY 2>/dev/null || true
-    if ip6tables_available; then
-        ip6tables -F TALLOW 2>/dev/null || true
-        ip6tables -F TDENY 2>/dev/null || true
-    fi
+    clean_trust_entries 192.0.2.60 192.0.2.61 192.0.2.62 192.0.2.63 "2001:db8::60"
     rm -f "$APF_DIR/internals/.block_history"
     # Reset PERMBLOCK to disabled
     apf_set_config "PERMBLOCK_COUNT" "0"
@@ -154,40 +143,25 @@ setup() {
 # Escalation details
 # =====================================================================
 
-@test "escalated entry has static noexpire markers (exempt from expirebans)" {
+@test "escalation sets permanent markers, clears history, and logs" {
     apf_set_config "PERMBLOCK_COUNT" "2"
 
     "$APF" -td 192.0.2.60 1h "deny1"
     "$APF" -u 192.0.2.60
     "$APF" -td 192.0.2.60 1h "deny2"
 
-    # Check for permanent markers
+    # Permanent markers (exempt from expirebans)
     run grep "static noexpire" "$APF_DIR/deny_hosts.rules"
     assert_success
     assert_output --partial "auto-escalated from temp deny (PERMBLOCK)"
-}
 
-@test "escalation removes entry from block history" {
-    apf_set_config "PERMBLOCK_COUNT" "2"
-
-    "$APF" -td 192.0.2.60 1h "deny1"
-    "$APF" -u 192.0.2.60
-    "$APF" -td 192.0.2.60 1h "deny2"
-
-    # After escalation, IP should be removed from history
+    # IP removed from block history after escalation
     if [ -f "$APF_DIR/internals/.block_history" ]; then
         run grep -F "192.0.2.60|" "$APF_DIR/internals/.block_history"
         assert_failure
     fi
-}
 
-@test "escalation log message present in LOG_APF" {
-    apf_set_config "PERMBLOCK_COUNT" "2"
-
-    "$APF" -td 192.0.2.60 1h "deny1"
-    "$APF" -u 192.0.2.60
-    "$APF" -td 192.0.2.60 1h "deny2"
-
+    # Log message with threshold info
     run grep "auto-escalated to permanent deny" /var/log/apf_log
     assert_success
     assert_output --partial "PERMBLOCK_COUNT=2"
