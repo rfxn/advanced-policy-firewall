@@ -310,6 +310,10 @@
 [Fix] Cron lifecycle: clean runtime-created refresh.apf and apf_develmode
       cron entries during install and uninstall; prevents stale cron jobs
       from persisting across reinstalls (install.sh, uninstall.sh)
+[Change] glob trust download: extract glob_trust_download() helper to
+      eliminate duplicated download/parse/validate logic between
+      glob_allow_download() and glob_deny_download(); both become
+      one-line wrappers (functions.apf)
 
   -- Test Suite --
 

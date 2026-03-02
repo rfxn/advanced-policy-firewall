@@ -2646,61 +2646,41 @@ done < "$ipset_rules"
 rm -f "$INSTALL_PATH/internals/.ipset.timestamps"
 }
 
-glob_allow_download() {
-if [ -n "$GA_URL" ] && [ "$USE_RGT" == "1" ] && ( [ -n "$CURL" ] || [ -n "$WGET" ] ); then
+## Shared helper for glob trust file downloads.
+# Usage: glob_trust_download url hosts_file
+# Downloads URL, parses entries through valid_host(), writes to hosts_file.
+# If URL or prerequisites missing, resets hosts_file to empty.
+glob_trust_download() {
+local _gtd_url="$1" _gtd_hosts="$2"
+if [ -n "$_gtd_url" ] && [ "$USE_RGT" == "1" ] && ( [ -n "$CURL" ] || [ -n "$WGET" ] ); then
    local url_tmp
    url_tmp=$(mktemp "$INSTALL_PATH/.apf-XXXXXX")
    _apf_reg_tmp "$url_tmp"
-   eout "{trust} downloading $GA_URL"
-   if download_url "$GA_URL" "$url_tmp"; then
-        eout "{trust} parsing download into $GALLOW_HOSTS"
+   eout "{trust} downloading $_gtd_url"
+   if download_url "$_gtd_url" "$url_tmp"; then
+        eout "{trust} parsing download into $_gtd_hosts"
         local _entry
-        :> "$GALLOW_HOSTS"
+        :> "$_gtd_hosts"
         while IFS= read -r _entry; do
             case "$_entry" in \#*|"") continue ;; esac
             read -r _entry _ <<< "$_entry"
             if [ -n "$_entry" ] && valid_host "$_entry"; then
-                echo "$_entry" >> "$GALLOW_HOSTS"
+                echo "$_entry" >> "$_gtd_hosts"
             fi
         done < "$url_tmp"
    else
-        eout "{trust} download of $GA_URL failed"
+        eout "{trust} download of $_gtd_url failed"
    fi
    rm -f "$url_tmp"
 else
-   rm -f "$GALLOW_HOSTS"
-   touch "$GALLOW_HOSTS"
-   chmod 600 "$GALLOW_HOSTS"
+   rm -f "$_gtd_hosts"
+   touch "$_gtd_hosts"
+   chmod 600 "$_gtd_hosts"
 fi
 }
 
-glob_deny_download() {
-if [ -n "$GD_URL" ] && [ "$USE_RGT" == "1" ] && ( [ -n "$CURL" ] || [ -n "$WGET" ] ); then
-   local url_tmp
-   url_tmp=$(mktemp "$INSTALL_PATH/.apf-XXXXXX")
-   _apf_reg_tmp "$url_tmp"
-   eout "{trust} downloading $GD_URL"
-   if download_url "$GD_URL" "$url_tmp"; then
-        eout "{trust} parsing download into $GDENY_HOSTS"
-        local _entry
-        :> "$GDENY_HOSTS"
-        while IFS= read -r _entry; do
-            case "$_entry" in \#*|"") continue ;; esac
-            read -r _entry _ <<< "$_entry"
-            if [ -n "$_entry" ] && valid_host "$_entry"; then
-                echo "$_entry" >> "$GDENY_HOSTS"
-            fi
-        done < "$url_tmp"
-   else
-        eout "{trust} download of $GD_URL failed"
-   fi
-   rm -f "$url_tmp"
-else
-   rm -f "$GDENY_HOSTS"
-   touch "$GDENY_HOSTS"
-   chmod 600 "$GDENY_HOSTS"
-fi
-}
+glob_allow_download() { glob_trust_download "$GA_URL" "$GALLOW_HOSTS"; }
+glob_deny_download() { glob_trust_download "$GD_URL" "$GDENY_HOSTS"; }
 
 dnet() {
 FILE="$1"
