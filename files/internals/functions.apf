@@ -43,6 +43,60 @@ _apf_cleanup_tmp() {
 	_APF_TMPFILES=""
 }
 
+## Snapshot save: atomic write with integrity validation
+# Writes iptables-save output to temp file, validates it, then atomically
+# moves into place. Handles both IPv4 and IPv6 (when USE_IPV6=1).
+# Also writes the backend marker (.apf.restore.backend).
+# Returns 0 on success, 1 on failure (IPv4 failure is fatal to caller;
+# IPv6 failure logs warning but does not fail the function).
+snapshot_save() {
+	local snap_dir="$INSTALL_PATH/internals"
+	local snap_tmp snap_rc
+
+	# IPv4 snapshot
+	snap_tmp=$(mktemp "$snap_dir/.apf.restore.XXXXXX")
+	_apf_reg_tmp "$snap_tmp"
+	$IPTS > "$snap_tmp" 2>/dev/null
+	snap_rc=$?
+	if [ "$snap_rc" -ne 0 ]; then
+		eout "{glob} snapshot save failed (iptables-save exit $snap_rc)"
+		rm -f "$snap_tmp"
+		return 1
+	fi
+	if [ ! -s "$snap_tmp" ] || ! grep -q '^\*' "$snap_tmp"; then
+		eout "{glob} snapshot save failed (empty or invalid output)"
+		rm -f "$snap_tmp"
+		return 1
+	fi
+	mv -f "$snap_tmp" "$snap_dir/.apf.restore"
+
+	# IPv6 snapshot (non-fatal — IPv4 snapshot survives if this fails)
+	if [ "$USE_IPV6" == "1" ] && [ -n "$IP6TS" ]; then
+		snap_tmp=$(mktemp "$snap_dir/.apf6.restore.XXXXXX")
+		_apf_reg_tmp "$snap_tmp"
+		$IP6TS > "$snap_tmp" 2>/dev/null
+		snap_rc=$?
+		if [ "$snap_rc" -ne 0 ]; then
+			eout "{glob} IPv6 snapshot save failed (ip6tables-save exit $snap_rc)"
+			rm -f "$snap_tmp"
+		elif [ ! -s "$snap_tmp" ] || ! grep -q '^\*' "$snap_tmp"; then
+			eout "{glob} IPv6 snapshot save failed (empty or invalid output)"
+			rm -f "$snap_tmp"
+		else
+			mv -f "$snap_tmp" "$snap_dir/.apf6.restore"
+		fi
+	fi
+
+	# Backend marker
+	local _ss_backend="legacy"
+	if $IPT --version 2>&1 | grep -q nf_tables; then
+		_ss_backend="nft"
+	fi
+	echo "$_ss_backend" > "$snap_dir/.apf.restore.backend"
+	eout "{glob} fast load snapshot saved (backend: $_ss_backend)"
+	return 0
+}
+
 ## Dual-stack iptables helpers
 # ipt()  — apply rule to both IPv4 and IPv6 (protocol-agnostic rules only)
 # ipt4() — IPv4 only (explicit)
@@ -1475,11 +1529,7 @@ flush_apf_chains() {
 flush() {
 firewall_on=$($IPT $IPT_FLAGS -L --numeric | grep -vE "Chain|destination")
 if [ "$SET_FASTLOAD" == "1" ] && [ "$DOCKER_COMPAT" != "1" ] && [ "$1" != "1" ] && [ "$DEVEL_ON" != "1" ] && [ -n "$firewall_on" ]; then
-	$IPTS > "$INSTALL_PATH/internals/.apf.restore"
-	if [ "$USE_IPV6" == "1" ] && [ -n "$IP6TS" ]; then
-		$IP6TS > "$INSTALL_PATH/internals/.apf6.restore"
-	fi
-	eout "{glob} fast load snapshot saved"
+	snapshot_save
 fi
 
 if [ "$DOCKER_COMPAT" == "1" ]; then

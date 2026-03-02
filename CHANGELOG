@@ -209,6 +209,14 @@
       SET_EXPIRE (functions.apf)
 [Fix] --gre-up/--gre-down report disabled state instead of silently
       exiting (apf)
+[New] snapshot_save(): atomic fast load snapshot writes via mktemp+mv;
+      validates iptables-save exit code and output (non-empty, contains
+      table markers); IPv6 snapshot failure non-fatal to IPv4; backend
+      marker written by snapshot_save for both save-side callers
+      (functions.apf, apf)
+[Fix] Fast load restore validates snapshot before iptables-restore:
+      empty or invalid snapshots (missing *table markers) fall back to
+      full load instead of silently loading no rules (apf)
 
   -- Changes --
 
