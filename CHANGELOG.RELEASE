@@ -51,6 +51,15 @@
       removal without DNS; refresh (apf -e) re-resolves FQDNs; works in
       CLI (-a/-d/-ta/-td/-u) and bulk load (functions.apf, conf.apf,
       internals.conf, .ca.def; 20 tests)
+[New] --rules: dump active iptables rules to stdout for piping/scripting;
+      uses -S format consistent across nft/legacy backends; includes IPv6
+      when USE_IPV6=1 (apf, functions.apf)
+[New] --info: firewall status summary showing active state, rule counts, trust
+      entries, enabled subsystems (ipset, GRE, Docker compat), DEVEL_MODE
+      warning, and recent log lines (apf, functions.apf)
+[New] --lookup HOST: check if host exists in trust files (allow, deny, global
+      allow, global deny) without searching iptables/ipset rules; exits 0 if
+      found, 1 if not found (apf, functions.apf)
 [New] -h/--help: explicit help handler exits 0; previously no args exited 1
       (apf)
 [New] --validate/--check: validate config without starting firewall; checks
@@ -217,10 +226,11 @@
 [Change] VNET: replace fork-heavy parsing with builtins and glob patterns;
       fix ifconfig detection; add variable quoting; use conditional default
       for INSTALL_PATH (main.vnet, vnetgen)
-[Change] help(): restructure with section headers (Firewall Control, Trust
-      Management, Temporary Trust, Diagnostics, Subsystems, Internal);
-      --temp-expire moved to Internal section (functions.apf, apf.8, README,
-      README.md)
+[Change] help() pass 2: remove silent options (-st, --temp-expire) from display;
+      show readable names (--temp-list, --dump-config, --list-allow) over
+      cryptic aliases (--templ, --ovars, --la); add --rules, --info, --lookup;
+      update -l description to "view in editor"; all hidden aliases still work
+      in dispatcher (functions.apf, apf.8, README, README.md)
 [Change] cl_cports(): reset SMTP and connlimit variables for VNET per-IP
       consistency (functions.apf)
 [Change] Drop Ubuntu 22.04 from CI matrix; redundant with 20.04+24.04

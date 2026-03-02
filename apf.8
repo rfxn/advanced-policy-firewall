@@ -8,7 +8,7 @@
 apf \- Advanced Policy Firewall
 .SH SYNOPSIS
 .B apf
-.RB [ \-s | \-r | \-f | \-l | \-t | \-e | \-o | \-v | \-h ]
+.RB [ \-s | \-r | \-f | \-l | \-t | \-e | \-v | \-h | \-\-rules | \-\-info | \-\-lookup ]
 .br
 .B apf
 .RB { \-a | \-d }
@@ -45,11 +45,22 @@ Stop (flush) and reload all firewall rules.
 .BR \-f ", " \-\-stop ", " \-\-flush
 Stop (flush) all firewall rules and reset chains to ACCEPT.
 .TP
-.BR \-l ", " \-\-list
-List all active iptables rules.
+.B \-\-rules
+Dump all active iptables rules to stdout in
+.BR iptables\-save (8)
+format (IPv4 + IPv6 when USE_IPV6=1).
+Output is suitable for piping and scripting:
+.B apf \-\-rules | grep DROP
 .TP
-.BR \-t ", " \-st ", " \-\-status
-Display the firewall status log.
+.BR \-l ", " \-\-list
+View all firewall rules in an editor (pico, nano, vi).
+.TP
+.B \-\-info
+Show a one\-screen firewall status summary: active state, rule counts,
+trust entry statistics, enabled subsystems, and recent log lines.
+.TP
+.BR \-t ", " \-\-status
+Page through the full firewall status log.
 .TP
 .BR \-e ", " \-\-refresh
 Refresh and re\-resolve DNS names in trust rules.
@@ -97,6 +108,13 @@ Display entries in
 Display entries in
 .IR deny_hosts.rules
 (comments and blank lines excluded).
+.TP
+.BR \-\-lookup " \fIHOST\fR"
+Check if
+.I HOST
+exists in any trust file (allow, deny, global allow, global deny).
+Searches are case\-insensitive with line numbers shown.
+Exits 0 if found, 1 if not found.
 .SS Temporary Trust
 .TP
 .BR \-ta " \fIHOST\fR \fITTL\fR [\fICOMMENT\fR], " \-\-temp\-allow " \fIHOST\fR \fITTL\fR [\fICOMMENT\fR]"
@@ -121,10 +139,6 @@ List all temporary trust entries with remaining TTL.
 .TP
 .BR \-\-tempf ", " \-\-temp\-flush
 Remove all temporary trust entries.
-.TP
-.B \-\-temp\-expire
-Expire temporary entries whose TTL has elapsed (internal; called from cron
-every minute).
 .SS Diagnostics
 .TP
 .BR \-g " \fIPATTERN\fR, " \-\-search " \fIPATTERN\fR"
@@ -137,7 +151,7 @@ Validate configuration without starting the firewall.
 Checks stop targets, rate formats, connlimit syntax, and other settings.
 Exits 0 on success, 1 on error with a diagnostic message.
 .TP
-.BR \-o ", " \-\-ovars ", " \-\-dump\-config
+.BR \-\-dump\-config ", " \-o ", " \-\-ovars
 Output all configuration variables.
 .TP
 .BR \-v ", " \-\-version
@@ -346,6 +360,24 @@ Search rules for an IP address:
 .PP
 .RS
 .B apf \-g 10.0.0.1
+.RE
+.PP
+Dump rules to stdout (pipeable):
+.PP
+.RS
+.B apf \-\-rules | grep DROP
+.RE
+.PP
+Show firewall status summary:
+.PP
+.RS
+.B apf \-\-info
+.RE
+.PP
+Check if a host is in the trust system:
+.PP
+.RS
+.B apf \-\-lookup 192.168.1.100
 .RE
 .PP
 Restart the firewall after configuration changes:

@@ -37,7 +37,7 @@ trap '_apf_cleanup_tmp; mutex_unlock' EXIT
 
 # Acquire exclusive lock for mutating operations via file-based flock.
 # Re-invokes this script under flock; child sees _APF_LOCKED=1 and skips gate.
-# Read-only ops (-l, -t, -o, -v, -g, -h, --templ, --gre-status, --la, --ld, --validate) excluded.
+# Read-only ops (-l, -t, -o, -v, -g, -h, --templ, --gre-status, --la, --ld, --validate, --rules, --info, --lookup) excluded.
 # Restart (-r) excluded — sub-invocations lock individually to avoid deadlock.
 if [ "$_APF_LOCKED" != "1" ]; then
   case "$1" in
@@ -351,6 +351,15 @@ case "$1" in
 	;;
 --ld|--list-deny)
 	list_trust_file "$DENY_HOSTS" "deny_hosts.rules"
+	;;
+--rules)
+	rules
+	;;
+--info)
+	firewall_info
+	;;
+--lookup)
+	trust_lookup "$2" || exit 1
 	;;
 *)
 	apf_banner

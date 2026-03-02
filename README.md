@@ -656,16 +656,19 @@ Firewall Control:
   -s, --start ................. load all firewall rules
   -r, --restart ............... flush & reload all firewall rules
   -f, --stop, --flush ......... flush all firewall rules
-  -l, --list .................. list all firewall rules (IPv4 + IPv6)
-  -t, -st, --status ........... firewall status log
+  --rules ..................... dump active rules to stdout
+  -l, --list .................. view all firewall rules in editor
+  --info ...................... show firewall status summary
+  -t, --status ................ page through full status log
   -e, --refresh ............... refresh & re-resolve DNS in trust rules
 
 Trust Management:
   -a HOST [CMT], --allow ...... add host to allow list and load rule
   -d HOST [CMT], --deny ....... add host to deny list and load rule
   -u HOST, --remove ........... remove host from all trust files
-  --la, --list-allow .......... display allow list entries
-  --ld, --list-deny ........... display deny list entries
+  --list-allow ................ display allow list entries
+  --list-deny ................. display deny list entries
+  --lookup HOST ............... check if host exists in trust system
 
   Advanced trust syntax:  apf -a "tcp:in:d=22:s=10.0.0.0/8"
                           apf -d "d=3306:s=192.168.1.5"
@@ -673,13 +676,13 @@ Trust Management:
 Temporary Trust:
   -ta HOST TTL [CMT] .......... temporarily allow host (5m, 1h, 7d)
   -td HOST TTL [CMT] .......... temporarily deny host
-  --templ, --temp-list ........ list temp entries with remaining TTL
-  --tempf, --temp-flush ....... remove all temporary entries
+  --temp-list ................. list temp entries with remaining TTL
+  --temp-flush ................ remove all temporary entries
 
 Diagnostics:
   -g PATTERN, --search ........ search iptables/ipset rules & trust files
   --validate, --check ......... validate config without starting firewall
-  -o, --ovars, --dump-config .. output all configuration variables
+  --dump-config ............... output all configuration variables
   -v, --version ............... output version number
   -h, --help .................. show this help message
 
@@ -688,16 +691,17 @@ Subsystems:
   --gre-up .................... bring up GRE tunnels
   --gre-down .................. tear down GRE tunnels
   --gre-status ................ show GRE tunnel status
-
-Internal:
-  --temp-expire ............... expire temp entries (called from cron)
 ```
 
-The **`-l|--list`** option shows all loaded iptables rules. The **`-t|--status`** option pages through the APF status log at `/var/log/apf_log`.
+The **`--rules`** option dumps all active iptables rules to stdout in `iptables-save` format, suitable for piping (e.g., `apf --rules | grep DROP`). The **`-l|--list`** option opens rules in an editor for browsing.
+
+The **`--info`** option shows a one-screen firewall status summary: active state, rule counts, trust entry statistics, enabled subsystems, and recent log lines. The **`-t|--status`** option pages through the full APF status log at `/var/log/apf_log`.
 
 The **`-e|--refresh`** option flushes trust chains and reloads them from rule files, re-resolving any DNS names. Useful for dynamic DNS entries in the trust system.
 
 The **`-a|--allow`** and **`-d|--deny`** options add entries to the trust system immediately without a firewall restart. Both accept an optional comment string. The **`-u|--remove`** option removes an address from all trust files. See [section 4.1](#41-trust-system) for details.
+
+The **`--lookup`** option checks whether a host exists in any trust file (allow, deny, global allow, global deny) without searching iptables rules. Exits 0 if found, 1 if not — useful in scripts: `apf --lookup 192.168.1.50 && echo "found"`
 
 The **`-g|--search`** option searches all iptables rules (IPv4 + IPv6), ipset sets, and trust files for a pattern match. Case-insensitive, with line-numbered output. Useful for quickly finding which rules or trust entries match a given IP, port, or chain name. Examples:
 
@@ -707,11 +711,11 @@ apf -g DROP
 apf -g :443
 ```
 
-The **`-o|--ovars|--dump-config`** option outputs all configured variables and their values — useful for troubleshooting or when reporting problems (see [section 6](#6-support-information)).
+The **`--dump-config`** option outputs all configured variables and their values — useful for troubleshooting or when reporting problems (see [section 6](#6-support-information)).
 
 The **`--validate|--check`** option validates the configuration without starting the firewall. Useful for verifying changes before a restart.
 
-The **`--la|--list-allow`** and **`--ld|--list-deny`** options display the contents of the allow and deny trust files (comments and blank lines excluded).
+The **`--list-allow`** and **`--list-deny`** options display the contents of the allow and deny trust files (comments and blank lines excluded).
 
 ### 4.1 Trust System
 
