@@ -359,6 +359,10 @@ validate_config() {
  local _vc_rate='^[0-9]+/[smh]$'
  local _vc_int='^[0-9]+$'
  local _vc_name _vc_val _vc_burst _vc_entry
+ # Validate IFACE_UNTRUSTED is set
+ if [ -z "$IFACE_UNTRUSTED" ]; then
+    err="${err}IFACE_UNTRUSTED is not set (conf.apf must define the untrusted network interface); "
+ fi
  # Validate stop targets
  for _vc_pair in "TCP_STOP:$TCP_STOP" "UDP_STOP:$UDP_STOP" "ALL_STOP:$ALL_STOP"; do
     _vc_name="${_vc_pair%%:*}"; _vc_val="${_vc_pair#*:}"
@@ -374,6 +378,23 @@ validate_config() {
     fi
     if [[ ! "$SYNFLOOD_BURST" =~ $_vc_int ]]; then
         err="${err}SYNFLOOD_BURST='$SYNFLOOD_BURST' is invalid (must be a positive integer); "
+    elif [ "$SYNFLOOD_BURST" == "0" ]; then
+        err="${err}SYNFLOOD_BURST='0' is invalid (must be greater than 0); "
+    fi
+ fi
+ # Validate RAB settings (only when RAB is enabled)
+ if [ "$RAB" == "1" ]; then
+    case "$RAB_PSCAN_LEVEL" in
+        0|1|2|3) ;;
+        *) err="${err}RAB_PSCAN_LEVEL='$RAB_PSCAN_LEVEL' is invalid (must be 0, 1, 2, or 3); " ;;
+    esac
+    if [[ ! "$RAB_HITCOUNT" =~ $_vc_int ]]; then
+        err="${err}RAB_HITCOUNT='$RAB_HITCOUNT' is invalid (must be a non-negative integer); "
+    fi
+    if [[ ! "$RAB_TIMER" =~ $_vc_int ]]; then
+        err="${err}RAB_TIMER='$RAB_TIMER' is invalid (must be a positive integer); "
+    elif [ "$RAB_TIMER" == "0" ]; then
+        err="${err}RAB_TIMER='0' is invalid (must be greater than 0); "
     fi
  fi
  # Validate ICMP_LIM rate format (only when set and non-zero)
@@ -400,6 +421,8 @@ validate_config() {
  if [ "$LOG_DROP" == "1" ] && [ -n "$LOG_RATE" ]; then
     if [[ ! "$LOG_RATE" =~ $_vc_int ]]; then
         err="${err}LOG_RATE='$LOG_RATE' is invalid (must be a positive integer); "
+    elif [ "$LOG_RATE" == "0" ]; then
+        err="${err}LOG_RATE='0' is invalid (must be greater than 0); "
     fi
  fi
  # Validate connlimit entries

@@ -624,6 +624,103 @@ mac_module_available() {
     apf_set_config "PERMBLOCK_INTERVAL" "86400"
 }
 
+@test "validate_config rejects invalid RAB_PSCAN_LEVEL" {
+    source /opt/tests/helpers/apf-config.sh
+    apf_set_config "RAB" "1"
+    apf_set_config "RAB_PSCAN_LEVEL" "5"
+    "$APF" -f 2>/dev/null || true
+
+    run "$APF" -s
+    assert_failure
+    [[ "$output" == *"RAB_PSCAN_LEVEL"*"invalid"* ]]
+
+    apf_set_config "RAB_PSCAN_LEVEL" "1"
+    apf_set_config "RAB" "0"
+}
+
+@test "validate_config rejects SYNFLOOD_BURST=0" {
+    source /opt/tests/helpers/apf-config.sh
+    apf_set_config "SYNFLOOD" "1"
+    apf_set_config_safe "SYNFLOOD_RATE" "100/s"
+    apf_set_config "SYNFLOOD_BURST" "0"
+    "$APF" -f 2>/dev/null || true
+
+    run "$APF" -s
+    assert_failure
+    [[ "$output" == *"SYNFLOOD_BURST"*"greater than 0"* ]]
+
+    apf_set_config "SYNFLOOD_BURST" "150"
+    apf_set_config "SYNFLOOD" "0"
+}
+
+@test "validate_config rejects LOG_RATE=0" {
+    source /opt/tests/helpers/apf-config.sh
+    apf_set_config "LOG_DROP" "1"
+    apf_set_config "LOG_RATE" "0"
+    "$APF" -f 2>/dev/null || true
+
+    run "$APF" -s
+    assert_failure
+    [[ "$output" == *"LOG_RATE"*"greater than 0"* ]]
+
+    apf_set_config "LOG_RATE" "30"
+    apf_set_config "LOG_DROP" "0"
+}
+
+@test "validate_config rejects non-numeric RAB_HITCOUNT" {
+    source /opt/tests/helpers/apf-config.sh
+    apf_set_config "RAB" "1"
+    apf_set_config "RAB_HITCOUNT" "abc"
+    "$APF" -f 2>/dev/null || true
+
+    run "$APF" -s
+    assert_failure
+    [[ "$output" == *"RAB_HITCOUNT"*"invalid"* ]]
+
+    apf_set_config "RAB_HITCOUNT" "1"
+    apf_set_config "RAB" "0"
+}
+
+@test "validate_config rejects non-numeric RAB_TIMER" {
+    source /opt/tests/helpers/apf-config.sh
+    apf_set_config "RAB" "1"
+    apf_set_config "RAB_TIMER" "abc"
+    "$APF" -f 2>/dev/null || true
+
+    run "$APF" -s
+    assert_failure
+    [[ "$output" == *"RAB_TIMER"*"invalid"* ]]
+
+    apf_set_config "RAB_TIMER" "300"
+    apf_set_config "RAB" "0"
+}
+
+@test "validate_config rejects RAB_TIMER=0" {
+    source /opt/tests/helpers/apf-config.sh
+    apf_set_config "RAB" "1"
+    apf_set_config "RAB_TIMER" "0"
+    "$APF" -f 2>/dev/null || true
+
+    run "$APF" -s
+    assert_failure
+    [[ "$output" == *"RAB_TIMER"*"greater than 0"* ]]
+
+    apf_set_config "RAB_TIMER" "300"
+    apf_set_config "RAB" "0"
+}
+
+@test "validate_config rejects empty IFACE_UNTRUSTED" {
+    source /opt/tests/helpers/apf-config.sh
+    apf_set_config "IFACE_UNTRUSTED" ""
+    "$APF" -f 2>/dev/null || true
+
+    run "$APF" -s
+    assert_failure
+    [[ "$output" == *"IFACE_UNTRUSTED"*"not set"* ]]
+
+    apf_set_config "IFACE_UNTRUSTED" "veth-pub"
+}
+
 # =====================================================================
 # trim() inode preservation (C-003)
 # =====================================================================

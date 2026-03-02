@@ -106,6 +106,28 @@ teardown_file() {
     apf_set_config_safe "SYNFLOOD_RATE" "5/s"
 }
 
+@test "apf --validate passes RAB_PSCAN_LEVEL=0 (disabled)" {
+    source /opt/tests/helpers/apf-config.sh
+    apf_set_config "RAB" "1"
+    apf_set_config "RAB_PSCAN_LEVEL" "0"
+    run "$APF" --validate
+    assert_success
+    # Restore
+    apf_set_config "RAB_PSCAN_LEVEL" "1"
+    apf_set_config "RAB" "0"
+}
+
+@test "apf --validate passes RAB_HITCOUNT=0 (auto-promoted)" {
+    source /opt/tests/helpers/apf-config.sh
+    apf_set_config "RAB" "1"
+    apf_set_config "RAB_HITCOUNT" "0"
+    run "$APF" --validate
+    assert_success
+    # Restore
+    apf_set_config "RAB_HITCOUNT" "1"
+    apf_set_config "RAB" "0"
+}
+
 # --- --list-allow / --list-deny ---
 
 @test "apf --la with empty file shows no entries" {

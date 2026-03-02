@@ -168,6 +168,10 @@
 [Fix] validate_config(): add validation for ICMP_LIM (rate format), LOG_LEVEL,
       LOG_TARGET, LOG_RATE (integer), SYSCTL_CONNTRACK (integer); reject
       non-numeric PERMBLOCK_COUNT/PERMBLOCK_INTERVAL (functions.apf)
+[Fix] validate_config(): reject empty IFACE_UNTRUSTED, invalid RAB_PSCAN_LEVEL,
+      non-numeric RAB_HITCOUNT/RAB_TIMER, RAB_TIMER=0, SYNFLOOD_BURST=0, and
+      LOG_RATE=0; RAB checks gated on RAB=1; defense-in-depth default branch
+      in firewall RAB_PSCAN_LEVEL case (functions.apf, firewall)
 [Fix] cl_cports(): clear EG_DROP_CMD between VNET iterations; prevents
       command-owner rules from leaking across per-IP rule files (functions.apf)
 [Fix] cli_trust_remove(): reject empty argument with error message; prevents
