@@ -84,6 +84,30 @@ teardown_file() {
     [ ! -f "/etc/cron.d/apf_temp" ]
 }
 
+@test "runtime cron refresh.apf cleaned during install" {
+    if [ ! -d "/etc/cron.d" ]; then
+        skip "cron.d not available"
+    fi
+    # Simulate runtime-created refresh cron
+    echo "*/10 * * * * root /opt/apf/apf --refresh >> /dev/null 2>&1 &" > /etc/cron.d/refresh.apf
+    [ -f "/etc/cron.d/refresh.apf" ]
+    cd /opt/apf-src
+    INSTALL_PATH="$APF_DIR" sh install.sh >/dev/null 2>&1
+    [ ! -f "/etc/cron.d/refresh.apf" ]
+}
+
+@test "runtime cron apf_develmode cleaned during install" {
+    if [ ! -d "/etc/cron.d" ]; then
+        skip "cron.d not available"
+    fi
+    # Simulate runtime-created develmode cron
+    echo "*/5 * * * * root /opt/apf/apf -f >> /dev/null 2>&1" > /etc/cron.d/apf_develmode
+    [ -f "/etc/cron.d/apf_develmode" ]
+    cd /opt/apf-src
+    INSTALL_PATH="$APF_DIR" sh install.sh >/dev/null 2>&1
+    [ ! -f "/etc/cron.d/apf_develmode" ]
+}
+
 @test "cron.d/apf references install path not /etc/apf" {
     if [ ! -f "/etc/cron.d/apf" ]; then
         skip "cron.d/apf not installed"

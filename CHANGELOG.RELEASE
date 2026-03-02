@@ -307,6 +307,9 @@
 [Change] nft backend detection: extract detect_ipt_backend() to eliminate
       duplicated iptables --version parsing in snapshot_save() and fast
       load path; sets global IPT_BACKEND (functions.apf, apf)
+[Fix] Cron lifecycle: clean runtime-created refresh.apf and apf_develmode
+      cron entries during install and uninstall; prevents stale cron jobs
+      from persisting across reinstalls (install.sh, uninstall.sh)
 
   -- Test Suite --
 

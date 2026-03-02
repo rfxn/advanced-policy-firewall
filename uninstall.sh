@@ -62,11 +62,12 @@ if [ -f "/etc/rc.local" ]; then
 	fi
 fi
 
-# Remove cron entries (current + all legacy variants)
+# Remove cron entries (current + all legacy + runtime-created variants)
 echo "Removing cron entries..."
 rm -f /etc/cron.d/apf /etc/cron.d/apf_ipset /etc/cron.d/apf_temp
 rm -f /etc/cron.d/fwdev /etc/cron.daily/apf /etc/cron.daily/fw
 rm -f /etc/cron.hourly/fw
+rm -f /etc/cron.d/refresh.apf /etc/cron.d/apf_develmode
 
 # Remove logrotate config
 if [ -f "/etc/logrotate.d/apf" ]; then

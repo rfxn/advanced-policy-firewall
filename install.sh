@@ -36,6 +36,8 @@ install() {
 	rm -f /etc/cron.hourly/fw /etc/cron.daily/fw /etc/cron.d/fwdev "$INSTALL_PATH/cron.fwdev"
 	# Clean up legacy cron entries (pre-2.0.2 used separate files)
 	rm -f /etc/cron.daily/apf /etc/cron.d/apf_ipset /etc/cron.d/apf_temp
+	# Clean up runtime-created cron entries (recreated by apf -s as needed)
+	rm -f /etc/cron.d/refresh.apf /etc/cron.d/apf_develmode
 	# Consolidated cron: daily restart, hourly ipset refresh, per-minute temp expiry
 	if [ -d "/etc/cron.d" ] && [ -f "cron.d.apf" ]; then
 		cp cron.d.apf /etc/cron.d/apf
