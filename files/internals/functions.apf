@@ -2196,29 +2196,36 @@ else
 fi
 }
 
-dlist_php_hosts() {
-if [ -n "$(grep -v "#" "$PHP_HOSTS")" ]; then
-        eout "{php} loading php_hosts.rules"
-        ipt -N PHP
-        while IFS= read -r i; do
-                [[ "$i" == \#* || -z "$i" ]] && continue
-                if [ -f "$PHP_HOSTS" ]; then
+## Shared dlist chain loading helper.
+# Usage: dlist_load_hosts chain_name hosts_file tag log_prefix
+# Creates iptables chain, loads validated entries with LOG+DROP, attaches
+# to INPUT and OUTPUT chains.
+dlist_load_hosts() {
+local _dlh_chain="$1" _dlh_file="$2" _dlh_tag="$3" _dlh_prefix="$4"
+if [ -n "$(grep -v "#" "$_dlh_file")" ]; then
+	eout "{$_dlh_tag} loading ${_dlh_file##*/}"
+	ipt -N "$_dlh_chain"
+	while IFS= read -r i; do
+		[[ "$i" == \#* || -z "$i" ]] && continue
+		if [ -f "$_dlh_file" ]; then
 			if ! valid_ip_cidr "$i"; then
-				eout "{php} skipping invalid entry: $i"
+				eout "{$_dlh_tag} skipping invalid entry: $i"
 				continue
 			fi
 			if ipt_for_host "$i"; then
-			  if [ "$LOG_DROP" == "1" ]; then
-                           $IPT_H $IPT_FLAGS -A PHP -s $i -d $ANY_ADDR -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** PHP ** "
-			  fi
-                          $IPT_H $IPT_FLAGS -A PHP -s $i -d $ANY_ADDR -j $ALL_STOP
+				if [ "$LOG_DROP" == "1" ]; then
+					$IPT_H $IPT_FLAGS -A "$_dlh_chain" -s $i -d $ANY_ADDR -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** $_dlh_prefix ** "
+				fi
+				$IPT_H $IPT_FLAGS -A "$_dlh_chain" -s $i -d $ANY_ADDR -j $ALL_STOP
 			fi
-                fi
-        done < "$PHP_HOSTS"
-        ipt -A INPUT -j PHP
-        ipt -A OUTPUT -j PHP
+		fi
+	done < "$_dlh_file"
+	ipt -A INPUT -j "$_dlh_chain"
+	ipt -A OUTPUT -j "$_dlh_chain"
 fi
 }
+
+dlist_php_hosts()      { dlist_load_hosts "PHP"     "$PHP_HOSTS"  "php"     "PHP"; }
 
 dlist_dshield() {
 if [ -n "$DLIST_DSHIELD_URL" ] && [ "$DLIST_DSHIELD" == "1" ] && ( [ -n "$CURL" ] || [ -n "$WGET" ] ); then
@@ -2228,29 +2235,7 @@ else
 fi
 }
 
-dlist_dshield_hosts() {
-if [ -n "$(grep -v "#" "$DS_HOSTS")" ]; then
-        eout "{dshield} loading ds_hosts.rules"
-        ipt -N DSHIELD
-        while IFS= read -r i; do
-                [[ "$i" == \#* || -z "$i" ]] && continue
-                if [ -f "$DS_HOSTS" ]; then
-			if ! valid_ip_cidr "$i"; then
-				eout "{dshield} skipping invalid entry: $i"
-				continue
-			fi
-			if ipt_for_host "$i"; then
-			  if [ "$LOG_DROP" == "1" ]; then
-                           $IPT_H $IPT_FLAGS -A DSHIELD -s $i -d $ANY_ADDR -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** DSHIELD ** "
-			  fi
-                          $IPT_H $IPT_FLAGS -A DSHIELD -s $i -d $ANY_ADDR -j $ALL_STOP
-			fi
-                fi
-        done < "$DS_HOSTS"
-        ipt -A INPUT -j DSHIELD
-        ipt -A OUTPUT -j DSHIELD
-fi
-}
+dlist_dshield_hosts()  { dlist_load_hosts "DSHIELD" "$DS_HOSTS"   "dshield" "DSHIELD"; }
 
 dlist_spamhaus() {
 if [ -n "$DLIST_SPAMHAUS_URL" ] && [ "$DLIST_SPAMHAUS" == "1" ] && ( [ -n "$CURL" ] || [ -n "$WGET" ] ); then
@@ -2260,30 +2245,7 @@ else
 fi
 }
 
-
-dlist_spamhaus_hosts() {
-if [ -n "$(grep -v "#" "$DROP_HOSTS")" ]; then
-        eout "{sdrop} loading sdrop_hosts.rules"
-        ipt -N SDROP
-        while IFS= read -r i; do
-                [[ "$i" == \#* || -z "$i" ]] && continue
-                if [ -f "$DROP_HOSTS" ]; then
-			if ! valid_ip_cidr "$i"; then
-				eout "{sdrop} skipping invalid entry: $i"
-				continue
-			fi
-			if ipt_for_host "$i"; then
-			  if [ "$LOG_DROP" == "1" ]; then
-                           $IPT_H $IPT_FLAGS -A SDROP -s $i -d $ANY_ADDR -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** SDROP ** "
-			  fi
-                          $IPT_H $IPT_FLAGS -A SDROP -s $i -d $ANY_ADDR -j $ALL_STOP
-			fi
-                fi
-        done < "$DROP_HOSTS"
-        ipt -A INPUT -j SDROP
-        ipt -A OUTPUT -j SDROP
-fi
-}
+dlist_spamhaus_hosts() { dlist_load_hosts "SDROP"   "$DROP_HOSTS" "sdrop"   "SDROP"; }
 
 dlist_ecnshame() {
 if [ -n "$DLIST_ECNSHAME_URL" ] && [ "$DLIST_ECNSHAME" == "1" ] && ( [ -n "$CURL" ] || [ -n "$WGET" ] ); then

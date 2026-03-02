@@ -314,6 +314,10 @@
       eliminate duplicated download/parse/validate logic between
       glob_allow_download() and glob_deny_download(); both become
       one-line wrappers (functions.apf)
+[Change] dlist chain loading: extract dlist_load_hosts() helper to unify
+      chain creation, valid_ip_cidr validation, LOG+DROP rules, and
+      INPUT/OUTPUT attachment; dlist_php_hosts, dlist_dshield_hosts,
+      dlist_spamhaus_hosts become one-line wrappers (functions.apf)
 
   -- Test Suite --
 
