@@ -209,6 +209,9 @@
       SET_EXPIRE (functions.apf)
 [Fix] --gre-up/--gre-down report disabled state instead of silently
       exiting (apf)
+[Fix] sysctl.rules: fix wrong proc paths for secure_redirects, send_redirects,
+      and proxy_arp; per-interface sysctls require conf/all/ prefix — settings
+      were silently never applied due to error suppression (sysctl.rules)
 [New] snapshot_save(): atomic fast load snapshot writes via mktemp+mv;
       validates iptables-save exit code and output (non-empty, contains
       table markers); IPv6 snapshot failure non-fatal to IPv4; backend

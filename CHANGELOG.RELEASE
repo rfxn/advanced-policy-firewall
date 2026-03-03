@@ -258,6 +258,9 @@
       consistency (functions.apf)
 [Change] Drop Ubuntu 22.04 from CI matrix; redundant with 20.04+24.04
       (smoke-test.yml)
+[Fix] sysctl.rules: fix wrong proc paths for secure_redirects, send_redirects,
+      and proxy_arp; per-interface sysctls require conf/all/ prefix — settings
+      were silently never applied due to error suppression (sysctl.rules)
 [Change] trust_hosts: replace four-pass grep cascade with single-pass loop
       and delegate advanced syntax to trust_entry_rule(); eliminates ~210
       lines of duplicated field extraction and iptables logic (C-002)
