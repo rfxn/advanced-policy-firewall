@@ -329,6 +329,9 @@
 [Change] Remove dead IN_IF/OUT_IF variables from internals.conf; replace
       command head shim with plain head in functions.apf now that head()
       has been renamed to apf_banner() (internals.conf, functions.apf)
+[Change] cli_trust: extract _sanitize_comment() and _trust_action_target()
+      helpers; replaces 6 copy-pasted comment sanitization blocks and 4
+      duplicated DENY/ALLOW→iptables action mappings (functions.apf)
 
   -- Test Suite --
 

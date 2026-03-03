@@ -1010,6 +1010,22 @@ cli_trust_remove() {
 	return 0
 }
 
+# Strip control characters from trust comment field (caller's CMT variable)
+_sanitize_comment() {
+	CMT="${CMT//$'\n'/ }"
+	CMT="${CMT//$'\r'/}"
+	CMT="${CMT//$'\t'/ }"
+}
+
+# Set JACTION from ACTION (DENY→ALL_STOP, ALLOW→ACCEPT) in caller scope
+_trust_action_target() {
+	if [ "$ACTION" == "DENY" ]; then
+		JACTION="$ALL_STOP"
+	elif [ "$ACTION" == "ALLOW" ]; then
+		JACTION="ACCEPT"
+	fi
+}
+
 cli_trust() {
  local CHAIN="$1" ACTION="$2" FILE="$3" HOST="$4" CMT="$5"
  local tlist f valtrust TIME JACTION
@@ -1049,9 +1065,7 @@ cli_trust() {
 		if [ "$_ct_skip" == "0" ]; then
 			TIME=$(date +"%D %H:%M:%S")
 			ADDED_EPOCH=$(date +%s)
-			CMT="${CMT//$'\n'/ }"
-			CMT="${CMT//$'\r'/}"
-			CMT="${CMT//$'\t'/ }"
+			_sanitize_comment
 			local _ct_csv="${_RESOLVED_IPS//$'\n'/,}"
 			if [ -n "$CMT" ]; then
 				echo "# added $HOST on $TIME addedtime=$ADDED_EPOCH resolved=$_ct_csv with comment: $CMT" >> "$FILE"
@@ -1076,9 +1090,7 @@ cli_trust() {
 	else
 		TIME=$(date +"%D %H:%M:%S")
 		ADDED_EPOCH=$(date +%s)
-		CMT="${CMT//$'\n'/ }"
-		CMT="${CMT//$'\r'/}"
-		CMT="${CMT//$'\t'/ }"
+		_sanitize_comment
 		if [ -n "$CMT" ]; then
 			echo "# added $HOST on $TIME addedtime=$ADDED_EPOCH with comment: $CMT" >> "$FILE"
 		else
@@ -1129,15 +1141,9 @@ cli_trust() {
 	if [ "$_ct_skip" == "0" ]; then
 		TIME=$(date +"%D %H:%M:%S")
 		ADDED_EPOCH=$(date +%s)
-		CMT="${CMT//$'\n'/ }"
-		CMT="${CMT//$'\r'/}"
-		CMT="${CMT//$'\t'/ }"
+		_sanitize_comment
 		local _ct_csv="${_RESOLVED_IPS//$'\n'/,}"
-		if [ "$ACTION" == "DENY" ]; then
-			JACTION="$ALL_STOP"
-		elif [ "$ACTION" == "ALLOW" ]; then
-			JACTION="ACCEPT"
-		fi
+		_trust_action_target
 		if [ "$CMT" ]; then
 			echo "# added $HOST on $TIME addedtime=$ADDED_EPOCH resolved=$_ct_csv with comment: $CMT" >> "$FILE"
 		else
@@ -1162,20 +1168,14 @@ cli_trust() {
  else
          TIME=$(date +"%D %H:%M:%S")
 	ADDED_EPOCH=$(date +%s)
-	CMT="${CMT//$'\n'/ }"
-	CMT="${CMT//$'\r'/}"
-	CMT="${CMT//$'\t'/ }"
+	_sanitize_comment
 	if [ "$CMT" ]; then
 		echo "# added $HOST on $TIME addedtime=$ADDED_EPOCH with comment: $CMT" >> "$FILE"
 	else
 		echo "# added $HOST on $TIME addedtime=$ADDED_EPOCH" >> "$FILE"
 	fi
          echo "$HOST" >> "$FILE"
-	if [ "$ACTION" == "DENY" ]; then
-		JACTION="$ALL_STOP"
-	elif [ "$ACTION" == "ALLOW" ]; then
-		JACTION="ACCEPT"
-	fi
+	_trust_action_target
          $IPT_H $IPT_FLAGS -I $CHAIN -s $HOST -j $JACTION
         	$IPT_H $IPT_FLAGS -I $CHAIN -d $HOST -j $JACTION
          eout "{trust} added $ACTION all to/from $HOST"
@@ -1240,9 +1240,7 @@ cli_trust_temp() {
 	done <<< "$_RESOLVED_IPS"
 	if [ "$_ctt_skip" == "0" ]; then
 		TIME=$(date +"%D %H:%M:%S")
-		CMT="${CMT//$'\n'/ }"
-		CMT="${CMT//$'\r'/}"
-		CMT="${CMT//$'\t'/ }"
+		_sanitize_comment
 		EXPIRE_EPOCH=$(($(date +%s) + _TTL_SECONDS))
 		local _ctt_csv="${_RESOLVED_IPS//$'\n'/,}"
 		if [ -n "$CMT" ]; then
@@ -1273,11 +1271,7 @@ cli_trust_temp() {
 			done <<< "$_RESOLVED_IPS"
 		else
 			# Bare FQDN
-			if [ "$ACTION" == "DENY" ]; then
-				JACTION="$ALL_STOP"
-			elif [ "$ACTION" == "ALLOW" ]; then
-				JACTION="ACCEPT"
-			fi
+			_trust_action_target
 			while IFS= read -r _ctt_rip; do
 				if ipt_for_host "$_ctt_rip"; then
 					$IPT_H $IPT_FLAGS -I $CHAIN -s "$_ctt_rip" -j $JACTION
@@ -1301,9 +1295,7 @@ cli_trust_temp() {
 	echo "$_VTE_IP is a local address and can not be added to the trust system"
  else
 	TIME=$(date +"%D %H:%M:%S")
-	CMT="${CMT//$'\n'/ }"
-	CMT="${CMT//$'\r'/}"
-	CMT="${CMT//$'\t'/ }"
+	_sanitize_comment
 	EXPIRE_EPOCH=$(($(date +%s) + _TTL_SECONDS))
 	if [ -n "$CMT" ]; then
 		echo "# added $HOST on $TIME ttl=$_TTL_SECONDS expire=$EXPIRE_EPOCH with comment: $CMT" >> "$FILE"
@@ -1336,11 +1328,7 @@ cli_trust_temp() {
 			echo "$HOST appears to be IPv6 but USE_IPV6 is not enabled"
 			return 1
 		fi
-		if [ "$ACTION" == "DENY" ]; then
-			JACTION="$ALL_STOP"
-		elif [ "$ACTION" == "ALLOW" ]; then
-			JACTION="ACCEPT"
-		fi
+		_trust_action_target
 		$IPT_H $IPT_FLAGS -I $CHAIN -s $HOST -j $JACTION
 		$IPT_H $IPT_FLAGS -I $CHAIN -d $HOST -j $JACTION
 		EXPIRE_DISP=$(date -d "@$EXPIRE_EPOCH" +"%D %H:%M:%S")
