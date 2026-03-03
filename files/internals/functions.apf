@@ -836,7 +836,7 @@ cli_trust_remove() {
 			local _ctr_fqdn_ips="" _ctr_rline
 			for f in "$ALLOW_HOSTS" "$DENY_HOSTS" "$GALLOW_HOSTS" "$GDENY_HOSTS"; do
 				[ -f "$f" ] || continue
-				_ctr_rline=$(grep -F "resolved=" "$f" 2>/dev/null | grep -F "$_VTE_IP" | command head -n1)
+				_ctr_rline=$(grep -F "resolved=" "$f" 2>/dev/null | grep -F "$_VTE_IP" | head -n1)
 				if [ -n "$_ctr_rline" ]; then
 					_ctr_fqdn_ips="${_ctr_rline##*resolved=}"
 					_ctr_fqdn_ips="${_ctr_fqdn_ips%% *}"
@@ -890,7 +890,7 @@ cli_trust_remove() {
 		local _ctr_fqdn_ips="" _ctr_rline
 		for f in "$ALLOW_HOSTS" "$DENY_HOSTS" "$GALLOW_HOSTS" "$GDENY_HOSTS"; do
 			[ -f "$f" ] || continue
-			_ctr_rline=$(grep -F "resolved=" "$f" 2>/dev/null | grep -F "$DIP" | command head -n1)
+			_ctr_rline=$(grep -F "resolved=" "$f" 2>/dev/null | grep -F "$DIP" | head -n1)
 			if [ -n "$_ctr_rline" ]; then
 				_ctr_fqdn_ips="${_ctr_rline##*resolved=}"
 				_ctr_fqdn_ips="${_ctr_fqdn_ips%% *}"

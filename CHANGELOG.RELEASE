@@ -326,6 +326,9 @@
       restore, and count logic between ipset_load() and ipset_update();
       uses awk set variable instead of shell interpolation in awk body;
       sets _IPSET_COUNT global to avoid subshell (functions.apf)
+[Change] Remove dead IN_IF/OUT_IF variables from internals.conf; replace
+      command head shim with plain head in functions.apf now that head()
+      has been renamed to apf_banner() (internals.conf, functions.apf)
 
   -- Test Suite --
 
