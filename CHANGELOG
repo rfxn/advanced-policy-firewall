@@ -332,6 +332,11 @@
 [Change] cli_trust: extract _sanitize_comment() and _trust_action_target()
       helpers; replaces 6 copy-pasted comment sanitization blocks and 4
       duplicated DENY/ALLOW→iptables action mappings (functions.apf)
+[Change] cli_trust_remove: extract _resolve_fqdn_metadata(),
+      _trust_remove_ip_rules(), and _trust_remove_advanced_entries()
+      helpers; deduplicates FQDN metadata lookup (2 sites), 12-rule
+      iptables deletion + spec-based cleanup (2 sites), and advanced
+      entry recursive cleanup (2 sites) (functions.apf)
 
   -- Test Suite --
 
