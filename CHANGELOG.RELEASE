@@ -342,6 +342,10 @@
       expire_temp_entries(), list_temp_entries(), and
       flush_temp_entries(); document error suppression rationale and
       dual-track parsing in expirebans() (functions.apf)
+[Change] bt.rules: extract _log_drop() and _rab_log() helpers to
+      replace inline LOG_DROP/RAB_LOG_HIT check+action patterns;
+      adopted at SANITY INV, PZERO, PZERO6, SYNFLOOD, IDENT, MCAST,
+      and MCAST6 blocks (functions.apf, bt.rules)
 
   -- Test Suite --
 

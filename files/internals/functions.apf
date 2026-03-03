@@ -2649,6 +2649,29 @@ cl_cports() {
 	EG_DROP_CMD=""
 }
 
+# Log-then-drop helper: optional LOG rule followed by action rule.
+# Usage: _log_drop ipt_fn chain match_args log_prefix action [extra_action_flags]
+# shellcheck disable=SC2086
+_log_drop() {
+	local ipt_fn="$1" chain="$2" match="$3" prefix="$4" action="$5" extra="$6"
+	if [ "$LOG_DROP" == "1" ]; then
+		$ipt_fn -A "$chain" $match -m limit --limit=$LOG_RATE/minute \
+			-j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "$prefix"
+	fi
+	$ipt_fn -A "$chain" $match $extra -j "$action"
+}
+
+# RAB hit log helper: emits LOG rule when RAB_LOG_HIT is enabled.
+# Usage: _rab_log ipt_fn chain match_args log_prefix
+# shellcheck disable=SC2086
+_rab_log() {
+	local ipt_fn="$1" chain="$2" match="$3" prefix="$4"
+	if [ "$RAB_LOG_HIT" == "1" ]; then
+		$ipt_fn -A "$chain" $match -m limit --limit=$LOG_RATE/minute \
+			-j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "$prefix"
+	fi
+}
+
 # Parse temp trust comment line: "# added IP on ... ttl=N expire=E ..."
 # Sets: _PTC_IP, _PTC_TTL, _PTC_EPOCH
 _parse_temp_comment() {

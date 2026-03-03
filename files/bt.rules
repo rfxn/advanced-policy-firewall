@@ -50,22 +50,10 @@ if [ "$PKT_SANITY" == "1" ]; then
 	        eout "{pkt_sanity} check outbound for INVALID states"
 	        eout "{pkt_sanity} deny inbound tcp-option 64"
 	        eout "{pkt_sanity} deny inbound tcp-option 128"
-	        if [ "$LOG_DROP" == "1" ]; then
-		 ipt4 -A IN_SANITY -m state --state INVALID -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** SANITY ** "
-		fi
-		ipt4 -A IN_SANITY -m state --state INVALID -j $ALL_STOP
-                if [ "$LOG_DROP" == "1" ]; then
-		 ipt4 -A IN_SANITY -p tcp --tcp-option 64 -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** SANITY ** "
-		fi
-		ipt4 -A IN_SANITY -p tcp --tcp-option 64 -j $TCP_STOP
-                if [ "$LOG_DROP" == "1" ]; then
-		 ipt4 -A IN_SANITY -p tcp --tcp-option 128 -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** SANITY ** "
-		fi
-		ipt4 -A IN_SANITY -p tcp --tcp-option 128 -j $TCP_STOP
-                if [ "$LOG_DROP" == "1" ]; then
-		 ipt4 -A OUT_SANITY -m state --state INVALID -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** SANITY ** "
-		fi
-		ipt4 -A OUT_SANITY -m state --state INVALID -j $ALL_STOP
+		_log_drop ipt4 IN_SANITY "-m state --state INVALID" "** SANITY ** " "$ALL_STOP"
+		_log_drop ipt4 IN_SANITY "-p tcp --tcp-option 64" "** SANITY ** " "$TCP_STOP"
+		_log_drop ipt4 IN_SANITY "-p tcp --tcp-option 128" "** SANITY ** " "$TCP_STOP"
+		_log_drop ipt4 OUT_SANITY "-m state --state INVALID" "** SANITY ** " "$ALL_STOP"
 	fi
 
         ipt4 -A OUTPUT -j OUT_SANITY
@@ -75,12 +63,10 @@ if [ "$PKT_SANITY" == "1" ]; then
 		# Block fragmented UDP (IPv4)
 	        eout "{pkt_sanity} deny all fragmented udp"
 		ipt4 -N FRAG_UDP
-                if [ "$LOG_DROP" == "1" ]; then
-		 ipt4 -A FRAG_UDP -p udp -f -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** UDP Frag ** "
+		if [ "$LOG_DROP" == "1" ]; then
+			ipt4 -A FRAG_UDP -p udp -f -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** UDP Frag ** "
 		fi
-                if [ "$RAB_LOG_HIT" == "1" ]; then
-		 ipt4 -A FRAG_UDP -p udp -f -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** RABHIT ** "
-		fi
+		_rab_log ipt4 FRAG_UDP "-p udp -f" "** RABHIT ** "
 		ipt4 -A FRAG_UDP -p udp -f $RAB_SANITY_FLAGS -j $UDP_STOP
 		ipt4 -A INPUT -j FRAG_UDP
 		ipt4 -A OUTPUT -j FRAG_UDP
@@ -92,9 +78,7 @@ if [ "$PKT_SANITY" == "1" ]; then
 		 if [ "$LOG_DROP" == "1" ]; then
 		  ipt6 -A FRAG_UDP6 -p udp -m frag --fragmore -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** UDP6 Frag ** "
 		 fi
-		 if [ "$RAB_LOG_HIT" == "1" ]; then
-		  ipt6 -A FRAG_UDP6 -p udp -m frag --fragmore -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** RABHIT6 ** "
-		 fi
+		 _rab_log ipt6 FRAG_UDP6 "-p udp -m frag --fragmore" "** RABHIT6 ** "
 		 ipt6 -A FRAG_UDP6 -p udp -m frag --fragmore $RAB_SANITY_FLAGS -j $UDP_STOP
 		 ipt6 -A INPUT -j FRAG_UDP6
 		 ipt6 -A OUTPUT -j FRAG_UDP6
@@ -105,22 +89,10 @@ if [ "$PKT_SANITY" == "1" ]; then
 	        eout "{pkt_sanity} deny inbound tcp port 0"
 	        eout "{pkt_sanity} deny outbound tcp port 0"
 		ipt4 -N PZERO
-                if [ "$LOG_DROP" == "1" ]; then
-		 ipt4 -A PZERO -p tcp --dport 0 -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** Port Zero ** "
-		fi
-		ipt4 -A PZERO -p tcp --dport 0 $RAB_SANITY_FLAGS -j $TCP_STOP
-                if [ "$LOG_DROP" == "1" ]; then
-		 ipt4 -A PZERO -p udp --dport 0 -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** Port Zero ** "
-		fi
-		ipt4 -A PZERO -p udp --dport 0 $RAB_SANITY_FLAGS -j $UDP_STOP
-                if [ "$LOG_DROP" == "1" ]; then
-		 ipt4 -A PZERO -p tcp --sport 0 -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** Port Zero ** "
-		fi
-		ipt4 -A PZERO -p tcp --sport 0 $RAB_SANITY_FLAGS -j $TCP_STOP
-                if [ "$LOG_DROP" == "1" ]; then
-		 ipt4 -A PZERO -p udp --sport 0 -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** Port Zero ** "
-		fi
-		ipt4 -A PZERO -p udp --sport 0 $RAB_SANITY_FLAGS -j $UDP_STOP
+		_log_drop ipt4 PZERO "-p tcp --dport 0" "** Port Zero ** " "$TCP_STOP" "$RAB_SANITY_FLAGS"
+		_log_drop ipt4 PZERO "-p udp --dport 0" "** Port Zero ** " "$UDP_STOP" "$RAB_SANITY_FLAGS"
+		_log_drop ipt4 PZERO "-p tcp --sport 0" "** Port Zero ** " "$TCP_STOP" "$RAB_SANITY_FLAGS"
+		_log_drop ipt4 PZERO "-p udp --sport 0" "** Port Zero ** " "$UDP_STOP" "$RAB_SANITY_FLAGS"
 		ipt4 -A INPUT -j PZERO
 		ipt4 -A OUTPUT -j PZERO
 	fi
@@ -136,14 +108,8 @@ if [ "$PKT_SANITY" == "1" ] && [ "$USE_IPV6" == "1" ]; then
 	pkt_sanity_flags OUT_SANITY6 ipt6 "SANITY6" "" 0
 
 	if [ "$PKT_SANITY_INV" == "1" ]; then
-		if [ "$LOG_DROP" == "1" ]; then
-			ipt6 -A IN_SANITY6 -m state --state INVALID -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** SANITY6 ** "
-		fi
-		ipt6 -A IN_SANITY6 -m state --state INVALID $RAB_SANITY_FLAGS -j $ALL_STOP
-		if [ "$LOG_DROP" == "1" ]; then
-			ipt6 -A OUT_SANITY6 -m state --state INVALID -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** SANITY6 ** "
-		fi
-		ipt6 -A OUT_SANITY6 -m state --state INVALID -j $ALL_STOP
+		_log_drop ipt6 IN_SANITY6 "-m state --state INVALID" "** SANITY6 ** " "$ALL_STOP" "$RAB_SANITY_FLAGS"
+		_log_drop ipt6 OUT_SANITY6 "-m state --state INVALID" "** SANITY6 ** " "$ALL_STOP"
 	fi
 
 	ipt6 -A INPUT -j IN_SANITY6
@@ -152,22 +118,10 @@ if [ "$PKT_SANITY" == "1" ] && [ "$USE_IPV6" == "1" ]; then
 	if [ "$PKT_SANITY_PZERO" == "1" ]; then
 		eout "{pkt_sanity} deny IPv6 port zero traffic"
 		ipt6 -N PZERO6
-		if [ "$LOG_DROP" == "1" ]; then
-			ipt6 -A PZERO6 -p tcp --dport 0 -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** PortZero6 ** "
-		fi
-		ipt6 -A PZERO6 -p tcp --dport 0 $RAB_SANITY_FLAGS -j $TCP_STOP
-		if [ "$LOG_DROP" == "1" ]; then
-			ipt6 -A PZERO6 -p udp --dport 0 -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** PortZero6 ** "
-		fi
-		ipt6 -A PZERO6 -p udp --dport 0 $RAB_SANITY_FLAGS -j $UDP_STOP
-		if [ "$LOG_DROP" == "1" ]; then
-			ipt6 -A PZERO6 -p tcp --sport 0 -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** PortZero6 ** "
-		fi
-		ipt6 -A PZERO6 -p tcp --sport 0 $RAB_SANITY_FLAGS -j $TCP_STOP
-		if [ "$LOG_DROP" == "1" ]; then
-			ipt6 -A PZERO6 -p udp --sport 0 -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** PortZero6 ** "
-		fi
-		ipt6 -A PZERO6 -p udp --sport 0 $RAB_SANITY_FLAGS -j $UDP_STOP
+		_log_drop ipt6 PZERO6 "-p tcp --dport 0" "** PortZero6 ** " "$TCP_STOP" "$RAB_SANITY_FLAGS"
+		_log_drop ipt6 PZERO6 "-p udp --dport 0" "** PortZero6 ** " "$UDP_STOP" "$RAB_SANITY_FLAGS"
+		_log_drop ipt6 PZERO6 "-p tcp --sport 0" "** PortZero6 ** " "$TCP_STOP" "$RAB_SANITY_FLAGS"
+		_log_drop ipt6 PZERO6 "-p udp --sport 0" "** PortZero6 ** " "$UDP_STOP" "$RAB_SANITY_FLAGS"
 		ipt6 -A INPUT -j PZERO6
 		ipt6 -A OUTPUT -j PZERO6
 	fi
@@ -179,10 +133,7 @@ if [ "$SYNFLOOD" == "1" ]; then
 	eout "{synflood} rate limit inbound SYN to $SYNFLOOD_RATE burst $SYNFLOOD_BURST"
 	ipt -N SYNFLOOD
 	ipt -A SYNFLOOD -p tcp --syn -m limit --limit=$SYNFLOOD_RATE --limit-burst=$SYNFLOOD_BURST -j RETURN
-	if [ "$LOG_DROP" == "1" ]; then
-		ipt -A SYNFLOOD -p tcp --syn -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** SYNFLOOD ** "
-	fi
-	ipt -A SYNFLOOD -p tcp --syn -j $TCP_STOP
+	_log_drop ipt SYNFLOOD "-p tcp --syn" "** SYNFLOOD ** " "$TCP_STOP"
 	ipt -A INPUT -j SYNFLOOD
 fi
 
@@ -192,22 +143,10 @@ if [ "$BLK_IDENT" = "1" ]; then
 	if [[ ",$IG_TCP_CPORTS," != *,113,* ]]; then
 		eout "{blk_ident} reject all to/from tcp port 113"
 		ipt -N IDENT
-                if [ "$LOG_DROP" == "1" ]; then
-	         ipt -A IDENT -p tcp --dport 113 -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** IDENT ** "
-		fi
-	        ipt -A IDENT -p tcp --dport 113 -j REJECT
-                if [ "$LOG_DROP" == "1" ]; then
-	         ipt -A IDENT -p tcp --sport 113 -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** IDENT ** "
-		fi
-	        ipt -A IDENT -p tcp --sport 113 -j REJECT
-                if [ "$LOG_DROP" == "1" ]; then
-	         ipt -A IDENT -p udp --dport 113 -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** IDENT ** "
-		fi
-	        ipt -A IDENT -p udp --dport 113 -j REJECT
-                if [ "$LOG_DROP" == "1" ]; then
-	         ipt -A IDENT -p udp --sport 113 -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** IDENT ** "
-		fi
-	        ipt -A IDENT -p udp --sport 113 -j REJECT
+		_log_drop ipt IDENT "-p tcp --dport 113" "** IDENT ** " "REJECT"
+		_log_drop ipt IDENT "-p tcp --sport 113" "** IDENT ** " "REJECT"
+		_log_drop ipt IDENT "-p udp --dport 113" "** IDENT ** " "REJECT"
+		_log_drop ipt IDENT "-p udp --sport 113" "** IDENT ** " "REJECT"
 		ipt -A INPUT -j IDENT
 		ipt -A OUTPUT -j IDENT
 	fi
@@ -219,14 +158,8 @@ if [ "$BLK_MCATNET" == "1" ]; then
 	eout "{blk_mcat} deny all from 224.0.0.0/8"
 	eout "{blk_mcat} deny all to 224.0.0.0/8"
 	ipt4 -N MCAST
-        if [ "$LOG_DROP" == "1" ]; then
-	 ipt4 -A MCAST -s 224.0.0.0/8 -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** MCAST ** "
-	fi
-	ipt4 -A MCAST -s 224.0.0.0/8 -j $ALL_STOP
-        if [ "$LOG_DROP" == "1" ]; then
-	 ipt4 -A MCAST -d 224.0.0.0/8 -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** MCAST ** "
-	fi
-	ipt4 -A MCAST -d 224.0.0.0/8 -j $ALL_STOP
+	_log_drop ipt4 MCAST "-s 224.0.0.0/8" "** MCAST ** " "$ALL_STOP"
+	_log_drop ipt4 MCAST "-d 224.0.0.0/8" "** MCAST ** " "$ALL_STOP"
 	ipt4 -A INPUT -j MCAST
 	ipt4 -A OUTPUT -j MCAST
 
@@ -242,14 +175,8 @@ if [ "$BLK_MCATNET" == "1" ]; then
 		ipt6 -A MCAST6 -p ipv6-icmp --icmpv6-type 134 -j RETURN
 		ipt6 -A MCAST6 -p ipv6-icmp --icmpv6-type 135 -j RETURN
 		ipt6 -A MCAST6 -p ipv6-icmp --icmpv6-type 136 -j RETURN
-		if [ "$LOG_DROP" == "1" ]; then
-			ipt6 -A MCAST6 -s ff00::/8 -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** MCAST6 ** "
-		fi
-		ipt6 -A MCAST6 -s ff00::/8 -j $ALL_STOP
-		if [ "$LOG_DROP" == "1" ]; then
-			ipt6 -A MCAST6 -d ff00::/8 -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** MCAST6 ** "
-		fi
-		ipt6 -A MCAST6 -d ff00::/8 -j $ALL_STOP
+		_log_drop ipt6 MCAST6 "-s ff00::/8" "** MCAST6 ** " "$ALL_STOP"
+		_log_drop ipt6 MCAST6 "-d ff00::/8" "** MCAST6 ** " "$ALL_STOP"
 		ipt6 -A INPUT -j MCAST6
 		ipt6 -A OUTPUT -j MCAST6
 	fi
