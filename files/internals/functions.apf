@@ -522,6 +522,20 @@ validate_config() {
         err="${err}PERMBLOCK_INTERVAL must be at least 60 seconds; "
     fi
  fi
+ # Validate SET_EXPIRE (non-negative integer; 0 = disabled)
+ if [ -n "$SET_EXPIRE" ]; then
+    if [[ ! "$SET_EXPIRE" =~ $_vc_int ]]; then
+        err="${err}SET_EXPIRE='$SET_EXPIRE' is invalid (must be a non-negative integer); "
+    fi
+ fi
+ # Validate FQDN_TIMEOUT (positive integer; passed to timeout command)
+ if [ -n "$FQDN_TIMEOUT" ]; then
+    if [[ ! "$FQDN_TIMEOUT" =~ $_vc_int ]]; then
+        err="${err}FQDN_TIMEOUT='$FQDN_TIMEOUT' is invalid (must be a positive integer); "
+    elif [ "$FQDN_TIMEOUT" == "0" ]; then
+        err="${err}FQDN_TIMEOUT='0' is invalid (must be greater than 0); "
+    fi
+ fi
  if [ -n "$err" ]; then
     eout "{glob} configuration error: $err"
     [ "$SET_VERBOSE" != "1" ] && echo "apf($$): configuration error: $err"

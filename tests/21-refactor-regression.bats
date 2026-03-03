@@ -721,6 +721,88 @@ mac_module_available() {
     apf_set_config "IFACE_UNTRUSTED" "veth-pub"
 }
 
+@test "validate_config rejects invalid connlimit entry" {
+    source /opt/tests/helpers/apf-config.sh
+    apf_set_config "IG_TCP_CLIMIT" "badentry"
+    "$APF" -f 2>/dev/null || true
+
+    run "$APF" -s
+    assert_failure
+    [[ "$output" == *"IG_TCP_CLIMIT"*"invalid"* ]]
+
+    apf_set_config "IG_TCP_CLIMIT" ""
+}
+
+@test "validate_config accepts valid connlimit entry" {
+    source /opt/tests/helpers/apf-config.sh
+    apf_set_config "IG_TCP_CLIMIT" "80:50,443:100"
+    "$APF" -f 2>/dev/null || true
+
+    run "$APF" -s
+    assert_success
+
+    apf_set_config "IG_TCP_CLIMIT" ""
+}
+
+@test "validate_config rejects connlimit entry missing colon" {
+    source /opt/tests/helpers/apf-config.sh
+    apf_set_config "IG_UDP_CLIMIT" "80-50"
+    "$APF" -f 2>/dev/null || true
+
+    run "$APF" -s
+    assert_failure
+    [[ "$output" == *"IG_UDP_CLIMIT"*"invalid"* ]]
+
+    apf_set_config "IG_UDP_CLIMIT" ""
+}
+
+@test "validate_config rejects non-numeric SET_EXPIRE" {
+    source /opt/tests/helpers/apf-config.sh
+    apf_set_config "SET_EXPIRE" "abc"
+    "$APF" -f 2>/dev/null || true
+
+    run "$APF" -s
+    assert_failure
+    [[ "$output" == *"SET_EXPIRE"*"invalid"* ]]
+
+    apf_set_config "SET_EXPIRE" "0"
+}
+
+@test "validate_config accepts SET_EXPIRE=0 (disabled)" {
+    source /opt/tests/helpers/apf-config.sh
+    apf_set_config "SET_EXPIRE" "0"
+    "$APF" -f 2>/dev/null || true
+
+    run "$APF" -s
+    assert_success
+
+    apf_set_config "SET_EXPIRE" "0"
+}
+
+@test "validate_config rejects non-numeric FQDN_TIMEOUT" {
+    source /opt/tests/helpers/apf-config.sh
+    apf_set_config "FQDN_TIMEOUT" "abc"
+    "$APF" -f 2>/dev/null || true
+
+    run "$APF" -s
+    assert_failure
+    [[ "$output" == *"FQDN_TIMEOUT"*"invalid"* ]]
+
+    apf_set_config "FQDN_TIMEOUT" "5"
+}
+
+@test "validate_config rejects FQDN_TIMEOUT=0" {
+    source /opt/tests/helpers/apf-config.sh
+    apf_set_config "FQDN_TIMEOUT" "0"
+    "$APF" -f 2>/dev/null || true
+
+    run "$APF" -s
+    assert_failure
+    [[ "$output" == *"FQDN_TIMEOUT"*"greater than 0"* ]]
+
+    apf_set_config "FQDN_TIMEOUT" "5"
+}
+
 # =====================================================================
 # trim() inode preservation (C-003)
 # =====================================================================

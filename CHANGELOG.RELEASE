@@ -261,6 +261,9 @@
 [Fix] sysctl.rules: fix wrong proc paths for secure_redirects, send_redirects,
       and proxy_arp; per-interface sysctls require conf/all/ prefix — settings
       were silently never applied due to error suppression (sysctl.rules)
+[Fix] validate_config(): add validation for SET_EXPIRE (non-negative integer)
+      and FQDN_TIMEOUT (positive integer, reject 0); prevents bash arithmetic
+      errors and silent timeout failures (functions.apf)
 [Change] trust_hosts: replace four-pass grep cascade with single-pass loop
       and delegate advanced syntax to trust_entry_rule(); eliminates ~210
       lines of duplicated field extraction and iptables logic (C-002)

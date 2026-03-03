@@ -212,6 +212,9 @@
 [Fix] sysctl.rules: fix wrong proc paths for secure_redirects, send_redirects,
       and proxy_arp; per-interface sysctls require conf/all/ prefix — settings
       were silently never applied due to error suppression (sysctl.rules)
+[Fix] validate_config(): add validation for SET_EXPIRE (non-negative integer)
+      and FQDN_TIMEOUT (positive integer, reject 0); prevents bash arithmetic
+      errors and silent timeout failures (functions.apf)
 [New] snapshot_save(): atomic fast load snapshot writes via mktemp+mv;
       validates iptables-save exit code and output (non-empty, contains
       table markers); IPv6 snapshot failure non-fatal to IPv4; backend
