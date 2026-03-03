@@ -536,6 +536,12 @@ validate_config() {
         err="${err}FQDN_TIMEOUT='0' is invalid (must be greater than 0); "
     fi
  fi
+ # Validate SET_REFRESH (non-negative integer; 0 = disabled)
+ if [ -n "$SET_REFRESH" ]; then
+    if [[ ! "$SET_REFRESH" =~ $_vc_int ]]; then
+        err="${err}SET_REFRESH='$SET_REFRESH' is invalid (must be a non-negative integer); "
+    fi
+ fi
  if [ -n "$err" ]; then
     eout "{glob} configuration error: $err"
     [ "$SET_VERBOSE" != "1" ] && echo "apf($$): configuration error: $err"
@@ -899,14 +905,14 @@ _trust_remove_advanced_entries() {
 cli_trust_remove() {
 	local DIP="$1"
 	if [ -z "$DIP" ]; then
-		echo "an FQDN or IP address is required for this option"
+		echo "an FQDN or IP address is required for this option" >&2
 		return 1
 	fi
 
 	# Advanced syntax removal
 	if [[ "$DIP" == *=* ]]; then
 		if ! valid_trust_entry "$DIP"; then
-			echo "Invalid trust entry '$DIP'"
+			echo "Invalid trust entry '$DIP'" >&2
 			return 1
 		fi
 		local found=0
@@ -940,7 +946,7 @@ cli_trust_remove() {
 	fi
 
 	if ! valid_host "$DIP"; then
-		echo "Invalid host '$DIP': must be a valid IP/IPv6 address, CIDR block, or FQDN"
+		echo "Invalid host '$DIP': must be a valid IP/IPv6 address, CIDR block, or FQDN" >&2
 		return 1
 	fi
 
@@ -963,7 +969,7 @@ cli_trust_remove() {
 	else
 		# IP/CIDR removal
 		if ! ipt_for_host "$DIP"; then
-			echo "Cannot remove '$DIP': IPv6 address but USE_IPV6 is not enabled"
+			echo "Cannot remove '$DIP': IPv6 address but USE_IPV6 is not enabled" >&2
 			return 1
 		fi
 		_trust_remove_ip_rules "$DIP"
@@ -1006,14 +1012,14 @@ cli_trust() {
  local CHAIN="$1" ACTION="$2" FILE="$3" HOST="$4" CMT="$5"
  local tlist f valtrust TIME JACTION
  if [ -z "$HOST" ]; then
-        echo "an FQDN or IP address is required for this option"
+        echo "an FQDN or IP address is required for this option" >&2
         return 1
  fi
 
  # Advanced trust syntax (contains '=')
  if [[ "$HOST" == *=* ]]; then
 	if ! valid_trust_entry "$HOST"; then
-		echo "Invalid trust entry '$HOST'"
+		echo "Invalid trust entry '$HOST'" >&2
 		return 1
 	fi
 	tlist=""
@@ -1028,13 +1034,13 @@ cli_trust() {
 	elif is_fqdn "$_VTE_IP"; then
 		# Advanced syntax with FQDN — resolve before iptables
 		if ! resolve_fqdn "$_VTE_IP"; then
-			echo "Failed to resolve FQDN '$_VTE_IP'"
+			echo "Failed to resolve FQDN '$_VTE_IP'" >&2
 			return 1
 		fi
 		local _ct_rip _ct_skip=0
 		while IFS= read -r _ct_rip; do
 			if is_local_addr "$_ct_rip"; then
-				echo "$_VTE_IP resolves to local address $_ct_rip and can not be added to the trust system"
+				echo "$_VTE_IP resolves to local address $_ct_rip and can not be added to the trust system" >&2
 				_ct_skip=1; break
 			fi
 		done <<< "$_RESOLVED_IPS"
@@ -1062,7 +1068,7 @@ cli_trust() {
 			done <<< "$_RESOLVED_IPS"
 		fi
 	elif is_local_addr "$_VTE_IP"; then
-		echo "$_VTE_IP is a local address and can not be added to the trust system"
+		echo "$_VTE_IP is a local address and can not be added to the trust system" >&2
 	else
 		TIME=$(date +"%D %H:%M:%S")
 		ADDED_EPOCH=$(date +%s)
@@ -1079,7 +1085,7 @@ cli_trust() {
 				echo "Inserted into firewall: $ACTION $_TER_DESC"
 			fi
 		else
-			echo "Failed to insert rule for '$HOST'"
+			echo "Failed to insert rule for '$HOST'" >&2
 			return 1
 		fi
 	fi
@@ -1088,7 +1094,7 @@ cli_trust() {
 
  # Bare host path (IP/CIDR/FQDN)
  if ! valid_host "$HOST"; then
-	echo "Invalid host '$HOST': must be a valid IP/IPv6 address, CIDR block, or FQDN"
+	echo "Invalid host '$HOST': must be a valid IP/IPv6 address, CIDR block, or FQDN" >&2
 	return 1
  fi
  tlist=""
@@ -1104,13 +1110,13 @@ cli_trust() {
  elif is_fqdn "$HOST"; then
 	# FQDN — resolve before iptables
 	if ! resolve_fqdn "$HOST"; then
-		echo "Failed to resolve FQDN '$HOST'"
+		echo "Failed to resolve FQDN '$HOST'" >&2
 		return 1
 	fi
 	local _ct_rip _ct_skip=0
 	while IFS= read -r _ct_rip; do
 		if is_local_addr "$_ct_rip"; then
-			echo "$HOST resolves to local address $_ct_rip and can not be added to the trust system"
+			echo "$HOST resolves to local address $_ct_rip and can not be added to the trust system" >&2
 			_ct_skip=1; break
 		fi
 	done <<< "$_RESOLVED_IPS"
@@ -1138,9 +1144,9 @@ cli_trust() {
 		fi
 	fi
  elif is_local_addr "$HOST"; then
-         echo "$HOST is a local address and can not be added to the trust system"
+         echo "$HOST is a local address and can not be added to the trust system" >&2
  elif ! ipt_for_host "$HOST"; then
-         echo "$HOST appears to be IPv6 but USE_IPV6 is not enabled"
+         echo "$HOST appears to be IPv6 but USE_IPV6 is not enabled" >&2
  else
          TIME=$(date +"%D %H:%M:%S")
 	ADDED_EPOCH=$(date +%s)
@@ -1165,30 +1171,30 @@ cli_trust_temp() {
  local CHAIN="$1" ACTION="$2" FILE="$3" HOST="$4" TTL_STR="$5" CMT="$6"
  local tlist f valtrust TIME EXPIRE_EPOCH JACTION EXPIRE_DISP
  if [ -z "$HOST" ]; then
-	echo "an FQDN or IP address is required for this option"
+	echo "an FQDN or IP address is required for this option" >&2
 	return 1
  fi
 
  # Validate entry (advanced or bare)
  if [[ "$HOST" == *=* ]]; then
 	if ! valid_trust_entry "$HOST"; then
-		echo "Invalid trust entry '$HOST'"
+		echo "Invalid trust entry '$HOST'" >&2
 		return 1
 	fi
  else
 	if ! valid_host "$HOST"; then
-		echo "Invalid host '$HOST': must be a valid IP/IPv6 address, CIDR block, or FQDN"
+		echo "Invalid host '$HOST': must be a valid IP/IPv6 address, CIDR block, or FQDN" >&2
 		return 1
 	fi
 	_VTE_IP="$HOST"
  fi
 
  if [ -z "$TTL_STR" ]; then
-	echo "a TTL value is required (e.g., 300, 5m, 1h, 7d)"
+	echo "a TTL value is required (e.g., 300, 5m, 1h, 7d)" >&2
 	return 1
  fi
  if ! parse_ttl "$TTL_STR"; then
-	echo "Invalid TTL '$TTL_STR': must be a positive number with optional suffix (s/m/h/d)"
+	echo "Invalid TTL '$TTL_STR': must be a positive number with optional suffix (s/m/h/d)" >&2
 	return 1
  fi
  tlist=""
@@ -1204,13 +1210,13 @@ cli_trust_temp() {
  elif is_fqdn "$_VTE_IP"; then
 	# FQDN (bare or in advanced syntax) — resolve before iptables
 	if ! resolve_fqdn "$_VTE_IP"; then
-		echo "Failed to resolve FQDN '$_VTE_IP'"
+		echo "Failed to resolve FQDN '$_VTE_IP'" >&2
 		return 1
 	fi
 	local _ctt_rip _ctt_skip=0
 	while IFS= read -r _ctt_rip; do
 		if is_local_addr "$_ctt_rip"; then
-			echo "$_VTE_IP resolves to local address $_ctt_rip and can not be added to the trust system"
+			echo "$_VTE_IP resolves to local address $_ctt_rip and can not be added to the trust system" >&2
 			_ctt_skip=1; break
 		fi
 	done <<< "$_RESOLVED_IPS"
@@ -1268,7 +1274,7 @@ cli_trust_temp() {
 		fi
 	fi
  elif is_local_addr "$_VTE_IP"; then
-	echo "$_VTE_IP is a local address and can not be added to the trust system"
+	echo "$_VTE_IP is a local address and can not be added to the trust system" >&2
  else
 	TIME=$(date +"%D %H:%M:%S")
 	_sanitize_comment
@@ -1283,7 +1289,7 @@ cli_trust_temp() {
 	if [[ "$HOST" == *=* ]]; then
 		# Advanced syntax — use trust_entry_rule for iptables insertion
 		if ! trust_entry_rule "$HOST" "$CHAIN" "$ACTION" "-I"; then
-			echo "Failed to insert rule for '$HOST'"
+			echo "Failed to insert rule for '$HOST'" >&2
 			return 1
 		fi
 		EXPIRE_DISP=$(date -d "@$EXPIRE_EPOCH" +"%D %H:%M:%S")
@@ -1301,7 +1307,7 @@ cli_trust_temp() {
 	else
 		# Bare host path
 		if ! ipt_for_host "$HOST"; then
-			echo "$HOST appears to be IPv6 but USE_IPV6 is not enabled"
+			echo "$HOST appears to be IPv6 but USE_IPV6 is not enabled" >&2
 			return 1
 		fi
 		_trust_action_target
@@ -1568,17 +1574,24 @@ if [ "$USE_IPV6" == "1" ] && [ -n "$IP6T" ]; then
 	echo "" >> "$iptc"
 	$IP6T $IPT_FLAGS --verbose --numeric --line-numbers --list >> "$iptc"
 fi
-echo "Opening editor"
 EDITOR_CMD=""
-for ed in pico nano vi vim; do
-	if command -v "$ed" > /dev/null 2>&1; then
-		EDITOR_CMD=$(command -v "$ed")
-		break
-	fi
-done
+if [ -n "$EDITOR" ] && command -v "$EDITOR" > /dev/null 2>&1; then
+	EDITOR_CMD=$(command -v "$EDITOR")
+else
+	for ed in pico nano vi vim; do
+		if command -v "$ed" > /dev/null 2>&1; then
+			EDITOR_CMD=$(command -v "$ed")
+			break
+		fi
+	done
+fi
 if [ -n "$EDITOR_CMD" ]; then
+	echo "Opening editor"
 	$EDITOR_CMD "$iptc"
 	command -v clear > /dev/null 2>&1 && clear
+else
+	echo "No editor found; displaying rules with pager"
+	${PAGER:-more} "$iptc"
 fi
 rm -f "$iptc"
 }
@@ -1754,7 +1767,7 @@ trust_lookup() {
 	done
 
 	if [ "$found" -eq 0 ]; then
-		echo "$host not found in any trust file."
+		echo "$host not found in any trust file." >&2
 		return 1
 	fi
 }
@@ -1872,7 +1885,7 @@ ovars() {
 search() {
  local pattern="$1"
  if [ -z "$pattern" ]; then
-  echo "usage: apf -g PATTERN"
+  echo "usage: apf -g PATTERN" >&2
   return 1
  fi
  local found=0

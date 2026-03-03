@@ -804,6 +804,33 @@ mac_module_available() {
 }
 
 # =====================================================================
+# SET_REFRESH validation (F-074)
+# =====================================================================
+
+@test "validate_config rejects non-numeric SET_REFRESH" {
+    source /opt/tests/helpers/apf-config.sh
+    apf_set_config "SET_REFRESH" "abc"
+    "$APF" -f 2>/dev/null || true
+
+    run "$APF" -s
+    assert_failure
+    [[ "$output" == *"SET_REFRESH"*"non-negative integer"* ]]
+
+    apf_set_config "SET_REFRESH" "10"
+}
+
+@test "validate_config accepts SET_REFRESH=0 (disabled)" {
+    source /opt/tests/helpers/apf-config.sh
+    apf_set_config "SET_REFRESH" "0"
+    "$APF" -f 2>/dev/null || true
+
+    run "$APF" -s
+    assert_success
+
+    apf_set_config "SET_REFRESH" "10"
+}
+
+# =====================================================================
 # trim() inode preservation (C-003)
 # =====================================================================
 

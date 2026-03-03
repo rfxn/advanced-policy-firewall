@@ -22,7 +22,7 @@ if [ -f "$CNF" ] && [ -n "$CNF" ]; then
    source "$CNF"
 else
    apf_banner
-   echo "\$CNF not found, aborting."
+   echo "\$CNF not found, aborting." >&2
    exit 1
 fi
 
@@ -274,7 +274,7 @@ case "$1" in
 	else
 		eout "{trust} $2 not found in trust system"
 		if [ "$SET_VERBOSE" != "1" ]; then
-			echo "$2 not found in trust system."
+			echo "$2 not found in trust system." >&2
 		fi
 	fi
 	;;
@@ -293,6 +293,8 @@ case "$1" in
 	if [ "$USE_IPSET" == "1" ]; then
 		mutex_lock
 		ipset_update
+	else
+		echo "ipset not enabled (USE_IPSET=0 in conf.apf)"
 	fi
 	;;
 --gre-up)

@@ -411,6 +411,18 @@
       discovery; mirrors uninstall.sh pattern (install.sh)
 [Fix] bandmin(): replace hardcoded /usr/local/bandmin paths with command -v
       discovery and directory derivation (functions.apf)
+[Fix] Redirect ~25 user-facing error messages to stderr across cli_trust(),
+      cli_trust_remove(), cli_trust_temp(), trust_lookup(), search(), and
+      apf startup; informational/success messages remain on stdout (F-027)
+      (functions.apf, apf)
+[Fix] list(): check $EDITOR env var before hardcoded editor list; fall back
+      to pager (${PAGER:-more}) when no editor found instead of silently
+      doing nothing (F-028) (functions.apf)
+[Fix] --ipset-update: add informational message when USE_IPSET=0, matching
+      existing --gre-up/--gre-down pattern (F-029) (apf)
+[New] validate_config(): validate SET_REFRESH as non-negative integer;
+      reuses existing $_vc_int regex; 0 is valid (disables refresh) (F-074)
+      (functions.apf)
 
   -- Test Suite --
 
