@@ -127,7 +127,7 @@ ipt6() {
 # both stacks apply without address restriction (0/0 is the default).
 ipt_dst() {
 	if [ -n "$VNET" ] && [ "$VNET" != "0/0" ]; then
-		ipt4 -d $VNET "$@"
+		ipt4 -d "$VNET" "$@"
 		ipt6 "$@"
 	else
 		ipt "$@"
@@ -135,7 +135,7 @@ ipt_dst() {
 }
 ipt_src() {
 	if [ -n "$VNET" ] && [ "$VNET" != "0/0" ]; then
-		ipt4 -s $VNET "$@"
+		ipt4 -s "$VNET" "$@"
 		ipt6 "$@"
 	else
 		ipt "$@"
@@ -1138,8 +1138,8 @@ cli_trust() {
 	fi
          echo "$HOST" >> "$FILE"
 	_trust_action_target
-         $IPT_H $IPT_FLAGS -I $CHAIN -s $HOST -j $JACTION
-        	$IPT_H $IPT_FLAGS -I $CHAIN -d $HOST -j $JACTION
+         $IPT_H $IPT_FLAGS -I $CHAIN -s "$HOST" -j $JACTION
+        	$IPT_H $IPT_FLAGS -I $CHAIN -d "$HOST" -j $JACTION
          eout "{trust} added $ACTION all to/from $HOST"
          if [ "$SET_VERBOSE" != "1" ]; then
 	        echo "Inserted into firewall: $ACTION all to/from $HOST"
@@ -1291,8 +1291,8 @@ cli_trust_temp() {
 			return 1
 		fi
 		_trust_action_target
-		$IPT_H $IPT_FLAGS -I $CHAIN -s $HOST -j $JACTION
-		$IPT_H $IPT_FLAGS -I $CHAIN -d $HOST -j $JACTION
+		$IPT_H $IPT_FLAGS -I $CHAIN -s "$HOST" -j $JACTION
+		$IPT_H $IPT_FLAGS -I $CHAIN -d "$HOST" -j $JACTION
 		EXPIRE_DISP=$(date -d "@$EXPIRE_EPOCH" +"%D %H:%M:%S")
 		eout "{trust} added temporary $ACTION all to/from $HOST (ttl=${_TTL_SECONDS}s, expires $EXPIRE_DISP)"
 		if [ "$SET_VERBOSE" != "1" ]; then
@@ -2044,8 +2044,8 @@ if [ -n "$_th_raw" ]; then
                          if [ -f "$file" ]; then
                           if ipt_for_host "$i"; then
                                 eout "{trust} $verb all to/from $i"
-                                $IPT_H $IPT_FLAGS -A $chain -s $i -d $ANY_ADDR -j $action_all
-                                $IPT_H $IPT_FLAGS -A $chain -d $i -s $ANY_ADDR -j $action_all
+                                $IPT_H $IPT_FLAGS -A $chain -s "$i" -d "$ANY_ADDR" -j $action_all
+                                $IPT_H $IPT_FLAGS -A $chain -d "$i" -s "$ANY_ADDR" -j $action_all
                           fi
                          fi
                         fi
@@ -2169,9 +2169,9 @@ if [ -n "$(grep -v "#" "$_dlh_file")" ]; then
 			fi
 			if ipt_for_host "$i"; then
 				if [ "$LOG_DROP" == "1" ]; then
-					$IPT_H $IPT_FLAGS -A "$_dlh_chain" -s $i -d $ANY_ADDR -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** $_dlh_prefix ** "
+					$IPT_H $IPT_FLAGS -A "$_dlh_chain" -s "$i" -d "$ANY_ADDR" -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** $_dlh_prefix ** "
 				fi
-				$IPT_H $IPT_FLAGS -A "$_dlh_chain" -s $i -d $ANY_ADDR -j $ALL_STOP
+				$IPT_H $IPT_FLAGS -A "$_dlh_chain" -s "$i" -d "$ANY_ADDR" -j $ALL_STOP
 			fi
 		fi
 	done < "$_dlh_file"
@@ -2221,7 +2221,7 @@ if [ -n "$(grep -v "#" "$ECNSHAME_HOSTS")" ]; then
 				continue
 			fi
 			if ipt_for_host "$i"; then
-				$IPT_H $IPT_FLAGS -t mangle -A POSTROUTING -p tcp -d $i -j ECN --ecn-tcp-remove
+				$IPT_H $IPT_FLAGS -t mangle -A POSTROUTING -p tcp -d "$i" -j ECN --ecn-tcp-remove
 			fi
                 fi
         done < "$ECNSHAME_HOSTS"
@@ -2560,17 +2560,22 @@ eout "{glob} loading $FNAME"
  while IFS= read -r i; do
   [[ "$i" == \#* || -z "$i" ]] && continue
   if ipt_for_host "$i"; then
-        $IPT_H $IPT_FLAGS -A INPUT -s $i -j $ALL_STOP
-	$IPT_H $IPT_FLAGS -A OUTPUT -d $i -j $ALL_STOP
+        $IPT_H $IPT_FLAGS -A INPUT -s "$i" -j $ALL_STOP
+	$IPT_H $IPT_FLAGS -A OUTPUT -d "$i" -j $ALL_STOP
   fi
  done < "$FILE"
 fi
 }
 
 bandmin() {
-if [ -f "/usr/local/bandmin/bandmin" ]; then
-        /usr/local/bandmin/bandmin >> /dev/null 2>&1
-        /usr/local/bandmin/ipaddrmap >> /dev/null 2>&1
+local _bm
+_bm=$(command -v bandmin 2>/dev/null)
+if [ -n "$_bm" ]; then
+        "$_bm" >> /dev/null 2>&1
+        local _bmdir="${_bm%/*}"
+        if [ -x "$_bmdir/ipaddrmap" ]; then
+                "$_bmdir/ipaddrmap" >> /dev/null 2>&1
+        fi
 fi
 }
 

@@ -426,3 +426,14 @@
 [New] ipset migration edge-case tests: missing ipset.rules early return,
       comment/blank-line preservation, mixed 4-field + 5-field in one pass
       (17-ipset.bats)
+[Fix] Quote unquoted variables ($i, $HOST, $VNET, $ANY_ADDR) in iptables
+      command context across firewall, functions.apf trust/dlist/dnet paths
+      (firewall, functions.apf)
+[Fix] Quote $INSTALL_PATH in apf.init start/stop/source commands (apf.init)
+[Change] vnetgen: replace 6 for-in-$(cmd) anti-patterns with pipe-into-
+      while-read loops in ifconfig fallback and ip additional-interface paths
+      (vnetgen)
+[Fix] install.sh: replace hardcoded /sbin/chkconfig with command -v
+      discovery; mirrors uninstall.sh pattern (install.sh)
+[Fix] bandmin(): replace hardcoded /usr/local/bandmin paths with command -v
+      discovery and directory derivation (functions.apf)

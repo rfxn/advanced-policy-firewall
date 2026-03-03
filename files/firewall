@@ -89,8 +89,8 @@ if [ -n "$IFACE_TRUSTED" ]; then
         eout "{glob} unable to verify status of interface $i; assuming untrusted"
  else
         eout "{glob} allow all to/from trusted interface $i"
-        ipt -A INPUT -i $i -j ACCEPT
-        ipt -A OUTPUT -o $i -j ACCEPT
+        ipt -A INPUT -i "$i" -j ACCEPT
+        ipt -A OUTPUT -o "$i" -j ACCEPT
  fi
  done
 fi
@@ -216,7 +216,7 @@ if [ "$RAB" == "1" ]; then
   if [ "$LDNS" ]; then
 	for i in $LDNS; do
 		if ipt_for_host "$i"; then
-			$IPT_H $IPT_FLAGS -I RABPSCAN -s $i -j RETURN
+			$IPT_H $IPT_FLAGS -I RABPSCAN -s "$i" -j RETURN
 		fi
 	done
   fi
@@ -275,17 +275,17 @@ LDNS=$(grep -v "#" /etc/resolv.conf | grep -w nameserver | awk '{print$2}' | gre
         if [[ "$i" == *:* ]]; then
                 # IPv6 nameserver
                 if [ "$USE_IPV6" == "1" ]; then
-                ipt6 -A INPUT -p udp -s $i --sport 53 --dport 1024:65535 -m state --state ESTABLISHED,RELATED -j ACCEPT
-                ipt6 -A INPUT -p tcp -s $i --sport 53 --dport 1024:65535 -m state --state ESTABLISHED,RELATED -j ACCEPT
-                ipt6 -A OUTPUT -p udp -d $i --dport 53 --sport 1024:65535 -j ACCEPT
-                ipt6 -A OUTPUT -p tcp -d $i --dport 53 --sport 1024:65535 -j ACCEPT
+                ipt6 -A INPUT -p udp -s "$i" --sport 53 --dport 1024:65535 -m state --state ESTABLISHED,RELATED -j ACCEPT
+                ipt6 -A INPUT -p tcp -s "$i" --sport 53 --dport 1024:65535 -m state --state ESTABLISHED,RELATED -j ACCEPT
+                ipt6 -A OUTPUT -p udp -d "$i" --dport 53 --sport 1024:65535 -j ACCEPT
+                ipt6 -A OUTPUT -p tcp -d "$i" --dport 53 --sport 1024:65535 -j ACCEPT
                 fi
         else
                 # IPv4 nameserver
-                ipt4 -A INPUT -p udp -s $i --sport 53 --dport 1024:65535 -m state --state ESTABLISHED,RELATED -j ACCEPT
-                ipt4 -A INPUT -p tcp -s $i --sport 53 --dport 1024:65535 -m state --state ESTABLISHED,RELATED -j ACCEPT
-                ipt4 -A OUTPUT -p udp -d $i --dport 53 --sport 1024:65535 -j ACCEPT
-                ipt4 -A OUTPUT -p tcp -d $i --dport 53 --sport 1024:65535 -j ACCEPT
+                ipt4 -A INPUT -p udp -s "$i" --sport 53 --dport 1024:65535 -m state --state ESTABLISHED,RELATED -j ACCEPT
+                ipt4 -A INPUT -p tcp -s "$i" --sport 53 --dport 1024:65535 -m state --state ESTABLISHED,RELATED -j ACCEPT
+                ipt4 -A OUTPUT -p udp -d "$i" --dport 53 --sport 1024:65535 -j ACCEPT
+                ipt4 -A OUTPUT -p tcp -d "$i" --dport 53 --sport 1024:65535 -j ACCEPT
         fi
         done
         if [ "$RESV_DNS_DROP" == "1" ]; then

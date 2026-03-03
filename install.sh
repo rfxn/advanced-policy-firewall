@@ -59,9 +59,9 @@ install() {
 		if [ "$INSTALL_PATH" != "/etc/apf" ]; then
 			sed -i "s:/etc/apf:$INSTALL_PATH:g" /etc/rc.d/init.d/apf
 		fi
-		if [ -f "/sbin/chkconfig" ]; then
-			/sbin/chkconfig --add apf
-			/sbin/chkconfig --level 345 apf on
+		if command -v chkconfig > /dev/null 2>&1; then
+			chkconfig --add apf
+			chkconfig --level 345 apf on
 		fi
 	elif [ -d "/etc/init.d" ]; then
 		cp -f apf.init /etc/init.d/apf
