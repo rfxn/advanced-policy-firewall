@@ -346,6 +346,12 @@
       replace inline LOG_DROP/RAB_LOG_HIT check+action patterns;
       adopted at SANITY INV, PZERO, PZERO6, SYNFLOOD, IDENT, MCAST,
       and MCAST6 blocks (functions.apf, bt.rules)
+[Change] bt.rules: unify IPv4/IPv6 sanity/frag/pzero chains via
+      _sanity_inv_rules(), _frag_udp_rules(), _pzero_rules() helpers;
+      merges separate IPv4 and IPv6 PKT_SANITY blocks into one
+      structure with parameterized ipt function and chain names;
+      preserves IPv4-only tcp-option 64/128 rules and IPv6-only
+      RAB_SANITY_FLAGS on INVALID (bt.rules)
 
   -- Test Suite --
 
