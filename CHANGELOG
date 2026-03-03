@@ -370,6 +370,10 @@
 [Change] firewall: extract _verify_iface_route() helper to deduplicate
       interface route verification for IFACE_UNTRUSTED and IFACE_TRUSTED
       (firewall)
+[Change] Document error suppression rationale: restore_external_baseline
+      non-APF chain tolerance, flush_apf_chains conditional existence
+      checks, ipset non-blocking download policy, dlist backup restore
+      policy (functions.apf)
 
   -- Test Suite --
 

@@ -1393,6 +1393,8 @@ save_external_baseline() {
 restore_external_baseline() {
 	local bdir="$INSTALL_PATH/internals"
 	local f rule
+	# Suppress: baseline rules may reference non-APF chains (Docker, k8s)
+	# that no longer exist after a selective flush
 	for f in "$bdir/.apf.input.baseline" "$bdir/.apf.output.baseline"; do
 		[ -f "$f" ] || continue
 		while IFS= read -r rule; do
@@ -1427,6 +1429,7 @@ flush_apf_chains() {
 		RESET PROHIBIT RABPSCAN TELNET_LOG SSH_LOG
 		IDENT P2P DEG SMTP_BLK SYNFLOOD IN_SANITY OUT_SANITY FRAG_UDP
 		PZERO MCAST LMAC PHP DSHIELD SDROP"
+	# Suppress: chain may not exist if not created during this load cycle
 	for chain in $apf_chains; do
 		if $IPT $IPT_FLAGS -L "$chain" -n >/dev/null 2>&1; then
 			ipt4 -F "$chain"
@@ -1440,6 +1443,7 @@ flush_apf_chains() {
 			RESET PROHIBIT RABPSCAN TELNET_LOG SSH_LOG
 			IDENT P2P PHP DSHIELD SDROP SMTP_BLK SYNFLOOD IN_SANITY6 OUT_SANITY6
 			FRAG_UDP6 PZERO6 MCAST6"
+		# Suppress: chain may not exist if not created during this load cycle
 		for chain in $apf_chains6; do
 			if $IP6T $IPT_FLAGS -L "$chain" -n >/dev/null 2>&1; then
 				ipt6 -F "$chain"
@@ -2129,6 +2133,7 @@ if download_url "$url" "$url_tmp"; then
                 fi
         done < "$url_tmp"
 else
+        # Error policy: dlist restores from backup to preserve data
         eout "{$tag} download of $url failed"
         if [ -f "$hosts_file.bk" ]; then
             cp "$hosts_file.bk" "$hosts_file"
@@ -2336,6 +2341,7 @@ _ipset_resolve_data() {
 	if [[ "$_IPE_FILE_OR_URL" =~ $_ipe_url ]]; then
 		_IPE_URL_TMP=$(mktemp "$INSTALL_PATH/.apf-XXXXXX")
 		_apf_reg_tmp "$_IPE_URL_TMP"
+		# Error policy: ipset continues with next entry (non-blocking)
 		if ! download_url "$_IPE_FILE_OR_URL" "$_IPE_URL_TMP"; then
 			eout "{ipset} download failed for $_IPE_NAME: $_IPE_FILE_OR_URL"
 			rm -f "$_IPE_URL_TMP"
