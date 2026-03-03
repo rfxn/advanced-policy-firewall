@@ -701,7 +701,7 @@ variables in conf.apf:
 
   LOG_DROP      - master toggle for firewall packet logging
   LOG_LEVEL     - syslog level for log entries (default: crit)
-  LOG_TARGET    - LOG (kernel syslog) or ULOG (ulogd userspace)
+  LOG_TARGET    - LOG (kernel syslog), NFLOG (ulogd2 nfnetlink), or ULOG (deprecated)
   LOG_IA        - log interactive access (SSH/Telnet, requires LOG_DROP="1")
   LOG_LGATE     - log foreign gateway traffic
   LOG_EXT       - extended logging (TCP/IP options in output)
@@ -823,7 +823,7 @@ Subsystems:
   --gre-down .................. tear down GRE tunnels
   --gre-status ................ show GRE tunnel status
 
-The --rules option dumps all active iptables rules to stdout in iptables-save
+The --rules option dumps all active iptables rules to stdout in iptables -S
 format, suitable for piping (e.g., apf --rules | grep DROP). The -l|--list
 option opens rules in an editor for browsing.
 
@@ -1054,7 +1054,7 @@ ipset block lists not loading?
 
 How to see what is blocked?
   Use 'apf -g IP' to search iptables rules and trust files, or
-  'apf -l | grep IP' to search loaded rules directly.
+  'apf --rules | grep IP' to search loaded rules directly.
 
 How to check if APF is running?
   Run 'apf -t' to view the status log, or 'iptables -S | head' to check

@@ -299,6 +299,12 @@
       description with help() wording (README, README.md)
 [Fix] .ca.def: sync IPT_LOCK_SUPPORT/IPT_LOCK_TIMEOUT comments with
       conf.apf (includes version range and compatibility notes)
+[Fix] Man page: --rules output format corrected from "iptables-save" to
+      "iptables -S" (apf.8)
+[Fix] conf.apf: document NFLOG as accepted LOG_TARGET value alongside LOG
+      and ULOG (conf.apf, apf.8, README)
+[Fix] README: troubleshooting corrected from 'apf -l | grep' (opens editor)
+      to 'apf --rules | grep' (stdout-pipeable) (README)
 [New] .dockerignore: exclude .git, .github, .claude, audit-output, and
       working files from Docker build context
 [Change] Makefile: override sequential tier targets (test-all, test-modern,
@@ -417,3 +423,6 @@
       with thin wrappers, replaces standalone CI with batsman reusable workflow;
       drops untested ubuntu2204 target, adds rocky10 as EXTRA tier
       (tests/Dockerfile*, tests/run-tests.sh, tests/Makefile, smoke-test.yml)
+[New] ipset migration edge-case tests: missing ipset.rules early return,
+      comment/blank-line preservation, mixed 4-field + 5-field in one pass
+      (17-ipset.bats)

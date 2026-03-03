@@ -669,7 +669,8 @@ LOG_LEVEL="crit"
 
 # Where should all the logging data be sent?
 # LOG (Default; sends logging to kernel log)
-# ULOG (deprecated; use NFLOG with ulogd2 on modern kernels)
+# NFLOG (sends logging to ulogd2 via nfnetlink on modern kernels)
+# ULOG (deprecated; use NFLOG with ulogd2 instead)
 LOG_TARGET="LOG"
 
 # Log interactive access over telnet & ssh; uses
