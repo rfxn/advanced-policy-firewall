@@ -612,9 +612,12 @@ trim() {
                 if [ -z "$CHK_SCMT" ]; then
                         MAXLINES=$((1+$MAXLINES))
                 fi
-                tail -n "$MAXLINES" "$FILE" > "$FILE.new"
-                cat "$FILE.new" > "$FILE"
-                rm -f "$FILE.new"
+                local _trim_tmp
+                _trim_tmp=$(mktemp "$(dirname "$FILE")/.trim.XXXXXX")
+                _apf_reg_tmp "$_trim_tmp"
+                tail -n "$MAXLINES" "$FILE" > "$_trim_tmp"
+                cat "$_trim_tmp" > "$FILE"
+                rm -f "$_trim_tmp"
         fi
  fi
 }
@@ -1566,6 +1569,7 @@ fi
 list() {
 echo "Loading iptables rules..."
 iptc=$(mktemp "$INSTALL_PATH/.iptrules.XXXXXX")
+_apf_reg_tmp "$iptc"
 chmod 600 "$iptc"
 $IPT $IPT_FLAGS --verbose --numeric --line-numbers --list >> "$iptc"
 if [ "$USE_IPV6" == "1" ] && [ -n "$IP6T" ]; then
@@ -2100,6 +2104,7 @@ download_url() {
     if [ -n "$WGET" ]; then
         $WGET -q -t 3 -T 10 -O "$output" "$url" >> /dev/null 2>&1 && return 0
     fi
+    eout "{glob} download failed for $url (check TLS support on legacy systems)"
     return 1
 }
 

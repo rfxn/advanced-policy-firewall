@@ -56,9 +56,10 @@ fi
 if [ -f "/etc/rc.local" ]; then
 	if grep -q "apf" /etc/rc.local 2>/dev/null; then
 		echo "Removing rc.local entry..."
-		grep -v "apf" /etc/rc.local > /tmp/.apf_rclocal_clean
-		cat /tmp/.apf_rclocal_clean > /etc/rc.local
-		rm -f /tmp/.apf_rclocal_clean
+		_tmp=$(mktemp /tmp/.apf_rclocal.XXXXXX)
+		grep -v "apf" /etc/rc.local > "$_tmp"
+		cat "$_tmp" > /etc/rc.local
+		rm -f "$_tmp"
 	fi
 fi
 

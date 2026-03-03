@@ -455,3 +455,14 @@
 [New] validate_config(): validate SET_REFRESH as non-negative integer;
       reuses existing $_vc_int regex; 0 is valid (disables refresh) (F-074)
       (functions.apf)
+[Fix] uninstall.sh: replace hardcoded /tmp/.apf_rclocal_clean with mktemp
+      for unpredictable temp file name (F-036) (uninstall.sh)
+[Fix] trim(): replace predictable $FILE.new suffix with mktemp on same
+      filesystem; register with _apf_reg_tmp for signal-safe cleanup (F-077)
+      (functions.apf)
+[Fix] list(): register mktemp file with _apf_reg_tmp for signal-safe
+      cleanup; explicit rm -f remains as belt-and-suspenders (F-013)
+      (functions.apf)
+[Change] download_url(): log TLS diagnostic hint on download failure to aid
+      troubleshooting on legacy systems with outdated TLS support (F-037)
+      (functions.apf)
