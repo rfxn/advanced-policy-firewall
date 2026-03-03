@@ -2663,6 +2663,7 @@ _parse_temp_comment() {
 expirebans() {
 local ip ban_time time_diff expire_time check_time REFRESH_TIME eff_expire line
 local _eb_date_str
+local -a _eb_expired=()
 if [ -z "$SET_EXPIRE" ]; then
         eff_expire=0
 else
@@ -2704,33 +2705,38 @@ if [ "$eff_expire" -ge "60" ]; then
                 time_diff=$(($check_time-$ban_time))
                 if [ "$time_diff" -ge "$expire_time" ]; then
                         eout "{trust} removed expired ban for $ip (${time_diff}s/${expire_time}s)"
-                        local escaped_ip="${ip//./\\.}"
-                        # Remove both the comment line and the bare IP line
-                        sed -i "\%# added ${escaped_ip} %d" "$INSTALL_PATH/deny_hosts.rules"
-                        sed -i "\%^${escaped_ip}$%d" "$INSTALL_PATH/deny_hosts.rules"
-                        cli_trust_remove "$ip" >> /dev/null 2>&1
+                        _eb_expired+=("$ip")
                 fi
          done < <(grep -vE "static|noexpire|ttl=" "$INSTALL_PATH/deny_hosts.rules" | grep -E "# added .* on ")
+         # Deferred removal: avoids modifying deny_hosts.rules while iterating;
+         # cli_trust_remove handles both iptables rules and file cleanup
+         for ip in "${_eb_expired[@]}"; do
+                cli_trust_remove "$ip" >> /dev/null 2>&1
+         done
  fi
 fi
 }
 
 expire_temp_entries() {
 	local current_time file line count=0
+	local -a _et_expired=()
 	current_time=$(date +%s)
 	for file in "$ALLOW_HOSTS" "$DENY_HOSTS"; do
 		[ -f "$file" ] || continue
 		while IFS= read -r line; do
 			_parse_temp_comment "$line"
 			if [ "$current_time" -ge "$_PTC_EPOCH" ] 2>/dev/null; then
-				local escaped_ip="${_PTC_IP//./\\.}"
-				sed -i "\%# added ${escaped_ip} .*ttl=.*expire=%d" "$file"
-				# Suppress errors: iptables rules may not exist after firewall restart
-				cli_trust_remove "$_PTC_IP" >> /dev/null 2>&1
 				eout "{trust} removed expired temp entry for $_PTC_IP"
+				_et_expired+=("$_PTC_IP")
 				count=$(($count + 1))
 			fi
 		done < <(grep "ttl=.*expire=" "$file")
+	done
+	# Deferred removal: avoids modifying trust files while iterating;
+	# cli_trust_remove handles both iptables rules and file cleanup
+	local _et_ip
+	for _et_ip in "${_et_expired[@]}"; do
+		cli_trust_remove "$_et_ip" >> /dev/null 2>&1
 	done
 	if [ "$count" -gt 0 ]; then
 		eout "{trust} expired $count temporary trust entries"
@@ -2779,17 +2785,24 @@ list_temp_entries() {
 
 flush_temp_entries() {
 	local file line count=0
+	local -a _ft_expired=()
 	for file in "$ALLOW_HOSTS" "$DENY_HOSTS"; do
 		[ -f "$file" ] || continue
 		while IFS= read -r line; do
 			_parse_temp_comment "$line"
-			# Suppress errors: iptables rules may not exist after firewall restart
-			cli_trust_remove "$_PTC_IP" >> /dev/null 2>&1
+			_ft_expired+=("$_PTC_IP")
 			count=$(($count + 1))
 		done < <(grep "ttl=.*expire=" "$file")
 		# Safety net: remove any orphaned ttl= comment lines not cleaned
 		# by per-IP cli_trust_remove (e.g., partial flush after restart)
 		sed -i '/ttl=.*expire=/d' "$file"
+	done
+	# Deferred removal: avoids modifying trust files while iterating;
+	# cli_trust_remove handles both iptables rules and file cleanup
+	local _ft_ip
+	for _ft_ip in "${_ft_expired[@]}"; do
+		# Suppress errors: iptables rules may not exist after firewall restart
+		cli_trust_remove "$_ft_ip" >> /dev/null 2>&1
 	done
 	eout "{trust} flushed $count temporary trust entries"
 	if [ "$SET_VERBOSE" != "1" ]; then
@@ -2825,7 +2838,7 @@ refresh() {
 		        eout "{glob} trust rules unchanged since last refresh, doing nothing."
 	                echo "$trusts_md5" > "$INSTALL_PATH/internals/.trusts.md5"
 		        mutex_unlock
-			exit 1
+			exit 0
 		else
 	                echo "$trusts_md5" > "$INSTALL_PATH/internals/.trusts.md5"
 		fi

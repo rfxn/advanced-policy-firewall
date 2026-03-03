@@ -374,6 +374,20 @@
       non-APF chain tolerance, flush_apf_chains conditional existence
       checks, ipset non-blocking download policy, dlist backup restore
       policy (functions.apf)
+[Fix] expirebans()/expire_temp_entries()/flush_temp_entries(): defer
+      cli_trust_remove calls until after iteration loop completes; avoids
+      modifying trust files via sed while reading them (functions.apf)
+[Fix] refresh(): exit 0 when trust rules unchanged; no-change is a
+      successful no-op, not an error (functions.apf)
+[Fix] Root importconf missing EG_DROP_CMD space-to-comma migration that
+      existed in files/extras/importconf; users upgrading from pre-2.0.2
+      now get consistent comma-separated format (importconf)
+[Change] apf_banner(): add "v2" qualifier to GPL notice to match file
+      header and license (apf)
+[Change] internals.conf: add standard copyright header block matching
+      other APF source files (internals.conf)
+[Change] Document deliberate -a/-d exit code propagation; cli_trust
+      failure now exits 1 instead of silent 0 (apf)
 
   -- Test Suite --
 
