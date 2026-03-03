@@ -182,10 +182,9 @@ if [ "$BLK_MCATNET" == "1" ]; then
 		eout "{blk_mcat} deny all to ff00::/8 (IPv6)"
 		ipt6 -N MCAST6
 		# Exempt NDP — these use ff02:: multicast destinations
-		ipt6 -A MCAST6 -p ipv6-icmp --icmpv6-type 133 -j RETURN
-		ipt6 -A MCAST6 -p ipv6-icmp --icmpv6-type 134 -j RETURN
-		ipt6 -A MCAST6 -p ipv6-icmp --icmpv6-type 135 -j RETURN
-		ipt6 -A MCAST6 -p ipv6-icmp --icmpv6-type 136 -j RETURN
+		for t in $NDP_TYPES; do
+			ipt6 -A MCAST6 -p ipv6-icmp --icmpv6-type $t -j RETURN
+		done
 		_log_drop ipt6 MCAST6 "-s ff00::/8" "** MCAST6 ** " "$ALL_STOP"
 		_log_drop ipt6 MCAST6 "-d ff00::/8" "** MCAST6 ** " "$ALL_STOP"
 		ipt6 -A INPUT -j MCAST6

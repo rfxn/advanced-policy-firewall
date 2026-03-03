@@ -352,6 +352,17 @@
       structure with parameterized ipt function and chain names;
       preserves IPv4-only tcp-option 64/128 rules and IPv6-only
       RAB_SANITY_FLAGS on INVALID (bt.rules)
+[Change] cports: extract _port_filter_loop() helper to deduplicate four
+      identical IG/EG TCP/UDP port-filtering loops into parameterized
+      calls (cports.common)
+[Change] cports: extract _uid_filter_loop() helper to deduplicate
+      EG_TCP_UID/EG_UDP_UID blocks (cports.common)
+[Change] cports: consolidate 7 separate EGF guards into single outer
+      block; reduces redundant conditional checks (cports.common)
+[Change] cports: replace hardcoded NDP type loops (133 134 135 136) with
+      $NDP_TYPES constant defined in internals.conf; adopted in
+      cports.common and bt.rules MCAST6 NDP exemption (internals.conf,
+      cports.common, bt.rules)
 
   -- Test Suite --
 
