@@ -2649,6 +2649,18 @@ cl_cports() {
 	EG_DROP_CMD=""
 }
 
+# Parse temp trust comment line: "# added IP on ... ttl=N expire=E ..."
+# Sets: _PTC_IP, _PTC_TTL, _PTC_EPOCH
+_parse_temp_comment() {
+	local line="$1"
+	_PTC_IP="${line#\# added }"
+	_PTC_IP="${_PTC_IP%% *}"
+	_PTC_TTL="${line#*ttl=}"
+	_PTC_TTL="${_PTC_TTL%% *}"
+	_PTC_EPOCH="${line#*expire=}"
+	_PTC_EPOCH="${_PTC_EPOCH%% *}"
+}
+
 expirebans() {
 local ip ban_time time_diff expire_time check_time REFRESH_TIME eff_expire line
 local _eb_date_str
@@ -2671,7 +2683,8 @@ if [ "$eff_expire" -ge "60" ]; then
                 ip="${ip%% *}"
                 [ -z "$ip" ] && continue
 
-                # Prefer structured addedtime= marker
+                # Dual-track: structured addedtime= marker preferred;
+                # legacy date --date fallback for pre-2.0.2 entries
                 if [[ "$line" == *addedtime=* ]]; then
                         ban_time="${line#*addedtime=}"
                         ban_time="${ban_time%% *}"
@@ -2704,20 +2717,18 @@ fi
 }
 
 expire_temp_entries() {
-	local current_time file ip epoch line count=0
+	local current_time file line count=0
 	current_time=$(date +%s)
 	for file in "$ALLOW_HOSTS" "$DENY_HOSTS"; do
 		[ -f "$file" ] || continue
 		while IFS= read -r line; do
-			ip="${line#\# added }"
-			ip="${ip%% *}"
-			epoch="${line#*expire=}"
-			epoch="${epoch%% *}"
-			if [ "$current_time" -ge "$epoch" ] 2>/dev/null; then
-				local escaped_ip="${ip//./\\.}"
+			_parse_temp_comment "$line"
+			if [ "$current_time" -ge "$_PTC_EPOCH" ] 2>/dev/null; then
+				local escaped_ip="${_PTC_IP//./\\.}"
 				sed -i "\%# added ${escaped_ip} .*ttl=.*expire=%d" "$file"
-				cli_trust_remove "$ip" >> /dev/null 2>&1
-				eout "{trust} removed expired temp entry for $ip"
+				# Suppress errors: iptables rules may not exist after firewall restart
+				cli_trust_remove "$_PTC_IP" >> /dev/null 2>&1
+				eout "{trust} removed expired temp entry for $_PTC_IP"
 				count=$(($count + 1))
 			fi
 		done < <(grep "ttl=.*expire=" "$file")
@@ -2728,7 +2739,7 @@ expire_temp_entries() {
 }
 
 list_temp_entries() {
-	local current_time file type ip ttl epoch cmt remaining line found=0
+	local current_time file type cmt remaining line found=0
 	current_time=$(date +%s)
 	for file in "$ALLOW_HOSTS" "$DENY_HOSTS"; do
 		[ -f "$file" ] || continue
@@ -2738,18 +2749,13 @@ list_temp_entries() {
 			type="DENY"
 		fi
 		while IFS= read -r line; do
-			ip="${line#\# added }"
-			ip="${ip%% *}"
-			ttl="${line#*ttl=}"
-			ttl="${ttl%% *}"
-			epoch="${line#*expire=}"
-			epoch="${epoch%% *}"
+			_parse_temp_comment "$line"
 			if [[ "$line" == *"with comment: "* ]]; then
 				cmt="${line#*with comment: }"
 			else
 				cmt=""
 			fi
-			remaining=$(($epoch - $current_time))
+			remaining=$(($_PTC_EPOCH - $current_time))
 			if [ "$remaining" -lt 0 ]; then
 				remaining=0
 			fi
@@ -2763,7 +2769,7 @@ list_temp_entries() {
 			else
 				disp="${remaining}s"
 			fi
-			echo "$type $ip ttl=${ttl}s remains=${disp} $cmt"
+			echo "$type $_PTC_IP ttl=${_PTC_TTL}s remains=${disp} $cmt"
 			found=1
 		done < <(grep "ttl=.*expire=" "$file")
 	done
@@ -2773,16 +2779,17 @@ list_temp_entries() {
 }
 
 flush_temp_entries() {
-	local file ip line count=0
+	local file line count=0
 	for file in "$ALLOW_HOSTS" "$DENY_HOSTS"; do
 		[ -f "$file" ] || continue
 		while IFS= read -r line; do
-			ip="${line#\# added }"
-			ip="${ip%% *}"
-			cli_trust_remove "$ip" >> /dev/null 2>&1
+			_parse_temp_comment "$line"
+			# Suppress errors: iptables rules may not exist after firewall restart
+			cli_trust_remove "$_PTC_IP" >> /dev/null 2>&1
 			count=$(($count + 1))
 		done < <(grep "ttl=.*expire=" "$file")
-		# Remove orphaned ttl= comment lines
+		# Safety net: remove any orphaned ttl= comment lines not cleaned
+		# by per-IP cli_trust_remove (e.g., partial flush after restart)
 		sed -i '/ttl=.*expire=/d' "$file"
 	done
 	eout "{trust} flushed $count temporary trust entries"
