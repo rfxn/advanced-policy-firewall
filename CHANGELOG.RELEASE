@@ -363,6 +363,13 @@
       $NDP_TYPES constant defined in internals.conf; adopted in
       cports.common and bt.rules MCAST6 NDP exemption (internals.conf,
       cports.common, bt.rules)
+[Change] ipset: extract _ipset_parse_entry() and _ipset_resolve_data()
+      helpers to deduplicate field parsing, validation, URL download, and
+      maxelem capping shared between ipset_load() and ipset_update()
+      (functions.apf)
+[Change] firewall: extract _verify_iface_route() helper to deduplicate
+      interface route verification for IFACE_UNTRUSTED and IFACE_TRUSTED
+      (firewall)
 
   -- Test Suite --
 

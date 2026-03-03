@@ -2293,12 +2293,77 @@ ipset_populate_set() {
 	rm -f "$_ips_restore"
 }
 
+# Parse and validate an ipset.rules entry line.
+# Sets: _IPE_NAME, _IPE_FLOW, _IPE_IPTYPE, _IPE_LOGFLAG, _IPE_INTERVAL,
+#       _IPE_MAXELEM, _IPE_FILE_OR_URL
+# Returns: 0 on valid entry, 1 on skip
+_ipset_parse_entry() {
+	local line="$1"
+	local _ipe_int='^[0-9]+$'
+	local _rest
+	IFS=: read -r _IPE_NAME _IPE_FLOW _IPE_IPTYPE _IPE_LOGFLAG _IPE_INTERVAL _IPE_MAXELEM _rest <<< "$line"
+	_IPE_FILE_OR_URL="$_rest"
+	[[ "$_IPE_INTERVAL" =~ $_ipe_int ]] || _IPE_INTERVAL=0
+	[[ "$_IPE_MAXELEM" =~ $_ipe_int ]] || _IPE_MAXELEM=0
+	if [ -z "$_IPE_NAME" ] || [ -z "$_IPE_FLOW" ] || [ -z "$_IPE_IPTYPE" ] || [ -z "$_IPE_LOGFLAG" ] || [ -z "$_IPE_FILE_OR_URL" ]; then
+		eout "{ipset} skipping malformed entry: $line"
+		return 1
+	fi
+	if [ "$_IPE_FLOW" != "src" ] && [ "$_IPE_FLOW" != "dst" ]; then
+		eout "{ipset} invalid flow '$_IPE_FLOW' in entry: $_IPE_NAME"
+		return 1
+	fi
+	if [ "$_IPE_IPTYPE" != "ip" ] && [ "$_IPE_IPTYPE" != "net" ]; then
+		eout "{ipset} invalid type '$_IPE_IPTYPE' in entry: $_IPE_NAME"
+		return 1
+	fi
+	if [ "$_IPE_LOGFLAG" != "0" ] && [ "$_IPE_LOGFLAG" != "1" ]; then
+		eout "{ipset} invalid log value '$_IPE_LOGFLAG' in entry: $_IPE_NAME"
+		return 1
+	fi
+	return 0
+}
+
+# Download URL (if needed), validate data file, compute maxelem.
+# Uses: _IPE_NAME, _IPE_FILE_OR_URL, _IPE_MAXELEM, _IPE_IPTYPE
+# Sets: _IPE_DATA_FILE, _IPE_URL_TMP, _IPE_HASH_TYPE, _IPE_IPSET_MAXELEM
+# Returns: 0 on success, 1 on failure (cleans up tmp on error)
+_ipset_resolve_data() {
+	local _ipe_url='^https?://'
+	_IPE_DATA_FILE=""
+	_IPE_URL_TMP=""
+	_IPE_HASH_TYPE="hash:$_IPE_IPTYPE"
+	if [[ "$_IPE_FILE_OR_URL" =~ $_ipe_url ]]; then
+		_IPE_URL_TMP=$(mktemp "$INSTALL_PATH/.apf-XXXXXX")
+		_apf_reg_tmp "$_IPE_URL_TMP"
+		if ! download_url "$_IPE_FILE_OR_URL" "$_IPE_URL_TMP"; then
+			eout "{ipset} download failed for $_IPE_NAME: $_IPE_FILE_OR_URL"
+			rm -f "$_IPE_URL_TMP"
+			_IPE_URL_TMP=""
+			return 1
+		fi
+		_IPE_DATA_FILE="$_IPE_URL_TMP"
+	else
+		_IPE_DATA_FILE="$_IPE_FILE_OR_URL"
+	fi
+	if [ ! -f "$_IPE_DATA_FILE" ] || [ ! -s "$_IPE_DATA_FILE" ]; then
+		eout "{ipset} empty or missing data for $_IPE_NAME"
+		[ -n "$_IPE_URL_TMP" ] && rm -f "$_IPE_URL_TMP"
+		_IPE_URL_TMP=""
+		return 1
+	fi
+	_IPE_IPSET_MAXELEM=1048576
+	if [ "$_IPE_MAXELEM" -gt 0 ]; then
+		_IPE_IPSET_MAXELEM="$_IPE_MAXELEM"
+		[ "$_IPE_IPSET_MAXELEM" -gt 1048576 ] && _IPE_IPSET_MAXELEM=1048576
+	fi
+	return 0
+}
+
 ipset_load() {
 if [ "$USE_IPSET" != "1" ] || [ -z "$IPSET" ]; then
 	return
 fi
-local _ils_int='^[0-9]+$'
-local _ils_url='^https?://'
 local ipset_rules="$INSTALL_PATH/ipset.rules"
 if [ ! -f "$ipset_rules" ]; then
 	return
@@ -2306,101 +2371,45 @@ fi
 ipset_migrate_rules
 eout "{ipset} loading ipset block lists"
 while IFS= read -r line; do
-	# Skip comments and blank lines
 	case "$line" in
 		\#*|"") continue ;;
 	esac
 
-	local name flow iptype logflag interval maxelem file_or_url _rest
-	IFS=: read -r name flow iptype logflag interval maxelem _rest <<< "$line"
-	# _rest contains field 7+ (may include colons in URLs)
-	file_or_url="$_rest"
-	# Default non-numeric interval/maxelem to 0
-	[[ "$interval" =~ $_ils_int ]] || interval=0
-	[[ "$maxelem" =~ $_ils_int ]] || maxelem=0
-
-	# Validate fields
-	if [ -z "$name" ] || [ -z "$flow" ] || [ -z "$iptype" ] || [ -z "$logflag" ] || [ -z "$file_or_url" ]; then
-		eout "{ipset} skipping malformed entry: $line"
-		continue
-	fi
-	if [ "$flow" != "src" ] && [ "$flow" != "dst" ]; then
-		eout "{ipset} invalid flow '$flow' in entry: $name"
-		continue
-	fi
-	if [ "$iptype" != "ip" ] && [ "$iptype" != "net" ]; then
-		eout "{ipset} invalid type '$iptype' in entry: $name"
-		continue
-	fi
-	if [ "$logflag" != "0" ] && [ "$logflag" != "1" ]; then
-		eout "{ipset} invalid log value '$logflag' in entry: $name"
-		continue
-	fi
-
-	local hash_type="hash:$iptype"
-	local data_file=""
-
-	eout "{ipset} loading set $name from $file_or_url"
-
-	# Resolve file_or_url to a local file
-	if [[ "$file_or_url" =~ $_ils_url ]]; then
-		local url_tmp
-		url_tmp=$(mktemp "$INSTALL_PATH/.apf-XXXXXX")
-		_apf_reg_tmp "$url_tmp"
-		if ! download_url "$file_or_url" "$url_tmp"; then
-			eout "{ipset} download failed for $name: $file_or_url"
-			rm -f "$url_tmp"
-			continue
-		fi
-		data_file="$url_tmp"
-	else
-		data_file="$file_or_url"
-	fi
-
-	if [ ! -f "$data_file" ] || [ ! -s "$data_file" ]; then
-		eout "{ipset} empty or missing data for $name"
-		[ -n "$url_tmp" ] && rm -f "$url_tmp"
-		continue
-	fi
-
-	# Determine effective maxelem
-	local ipset_maxelem=1048576
-	if [ "$maxelem" -gt 0 ]; then
-		ipset_maxelem="$maxelem"
-		[ "$ipset_maxelem" -gt 1048576 ] && ipset_maxelem=1048576
-	fi
+	_ipset_parse_entry "$line" || continue
+	eout "{ipset} loading set $_IPE_NAME from $_IPE_FILE_OR_URL"
+	_ipset_resolve_data || continue
 
 	# Create sets and populate with atomic swap
-	$IPSET create "$name" "$hash_type" maxelem "$ipset_maxelem" 2>/dev/null || true
-	$IPSET create "${name}-tmp" "$hash_type" maxelem "$ipset_maxelem" 2>/dev/null || true
-	$IPSET flush "${name}-tmp"
+	$IPSET create "$_IPE_NAME" "$_IPE_HASH_TYPE" maxelem "$_IPE_IPSET_MAXELEM" 2>/dev/null || true
+	$IPSET create "${_IPE_NAME}-tmp" "$_IPE_HASH_TYPE" maxelem "$_IPE_IPSET_MAXELEM" 2>/dev/null || true
+	$IPSET flush "${_IPE_NAME}-tmp"
 
-	ipset_populate_set "$name" "$ipset_maxelem" "$data_file"
+	ipset_populate_set "$_IPE_NAME" "$_IPE_IPSET_MAXELEM" "$_IPE_DATA_FILE"
 	local count="$_IPSET_COUNT"
 
-	[ -n "$url_tmp" ] && rm -f "$url_tmp"
+	[ -n "$_IPE_URL_TMP" ] && rm -f "$_IPE_URL_TMP"
 
 	if [ "$count" -eq 0 ]; then
-		eout "{ipset} no valid entries for $name, skipping"
-		$IPSET destroy "${name}-tmp" 2>/dev/null
-		$IPSET destroy "$name" 2>/dev/null
+		eout "{ipset} no valid entries for $_IPE_NAME, skipping"
+		$IPSET destroy "${_IPE_NAME}-tmp" 2>/dev/null
+		$IPSET destroy "$_IPE_NAME" 2>/dev/null
 		continue
 	fi
 
-	$IPSET swap "${name}-tmp" "$name"
-	$IPSET flush "${name}-tmp"
-	$IPSET destroy "${name}-tmp" 2>/dev/null
-	eout "{ipset} loaded $count entries into $name ($hash_type)"
-	ipset_update_timestamp "$name" "$(date +%s)"
+	$IPSET swap "${_IPE_NAME}-tmp" "$_IPE_NAME"
+	$IPSET flush "${_IPE_NAME}-tmp"
+	$IPSET destroy "${_IPE_NAME}-tmp" 2>/dev/null
+	eout "{ipset} loaded $count entries into $_IPE_NAME ($_IPE_HASH_TYPE)"
+	ipset_update_timestamp "$_IPE_NAME" "$(date +%s)"
 
 	# Create iptables chain (IPv4 only — ipset entries are IPv4-filtered)
-	ipt4 -N "IPSET_${name}" 2>/dev/null
-	if [ "$logflag" == "1" ] && [ "$LOG_DROP" == "1" ]; then
-		ipt4 -A "IPSET_${name}" -m set --match-set "$name" "$flow" -m limit --limit="${IPSET_LOG_RATE}/minute" -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** IPSET_${name} ** "
+	ipt4 -N "IPSET_${_IPE_NAME}" 2>/dev/null
+	if [ "$_IPE_LOGFLAG" == "1" ] && [ "$LOG_DROP" == "1" ]; then
+		ipt4 -A "IPSET_${_IPE_NAME}" -m set --match-set "$_IPE_NAME" "$_IPE_FLOW" -m limit --limit="${IPSET_LOG_RATE}/minute" -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** IPSET_${_IPE_NAME} ** "
 	fi
-	ipt4 -A "IPSET_${name}" -m set --match-set "$name" "$flow" -j $ALL_STOP
-	ipt4 -A INPUT -j "IPSET_${name}"
-	ipt4 -A OUTPUT -j "IPSET_${name}"
+	ipt4 -A "IPSET_${_IPE_NAME}" -m set --match-set "$_IPE_NAME" "$_IPE_FLOW" -j $ALL_STOP
+	ipt4 -A INPUT -j "IPSET_${_IPE_NAME}"
+	ipt4 -A OUTPUT -j "IPSET_${_IPE_NAME}"
 done < "$ipset_rules"
 }
 
@@ -2423,8 +2432,6 @@ ipset_update() {
 if [ "$USE_IPSET" != "1" ] || [ -z "$IPSET" ]; then
 	return
 fi
-local _ius_int='^[0-9]+$'
-local _ius_url='^https?://'
 local ipset_rules="$INSTALL_PATH/ipset.rules"
 if [ ! -f "$ipset_rules" ]; then
 	return
@@ -2435,87 +2442,50 @@ while IFS= read -r line; do
 		\#*|"") continue ;;
 	esac
 
-	local name flow iptype logflag interval maxelem file_or_url _rest
-	IFS=: read -r name flow iptype logflag interval maxelem _rest <<< "$line"
-	file_or_url="$_rest"
-	# Default non-numeric interval/maxelem to 0
-	[[ "$interval" =~ $_ius_int ]] || interval=0
-	[[ "$maxelem" =~ $_ius_int ]] || maxelem=0
-
-	if [ -z "$name" ] || [ -z "$file_or_url" ]; then
-		continue
-	fi
+	_ipset_parse_entry "$line" || continue
 
 	# Only update sets that already exist (created during full load)
-	if ! $IPSET list "$name" > /dev/null 2>&1; then
+	if ! $IPSET list "$_IPE_NAME" > /dev/null 2>&1; then
 		continue
 	fi
 
 	# Check per-list interval before downloading
-	local eff_interval="$interval"
+	local eff_interval="$_IPE_INTERVAL"
 	[ "$eff_interval" -eq 0 ] && eff_interval="${IPSET_REFRESH:-21600}"
 	local ts_file="$INSTALL_PATH/internals/.ipset.timestamps"
 	if [ -f "$ts_file" ]; then
 		local last_ts
-		last_ts=$(grep "^${name}:" "$ts_file" 2>/dev/null | tail -1)
+		last_ts=$(grep "^${_IPE_NAME}:" "$ts_file" 2>/dev/null | tail -1)
 		if [ -n "$last_ts" ]; then
 			local last_epoch="${last_ts#*:}"
 			local now_epoch
 			now_epoch=$(date +%s)
 			local elapsed=$((now_epoch - last_epoch))
 			if [ "$elapsed" -lt "$eff_interval" ]; then
-				eout "{ipset} skipping $name (refreshes in $((eff_interval - elapsed))s)"
+				eout "{ipset} skipping $_IPE_NAME (refreshes in $((eff_interval - elapsed))s)"
 				continue
 			fi
 		fi
 	fi
 
-	local hash_type="hash:$iptype"
-	local data_file=""
-	local url_tmp=""
+	eout "{ipset} updating set $_IPE_NAME from $_IPE_FILE_OR_URL"
+	_ipset_resolve_data || continue
 
-	eout "{ipset} updating set $name from $file_or_url"
+	$IPSET create "${_IPE_NAME}-tmp" "$_IPE_HASH_TYPE" maxelem "$_IPE_IPSET_MAXELEM" 2>/dev/null || true
+	$IPSET flush "${_IPE_NAME}-tmp"
 
-	if [[ "$file_or_url" =~ $_ius_url ]]; then
-		url_tmp=$(mktemp "$INSTALL_PATH/.apf-XXXXXX")
-		_apf_reg_tmp "$url_tmp"
-		if ! download_url "$file_or_url" "$url_tmp"; then
-			eout "{ipset} update download failed for $name: $file_or_url"
-			rm -f "$url_tmp"
-			continue
-		fi
-		data_file="$url_tmp"
-	else
-		data_file="$file_or_url"
-	fi
-
-	if [ ! -f "$data_file" ] || [ ! -s "$data_file" ]; then
-		[ -n "$url_tmp" ] && rm -f "$url_tmp"
-		continue
-	fi
-
-	# Determine effective maxelem
-	local ipset_maxelem=1048576
-	if [ "$maxelem" -gt 0 ]; then
-		ipset_maxelem="$maxelem"
-		[ "$ipset_maxelem" -gt 1048576 ] && ipset_maxelem=1048576
-	fi
-
-	$IPSET create "${name}-tmp" "$hash_type" maxelem "$ipset_maxelem" 2>/dev/null || true
-	$IPSET flush "${name}-tmp"
-
-	ipset_populate_set "$name" "$ipset_maxelem" "$data_file"
+	ipset_populate_set "$_IPE_NAME" "$_IPE_IPSET_MAXELEM" "$_IPE_DATA_FILE"
 	local count="$_IPSET_COUNT"
 
-	[ -n "$url_tmp" ] && rm -f "$url_tmp"
+	[ -n "$_IPE_URL_TMP" ] && rm -f "$_IPE_URL_TMP"
 
 	if [ "$count" -gt 0 ]; then
-		$IPSET swap "${name}-tmp" "$name"
-		eout "{ipset} updated $name with $count entries"
-		ipset_update_timestamp "$name" "$(date +%s)"
+		$IPSET swap "${_IPE_NAME}-tmp" "$_IPE_NAME"
+		eout "{ipset} updated $_IPE_NAME with $count entries"
+		ipset_update_timestamp "$_IPE_NAME" "$(date +%s)"
 	fi
-	$IPSET flush "${name}-tmp" 2>/dev/null
-	$IPSET destroy "${name}-tmp" 2>/dev/null
+	$IPSET flush "${_IPE_NAME}-tmp" 2>/dev/null
+	$IPSET destroy "${_IPE_NAME}-tmp" 2>/dev/null
 done < "$ipset_rules"
 }
 

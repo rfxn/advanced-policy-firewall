@@ -29,43 +29,36 @@ if [ -x "$INSTALL_PATH/hook_pre.sh" ]; then
 	. "$INSTALL_PATH/hook_pre.sh" || true
 fi
 
-if [ -n "$IF" ] && [ "$VF_ROUTE" == "1" ]; then
- for i in $IF; do
-  if [ -n "$ip" ]; then
-	VAL_IF=$($ip route show dev "$i" 2>/dev/null)
-  elif command -v route > /dev/null 2>&1; then
-	VAL_IF=$(route -n | grep -w "$i")
-  else
-	eout "{glob} neither ip nor route found; cannot verify interface $i"
-	exit 1
-  fi
-	if [ -z "$VAL_IF" ]; then
-		eout "{glob} could not verify that interface $i is routed to a network, aborting."
-	        if [ "$SET_VERBOSE" != "1" ]; then
-			echo "could not verify that interface $i is routed to a network, aborting."
+# Verify that an interface has a route to a network; abort if not.
+_verify_iface_route() {
+	local iface="$1"
+	local val=""
+	if [ -n "$ip" ]; then
+		val=$($ip route show dev "$iface" 2>/dev/null)
+	elif command -v route > /dev/null 2>&1; then
+		val=$(route -n | grep -w "$iface")
+	else
+		eout "{glob} neither ip nor route found; cannot verify interface $iface"
+		exit 1
+	fi
+	if [ -z "$val" ]; then
+		eout "{glob} could not verify that interface $iface is routed to a network, aborting."
+		if [ "$SET_VERBOSE" != "1" ]; then
+			echo "could not verify that interface $iface is routed to a network, aborting."
 		fi
 		exit 1
 	fi
- done
+}
+
+if [ -n "$IF" ] && [ "$VF_ROUTE" == "1" ]; then
+	for i in $IF; do
+		_verify_iface_route "$i"
+	done
 fi
 if [ -n "$IFACE_TRUSTED" ] && [ "$VF_ROUTE" == "1" ]; then
- for i in ${IFACE_TRUSTED//,/ }; do
-  if [ -n "$ip" ]; then
-	VAL_IFACE_TRUSTED=$($ip route show dev "$i" 2>/dev/null)
-  elif command -v route > /dev/null 2>&1; then
-	VAL_IFACE_TRUSTED=$(route -n | grep -w "$i")
-  else
-	eout "{glob} neither ip nor route found; cannot verify interface $i"
-	exit 1
-  fi
-        if [ -z "$VAL_IFACE_TRUSTED" ]; then
-                eout "{glob} could not verify that interface $i is routed to a network, aborting."
-	        if [ "$SET_VERBOSE" != "1" ]; then
-			echo "could not verify that interface $i is routed to a network, aborting."
-		fi
-                exit 1
-        fi
- done
+	for i in ${IFACE_TRUSTED//,/ }; do
+		_verify_iface_route "$i"
+	done
 fi
 
 $ip addr list "$IFACE_UNTRUSTED" | grep -w inet | grep -v inet6 | tr '/' ' ' | awk '{print$2}' > "$INSTALL_PATH/internals/.localaddrs"
