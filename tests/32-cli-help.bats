@@ -21,6 +21,12 @@ teardown_file() {
     source /opt/tests/helpers/teardown-netns.sh
 }
 
+teardown() {
+    source /opt/tests/helpers/reset-apf.sh
+    source /opt/tests/helpers/apf-config.sh
+    apf_set_interface "veth-pub" ""
+}
+
 # --- help and version ---
 
 @test "apf -h exits 0 and shows usage" {
@@ -307,4 +313,42 @@ teardown_file() {
     run "$APF" --help
     assert_success
     refute_output --partial "--temp-expire"
+}
+
+# --- validate_config: SYNCOOKIES/OVERFLOW mutual exclusion (F-047) ---
+
+@test "apf --validate rejects SYSCTL_SYNCOOKIES + SYSCTL_OVERFLOW both enabled" {
+    source /opt/tests/helpers/apf-config.sh
+    apf_set_config "SYSCTL_SYNCOOKIES" "1"
+    apf_set_config "SYSCTL_OVERFLOW" "1"
+    run "$APF" --validate
+    assert_failure
+    assert_output --partial "SYSCTL_SYNCOOKIES"
+    assert_output --partial "SYSCTL_OVERFLOW"
+}
+
+@test "apf --validate passes with only SYSCTL_SYNCOOKIES enabled" {
+    source /opt/tests/helpers/apf-config.sh
+    apf_set_config "SYSCTL_SYNCOOKIES" "1"
+    apf_set_config "SYSCTL_OVERFLOW" "0"
+    run "$APF" --validate
+    assert_success
+}
+
+# --- firewall script failure propagation (F-052) ---
+
+@test "apf -s propagates firewall script exit code on failure" {
+    source /opt/tests/helpers/apf-config.sh
+    # Inject failure at top of firewall script
+    local fw_script="$APF_DIR/firewall"
+    local fw_backup="$APF_DIR/firewall.bak"
+    cp "$fw_script" "$fw_backup"
+    sed -i '1a exit 42' "$fw_script"
+
+    run "$APF" -s
+    [ "$status" -eq 42 ]
+    assert_output --partial "firewall script failed"
+
+    # Restore firewall script
+    mv "$fw_backup" "$fw_script"
 }

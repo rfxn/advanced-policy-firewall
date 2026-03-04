@@ -113,6 +113,16 @@ setup() {
     assert_output --partial "198.51.100.12"
 }
 
+# --- Status Tests ---
+
+@test "--gre-status shows tunnel section headers" {
+    run "$APF" --gre-status
+    assert_success
+    assert_output --partial "GRE Tunnel Interfaces"
+    assert_output --partial "GRE Routes"
+    assert_output --partial "GRE Firewall Rules"
+}
+
 # --- Disable / Flush Tests ---
 
 @test "USE_GRE=0 creates no tunnels or chains" {

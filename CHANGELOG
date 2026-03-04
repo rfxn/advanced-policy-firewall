@@ -233,6 +233,13 @@
 [New] Test parallelization: --parallel [N] flag splits across N containers
 [Change] Migrate test infrastructure to batsman shared framework; 2-phase
       Docker builds, reusable CI workflow, adds rocky10 tier
+[New] Uninstall test coverage: non-existent path rejection, keep/remove
+      install dir modes, symlink/cron/man page cleanup (33-uninstall.bats)
+[New] Test coverage gap closures: SYSCTL_SYNCOOKIES/OVERFLOW mutual
+      exclusion, --gre-status output, firewall script failure propagation,
+      tosroute() mangle rules, Docker baseline file creation
+[Change] Add per-test teardown() to 21-refactor-regression.bats,
+      25-connlimit.bats, 32-cli-help.bats to prevent cascading failures
 
 - 2.0.1 | Feb 20 2026:
 

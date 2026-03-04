@@ -30,6 +30,13 @@ teardown_file() {
     source /opt/tests/helpers/teardown-netns.sh
 }
 
+teardown() {
+    "$APF" -f 2>/dev/null || true
+    source /opt/tests/helpers/reset-apf.sh
+    source /opt/tests/helpers/apf-config.sh
+    apf_set_interface "veth-pub" ""
+}
+
 # =====================================================================
 # ICMP filtering: _icmp_filter() helper (Phase 5)
 # =====================================================================
@@ -945,4 +952,27 @@ _dl_serve() {
     assert_output "fallback-content"
 
     rm -f "$dst"
+}
+
+# =====================================================================
+# tosroute() mangle table rules (F-048)
+# =====================================================================
+
+# Check if xt_TOS module is available
+tos_module_available() {
+    iptables -t mangle -A OUTPUT -p tcp --dport 9999 -j TOS --set-tos 8 2>/dev/null || return 1
+    iptables -t mangle -D OUTPUT -p tcp --dport 9999 -j TOS --set-tos 8 2>/dev/null
+    return 0
+}
+
+@test "tosroute creates mangle TOS rules for configured ports" {
+    if ! tos_module_available; then skip "xt_TOS module not available"; fi
+    source /opt/tests/helpers/apf-config.sh
+    apf_set_config "TOS_8" "80"
+
+    "$APF" -s
+
+    run iptables -t mangle -S POSTROUTING
+    assert_output --partial "dport 80"
+    assert_output --partial "TOS"
 }
