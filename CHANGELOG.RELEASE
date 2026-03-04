@@ -161,6 +161,12 @@
       discovery
 [Fix] help(): add missing -st alias to status line help text
 [Fix] trim(): exclude blank lines from data line count
+[Fix] vnetgen: strip Docker @ifN suffix from ip link output in
+      SET_ADDIFACE block; prevents duplicate VNET rules in containers
+[Fix] internals.conf: initialize IPT_FLAGS="" before conditional append
+      to prevent environment variable contamination
+[Fix] .ca.def: add missing preamble defaults for IPT_LOCK_SUPPORT and
+      IPT_LOCK_TIMEOUT; prevents unset variables on upgrade from pre-2.0.1
 
   -- Changes --
 
@@ -202,6 +208,10 @@
       legacy system troubleshooting
 [Change] nft backend detection: extract detect_ipt_backend() to eliminate
       duplicated iptables --version parsing
+[Change] conf.apf: split TCR_PASS and TCR_PORTS onto separate lines for
+      readability; aligns with .ca.def template
+[Change] Runtime file permissions: align chmod 600 to 640 for trust files
+      and log file created at runtime; matches install.sh convention
 
   -- Documentation --
 

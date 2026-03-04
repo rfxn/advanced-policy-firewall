@@ -57,7 +57,7 @@ fi
 if [ "$SET_ADDIFACE" == "1" ]; then
  ## associate a vnet rule for ip's on additional interfaces other than the main
  if [ -n "$ip" ]; then
-  $ip -o link show 2>/dev/null | awk -F': ' '{print $2}' | grep -vwE "lo|$IFACE_UNTRUSTED" | while IFS= read -r anet; do
+  $ip -o link show 2>/dev/null | awk -F': ' '{print $2}' | sed 's/@.*//' | grep -vwE "lo|$IFACE_UNTRUSTED" | while IFS= read -r anet; do
    valtif=""; [[ ",$IFACE_TRUSTED," == *,"$anet",* ]] && valtif="$anet"
    if [ -z "$valtif" ]; then
     while IFS=' ' read -r _ _ _ addr _; do
