@@ -29,7 +29,7 @@ teardown_file() {
 }
 
 @test "uninstall.sh exits 1 for non-existent INSTALL_PATH" {
-    run env INSTALL_PATH=/opt/apf-nonexistent sh "$APF_SRC/uninstall.sh"
+    run sh -c "INSTALL_PATH=/opt/apf-nonexistent sh '$APF_SRC/uninstall.sh'"
     assert_failure
     assert_output --partial "does not exist"
 }
@@ -39,7 +39,7 @@ teardown_file() {
     [ -L "/usr/local/sbin/apf" ] || skip "apf symlink not present"
 
     # Answer 'n' to both prompts (remove dir? remove logs?)
-    run sh -c "printf 'n\nn\n' | sh '$APF_SRC/uninstall.sh'"
+    run sh -c "printf 'n\nn\n' | INSTALL_PATH='$APF_DIR' sh '$APF_SRC/uninstall.sh'"
     assert_success
     assert_output --partial "Removing"
     assert_output --partial "Kept $APF_DIR"
@@ -61,7 +61,7 @@ teardown_file() {
 
 @test "uninstall.sh removes install dir and logs when answering yes" {
     # Answer 'y' to both prompts
-    run sh -c "printf 'y\ny\n' | sh '$APF_SRC/uninstall.sh'"
+    run sh -c "printf 'y\ny\n' | INSTALL_PATH='$APF_DIR' sh '$APF_SRC/uninstall.sh'"
     assert_success
     assert_output --partial "Removed $APF_DIR"
     assert_output --partial "Removed log files"
