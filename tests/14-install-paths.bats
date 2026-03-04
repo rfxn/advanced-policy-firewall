@@ -92,7 +92,9 @@ teardown_file() {
     echo "*/10 * * * * root /opt/apf/apf --refresh >> /dev/null 2>&1 &" > /etc/cron.d/refresh.apf
     [ -f "/etc/cron.d/refresh.apf" ]
     cd /opt/apf-src
-    INSTALL_PATH="$APF_DIR" sh install.sh >/dev/null 2>&1
+    # install.sh may exit non-zero in Docker (service setup fails) — tolerate it;
+    # we're testing the cron file removal side effect, not install.sh exit code
+    INSTALL_PATH="$APF_DIR" sh install.sh >/dev/null 2>&1 || true
     [ ! -f "/etc/cron.d/refresh.apf" ]
 }
 
@@ -104,7 +106,8 @@ teardown_file() {
     echo "*/5 * * * * root /opt/apf/apf -f >> /dev/null 2>&1" > /etc/cron.d/apf_develmode
     [ -f "/etc/cron.d/apf_develmode" ]
     cd /opt/apf-src
-    INSTALL_PATH="$APF_DIR" sh install.sh >/dev/null 2>&1
+    # install.sh may exit non-zero in Docker (service setup fails) — tolerate it
+    INSTALL_PATH="$APF_DIR" sh install.sh >/dev/null 2>&1 || true
     [ ! -f "/etc/cron.d/apf_develmode" ]
 }
 
