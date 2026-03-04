@@ -2058,6 +2058,8 @@ if [ -n "$_th_raw" ]; then
         eout "{glob} loading $file"
         local ter_action
         if [ "$verb" == "allow" ]; then ter_action="ALLOW"; else ter_action="DENY"; fi
+        # Batch buffers for iptables-restore --noflush
+        local _th_rf4="" _th_rf6=""
         while IFS= read -r i; do
                 [ -z "$i" ] && continue
                 if [[ "$i" != *=* ]]; then
@@ -2071,10 +2073,18 @@ if [ -n "$_th_raw" ]; then
                           local _th_rip
                           while IFS= read -r _th_rip; do
                            if ! is_local_addr "$_th_rip"; then
-                            if ipt_for_host "$_th_rip"; then
+                            if [[ "$_th_rip" == *:* ]]; then
+                                if [ "$USE_IPV6" == "1" ]; then
+                                    eout "{trust} $verb all to/from $i (resolved: $_th_rip)"
+                                    _th_rf6="${_th_rf6}-A $chain -s $_th_rip -d ::/0 -j $action_all
+-A $chain -d $_th_rip -s ::/0 -j $action_all
+"
+                                fi
+                            else
                                 eout "{trust} $verb all to/from $i (resolved: $_th_rip)"
-                                $IPT_H $IPT_FLAGS -A $chain -s "$_th_rip" -d $ANY_ADDR -j $action_all
-                                $IPT_H $IPT_FLAGS -A $chain -d "$_th_rip" -s $ANY_ADDR -j $action_all
+                                _th_rf4="${_th_rf4}-A $chain -s $_th_rip -d 0/0 -j $action_all
+-A $chain -d $_th_rip -s 0/0 -j $action_all
+"
                             fi
                            fi
                           done <<< "$_RESOLVED_IPS"
@@ -2083,10 +2093,18 @@ if [ -n "$_th_raw" ]; then
                          fi
                         elif ! is_local_addr "$i"; then
                          if [ -f "$file" ]; then
-                          if ipt_for_host "$i"; then
+                          if [[ "$i" == *:* ]]; then
+                                if [ "$USE_IPV6" == "1" ]; then
+                                    eout "{trust} $verb all to/from $i"
+                                    _th_rf6="${_th_rf6}-A $chain -s $i -d ::/0 -j $action_all
+-A $chain -d $i -s ::/0 -j $action_all
+"
+                                fi
+                          else
                                 eout "{trust} $verb all to/from $i"
-                                $IPT_H $IPT_FLAGS -A $chain -s "$i" -d "$ANY_ADDR" -j $action_all
-                                $IPT_H $IPT_FLAGS -A $chain -d "$i" -s "$ANY_ADDR" -j $action_all
+                                _th_rf4="${_th_rf4}-A $chain -s $i -d 0/0 -j $action_all
+-A $chain -d $i -s 0/0 -j $action_all
+"
                           fi
                          fi
                         fi
@@ -2095,6 +2113,13 @@ if [ -n "$_th_raw" ]; then
                         _trust_hosts_advanced "$i" "$chain" "$ter_action" "$verb"
                 fi
         done <<< "$_th_raw"
+        # Apply batched rules via iptables-restore --noflush
+        if [ -n "$_th_rf4" ] && [ -n "$IPTR" ]; then
+                printf '*filter\n%sCOMMIT\n' "$_th_rf4" | $IPTR --noflush
+        fi
+        if [ -n "$_th_rf6" ] && [ "$USE_IPV6" == "1" ] && [ -n "$IP6TR" ]; then
+                printf '*filter\n%sCOMMIT\n' "$_th_rf6" | $IP6TR --noflush
+        fi
 fi
 }
 
