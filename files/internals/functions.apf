@@ -388,6 +388,16 @@ check_deps() {
   warn="$warn getent(fqdn-trust)"
  fi
 
+ # Warn: conflicting firewall services
+ if command -v systemctl > /dev/null 2>&1; then
+  if systemctl is-active firewalld > /dev/null 2>&1; then
+   warn="$warn firewalld(conflict)"
+  fi
+  if systemctl is-active ufw > /dev/null 2>&1; then
+   warn="$warn ufw(conflict)"
+  fi
+ fi
+
  # Emit warnings (non-fatal)
  if [ -n "$warn" ]; then
   eout "{glob} missing optional dependencies:$warn"
@@ -826,16 +836,35 @@ trust_entry_rule() {
 	_TER_DESC="${dir_desc}${proto_desc}${pip} ${flow_desc} port ${port}"
 	_TER_DIR="$dir"
 
-	# Apply rule(s)
+	# Build rule string(s)
+	local _ter_r1 _ter_r2=""
 	if [ -n "$proto" ]; then
-		# Single protocol
 		local jtarget
 		if [ "$proto" == "tcp" ]; then jtarget="$action_tcp"; else jtarget="$action_udp"; fi
-		$IPT_H $IPT_FLAGS $mode $chain -p $proto -m multiport -$ipflow $pip --$pflag $port -j $jtarget
+		_ter_r1="$mode $chain -p $proto -m multiport -$ipflow $pip --$pflag $port -j $jtarget"
 	else
-		# Both protocols
-		$IPT_H $IPT_FLAGS $mode $chain -p tcp -m multiport -$ipflow $pip --$pflag $port -j $action_tcp
-		$IPT_H $IPT_FLAGS $mode $chain -p udp -m multiport -$ipflow $pip --$pflag $port -j $action_udp
+		_ter_r1="$mode $chain -p tcp -m multiport -$ipflow $pip --$pflag $port -j $action_tcp"
+		_ter_r2="$mode $chain -p udp -m multiport -$ipflow $pip --$pflag $port -j $action_udp"
+	fi
+
+	# Apply: buffer for batch restore or execute immediately
+	if [ -n "$_TER_BUFFER_MODE" ]; then
+		if [ "$IPT_H" == "$IP6T" ]; then
+			_th_rf6="${_th_rf6}${_ter_r1}
+"
+			[ -n "$_ter_r2" ] && _th_rf6="${_th_rf6}${_ter_r2}
+"
+		else
+			_th_rf4="${_th_rf4}${_ter_r1}
+"
+			[ -n "$_ter_r2" ] && _th_rf4="${_th_rf4}${_ter_r2}
+"
+		fi
+	else
+		# shellcheck disable=SC2086
+		$IPT_H $IPT_FLAGS $_ter_r1
+		# shellcheck disable=SC2086
+		[ -n "$_ter_r2" ] && $IPT_H $IPT_FLAGS $_ter_r2
 	fi
 	return 0
 }
@@ -1246,13 +1275,7 @@ cli_trust_temp() {
 						echo "Inserted into firewall: temporary $ACTION $_TER_DESC (ttl=${_TTL_SECONDS}s, expires $EXPIRE_DISP)"
 					fi
 				fi
-				# Block escalation per resolved IP
-				if [ "$PERMBLOCK_COUNT" -gt 0 ] && [ "$ACTION" == "DENY" ]; then
-					record_block "$_ctt_rip"
-					if check_block_escalation "$_ctt_rip"; then
-						escalate_to_permanent "$_ctt_rip"
-					fi
-				fi
+				_maybe_block_escalate "$_ctt_rip" "$ACTION"
 			done <<< "$_RESOLVED_IPS"
 		else
 			# Bare FQDN
@@ -1262,13 +1285,7 @@ cli_trust_temp() {
 					$IPT_H $IPT_FLAGS -I $CHAIN -s "$_ctt_rip" -j $JACTION
 					$IPT_H $IPT_FLAGS -I $CHAIN -d "$_ctt_rip" -j $JACTION
 				fi
-				# Block escalation per resolved IP
-				if [ "$PERMBLOCK_COUNT" -gt 0 ] && [ "$ACTION" == "DENY" ]; then
-					record_block "$_ctt_rip"
-					if check_block_escalation "$_ctt_rip"; then
-						escalate_to_permanent "$_ctt_rip"
-					fi
-				fi
+				_maybe_block_escalate "$_ctt_rip" "$ACTION"
 			done <<< "$_RESOLVED_IPS"
 			eout "{trust} added temporary $ACTION all to/from $HOST (resolved: $_ctt_csv, ttl=${_TTL_SECONDS}s, expires $EXPIRE_DISP)"
 			if [ "$SET_VERBOSE" != "1" ]; then
@@ -1300,13 +1317,7 @@ cli_trust_temp() {
 		if [ "$SET_VERBOSE" != "1" ]; then
 			echo "Inserted into firewall: temporary $ACTION $_TER_DESC (ttl=${_TTL_SECONDS}s, expires $EXPIRE_DISP)"
 		fi
-		# Block escalation uses extracted IP
-		if [ "$PERMBLOCK_COUNT" -gt 0 ] && [ "$ACTION" == "DENY" ]; then
-			record_block "$_TER_IP"
-			if check_block_escalation "$_TER_IP"; then
-				escalate_to_permanent "$_TER_IP"
-			fi
-		fi
+		_maybe_block_escalate "$_TER_IP" "$ACTION"
 	else
 		# Bare host path
 		if ! ipt_for_host "$HOST"; then
@@ -1321,13 +1332,7 @@ cli_trust_temp() {
 		if [ "$SET_VERBOSE" != "1" ]; then
 			echo "Inserted into firewall: temporary $ACTION all to/from $HOST (ttl=${_TTL_SECONDS}s, expires $EXPIRE_DISP)"
 		fi
-		# Block escalation: record and check for auto-promotion
-		if [ "$PERMBLOCK_COUNT" -gt 0 ] && [ "$ACTION" == "DENY" ]; then
-			record_block "$HOST"
-			if check_block_escalation "$HOST"; then
-				escalate_to_permanent "$HOST"
-			fi
-		fi
+		_maybe_block_escalate "$HOST" "$ACTION"
 	fi
  fi
 }
@@ -1397,6 +1402,16 @@ escalate_to_permanent() {
 	# Remove from block history (escalation complete)
 	local history_file="$INSTALL_PATH/internals/.block_history"
 	sed -i "\%^${escaped_ip}|%d" "$history_file"
+}
+
+_maybe_block_escalate() {
+	local ip="$1" action="$2"
+	if [ "$PERMBLOCK_COUNT" -gt 0 ] && [ "$action" == "DENY" ]; then
+		record_block "$ip"
+		if check_block_escalation "$ip"; then
+			escalate_to_permanent "$ip"
+		fi
+	fi
 }
 
 save_external_baseline() {
@@ -2034,6 +2049,7 @@ local file="$1"
 local chain="$2"
 local action_all="$3" action_tcp="$4" action_udp="$5" verb="$6"
 local i
+local _TER_BUFFER_MODE=1
 load_local_addrs
 if [ -z "$file" ] || [ -z "$chain" ]; then
         eout "{trust} could not process trust_hosts $file $chain, fatal error, aborting!"
@@ -2048,6 +2064,8 @@ if [ -n "$_th_raw" ]; then
         eout "{glob} loading $file"
         local ter_action
         if [ "$verb" == "allow" ]; then ter_action="ALLOW"; else ter_action="DENY"; fi
+        # Batch buffers for iptables-restore --noflush
+        local _th_rf4="" _th_rf6=""
         while IFS= read -r i; do
                 [ -z "$i" ] && continue
                 if [[ "$i" != *=* ]]; then
@@ -2061,10 +2079,18 @@ if [ -n "$_th_raw" ]; then
                           local _th_rip
                           while IFS= read -r _th_rip; do
                            if ! is_local_addr "$_th_rip"; then
-                            if ipt_for_host "$_th_rip"; then
+                            if [[ "$_th_rip" == *:* ]]; then
+                                if [ "$USE_IPV6" == "1" ]; then
+                                    eout "{trust} $verb all to/from $i (resolved: $_th_rip)"
+                                    _th_rf6="${_th_rf6}-A $chain -s $_th_rip -d ::/0 -j $action_all
+-A $chain -d $_th_rip -s ::/0 -j $action_all
+"
+                                fi
+                            else
                                 eout "{trust} $verb all to/from $i (resolved: $_th_rip)"
-                                $IPT_H $IPT_FLAGS -A $chain -s "$_th_rip" -d $ANY_ADDR -j $action_all
-                                $IPT_H $IPT_FLAGS -A $chain -d "$_th_rip" -s $ANY_ADDR -j $action_all
+                                _th_rf4="${_th_rf4}-A $chain -s $_th_rip -d 0/0 -j $action_all
+-A $chain -d $_th_rip -s 0/0 -j $action_all
+"
                             fi
                            fi
                           done <<< "$_RESOLVED_IPS"
@@ -2073,10 +2099,18 @@ if [ -n "$_th_raw" ]; then
                          fi
                         elif ! is_local_addr "$i"; then
                          if [ -f "$file" ]; then
-                          if ipt_for_host "$i"; then
+                          if [[ "$i" == *:* ]]; then
+                                if [ "$USE_IPV6" == "1" ]; then
+                                    eout "{trust} $verb all to/from $i"
+                                    _th_rf6="${_th_rf6}-A $chain -s $i -d ::/0 -j $action_all
+-A $chain -d $i -s ::/0 -j $action_all
+"
+                                fi
+                          else
                                 eout "{trust} $verb all to/from $i"
-                                $IPT_H $IPT_FLAGS -A $chain -s "$i" -d "$ANY_ADDR" -j $action_all
-                                $IPT_H $IPT_FLAGS -A $chain -d "$i" -s "$ANY_ADDR" -j $action_all
+                                _th_rf4="${_th_rf4}-A $chain -s $i -d 0/0 -j $action_all
+-A $chain -d $i -s 0/0 -j $action_all
+"
                           fi
                          fi
                         fi
@@ -2085,6 +2119,13 @@ if [ -n "$_th_raw" ]; then
                         _trust_hosts_advanced "$i" "$chain" "$ter_action" "$verb"
                 fi
         done <<< "$_th_raw"
+        # Apply batched rules via iptables-restore --noflush
+        if [ -n "$_th_rf4" ] && [ -n "$IPTR" ]; then
+                printf '*filter\n%sCOMMIT\n' "$_th_rf4" | $IPTR --noflush
+        fi
+        if [ -n "$_th_rf6" ] && [ "$USE_IPV6" == "1" ] && [ -n "$IP6TR" ]; then
+                printf '*filter\n%sCOMMIT\n' "$_th_rf6" | $IP6TR --noflush
+        fi
 fi
 }
 
@@ -2596,18 +2637,6 @@ eout "{glob} loading $FNAME"
 	$IPT_H $IPT_FLAGS -A OUTPUT -d "$i" -j $ALL_STOP
   fi
  done < "$FILE"
-fi
-}
-
-bandmin() {
-local _bm
-_bm=$(command -v bandmin 2>/dev/null)
-if [ -n "$_bm" ]; then
-        "$_bm" >> /dev/null 2>&1
-        local _bmdir="${_bm%/*}"
-        if [ -x "$_bmdir/ipaddrmap" ]; then
-                "$_bmdir/ipaddrmap" >> /dev/null 2>&1
-        fi
 fi
 }
 

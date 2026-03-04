@@ -36,8 +36,7 @@ install() {
 	rm -f /etc/cron.hourly/fw /etc/cron.daily/fw /etc/cron.d/fwdev "$INSTALL_PATH/cron.fwdev"
 	# Clean up legacy cron entries (pre-2.0.2 used separate files)
 	rm -f /etc/cron.daily/apf /etc/cron.d/apf_ipset /etc/cron.d/apf_temp
-	# Clean up runtime-created cron entries (recreated by apf -s as needed)
-	rm -f /etc/cron.d/refresh.apf /etc/cron.d/apf_develmode
+	# Runtime cron entries (refresh.apf, apf_develmode) already cleaned pre-backup
 	# Consolidated cron: daily restart, hourly ipset refresh, per-minute temp expiry
 	if [ -d "/etc/cron.d" ] && [ -f "cron.d.apf" ]; then
 		cp cron.d.apf /etc/cron.d/apf
@@ -74,6 +73,22 @@ install() {
 			if [ -z "$val" ]; then
 				echo "$INSTALL_PATH/apf -s >> /dev/null 2>&1" >> /etc/rc.local
 			fi
+		fi
+	fi
+	# Disable conflicting firewall services (firewalld, ufw)
+	# These manage iptables/nftables independently and conflict with APF
+	if command -v systemctl > /dev/null 2>&1; then
+		if systemctl is-active firewalld > /dev/null 2>&1; then
+			systemctl stop firewalld > /dev/null 2>&1
+			systemctl disable firewalld > /dev/null 2>&1
+			echo "  Note: firewalld was active and has been stopped and disabled."
+			echo "        APF manages iptables directly; firewalld cannot coexist."
+		fi
+		if systemctl is-active ufw > /dev/null 2>&1; then
+			systemctl stop ufw > /dev/null 2>&1
+			systemctl disable ufw > /dev/null 2>&1
+			echo "  Note: ufw was active and has been stopped and disabled."
+			echo "        APF manages iptables directly; ufw cannot coexist."
 		fi
 	fi
 	if [ -f "/var/log/apf_log" ]; then
@@ -134,8 +149,13 @@ show_iface_info() {
 }
 
 VER=$(awk '/version/ {print$2}' files/VERSION)
+# Pre-install cleanup: remove runtime-created cron entries before backup
+# These are recreated by apf -s as needed; must happen before backup to
+# ensure cleanup even if backup step fails (e.g., rapid re-installs)
+rm -f /etc/cron.d/refresh.apf /etc/cron.d/apf_develmode
 if [ -d "$INSTALL_PATH" ]; then
 	DVAL=$(date +"%d%m%Y-%s")
+	rm -rf "$INSTALL_PATH.bk$DVAL"
 	cp -R "$INSTALL_PATH" "$INSTALL_PATH.bk$DVAL" || { echo "Backup failed, aborting."; exit 1; }
 	rm -f "$INSTALL_PATH.bk.last"
 	ln -fs "$INSTALL_PATH.bk$DVAL" "${INSTALL_PATH}.bk.last"

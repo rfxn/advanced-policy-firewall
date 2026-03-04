@@ -8,7 +8,7 @@ IG_UDP_CLIMIT="${IG_UDP_CLIMIT:-}"
 SYNFLOOD="${SYNFLOOD:-0}"
 SYNFLOOD_RATE="${SYNFLOOD_RATE:-100/s}"
 SYNFLOOD_BURST="${SYNFLOOD_BURST:-150}"
-DOCKER_COMPAT="${DOCKER_COMPAT:-0}"
+DOCKER_COMPAT="${DOCKER_COMPAT:-auto}"
 IG_ICMPV6_TYPES="${IG_ICMPV6_TYPES:-1,2,3,4,128,129}"
 EG_ICMPV6_TYPES="${EG_ICMPV6_TYPES:-all}"
 USE_IPSET="${USE_IPSET:-0}"
@@ -23,7 +23,7 @@ SYSCTL_CONNTRACK_ADAPTIVE="${SYSCTL_CONNTRACK_ADAPTIVE:-0}"
 SYSCTL_CONNTRACK_INCREMENT="${SYSCTL_CONNTRACK_INCREMENT:-65536}"
 SYSCTL_CONNTRACK_HIGH="${SYSCTL_CONNTRACK_HIGH:-1048576}"
 SYSCTL_CONNTRACK_BUCKETS="${SYSCTL_CONNTRACK_BUCKETS:-16384}"
-IPT_LOCK_SUPPORT="${IPT_LOCK_SUPPORT:-0}"
+IPT_LOCK_SUPPORT="${IPT_LOCK_SUPPORT:-auto}"
 IPT_LOCK_TIMEOUT="${IPT_LOCK_TIMEOUT:-3}"
 PERMBLOCK_COUNT="${PERMBLOCK_COUNT:-0}"
 PERMBLOCK_INTERVAL="${PERMBLOCK_INTERVAL:-86400}"
@@ -34,7 +34,7 @@ DLIST_RESERVED_URL="${DLIST_RESERVED_URL:-https://cdn.rfxn.com/downloads/reserve
 DLIST_ECNSHAME_URL="${DLIST_ECNSHAME_URL:-https://cdn.rfxn.com/downloads/ecnshame.lst}"
 
 cat > .conf.apf <<EOF
-#!/bin/sh
+#!/bin/bash
 #
 ##
 # Advanced Policy Firewall (APF) v2.0.2
@@ -76,8 +76,8 @@ USE_IPV6="$USE_IPV6"
 SET_VERBOSE="$SET_VERBOSE"
 
 # The fast load feature makes use of the iptables-save/restore facilities to do
-# a snapshot save of the current firewall rules on an APF stop then when APF is
-# instructed to start again it will restore the snapshot. This feature allows
+# a snapshot save of the current firewall rules after a full start and before a
+# flush, then when APF is instructed to start again it will restore the snapshot. This feature allows
 # APF to load hundreds of rules back into the firewall without the need to
 # regenerate every firewall entry. 
 # Note: a) if system uptime is 10 minutes or less, the snapshot is expired
@@ -115,12 +115,15 @@ SET_MONOKERN="$SET_MONOKERN"
 # by Docker, containerd, Kubernetes, Podman, or other software that manages
 # the FORWARD chain and nat table. This also disables fast load, since
 # iptables-restore would overwrite external chains.
-# Note: This applies to any software using FORWARD/nat -- not just Docker.
+# "auto" = detect at startup (checks for DOCKER-USER chain in iptables)
+# "1"    = force enable
+# "0"    = force disable
 DOCKER_COMPAT="$DOCKER_COMPAT"
 
 # The expiry interval, in seconds, that bans will be expired out of the trust
 # system. This only applies to local bans from deny_hosts.rules and not global
-# import rules. Must not be less than SET_REFRESH in seconds (e.g., 10 min = 600s).
+# import rules. If less than SET_REFRESH (in seconds), the effective value is
+# automatically raised to match (e.g., 10 min = 600s).
 # [value in seconds, 0 to disable, recommended 600]
 SET_EXPIRE="$SET_EXPIRE"
 
@@ -707,7 +710,8 @@ LOG_LEVEL="$LOG_LEVEL"
 
 # Where should all the logging data be sent?
 # LOG (Default; sends logging to kernel log)
-# ULOG (deprecated; use NFLOG with ulogd2 on modern kernels)
+# NFLOG (sends logging to ulogd2 via nfnetlink on modern kernels)
+# ULOG (deprecated; use NFLOG with ulogd2 instead)
 LOG_TARGET="$LOG_TARGET"
 
 # Log interactive access over telnet & ssh; uses
@@ -731,12 +735,13 @@ LOG_RATE="$LOG_RATE"
 # sends outputs to this file
 LOG_APF="$LOG_APF"
 
-# Adds -w flag to iptables to enable locking support. Available on
-# iptables >= 1.4.20 (RHEL/CentOS 7+, Debian 8+, Ubuntu 14.04+).
-# Recommended to enable on modern systems; default "0" preserves
-# compatibility with CentOS 6 / RHEL 6 (iptables 1.4.7, no -w support).
+# iptables locking support (-w flag). Prevents lock contention when
+# multiple processes issue iptables commands concurrently.
+# "auto" = detect at startup (recommended; probes iptables --help for -w)
+# "1"    = force enable (fails on iptables < 1.4.20, e.g., CentOS 6)
+# "0"    = force disable (no -w flag added)
 IPT_LOCK_SUPPORT="$IPT_LOCK_SUPPORT"
-# Seconds to wait for iptables lock before giving up (requires above = 1)
+# Seconds to wait for iptables lock before giving up
 IPT_LOCK_TIMEOUT="$IPT_LOCK_TIMEOUT"
 
 ##
