@@ -76,6 +76,22 @@ install() {
 			fi
 		fi
 	fi
+	# Disable conflicting firewall services (firewalld, ufw)
+	# These manage iptables/nftables independently and conflict with APF
+	if command -v systemctl > /dev/null 2>&1; then
+		if systemctl is-active firewalld > /dev/null 2>&1; then
+			systemctl stop firewalld > /dev/null 2>&1
+			systemctl disable firewalld > /dev/null 2>&1
+			echo "  Note: firewalld was active and has been stopped and disabled."
+			echo "        APF manages iptables directly; firewalld cannot coexist."
+		fi
+		if systemctl is-active ufw > /dev/null 2>&1; then
+			systemctl stop ufw > /dev/null 2>&1
+			systemctl disable ufw > /dev/null 2>&1
+			echo "  Note: ufw was active and has been stopped and disabled."
+			echo "        APF manages iptables directly; ufw cannot coexist."
+		fi
+	fi
 	if [ -f "/var/log/apf_log" ]; then
 		mv -f /var/log/apf_log /var/log/apf_log.prev
 	fi

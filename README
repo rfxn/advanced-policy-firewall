@@ -217,6 +217,12 @@ is verified and you are ready for persistent operation.
 A comprehensive man page is installed automatically; run 'man apf' for a
 complete CLI and configuration reference.
 
+On RHEL 7+/CentOS 7+/Fedora systems, the installer automatically detects and
+disables firewalld if it is running. On Ubuntu/Debian systems with ufw active,
+ufw is likewise stopped and disabled. APF manages iptables directly and cannot
+coexist with these services. If firewalld or ufw is started after APF is
+installed, APF will warn at startup via check_deps().
+
 2.1) Installation: Boot Loading
 On installation APF will install a systemd service unit (apf.service) on
 systems with systemd, or an init script to /etc/init.d/apf on older systems,

@@ -388,6 +388,16 @@ check_deps() {
   warn="$warn getent(fqdn-trust)"
  fi
 
+ # Warn: conflicting firewall services
+ if command -v systemctl > /dev/null 2>&1; then
+  if systemctl is-active firewalld > /dev/null 2>&1; then
+   warn="$warn firewalld(conflict)"
+  fi
+  if systemctl is-active ufw > /dev/null 2>&1; then
+   warn="$warn ufw(conflict)"
+  fi
+ fi
+
  # Emit warnings (non-fatal)
  if [ -n "$warn" ]; then
   eout "{glob} missing optional dependencies:$warn"

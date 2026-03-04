@@ -79,6 +79,9 @@
       modprobe; non-fatal for chroot/container builds
 [New] install.sh: auto-detect default network interface on fresh install;
       show interface and listening port details during install and upgrade
+[New] install.sh: auto-detect and disable conflicting firewall services
+      (firewalld, ufw) during installation; check_deps() runtime warning
+      when conflict detected post-install; CentOS 6 safe (no systemctl)
 
   -- Bug Fixes --
 
