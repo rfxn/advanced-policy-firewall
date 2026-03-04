@@ -1833,7 +1833,7 @@ help() {
 	echo "Diagnostics:"
 	echo "  -g PATTERN, --search ........ search iptables/ipset rules & trust files"
 	echo "  --validate, --check ......... validate config without starting firewall"
-	echo "  --dump-config ............... output all configuration variables"
+	echo "  -o, --dump-config ........... output all configuration variables"
 	echo "  -v, --version ............... output version number"
 	echo "  -h, --help .................. show this help message"
 	echo ""

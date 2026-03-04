@@ -40,8 +40,8 @@ USE_IPV6="0"
 SET_VERBOSE="1"
 
 # The fast load feature makes use of the iptables-save/restore facilities to do
-# a snapshot save of the current firewall rules on an APF stop then when APF is
-# instructed to start again it will restore the snapshot. This feature allows
+# a snapshot save of the current firewall rules after a full start and before a
+# flush, then when APF is instructed to start again it will restore the snapshot. This feature allows
 # APF to load hundreds of rules back into the firewall without the need to
 # regenerate every firewall entry. 
 # Note: a) if system uptime is 10 minutes or less, the snapshot is expired
@@ -84,7 +84,8 @@ DOCKER_COMPAT="0"
 
 # The expiry interval, in seconds, that bans will be expired out of the trust
 # system. This only applies to local bans from deny_hosts.rules and not global
-# import rules. Must not be less than SET_REFRESH in seconds (e.g., 10 min = 600s).
+# import rules. If less than SET_REFRESH (in seconds), the effective value is
+# automatically raised to match (e.g., 10 min = 600s).
 # [value in seconds, 0 to disable, recommended 600]
 SET_EXPIRE="0"
 

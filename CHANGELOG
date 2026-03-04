@@ -215,6 +215,15 @@
 [Fix] FLOW: add missing SYNFLOOD entry to INPUT chain precedence table
 [Fix] conf.apf: document NFLOG as accepted LOG_TARGET value alongside LOG
       and ULOG
+[Fix] help(): add missing -o short form for --dump-config
+[Fix] apf.8 SYNOPSIS: add missing -u, -o, --validate, --templ/--tempf,
+      --lookup, --ipset-update, --gre-up/--gre-down/--gre-status
+[Fix] conf.apf: correct SET_FASTLOAD comment (snapshot saved after full
+      start and before flush, not on stop)
+[Fix] conf.apf: correct SET_EXPIRE comment (silent clamp to SET_REFRESH,
+      not a hard constraint)
+[Fix] firewall: simplify EGF output policy branch — remove redundant
+      -z test and elif (dead code)
 
   -- Test Suite --
 

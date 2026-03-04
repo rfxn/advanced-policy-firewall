@@ -350,14 +350,14 @@ tosroute POSTROUTING
 . "$POSTRT"
 
 # Default Output Policies
-if [ "$EGF" != "1" ] || [ -z "$EGF" ]; then
-        ipt -A OUTPUT -j ACCEPT
-        eout "{glob} default (egress) output accept"
-elif [ "$EGF" == "1" ]; then
+if [ "$EGF" == "1" ]; then
 	ipt -A OUTPUT -p tcp -j $TCP_STOP
 	ipt -A OUTPUT -p udp -j $UDP_STOP
-        ipt -A OUTPUT -p all -j $ALL_STOP
-        eout "{glob} default (egress) output drop"
+	ipt -A OUTPUT -p all -j $ALL_STOP
+	eout "{glob} default (egress) output drop"
+else
+	ipt -A OUTPUT -j ACCEPT
+	eout "{glob} default (egress) output accept"
 fi
 
 # Default Input Policies

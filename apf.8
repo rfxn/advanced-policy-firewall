@@ -8,19 +8,29 @@
 apf \- Advanced Policy Firewall
 .SH SYNOPSIS
 .B apf
-.RB [ \-s | \-r | \-f | \-l | \-t | \-e | \-v | \-h | \-\-rules | \-\-info | \-\-lookup ]
+.RB [ \-s | \-r | \-f | \-l | \-t | \-e | \-o | \-v | \-h | \-\-rules | \-\-info | \-\-validate ]
 .br
 .B apf
 .RB { \-a | \-d }
 .IR HOST\  [ COMMENT ]
 .br
 .B apf
+.B \-u
+.I HOST
+.br
+.B apf
 .RB { \-ta | \-td }
 .IR HOST\  TTL\  [ COMMENT ]
 .br
 .B apf
-.B \-g
+.RB [ \-\-templ | \-\-tempf ]
+.br
+.B apf
+.RB { \-\-lookup | \-g }
 .I PATTERN
+.br
+.B apf
+.RB [ \-\-ipset\-update | \-\-gre\-up | \-\-gre\-down | \-\-gre\-status ]
 .SH DESCRIPTION
 Advanced Policy Firewall (APF) is an iptables/netfilter\-based firewall
 management system for Linux servers.
