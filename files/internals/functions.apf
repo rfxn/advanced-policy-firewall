@@ -1256,13 +1256,7 @@ cli_trust_temp() {
 						echo "Inserted into firewall: temporary $ACTION $_TER_DESC (ttl=${_TTL_SECONDS}s, expires $EXPIRE_DISP)"
 					fi
 				fi
-				# Block escalation per resolved IP
-				if [ "$PERMBLOCK_COUNT" -gt 0 ] && [ "$ACTION" == "DENY" ]; then
-					record_block "$_ctt_rip"
-					if check_block_escalation "$_ctt_rip"; then
-						escalate_to_permanent "$_ctt_rip"
-					fi
-				fi
+				_maybe_block_escalate "$_ctt_rip" "$ACTION"
 			done <<< "$_RESOLVED_IPS"
 		else
 			# Bare FQDN
@@ -1272,13 +1266,7 @@ cli_trust_temp() {
 					$IPT_H $IPT_FLAGS -I $CHAIN -s "$_ctt_rip" -j $JACTION
 					$IPT_H $IPT_FLAGS -I $CHAIN -d "$_ctt_rip" -j $JACTION
 				fi
-				# Block escalation per resolved IP
-				if [ "$PERMBLOCK_COUNT" -gt 0 ] && [ "$ACTION" == "DENY" ]; then
-					record_block "$_ctt_rip"
-					if check_block_escalation "$_ctt_rip"; then
-						escalate_to_permanent "$_ctt_rip"
-					fi
-				fi
+				_maybe_block_escalate "$_ctt_rip" "$ACTION"
 			done <<< "$_RESOLVED_IPS"
 			eout "{trust} added temporary $ACTION all to/from $HOST (resolved: $_ctt_csv, ttl=${_TTL_SECONDS}s, expires $EXPIRE_DISP)"
 			if [ "$SET_VERBOSE" != "1" ]; then
@@ -1310,13 +1298,7 @@ cli_trust_temp() {
 		if [ "$SET_VERBOSE" != "1" ]; then
 			echo "Inserted into firewall: temporary $ACTION $_TER_DESC (ttl=${_TTL_SECONDS}s, expires $EXPIRE_DISP)"
 		fi
-		# Block escalation uses extracted IP
-		if [ "$PERMBLOCK_COUNT" -gt 0 ] && [ "$ACTION" == "DENY" ]; then
-			record_block "$_TER_IP"
-			if check_block_escalation "$_TER_IP"; then
-				escalate_to_permanent "$_TER_IP"
-			fi
-		fi
+		_maybe_block_escalate "$_TER_IP" "$ACTION"
 	else
 		# Bare host path
 		if ! ipt_for_host "$HOST"; then
@@ -1331,13 +1313,7 @@ cli_trust_temp() {
 		if [ "$SET_VERBOSE" != "1" ]; then
 			echo "Inserted into firewall: temporary $ACTION all to/from $HOST (ttl=${_TTL_SECONDS}s, expires $EXPIRE_DISP)"
 		fi
-		# Block escalation: record and check for auto-promotion
-		if [ "$PERMBLOCK_COUNT" -gt 0 ] && [ "$ACTION" == "DENY" ]; then
-			record_block "$HOST"
-			if check_block_escalation "$HOST"; then
-				escalate_to_permanent "$HOST"
-			fi
-		fi
+		_maybe_block_escalate "$HOST" "$ACTION"
 	fi
  fi
 }
@@ -1407,6 +1383,16 @@ escalate_to_permanent() {
 	# Remove from block history (escalation complete)
 	local history_file="$INSTALL_PATH/internals/.block_history"
 	sed -i "\%^${escaped_ip}|%d" "$history_file"
+}
+
+_maybe_block_escalate() {
+	local ip="$1" action="$2"
+	if [ "$PERMBLOCK_COUNT" -gt 0 ] && [ "$action" == "DENY" ]; then
+		record_block "$ip"
+		if check_block_escalation "$ip"; then
+			escalate_to_permanent "$ip"
+		fi
+	fi
 }
 
 save_external_baseline() {

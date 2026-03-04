@@ -226,6 +226,8 @@
       readability; aligns with .ca.def template
 [Change] Runtime file permissions: align chmod 600 to 640 for trust files
       and log file created at runtime; matches install.sh convention
+[Change] cli_trust_temp(): extract _maybe_block_escalate() helper to replace
+      4 repeated inline block-escalation blocks
 
   -- Documentation --
 
