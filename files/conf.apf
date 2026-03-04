@@ -697,12 +697,13 @@ LOG_RATE="30"
 # sends outputs to this file
 LOG_APF="/var/log/apf_log"
 
-# Adds -w flag to iptables to enable locking support. Available on
-# iptables >= 1.4.20 (RHEL/CentOS 7+, Debian 8+, Ubuntu 14.04+).
-# Recommended to enable on modern systems; default "0" preserves
-# compatibility with CentOS 6 / RHEL 6 (iptables 1.4.7, no -w support).
-IPT_LOCK_SUPPORT="0"
-# Seconds to wait for iptables lock before giving up (requires above = 1)
+# iptables locking support (-w flag). Prevents lock contention when
+# multiple processes issue iptables commands concurrently.
+# "auto" = detect at startup (recommended; probes iptables --help for -w)
+# "1"    = force enable (fails on iptables < 1.4.20, e.g., CentOS 6)
+# "0"    = force disable (no -w flag added)
+IPT_LOCK_SUPPORT="auto"
+# Seconds to wait for iptables lock before giving up
 IPT_LOCK_TIMEOUT="3"
 
 ##

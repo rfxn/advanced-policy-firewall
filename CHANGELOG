@@ -82,6 +82,10 @@
 [New] install.sh: auto-detect and disable conflicting firewall services
       (firewalld, ufw) during installation; check_deps() runtime warning
       when conflict detected post-install; CentOS 6 safe (no systemctl)
+[New] IPT_LOCK_SUPPORT="auto": auto-detect iptables -w lock support at
+      startup by probing iptables --help; CentOS 6 (1.4.7, no -w) safely
+      resolves to disabled; explicit "0"/"1" still honored; .ca.def
+      preamble defaults to "auto" for fresh installs and pre-2.0.1 upgrades
 
   -- Bug Fixes --
 

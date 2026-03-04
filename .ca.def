@@ -23,7 +23,7 @@ SYSCTL_CONNTRACK_ADAPTIVE="${SYSCTL_CONNTRACK_ADAPTIVE:-0}"
 SYSCTL_CONNTRACK_INCREMENT="${SYSCTL_CONNTRACK_INCREMENT:-65536}"
 SYSCTL_CONNTRACK_HIGH="${SYSCTL_CONNTRACK_HIGH:-1048576}"
 SYSCTL_CONNTRACK_BUCKETS="${SYSCTL_CONNTRACK_BUCKETS:-16384}"
-IPT_LOCK_SUPPORT="${IPT_LOCK_SUPPORT:-0}"
+IPT_LOCK_SUPPORT="${IPT_LOCK_SUPPORT:-auto}"
 IPT_LOCK_TIMEOUT="${IPT_LOCK_TIMEOUT:-3}"
 PERMBLOCK_COUNT="${PERMBLOCK_COUNT:-0}"
 PERMBLOCK_INTERVAL="${PERMBLOCK_INTERVAL:-86400}"
@@ -731,12 +731,13 @@ LOG_RATE="$LOG_RATE"
 # sends outputs to this file
 LOG_APF="$LOG_APF"
 
-# Adds -w flag to iptables to enable locking support. Available on
-# iptables >= 1.4.20 (RHEL/CentOS 7+, Debian 8+, Ubuntu 14.04+).
-# Recommended to enable on modern systems; default "0" preserves
-# compatibility with CentOS 6 / RHEL 6 (iptables 1.4.7, no -w support).
+# iptables locking support (-w flag). Prevents lock contention when
+# multiple processes issue iptables commands concurrently.
+# "auto" = detect at startup (recommended; probes iptables --help for -w)
+# "1"    = force enable (fails on iptables < 1.4.20, e.g., CentOS 6)
+# "0"    = force disable (no -w flag added)
 IPT_LOCK_SUPPORT="$IPT_LOCK_SUPPORT"
-# Seconds to wait for iptables lock before giving up (requires above = 1)
+# Seconds to wait for iptables lock before giving up
 IPT_LOCK_TIMEOUT="$IPT_LOCK_TIMEOUT"
 
 ##
