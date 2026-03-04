@@ -4,465 +4,232 @@
 
 [New] SYN flood protection: SYNFLOOD chain rate-limits inbound TCP SYN packets
       via iptables limit module; configurable rate/burst thresholds, LOG +
-      DROP for excess, dual-stack support (conf.apf, bt.rules, .ca.def)
+      DROP for excess, dual-stack support
 [New] SMTP outbound blocking: SMTP_BLOCK restricts outbound SMTP (ports 25,
       465, 587) to whitelisted users/groups; root always allowed;
       SMTP_ALLOWUSER/SMTP_ALLOWGROUP exemptions with runtime --gid-owner
-      detection; works independently of EGF toggle (conf.apf, cports.common)
+      detection; works independently of EGF toggle
 [New] Temporary allow/deny with per-entry TTL: apf -ta/-td HOST TTL adds
       time-limited trust entries; supports seconds/minutes/hours/days (300,
       5m, 1h, 7d); automatic cron expiry; list with --templ, flush with
       --tempf; block escalation auto-promotes repeat temp denies to permanent
-      via PERMBLOCK_COUNT/PERMBLOCK_INTERVAL (apf, functions.apf, conf.apf,
-      cron.d.apf, .ca.def)
+      via PERMBLOCK_COUNT/PERMBLOCK_INTERVAL
 [New] Custom hook scripts: hook_pre.sh/hook_post.sh sourced before/after
       iptables rules; activated by chmod 750; all APF variables available;
-      preserved across upgrades (firewall, importconf)
+      preserved across upgrades
 [New] Silent IP blocking: silent_ips.rules drops all traffic to/from listed
       addresses with no logging; IPv4/IPv6 supported; entries validated with
-      valid_host(); preserved across upgrades (firewall, importconf)
+      valid_host(); preserved across upgrades
 [New] Search CLI: apf -g PATTERN searches iptables rules (IPv4/IPv6), ipset
-      sets, and trust files; case-insensitive (apf, functions.apf)
+      sets, and trust files; case-insensitive
 [New] Per-port connection limiting via xt_connlimit: IG_TCP_CLIMIT and
       IG_UDP_CLIMIT config variables with port:limit pairs, port range
-      support, and VNET per-IP binding (conf.apf, cports.common)
+      support, and VNET per-IP binding
 [New] ipset 7-field format: per-list refresh interval and max entry count;
       IPSET_REFRESH global default; per-list interval tracking via
       .ipset.timestamps; backward-compatible auto-migration from 4-field
-      and 5-field formats (functions.apf, ipset.rules, conf.apf)
+      and 5-field formats
 [New] download_url(): unified download helper with curl primary, wget
       fallback; redirect following, 10s connect / 60s total timeout, 3
       retries; all download sites migrated; check_deps() warns when
-      neither available (functions.apf)
+      neither available
 [New] Advanced trust syntax in CLI: apf -a/-d/-ta/-td/-u now accept
       proto:flow:port:ip format (e.g., "tcp:in:d=22:s=10.0.0.0/8") for
       protocol/direction/port-scoped trust rules; live iptables insertion
       via trust_entry_rule(); bare IP removal also removes advanced entries
       containing that IP; duplicate detection, IPv6 bracket syntax, port
-      ranges, and temp trust TTL markers all supported (functions.apf)
-[New] validate_config(): startup validation for TCP_STOP/UDP_STOP/ALL_STOP
-      stop targets, SYNFLOOD rate/burst format, connlimit entry syntax, and
-      SYSCTL_SYNCOOKIES/SYSCTL_OVERFLOW conflict; clear error messages
-      instead of cryptic iptables failures (functions.apf, apf)
+      ranges, and temp trust TTL markers all supported
+[New] validate_config(): startup config validation covers stop targets,
+      rate/burst formats, connlimit syntax, SYSCTL_SYNCOOKIES conflict,
+      IFACE_UNTRUSTED, RAB_PSCAN_LEVEL/HITCOUNT/TIMER, LOG_LEVEL/TARGET/RATE,
+      ICMP_LIM, SET_EXPIRE, FQDN_TIMEOUT, SET_REFRESH,
+      PERMBLOCK_COUNT/INTERVAL, and SYSCTL_CONNTRACK; clear error messages
+      instead of cryptic iptables failures
 [New] FQDN pre-resolution in trust system: hostnames are resolved to IP
       addresses via getent before loading into iptables; supports multiple
       A/AAAA records, IPv6 (when USE_IPV6=1), configurable timeout via
       FQDN_TIMEOUT; resolved= metadata in trust file comments enables
       removal without DNS; refresh (apf -e) re-resolves FQDNs; works in
-      CLI (-a/-d/-ta/-td/-u) and bulk load (functions.apf, conf.apf,
-      internals.conf, .ca.def; 20 tests)
+      CLI (-a/-d/-ta/-td/-u) and bulk load
 [New] --rules: dump active iptables rules to stdout for piping/scripting;
       uses -S format consistent across nft/legacy backends; includes IPv6
-      when USE_IPV6=1 (apf, functions.apf)
+      when USE_IPV6=1
 [New] --info: firewall status summary with sections for status (active state,
       rules, chains), trust system (allow/deny/temp counts, ban expiry, block
       escalation, FQDN resolution), filtering (stop targets, inbound/outbound
       ports, packet sanity, connlimit, SYN flood, SMTP blocking), subsystems
       (fast load, RAB, VNET, Docker compat, ipset, GRE, remote block lists),
       and logging (log file, log drops, trim, recent entries)
-      (apf, functions.apf)
 [New] --lookup HOST: check if host exists in trust files (allow, deny, global
       allow, global deny) without searching iptables/ipset rules; exits 0 if
-      found, 1 if not found (apf, functions.apf)
+      found, 1 if not found
 [New] -h/--help: explicit help handler exits 0; previously no args exited 1
-      (apf)
-[New] --validate/--check: validate config without starting firewall; checks
-      stop targets, rate formats, connlimit syntax (apf, functions.apf)
+[New] --validate/--check: validate config without starting firewall
 [New] --list-allow/--list-deny (--la/--ld): display trust file entries with
-      comments and blank lines stripped (apf, functions.apf)
-[New] --dump-config: self-documenting alias for -o/--ovars (apf)
+      comments and blank lines stripped
+[New] --dump-config: self-documenting alias for -o/--ovars
+[New] snapshot_save(): atomic fast load snapshot writes via mktemp+mv;
+      validates iptables-save exit code and output; IPv6 snapshot failure
+      non-fatal to IPv4; backend marker tracking for nft/legacy compatibility
+[New] Ban expiry: structured addedtime=EPOCH markers in permanent trust
+      entries for reliable expiry; backward-compatible with pre-2.0.2 entries
+[New] uninstall.sh: removes all system-wide artifacts; prompts before
+      removing install directory and logs
+[New] install.sh: post-install dependency warnings for iptables, ip,
+      modprobe; non-fatal for chroot/container builds
+[New] install.sh: auto-detect default network interface on fresh install;
+      show interface and listening port details during install and upgrade
 
   -- Bug Fixes --
 
-[Fix] install.sh: fix chmod -R 640 breaking subdirectory traversal;
-      use find to set dirs=750, files=640, then explicit executable perms
-      (install.sh)
-[Fix] install.sh: suppress "Device does not exist" stderr from vnetgen
-      during install (install.sh)
-[Fix] importconf: guard vnet/*.rules glob to prevent "cannot stat" error
-      on fresh or non-VNET installs (importconf, files/extras/importconf)
-[Fix] importconf: suppress stderr noise from conf.apf sourcing during
-      config import (importconf, files/extras/importconf)
-[Fix] files/extras/importconf: use INSTALL_PATH variable default pattern
-      (files/extras/importconf)
-[New] install.sh: auto-detect default network interface on fresh install;
-      sets IFACE_UNTRUSTED when not eth0 (install.sh)
-[New] install.sh: show default routed interface and additional interfaces
-      during install; contextual output when no default route found
-      (install.sh)
-[Change] importconf: clarify message on same-version reinstall
-      (importconf, files/extras/importconf)
-[Change] install.sh: optimize sed path replacement with grep -rl
-      pre-filter; skip files that don't contain /etc/apf (install.sh)
-[Change] install.sh: add error handling for mkdir and file copy
-      (install.sh)
-[Change] install.sh: remove unnecessary sleep 1 (install.sh)
-[Fix] cli_trust_remove(): anchor comment cleanup sed pattern to prevent
-      over-deletion; '# added 192.0.2.1 ' no longer matches 192.0.2.10
-      (functions.apf)
-[Fix] cli_trust(): change duplicate check from grep -Fw to grep -Fx for
-      exact full-line match; prevents FQDN substring false positives
-      (functions.apf)
-[Fix] check_block_escalation(): anchor grep pattern with ^ and escape dots
-      to prevent IP prefix collisions in block history (functions.apf)
-[Fix] escalate_to_permanent(): anchor sed patterns to comment format, use
-      % delimiter for CIDR safety, replace subprocesses with bash parameter
-      expansion (functions.apf)
-[Fix] expire_temp_entries(): anchor sed pattern to '# added IP ' prefix to
-      prevent substring over-deletion of temp trust comments (functions.apf)
-[Fix] cli_trust_remove(): spec-based iptables rule deletion replaces racy
-      line-number approach; tracks removal status and returns 1 when host
-      not found (functions.apf)
+[Fix] install.sh: fix directory permissions (find-based dirs=750, files=640),
+      suppress vnetgen stderr, verify source files before install, remove
+      unsafe pre-install rm -rf
+[Fix] importconf: guard vnet/*.rules glob, suppress stderr, fix
+      INSTALL_PATH default, preserve custom files and hook permissions
+      during upgrade
+[Fix] importconf: migrate EG_DROP_CMD from space-separated to
+      comma-separated format in root and extras importconf
+[Fix] Anchor grep/sed patterns across trust, expiry, and block escalation
+      functions to prevent IP substring collisions; escape dots in IP
+      addresses, use exact-match flags
+[Fix] cli_trust_remove(): spec-based iptables rule deletion with removal
+      tracking; anchored comment cleanup; reject empty argument
 [Fix] lgate_mac(): use $VF_LGATE instead of undefined $LGATE_MAC; gateway
-      MAC filtering was non-functional (functions.apf)
+      MAC filtering was non-functional
 [Fix] expirebans(): fix $ip loop variable shadowing global iproute2 path;
-      replace unquoted array expansion with IFS read to prevent globbing;
-      add date parse error handling; skip ttl= entries (functions.apf)
+      replace unquoted array expansion with IFS read; add date parse error
+      handling; skip ttl= entries; fix orphaned comment cleanup
+[Fix] expirebans()/expire_temp_entries()/flush_temp_entries(): defer
+      cli_trust_remove calls until after iteration to avoid modifying trust
+      files while reading
 [Fix] ipset_migrate_rules(): add 5-field (v2.0.1) to 7-field migration;
-      5-field entries were silently dropped on upgrade (functions.apf)
+      5-field entries were silently dropped on upgrade
 [Fix] glob_allow_download()/glob_deny_download(): validate entries with
-      valid_host() instead of raw file copy (functions.apf)
-[Fix] Escape dots in IP addresses used in sed patterns across
-      cli_trust_remove(), expirebans(), expire_temp_entries() (functions.apf)
-[Fix] importconf: preserve preroute.rules/postroute.rules and hook script
-      permissions during upgrade (importconf)
+      valid_host() instead of raw file copy
 [Fix] SMTP_BLK: add chain-exists guard for VNET re-sourcing; add to Docker
-      compat flush chain list; warn on empty SMTP_PORTS (cports.common,
-      functions.apf)
-[Fix] .ca.def preamble: add missing defaults for SYSCTL_CONNTRACK_*,
-      DOCKER_COMPAT, IG_ICMPV6_TYPES, EG_ICMPV6_TYPES; prevents empty
-      values on upgrade from pre-2.0.1 (.ca.def)
-[Fix] Bash 4.2+ ${var,,}/${var^^} reverted to tr-based case conversion for
-      CentOS 6 compatibility (cports.common, internals.conf)
-[Fix] Fast load IPv4 restore failure now flushes partial rules before
-      falling through to full load, matching IPv6 failure behavior (apf)
-[Fix] Unknown CLI options now exit with code 1 instead of 0 (apf)
-[Fix] Quote $INSTALL_PATH in 32+ locations across apf, firewall, and
-      functions.apf to handle paths with spaces
+      compat flush chain list; warn on empty SMTP_PORTS
+[Fix] .ca.def: add missing preamble defaults for SYSCTL_CONNTRACK_*,
+      DOCKER_COMPAT, IG_ICMPV6_TYPES, EG_ICMPV6_TYPES; preserve DLIST_*_URL
+      customizations on upgrade
+[Fix] Fast load: validate snapshots before iptables-restore; flush partial
+      rules on restore failure; check firewall exit code to prevent saving
+      broken state; skip snapshot save on failure
+[Fix] Unknown CLI options now exit with code 1 instead of 0
+[Fix] Quote shell variables in iptables command context, dot-source paths,
+      and config references across apf, firewall, functions.apf, sysctl.rules,
+      internals.conf, and apf.init
 [Fix] Strip control characters from trust comment field to prevent line
-      injection in allow/deny hosts files (functions.apf)
-[Fix] install.sh: cd to script directory and verify source files before
-      installing; remove pre-install rm -rf to prevent data loss on failure
-      (install.sh)
+      injection in allow/deny hosts files
 [Fix] refresh(): populate REFRESH_TEMP from trust files instead of
-      iptables-save parsing; move temp file creation past MD5 early-exit
-      to prevent orphaned files (functions.apf)
+      iptables-save parsing; move temp file creation past MD5 early-exit;
+      exit 0 when trust rules unchanged
 [Fix] flush(): remove /etc/cron.d/refresh.apf on firewall stop; prevents
-      refresh into a stopped firewall (functions.apf)
-[Fix] Add missing local declarations to 10 functions to prevent global
-      scope pollution (functions.apf)
-[Fix] Rename head() to apf_banner() to stop shadowing /usr/bin/head in
-      sourced scripts (apf)
+      refresh into a stopped firewall
+[Fix] Cron lifecycle: clean runtime-created refresh.apf and apf_develmode
+      cron entries during install and uninstall
+[Fix] Rename head() to apf_banner() to stop shadowing /usr/bin/head; add
+      "v2" qualifier to GPL notice
 [Fix] Propagate cli_trust/cli_trust_temp return codes to CLI exit status;
-      apf -a/-d/-ta/-td now exit 1 on failure (apf)
+      apf -a/-d/-ta/-td now exit 1 on failure
 [Fix] REFRESH_TEMP now protects bare IPv6 trust entries during refresh;
-      change case filter from *:* to *=* so IPv6 addresses are not
-      excluded while advanced trust entries remain correctly skipped
-      (functions.apf)
-[Fix] Install FLOW document to doc/ directory alongside README; resolves
-      missing file referenced by README documentation (install.sh)
-[Fix] Migrate EG_DROP_CMD from space-separated (pre-2.0.2) to
-      comma-separated format during upgrade via importconf (importconf)
-[Fix] install.sh: display detected listening ports during upgrade installs;
-      previously only shown on fresh installs (install.sh)
-[Fix] validate_config(): add validation for ICMP_LIM (rate format), LOG_LEVEL,
-      LOG_TARGET, LOG_RATE (integer), SYSCTL_CONNTRACK (integer); reject
-      non-numeric PERMBLOCK_COUNT/PERMBLOCK_INTERVAL (functions.apf)
-[Fix] validate_config(): reject empty IFACE_UNTRUSTED, invalid RAB_PSCAN_LEVEL,
-      non-numeric RAB_HITCOUNT/RAB_TIMER, RAB_TIMER=0, SYNFLOOD_BURST=0, and
-      LOG_RATE=0; RAB checks gated on RAB=1; defense-in-depth default branch
-      in firewall RAB_PSCAN_LEVEL case (functions.apf, firewall)
-[Fix] cl_cports(): clear EG_DROP_CMD between VNET iterations; prevents
-      command-owner rules from leaking across per-IP rule files (functions.apf)
-[Fix] cli_trust_remove(): reject empty argument with error message; prevents
-      confusing double output when apf -u called with no host (functions.apf)
-[Fix] Quote $IFACE_UNTRUSTED in sysctl.rules redirect paths and internals.conf
-      ip addr list calls; aligns with project variable quoting convention
-      (sysctl.rules, internals.conf)
-[Fix] logrotate: add copytruncate directive to preserve log file inode for
-      external tail -f consumers (logrotate.d.apf)
-[Fix] trim(): replace mv with cat+rm to preserve file inode; prevents inode
-      change when trust files are trimmed (functions.apf)
-[Change] trust_hosts(): cache file content in single read; tighten pass 3/4
-      grep filters to target only 4-field and 5-field entries respectively;
-      eliminates redundant file reads (functions.apf)
-[Fix] Replace deprecated -a test operator with && in OpenVZ detection
-      (internals.conf)
-[Fix] Quote all dot-source paths to prevent word splitting on paths with
-      spaces (internals.conf, firewall, conf.apf, vnetgen.def)
-[Fix] Hoist local declarations out of loops in validate_config(); remove
-      redundant _vc_burst variable (functions.apf)
-[Fix] Add -r flag to all read commands to prevent backslash interpretation
-      (apf, functions.apf, sysctl.rules, bt.rules)
-[Change] Extract inline regex patterns to named variables in validation
-      functions for portability and readability (functions.apf, gretunnel.sh)
-[Fix] Fast load failure now skips snapshot save to prevent overwriting
-      working snapshot with broken/partial state (apf)
-[Fix] Firewall script exit code checked; failure aborts start cleanly
-      instead of saving partial snapshot (apf)
-[Fix] Temp file cleanup on signal: global tracking prevents orphaned
-      files in install directory on SIGTERM/SIGINT (functions.apf, apf)
-[Change] Remove unused action_all variable from trust_entry_rule()
-      (functions.apf)
-[Fix] trim(): exclude blank lines from data line count (functions.apf)
-[Fix] expirebans(): use local variable instead of modifying global
-      SET_EXPIRE (functions.apf)
-[Fix] --gre-up/--gre-down report disabled state instead of silently
-      exiting (apf)
-[New] snapshot_save(): atomic fast load snapshot writes via mktemp+mv;
-      validates iptables-save exit code and output (non-empty, contains
-      table markers); IPv6 snapshot failure non-fatal to IPv4; backend
-      marker written by snapshot_save for both save-side callers
-      (functions.apf, apf)
-[Fix] Fast load restore validates snapshot before iptables-restore:
-      empty or invalid snapshots (missing *table markers) fall back to
-      full load instead of silently loading no rules (apf)
-[Change] expirebans(): prefer structured addedtime=EPOCH markers over
-      positional awk date extraction; legacy fallback for pre-2.0.2
-      entries without addedtime=; fix orphaned comment lines left behind
-      when bare IP was removed (functions.apf)
-[New] cli_trust permanent entries now include addedtime=EPOCH marker in
-      comment lines for reliable ban expiry; consistent with temp trust
-      expire= pattern; backward compatible (functions.apf)
+      change case filter from *:* to *=* so IPv6 addresses are not excluded
+[Fix] Install FLOW document to doc/ directory alongside README
+[Fix] cl_cports(): reset EG_DROP_CMD, SMTP, and connlimit variables between
+      VNET iterations to prevent rule leaking
+[Fix] Preserve file inodes: logrotate copytruncate directive for external
+      tail -f consumers; trim() uses cat+rm instead of mv
+[Fix] Shell compatibility: revert bash 4.2+ case conversion for CentOS 6;
+      replace deprecated -a test operator; add -r flag to read commands
+[Fix] Local variable hygiene: add missing local declarations to 10+
+      functions; hoist declarations out of loops; avoid modifying globals
+[Fix] Temp file hygiene: use mktemp for all temp files; register with
+      _apf_reg_tmp for signal-safe cleanup across apf, uninstall.sh,
+      trim(), and list()
+[Fix] sysctl.rules: fix wrong proc paths for secure_redirects,
+      send_redirects, and proxy_arp; per-interface sysctls require conf/all/
+      prefix — settings were silently never applied
+[Fix] Redirect user-facing error messages to stderr across cli_trust(),
+      cli_trust_remove(), cli_trust_temp(), trust_lookup(), search(), and
+      apf startup
+[Fix] list(): check $EDITOR env var before hardcoded editor list; fall back
+      to pager when no editor found
+[Fix] --ipset-update: add informational message when USE_IPSET=0
+[Fix] --gre-up/--gre-down: report disabled state instead of silently exiting
+[Fix] install.sh: replace hardcoded /sbin/chkconfig with command -v discovery
+[Fix] bandmin(): replace hardcoded /usr/local/bandmin with command -v
+      discovery
+[Fix] help(): add missing -st alias to status line help text
+[Fix] trim(): exclude blank lines from data line count
 
   -- Changes --
 
 [Change] File-based flock mutex: replace FD-based exec/flock with file-based
       gate; noclobber + PID fallback; EXIT trap releases lock on signal;
-      trust CLI operations (-a, -d, -u, -ta, -td) acquire lock to prevent
-      races with concurrent cron operations (apf, functions.apf)
+      trust CLI operations acquire lock for cron race prevention
 [Change] ESTABLISHED,RELATED state tracking moved earlier in INPUT chain;
       established connections now fast-path past VNET, port filtering, and
-      logging (firewall)
-[Change] Fast load uptime threshold raised from 5 to 10 minutes (apf)
+      logging
+[Change] Fast load uptime threshold raised from 5 to 10 minutes
 [Change] Consolidate 3 cron files into single cron.d.apf with daily restart,
-      hourly ipset refresh, and per-minute temp expiry (cron.d.apf, install.sh)
+      hourly ipset refresh, and per-minute temp expiry
 [Change] ipset batch loading via ipset restore; reduces load time from
-      minutes to seconds for large block lists (functions.apf)
-[Change] Performance and code consolidation: replace subprocess chains
-      (echo|tr|awk|grep) with bash builtins across all hot paths; unify
-      duplicated code (trust_hosts, dlist_download, _icmp_filter,
-      expand_port, trust_parse_fields, tosroute); modernize string tests
-      and remove unnecessary $(echo $var) wrappers (functions.apf,
-      cports.common, bt.rules, firewall, vnetgen, main.vnet, sysctl.rules,
-      install.sh, internals.conf)
+      minutes to seconds for large block lists
+[Change] Performance: replace subprocess chains with bash builtins across
+      all hot paths; modernize string tests; remove unnecessary wrappers
 [Change] VNET: replace fork-heavy parsing with builtins and glob patterns;
-      fix ifconfig detection; add variable quoting; use conditional default
-      for INSTALL_PATH (main.vnet, vnetgen)
-[Change] help() pass 2: remove silent options (-st, --temp-expire) from display;
-      show readable names (--temp-list, --dump-config, --list-allow) over
-      cryptic aliases (--templ, --ovars, --la); add --rules, --info, --lookup;
-      update -l description to "view in editor"; all hidden aliases still work
-      in dispatcher (functions.apf, apf.8, README, README.md)
-[Change] cl_cports(): reset SMTP and connlimit variables for VNET per-IP
-      consistency (functions.apf)
+      fix ifconfig detection; add variable quoting
+[Change] help(): show readable option names over cryptic aliases; add
+      --rules, --info, --lookup; hide silent aliases from display
 [Change] Drop Ubuntu 22.04 from CI matrix; redundant with 20.04+24.04
-      (smoke-test.yml)
-[Fix] sysctl.rules: fix wrong proc paths for secure_redirects, send_redirects,
-      and proxy_arp; per-interface sysctls require conf/all/ prefix — settings
-      were silently never applied due to error suppression (sysctl.rules)
-[Fix] validate_config(): add validation for SET_EXPIRE (non-negative integer)
-      and FQDN_TIMEOUT (positive integer, reject 0); prevents bash arithmetic
-      errors and silent timeout failures (functions.apf)
-[Change] trust_hosts: replace four-pass grep cascade with single-pass loop
-      and delegate advanced syntax to trust_entry_rule(); eliminates ~210
-      lines of duplicated field extraction and iptables logic (C-002)
-      (functions.apf)
-[Fix] trust_hosts: anchor comment filter to line start (grep -v '^#')
-      preventing false matches on entries containing '#' (F-019)
-      (functions.apf)
-[Fix] trust_hosts: eliminate grep -v tcp/udp classification that could
-      misclassify entries containing protocol substrings (F-020)
-      (functions.apf)
+[Change] trust_hosts(): replace four-pass grep cascade with single-pass loop
+      delegating advanced syntax to trust_entry_rule(); anchor comment filter;
+      eliminate fragile protocol-substring classification
+[Change] importconf: clarify message on same-version reinstall
+[Change] install.sh: optimize sed path replacement with grep -rl pre-filter;
+      add error handling
+[Change] Code consolidation: extract shared helpers across trust, ipset, port
+      filtering, and firewall subsystems; remove dead variables
+[Change] bt.rules: unify IPv4/IPv6 sanity, fragment, and pzero chain
+      creation via parameterized helpers; extract _log_drop() and _rab_log()
+      for consistent LOG+DROP patterns
+[Change] cports: extract port-filter and uid-filter loop helpers; consolidate
+      EGF guards; define NDP_TYPES constant
+[Change] Extract inline regex patterns to named variables in validation
+      functions for portability
+[Change] vnetgen: replace for-in-$(cmd) anti-patterns with while-read loops
+[Change] download_url(): log TLS diagnostic hint on download failure for
+      legacy system troubleshooting
+[Change] nft backend detection: extract detect_ipt_backend() to eliminate
+      duplicated iptables --version parsing
 
   -- Documentation --
 
-[New] uninstall.sh: removes all system-wide artifacts; prompts before removing
-      install directory and logs (uninstall.sh)
-[New] install.sh: post-install dependency warnings for iptables, ip, modprobe;
-      non-fatal for chroot/container builds (install.sh)
-[New] README/README.md: section 2.4 Uninstallation (README, README.md)
-[Fix] .ca.def: DLIST_*_URL variables now preserve user customizations on
-      upgrade; preamble defaults + variable expansion in template (.ca.def)
-[New] Man page: apf.8 section 8, all CLI operations, trust system overview,
-      configuration reference, installed to /usr/share/man/man8/ (apf.8,
-      install.sh)
+[New] Man page: apf.8 covering all CLI operations, trust system, and
+      configuration reference
 [New] FLOW.md/FLOW: standalone order-of-operations document with INPUT chain
       precedence table and fast/full load conditions
-[Change] README/README.md: modernize headers; add Quick Start section;
-      reorganize feature list; add documentation for connlimit, uid-based
-      egress, ICMPv6 types, SMTP blocking, temporary trust, hooks, silent
-      IPs, search CLI, and firewall order of operations
-[Change] conf.apf: correct DOCKER_COMPAT comment; improve IPT_LOCK docs
-      (conf.apf)
-[Change] Remove untested Debian 10/11 from supported platforms list (README)
-[Fix] help() missing -st alias: add -st to status line help text to match
-      case dispatcher (functions.apf)
-[Fix] FLOW: add missing SYNFLOOD entry to INPUT chain precedence table;
-      renumber entries 23-48 to match FLOW.md (FLOW)
-[Fix] README/README.md: correct backup path format from DDMMYY-UTIME to
-      DDMMYYYY-EPOCH to match install.sh date format; sync -e/--refresh
-      description with help() wording (README, README.md)
-[Fix] .ca.def: sync IPT_LOCK_SUPPORT/IPT_LOCK_TIMEOUT comments with
-      conf.apf (includes version range and compatibility notes)
-[Fix] Man page: --rules output format corrected from "iptables-save" to
-      "iptables -S" (apf.8)
+[Change] README: modernize headers; add Quick Start; document 2.0.2 features;
+      correct backup path format; fix troubleshooting from 'apf -l' to
+      'apf --rules'; remove untested Debian versions
+[Fix] FLOW: add missing SYNFLOOD entry to INPUT chain precedence table
 [Fix] conf.apf: document NFLOG as accepted LOG_TARGET value alongside LOG
-      and ULOG (conf.apf, apf.8, README)
-[Fix] README: troubleshooting corrected from 'apf -l | grep' (opens editor)
-      to 'apf --rules | grep' (stdout-pipeable) (README)
-[New] .dockerignore: exclude .git, .github, .claude, audit-output, and
-      working files from Docker build context
-[Change] Makefile: override sequential tier targets (test-all, test-modern,
-      test-legacy, test-deep-legacy) to continue on failure and report
-      combined exit code instead of stopping on first failure
-[Change] nft backend detection: extract detect_ipt_backend() to eliminate
-      duplicated iptables --version parsing in snapshot_save() and fast
-      load path; sets global IPT_BACKEND (functions.apf, apf)
-[Fix] Cron lifecycle: clean runtime-created refresh.apf and apf_develmode
-      cron entries during install and uninstall; prevents stale cron jobs
-      from persisting across reinstalls (install.sh, uninstall.sh)
-[Change] glob trust download: extract glob_trust_download() helper to
-      eliminate duplicated download/parse/validate logic between
-      glob_allow_download() and glob_deny_download(); both become
-      one-line wrappers (functions.apf)
-[Change] dlist chain loading: extract dlist_load_hosts() helper to unify
-      chain creation, valid_ip_cidr validation, LOG+DROP rules, and
-      INPUT/OUTPUT attachment; dlist_php_hosts, dlist_dshield_hosts,
-      dlist_spamhaus_hosts become one-line wrappers (functions.apf)
-[Change] pkt_sanity: extract pkt_sanity_flags() helper to replace ~170
-      lines of unrolled TCP flag pair checks with loop calls; unifies
-      IPv4 IN/OUT_SANITY and IPv6 IN/OUT_SANITY6; preserves RAB
-      integration and LOG behavior (functions.apf, bt.rules)
-[Change] ipset: extract ipset_populate_set() to deduplicate awk filter,
-      restore, and count logic between ipset_load() and ipset_update();
-      uses awk set variable instead of shell interpolation in awk body;
-      sets _IPSET_COUNT global to avoid subshell (functions.apf)
-[Change] Remove dead IN_IF/OUT_IF variables from internals.conf; replace
-      command head shim with plain head in functions.apf now that head()
-      has been renamed to apf_banner() (internals.conf, functions.apf)
-[Change] cli_trust: extract _sanitize_comment() and _trust_action_target()
-      helpers; replaces 6 copy-pasted comment sanitization blocks and 4
-      duplicated DENY/ALLOW→iptables action mappings (functions.apf)
-[Change] cli_trust_remove: extract _resolve_fqdn_metadata(),
-      _trust_remove_ip_rules(), and _trust_remove_advanced_entries()
-      helpers; deduplicates FQDN metadata lookup (2 sites), 12-rule
-      iptables deletion + spec-based cleanup (2 sites), and advanced
-      entry recursive cleanup (2 sites) (functions.apf)
-[Change] expiry: extract _parse_temp_comment() helper to deduplicate
-      IP/TTL/epoch extraction from temp trust comment lines across
-      expire_temp_entries(), list_temp_entries(), and
-      flush_temp_entries(); document error suppression rationale and
-      dual-track parsing in expirebans() (functions.apf)
-[Change] bt.rules: extract _log_drop() and _rab_log() helpers to
-      replace inline LOG_DROP/RAB_LOG_HIT check+action patterns;
-      adopted at SANITY INV, PZERO, PZERO6, SYNFLOOD, IDENT, MCAST,
-      and MCAST6 blocks (functions.apf, bt.rules)
-[Change] bt.rules: unify IPv4/IPv6 sanity/frag/pzero chains via
-      _sanity_inv_rules(), _frag_udp_rules(), _pzero_rules() helpers;
-      merges separate IPv4 and IPv6 PKT_SANITY blocks into one
-      structure with parameterized ipt function and chain names;
-      preserves IPv4-only tcp-option 64/128 rules and IPv6-only
-      RAB_SANITY_FLAGS on INVALID (bt.rules)
-[Change] cports: extract _port_filter_loop() helper to deduplicate four
-      identical IG/EG TCP/UDP port-filtering loops into parameterized
-      calls (cports.common)
-[Change] cports: extract _uid_filter_loop() helper to deduplicate
-      EG_TCP_UID/EG_UDP_UID blocks (cports.common)
-[Change] cports: consolidate 7 separate EGF guards into single outer
-      block; reduces redundant conditional checks (cports.common)
-[Change] cports: replace hardcoded NDP type loops (133 134 135 136) with
-      $NDP_TYPES constant defined in internals.conf; adopted in
-      cports.common and bt.rules MCAST6 NDP exemption (internals.conf,
-      cports.common, bt.rules)
-[Change] ipset: extract _ipset_parse_entry() and _ipset_resolve_data()
-      helpers to deduplicate field parsing, validation, URL download, and
-      maxelem capping shared between ipset_load() and ipset_update()
-      (functions.apf)
-[Change] firewall: extract _verify_iface_route() helper to deduplicate
-      interface route verification for IFACE_UNTRUSTED and IFACE_TRUSTED
-      (firewall)
-[Change] Document error suppression rationale: restore_external_baseline
-      non-APF chain tolerance, flush_apf_chains conditional existence
-      checks, ipset non-blocking download policy, dlist backup restore
-      policy (functions.apf)
-[Fix] expirebans()/expire_temp_entries()/flush_temp_entries(): defer
-      cli_trust_remove calls until after iteration loop completes; avoids
-      modifying trust files via sed while reading them (functions.apf)
-[Fix] refresh(): exit 0 when trust rules unchanged; no-change is a
-      successful no-op, not an error (functions.apf)
-[Fix] Root importconf missing EG_DROP_CMD space-to-comma migration that
-      existed in files/extras/importconf; users upgrading from pre-2.0.2
-      now get consistent comma-separated format (importconf)
-[Change] apf_banner(): add "v2" qualifier to GPL notice to match file
-      header and license (apf)
-[Change] internals.conf: add standard copyright header block matching
-      other APF source files (internals.conf)
-[Change] Document deliberate -a/-d exit code propagation; cli_trust
-      failure now exits 1 instead of silent 0 (apf)
+      and ULOG
 
   -- Test Suite --
 
-[New] 11 new test files: 21-refactor-regression, 22-uid-egress,
-      23-devel-fastload, 24-vnet, 25-connlimit, 26-hook-search-silent,
-      27-temp-trust, 28-synflood, 29-block-escalation, 30-advanced-trust-cli,
-      31-fqdn-trust (487 tests total across 31 files)
-[New] LOG_DROP=0 negative tests: verify SYNFLOOD and SMTP_BLK chains omit LOG
-      rules when LOG_DROP is disabled (28-synflood.bats, 22-uid-egress.bats)
-[New] Hook execution order tests: verify hook_pre.sh runs before trust chains
-      and hook_post.sh runs after default DROP policies (26-hook-search-silent.bats)
-[New] Hook environment test: verify hooks have access to $IPT and $INSTALL_PATH
-      variables (26-hook-search-silent.bats)
-[New] Hook error handling tests: verify firewall continues loading when
-      hook_pre.sh or hook_post.sh fails (26-hook-search-silent.bats)
-[New] Search special character tests: verify apf -g handles dots, brackets,
-      and dash-prefixed patterns without crashing (26-hook-search-silent.bats)
-[New] 32-cli-help.bats: tests for -h/--help, --dump-config, --validate/--check,
-      --la/--ld, section headers in help output (32-cli-help.bats)
-[Fix] Hook ordering test: CentOS 6 iptables 1.4.7 compat — use protocol-
-      specific DROP anchor instead of catch-all (26-hook-search-silent.bats)
-[New] Test parallelization: --parallel [N] flag splits across N containers;
-      3x speedup (run-tests.sh, Makefile)
-[Change] Migrate test infrastructure to batsman shared framework via git
-      submodule at tests/infra; replaces monolithic Dockerfiles with two-phase
-      base+project builds, replaces 254-line run-tests.sh and 91-line Makefile
-      with thin wrappers, replaces standalone CI with batsman reusable workflow;
-      drops untested ubuntu2204 target, adds rocky10 as EXTRA tier
-      (tests/Dockerfile*, tests/run-tests.sh, tests/Makefile, smoke-test.yml)
-[New] ipset migration edge-case tests: missing ipset.rules early return,
-      comment/blank-line preservation, mixed 4-field + 5-field in one pass
-      (17-ipset.bats)
-[Fix] Quote unquoted variables ($i, $HOST, $VNET, $ANY_ADDR) in iptables
-      command context across firewall, functions.apf trust/dlist/dnet paths
-      (firewall, functions.apf)
-[Fix] Quote $INSTALL_PATH in apf.init start/stop/source commands (apf.init)
-[Change] vnetgen: replace 6 for-in-$(cmd) anti-patterns with pipe-into-
-      while-read loops in ifconfig fallback and ip additional-interface paths
-      (vnetgen)
-[Fix] install.sh: replace hardcoded /sbin/chkconfig with command -v
-      discovery; mirrors uninstall.sh pattern (install.sh)
-[Fix] bandmin(): replace hardcoded /usr/local/bandmin paths with command -v
-      discovery and directory derivation (functions.apf)
-[Fix] Redirect ~25 user-facing error messages to stderr across cli_trust(),
-      cli_trust_remove(), cli_trust_temp(), trust_lookup(), search(), and
-      apf startup; informational/success messages remain on stdout (F-027)
-      (functions.apf, apf)
-[Fix] list(): check $EDITOR env var before hardcoded editor list; fall back
-      to pager (${PAGER:-more}) when no editor found instead of silently
-      doing nothing (F-028) (functions.apf)
-[Fix] --ipset-update: add informational message when USE_IPSET=0, matching
-      existing --gre-up/--gre-down pattern (F-029) (apf)
-[New] validate_config(): validate SET_REFRESH as non-negative integer;
-      reuses existing $_vc_int regex; 0 is valid (disables refresh) (F-074)
-      (functions.apf)
-[Fix] uninstall.sh: replace hardcoded /tmp/.apf_rclocal_clean with mktemp
-      for unpredictable temp file name (F-036) (uninstall.sh)
-[Fix] trim(): replace predictable $FILE.new suffix with mktemp on same
-      filesystem; register with _apf_reg_tmp for signal-safe cleanup (F-077)
-      (functions.apf)
-[Fix] list(): register mktemp file with _apf_reg_tmp for signal-safe
-      cleanup; explicit rm -f remains as belt-and-suspenders (F-013)
-      (functions.apf)
-[Change] download_url(): log TLS diagnostic hint on download failure to aid
-      troubleshooting on legacy systems with outdated TLS support (F-037)
-      (functions.apf)
+[New] 12 new test files (21-32): uid-egress, devel-fastload, vnet,
+      connlimit, hook-search-silent, temp-trust, synflood, block-escalation,
+      advanced-trust-cli, fqdn-trust, cli-help, refactor-regression
+      (543 tests across 32 files)
+[New] LOG_DROP=0 negative tests: verify SYNFLOOD and SMTP_BLK chains omit
+      LOG rules when LOG_DROP is disabled
+[New] Hook tests: execution order, environment variable access, error
+      handling, CentOS 6 iptables 1.4.7 compatibility
+[New] Search special character tests: dots, brackets, and dash-prefixed
+      patterns
+[New] ipset migration edge-case tests: missing ipset.rules, comment/blank
+      preservation, mixed 4-field + 5-field in one pass
+[New] Test parallelization: --parallel [N] flag splits across N containers
+[Change] Migrate test infrastructure to batsman shared framework; 2-phase
+      Docker builds, reusable CI workflow, adds rocky10 tier
