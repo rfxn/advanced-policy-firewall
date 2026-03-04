@@ -836,16 +836,35 @@ trust_entry_rule() {
 	_TER_DESC="${dir_desc}${proto_desc}${pip} ${flow_desc} port ${port}"
 	_TER_DIR="$dir"
 
-	# Apply rule(s)
+	# Build rule string(s)
+	local _ter_r1 _ter_r2=""
 	if [ -n "$proto" ]; then
-		# Single protocol
 		local jtarget
 		if [ "$proto" == "tcp" ]; then jtarget="$action_tcp"; else jtarget="$action_udp"; fi
-		$IPT_H $IPT_FLAGS $mode $chain -p $proto -m multiport -$ipflow $pip --$pflag $port -j $jtarget
+		_ter_r1="$mode $chain -p $proto -m multiport -$ipflow $pip --$pflag $port -j $jtarget"
 	else
-		# Both protocols
-		$IPT_H $IPT_FLAGS $mode $chain -p tcp -m multiport -$ipflow $pip --$pflag $port -j $action_tcp
-		$IPT_H $IPT_FLAGS $mode $chain -p udp -m multiport -$ipflow $pip --$pflag $port -j $action_udp
+		_ter_r1="$mode $chain -p tcp -m multiport -$ipflow $pip --$pflag $port -j $action_tcp"
+		_ter_r2="$mode $chain -p udp -m multiport -$ipflow $pip --$pflag $port -j $action_udp"
+	fi
+
+	# Apply: buffer for batch restore or execute immediately
+	if [ -n "$_TER_BUFFER_MODE" ]; then
+		if [ "$IPT_H" == "$IP6T" ]; then
+			_th_rf6="${_th_rf6}${_ter_r1}
+"
+			[ -n "$_ter_r2" ] && _th_rf6="${_th_rf6}${_ter_r2}
+"
+		else
+			_th_rf4="${_th_rf4}${_ter_r1}
+"
+			[ -n "$_ter_r2" ] && _th_rf4="${_th_rf4}${_ter_r2}
+"
+		fi
+	else
+		# shellcheck disable=SC2086
+		$IPT_H $IPT_FLAGS $_ter_r1
+		# shellcheck disable=SC2086
+		[ -n "$_ter_r2" ] && $IPT_H $IPT_FLAGS $_ter_r2
 	fi
 	return 0
 }
@@ -2030,6 +2049,7 @@ local file="$1"
 local chain="$2"
 local action_all="$3" action_tcp="$4" action_udp="$5" verb="$6"
 local i
+local _TER_BUFFER_MODE=1
 load_local_addrs
 if [ -z "$file" ] || [ -z "$chain" ]; then
         eout "{trust} could not process trust_hosts $file $chain, fatal error, aborting!"

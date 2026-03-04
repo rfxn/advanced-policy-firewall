@@ -181,9 +181,10 @@
 
   -- Changes --
 
-[Change] trust_hosts(): batch bare host rules via iptables-restore --noflush;
-      reduces per-trust-file lock acquisitions from O(n) to O(1); advanced
-      syntax entries still use individual iptables calls via trust_entry_rule()
+[Change] trust_hosts(): batch all trust rules (bare hosts and advanced syntax)
+      via iptables-restore --noflush; reduces per-trust-file lock acquisitions
+      from O(n) to O(1); trust_entry_rule() buffers rules when called from
+      bulk loading path, executes immediately for CLI operations
 [Change] File-based flock mutex: replace FD-based exec/flock with file-based
       gate; noclobber + PID fallback; EXIT trap releases lock on signal;
       trust CLI operations acquire lock for cron race prevention
