@@ -80,7 +80,10 @@ SET_MONOKERN="0"
 # the FORWARD chain and nat table.
 # This also disables fast load, since iptables-restore would overwrite
 # external chains.
-DOCKER_COMPAT="0"
+# "auto" = detect at startup (checks for DOCKER-USER chain in iptables)
+# "1"    = force enable
+# "0"    = force disable
+DOCKER_COMPAT="auto"
 
 # The expiry interval, in seconds, that bans will be expired out of the trust
 # system. This only applies to local bans from deny_hosts.rules and not global

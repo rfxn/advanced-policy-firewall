@@ -8,7 +8,7 @@ IG_UDP_CLIMIT="${IG_UDP_CLIMIT:-}"
 SYNFLOOD="${SYNFLOOD:-0}"
 SYNFLOOD_RATE="${SYNFLOOD_RATE:-100/s}"
 SYNFLOOD_BURST="${SYNFLOOD_BURST:-150}"
-DOCKER_COMPAT="${DOCKER_COMPAT:-0}"
+DOCKER_COMPAT="${DOCKER_COMPAT:-auto}"
 IG_ICMPV6_TYPES="${IG_ICMPV6_TYPES:-1,2,3,4,128,129}"
 EG_ICMPV6_TYPES="${EG_ICMPV6_TYPES:-all}"
 USE_IPSET="${USE_IPSET:-0}"
@@ -115,7 +115,9 @@ SET_MONOKERN="$SET_MONOKERN"
 # by Docker, containerd, Kubernetes, Podman, or other software that manages
 # the FORWARD chain and nat table. This also disables fast load, since
 # iptables-restore would overwrite external chains.
-# Note: This applies to any software using FORWARD/nat -- not just Docker.
+# "auto" = detect at startup (checks for DOCKER-USER chain in iptables)
+# "1"    = force enable
+# "0"    = force disable
 DOCKER_COMPAT="$DOCKER_COMPAT"
 
 # The expiry interval, in seconds, that bans will be expired out of the trust

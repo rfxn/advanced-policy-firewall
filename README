@@ -569,8 +569,11 @@ runtimes, the default flush behavior (which wipes all iptables rules and chains)
 will destroy the container runtime's networking rules. The DOCKER_COMPAT option
 solves this by switching APF to a surgical flush mode.
 
-DOCKER_COMPAT - When set to "1", APF's flush operation only removes APF-owned
-chains from the filter table, leaving all external chains intact. Specifically:
+DOCKER_COMPAT - Controls container-safe flush mode. Set to "auto" (default) to
+detect Docker/Podman/containerd at startup by checking for the DOCKER-USER
+chain. Set to "1" to force enable or "0" to force disable. When active, APF's
+flush operation only removes APF-owned chains from the filter table, leaving
+all external chains intact. Specifically:
 
   - FORWARD chain policy and rules are preserved (Docker routing)
   - nat table is left untouched (Docker port mapping and MASQUERADE rules)
@@ -1047,8 +1050,9 @@ Locked out of the server?
   configured (see section 2.1).
 
 Docker containers lost network after apf -s?
-  Set DOCKER_COMPAT="1" in conf.apf to preserve container networking rules
-  during firewall operations. See section 3.9.
+  DOCKER_COMPAT="auto" (the default) detects container runtimes automatically.
+  If auto-detection fails, set DOCKER_COMPAT="1" in conf.apf to force
+  container-safe mode. See section 3.9.
 
 Firewall rules gone after reboot?
   Ensure boot loading is configured — systemd service, chkconfig, or

@@ -86,6 +86,10 @@
       startup by probing iptables --help; CentOS 6 (1.4.7, no -w) safely
       resolves to disabled; explicit "0"/"1" still honored; .ca.def
       preamble defaults to "auto" for fresh installs and pre-2.0.1 upgrades
+[New] DOCKER_COMPAT="auto": auto-detect container runtimes at startup by
+      checking for DOCKER-USER chain in iptables filter table; resolves to
+      "1" when Docker/Podman/containerd is actively managing iptables, "0"
+      otherwise; explicit "0"/"1" still honored; zero overhead when forced
 
   -- Bug Fixes --
 
