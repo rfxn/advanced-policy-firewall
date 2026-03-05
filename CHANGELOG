@@ -138,7 +138,10 @@
 [Fix] flush(): remove /etc/cron.d/refresh.apf on firewall stop; prevents
       refresh into a stopped firewall
 [Fix] Cron lifecycle: clean runtime-created refresh.apf and apf_develmode
-      cron entries during install and uninstall
+      cron entries during install and uninstall; move cleanup before backup
+      step to ensure it runs even on rapid re-installs
+[Fix] install.sh: prevent backup collision on rapid re-installs by removing
+      stale backup target before cp -R
 [Fix] Rename head() to apf_banner() to stop shadowing /usr/bin/head; add
       "v2" qualifier to GPL notice
 [Fix] Propagate cli_trust/cli_trust_temp return codes to CLI exit status;
