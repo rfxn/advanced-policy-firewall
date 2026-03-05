@@ -972,8 +972,9 @@ options (proto:flow:port:ip);
  3) s/d=port: [packet source or destination port]
  4) s/d=ip(/xx) [packet source or destination address, masking supported]
 
-Flow assumed as Input if not defined. Protocol assumed as TCP if not defined.
-When defining rules with protocol, flow is required.
+When protocol is omitted, rules are created for both TCP and UDP. When flow
+is omitted, rules apply to both inbound and outbound traffic. When defining
+rules with protocol, flow is required.
 
 Syntax:
  proto:flow:[s/d]=port:[s/d]=ip(/mask)
