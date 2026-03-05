@@ -34,7 +34,7 @@ DLIST_RESERVED_URL="${DLIST_RESERVED_URL:-https://cdn.rfxn.com/downloads/reserve
 DLIST_ECNSHAME_URL="${DLIST_ECNSHAME_URL:-https://cdn.rfxn.com/downloads/ecnshame.lst}"
 
 cat > .conf.apf <<EOF
-#!/bin/sh
+#!/bin/bash
 #
 ##
 # Advanced Policy Firewall (APF) v2.0.2
@@ -76,8 +76,8 @@ USE_IPV6="$USE_IPV6"
 SET_VERBOSE="$SET_VERBOSE"
 
 # The fast load feature makes use of the iptables-save/restore facilities to do
-# a snapshot save of the current firewall rules on an APF stop then when APF is
-# instructed to start again it will restore the snapshot. This feature allows
+# a snapshot save of the current firewall rules after a full start and before a
+# flush, then when APF is instructed to start again it will restore the snapshot. This feature allows
 # APF to load hundreds of rules back into the firewall without the need to
 # regenerate every firewall entry. 
 # Note: a) if system uptime is 10 minutes or less, the snapshot is expired
@@ -122,7 +122,8 @@ DOCKER_COMPAT="$DOCKER_COMPAT"
 
 # The expiry interval, in seconds, that bans will be expired out of the trust
 # system. This only applies to local bans from deny_hosts.rules and not global
-# import rules. Must not be less than SET_REFRESH in seconds (e.g., 10 min = 600s).
+# import rules. If less than SET_REFRESH (in seconds), the effective value is
+# automatically raised to match (e.g., 10 min = 600s).
 # [value in seconds, 0 to disable, recommended 600]
 SET_EXPIRE="$SET_EXPIRE"
 
@@ -709,7 +710,8 @@ LOG_LEVEL="$LOG_LEVEL"
 
 # Where should all the logging data be sent?
 # LOG (Default; sends logging to kernel log)
-# ULOG (deprecated; use NFLOG with ulogd2 on modern kernels)
+# NFLOG (sends logging to ulogd2 via nfnetlink on modern kernels)
+# ULOG (deprecated; use NFLOG with ulogd2 instead)
 LOG_TARGET="$LOG_TARGET"
 
 # Log interactive access over telnet & ssh; uses

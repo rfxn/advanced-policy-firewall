@@ -759,17 +759,18 @@ INPUT chain evaluation order (first match wins):
   11  ipset block lists                         DROP
   12  Common drop ports (BLK_PORTS)             DROP
   13  Packet sanity checks                      DROP
-  14  IDENT / Multicast / P2P blocking          REJECT/DROP
-  15  RAB trip and portscan rules               DROP
-  16  State tracking (ESTABLISHED,RELATED)      ACCEPT
-  17  VNET per-IP port rules                    ACCEPT
-  18  Connlimit (per-port connection limits)    REJECT
-  19  Inbound TCP/UDP port ACCEPT               ACCEPT
-  20  ICMP / ICMPv6 / NDP                       ACCEPT
-  21  Non-SYN NEW tcp DROP                      DROP
-  22  DNS, FTP, SSH, Traceroute helpers         ACCEPT
-  23  Log (rate-limited)                        LOG
-  24  Default DROP (tcp, udp, all)              DROP
+  14  SYN flood rate limiting (SYNFLOOD)        RETURN/DROP
+  15  IDENT / Multicast / P2P blocking          REJECT/DROP
+  16  RAB trip and portscan rules               DROP
+  17  State tracking (ESTABLISHED,RELATED)      ACCEPT
+  18  VNET per-IP port rules                    ACCEPT
+  19  Connlimit (per-port connection limits)    REJECT
+  20  Inbound TCP/UDP port ACCEPT               ACCEPT
+  21  ICMP / ICMPv6 / NDP                       ACCEPT
+  22  Non-SYN NEW tcp DROP                      DROP
+  23  DNS, FTP, SSH, Traceroute helpers         ACCEPT
+  24  Log (rate-limited)                        LOG
+  25  Default DROP (tcp, udp, all)              DROP
 
 Key precedence rules:
   - Trusted interfaces bypass all filtering
@@ -822,7 +823,7 @@ Temporary Trust:
 Diagnostics:
   -g PATTERN, --search ........ search iptables/ipset rules & trust files
   --validate, --check ......... validate config without starting firewall
-  --dump-config ............... output all configuration variables
+  -o, --dump-config ........... output all configuration variables
   -v, --version ............... output version number
   -h, --help .................. show this help message
 
@@ -1086,7 +1087,7 @@ https://github.com/rfxn/advanced-policy-firewall
 
 Bugs, feature requests, and general questions can be filed as GitHub issues or
 sent to proj@rfxn.com. When reporting issues, include the output of
-'apf --ovars' to help diagnose configuration problems. For a complete CLI and
+'apf --dump-config' to help diagnose configuration problems. For a complete CLI and
 configuration reference, run 'man apf'.
 
 The official project page is at:

@@ -261,7 +261,7 @@
 [New] 12 new test files (21-32): uid-egress, devel-fastload, vnet,
       connlimit, hook-search-silent, temp-trust, synflood, block-escalation,
       advanced-trust-cli, fqdn-trust, cli-help, refactor-regression
-      (543 tests across 32 files)
+      (553 tests across 33 files)
 [New] LOG_DROP=0 negative tests: verify SYNFLOOD and SMTP_BLK chains omit
       LOG rules when LOG_DROP is disabled
 [New] Hook tests: execution order, environment variable access, error
