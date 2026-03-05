@@ -213,11 +213,6 @@ if [ "$fw_rc" -ne 0 ]; then
 	mutex_unlock
 	exit "$fw_rc"
 fi
-# check for/load bandmin
-read -r LOAD _ < /proc/loadavg; LOAD="${LOAD%%.*}"
- if [ ! "$LOAD" -gt "10" ]; then
-	bandmin
- fi
 eout "{glob} firewall initialized"
 if [ "$MD5_FIRSTRUN" == "1" ]; then
         $MD5 $MD5_FILES > "$INSTALL_PATH/internals/.md5.cores" 2> /dev/null

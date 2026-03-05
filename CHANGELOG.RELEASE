@@ -168,8 +168,9 @@
 [Fix] --ipset-update: add informational message when USE_IPSET=0
 [Fix] --gre-up/--gre-down: report disabled state instead of silently exiting
 [Fix] install.sh: replace hardcoded /sbin/chkconfig with command -v discovery
-[Fix] bandmin(): replace hardcoded /usr/local/bandmin with command -v
-      discovery
+[Change] remove dead bandmin() integration (cPanel bandwidth monitor
+      discontinued ~2014); eliminates `command -v` call that triggers bash
+      SIGSEGV on GHA runners with newer kernels
 [Fix] help(): add missing -st alias to status line help text
 [Fix] trim(): exclude blank lines from data line count
 [Fix] vnetgen: strip Docker @ifN suffix from ip link output in

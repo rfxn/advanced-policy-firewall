@@ -2640,18 +2640,6 @@ eout "{glob} loading $FNAME"
 fi
 }
 
-bandmin() {
-local _bm
-_bm=$(command -v bandmin 2>/dev/null)
-if [ -n "$_bm" ]; then
-        "$_bm" >> /dev/null 2>&1
-        local _bmdir="${_bm%/*}"
-        if [ -x "$_bmdir/ipaddrmap" ]; then
-                "$_bmdir/ipaddrmap" >> /dev/null 2>&1
-        fi
-fi
-}
-
 cdports() {
 if [ -n "$BLK_PORTS" ]; then
 	eout "{glob} loading common drop ports"
