@@ -114,6 +114,9 @@
       during upgrade
 [Fix] importconf: migrate EG_DROP_CMD from space-separated to
       comma-separated format in root and extras importconf
+[Fix] install.sh/importconf: fix upgrade detection using pkg_backup_exists
+      instead of hardcoded $INSTALL_PATH.bk.last; importconf uses BK_LAST
+      env var with legacy fallback for backward compatibility
 [Fix] Anchor grep/sed patterns across trust, expiry, and block escalation
       functions to prevent IP substring collisions; escape dots in IP
       addresses, use exact-match flags

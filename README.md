@@ -194,7 +194,7 @@ If one so desires they may customize the setup of APF by editing the variables i
 
 The package includes two convenience scripts, the first is `importconf` which will import all the variable settings from your previous version of APF into the new installation. The second is `get_ports`, a script which will output the system's currently in use 'server' ports for the user during the installation process in an effort to aid in configuring port settings.
 
-All previous versions of APF are saved upon the installation of newer versions and stored in `/etc/apf.bkDDMMYYYY-EPOCH` format (e.g., `/etc/apf.bk19022026-1771538400`). In addition, there is a `/etc/apf.bk.last` sym-link created to the last version of APF you had installed.
+All previous versions of APF are saved upon the installation of newer versions and stored in `/etc/apf.DDMMYYYY-EPOCH` format (e.g., `/etc/apf.19022026-1771538400`). In addition, there is a `/etc/.bk.last` symlink created pointing to the most recent backup directory.
 
 After installation is completed the documentation and convenience scripts are copied to `/etc/apf/doc` and `/etc/apf/extras` respectively.
 
@@ -236,7 +236,7 @@ It is **NOT** recommended that you use multiple startup methods together.
 
 When upgrading from a previous version of APF:
 
-- `install.sh` automatically backs up your existing installation to `/etc/apf.bkDDMMYYYY-EPOCH` before overwriting.
+- `install.sh` automatically backs up your existing installation to `/etc/apf.DDMMYYYY-EPOCH` before overwriting.
 - `importconf` migrates your `conf.apf` settings into the new version, preserving customized values while adding new variables.
 - New configuration variables introduced in later versions receive safe defaults from the `.ca.def` preamble, so upgrades never produce unbound variable errors.
 - Hook scripts (`hook_pre.sh`, `hook_post.sh`), `silent_ips.rules`, and trust files are preserved across upgrades via `importconf`.

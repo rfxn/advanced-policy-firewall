@@ -11,34 +11,38 @@ INSTALL_PATH=${INSTALL_PATH:-"/etc/apf"}
 DEF=${DEF:-".ca.def"}
 DOUT=${DOUT:-".conf.apf"}
 
-if [ -d "$INSTALL_PATH.bk.last" ]; then
+# BK_LAST is set by install.sh via pkg_backup_path(); fall back to legacy
+# path for backward compatibility with manual invocation or DEB packaging
+BK_LAST=${BK_LAST:-"${INSTALL_PATH}.bk.last"}
+
+if [ -d "$BK_LAST" ]; then
 # get all the vars from current release
 . "$INSTALL_PATH/conf.apf" 2>/dev/null
 # replace with any vars old release had
-. "$INSTALL_PATH.bk.last/conf.apf" 2>/dev/null
+. "$BK_LAST/conf.apf" 2>/dev/null
 # generate new conf
 . "$DEF"
 
 cp -f "$INSTALL_PATH/conf.apf" "$INSTALL_PATH/conf.apf.orig"
 cp -f "$DOUT" "$INSTALL_PATH/conf.apf"
-cp -f "$INSTALL_PATH.bk.last"/*_hosts.rules "$INSTALL_PATH/"
-cp -f "$INSTALL_PATH.bk.last"/glob_allow.rules "$INSTALL_PATH/" 2>/dev/null || true
-cp -f "$INSTALL_PATH.bk.last"/glob_deny.rules "$INSTALL_PATH/" 2>/dev/null || true
-cp -f "$INSTALL_PATH.bk.last"/vnet/*.rules "$INSTALL_PATH/vnet/" 2>/dev/null || true
-cp -f "$INSTALL_PATH.bk.last"/ipset.rules "$INSTALL_PATH/" 2>/dev/null || true
-cp -f "$INSTALL_PATH.bk.last"/gre.rules "$INSTALL_PATH/" 2>/dev/null || true
-cp -pf "$INSTALL_PATH.bk.last"/hook_pre.sh "$INSTALL_PATH/" 2>/dev/null || true
-cp -pf "$INSTALL_PATH.bk.last"/hook_post.sh "$INSTALL_PATH/" 2>/dev/null || true
-cp -f "$INSTALL_PATH.bk.last"/silent_ips.rules "$INSTALL_PATH/" 2>/dev/null || true
-cp -f "$INSTALL_PATH.bk.last"/preroute.rules "$INSTALL_PATH/" 2>/dev/null || true
-cp -f "$INSTALL_PATH.bk.last"/postroute.rules "$INSTALL_PATH/" 2>/dev/null || true
+cp -f "$BK_LAST"/*_hosts.rules "$INSTALL_PATH/"
+cp -f "$BK_LAST"/glob_allow.rules "$INSTALL_PATH/" 2>/dev/null || true
+cp -f "$BK_LAST"/glob_deny.rules "$INSTALL_PATH/" 2>/dev/null || true
+cp -f "$BK_LAST"/vnet/*.rules "$INSTALL_PATH/vnet/" 2>/dev/null || true
+cp -f "$BK_LAST"/ipset.rules "$INSTALL_PATH/" 2>/dev/null || true
+cp -f "$BK_LAST"/gre.rules "$INSTALL_PATH/" 2>/dev/null || true
+cp -pf "$BK_LAST"/hook_pre.sh "$INSTALL_PATH/" 2>/dev/null || true
+cp -pf "$BK_LAST"/hook_post.sh "$INSTALL_PATH/" 2>/dev/null || true
+cp -f "$BK_LAST"/silent_ips.rules "$INSTALL_PATH/" 2>/dev/null || true
+cp -f "$BK_LAST"/preroute.rules "$INSTALL_PATH/" 2>/dev/null || true
+cp -f "$BK_LAST"/postroute.rules "$INSTALL_PATH/" 2>/dev/null || true
 
 # Migrate EG_DROP_CMD from space-separated (pre-2.0.2) to comma-separated
 if [ -n "$EG_DROP_CMD" ] && [[ "$EG_DROP_CMD" == *" "* ]] && [[ "$EG_DROP_CMD" != *","* ]]; then
 	EG_DROP_CMD="${EG_DROP_CMD// /,}"
 fi
 
-OV=$(awk '{print$2}' "$INSTALL_PATH.bk.last/VERSION")
+OV=$(awk '{print$2}' "$BK_LAST/VERSION")
 NV=$(awk '{print$2}' "$INSTALL_PATH/VERSION")
 if [ "$OV" = "$NV" ]; then
         echo "  Restored configuration from backup ($NV reinstall)."

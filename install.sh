@@ -192,8 +192,8 @@ if [ -f "/usr/share/man/man8/apf.8.gz" ]; then
 fi
 echo ""
 echo "Other Details:"
-if [ -d "$INSTALL_PATH.bk.last" ]; then
-	./importconf
+if pkg_backup_exists "$INSTALL_PATH"; then
+	BK_LAST=$(pkg_backup_path "$INSTALL_PATH") ./importconf
 	show_iface_info
 	. "$INSTALL_PATH/extras/get_ports"
 	echo "  Note: Please review $INSTALL_PATH/conf.apf for consistency, install default backed up to $INSTALL_PATH/conf.apf.orig"
