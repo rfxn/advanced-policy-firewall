@@ -214,6 +214,9 @@
       compatibility
 [Change] Update vendored pkg_lib.sh from v1.0.0 to v1.0.1; includes
       sed escaping fix in pkg_sed_path and inline error comments
+[Fix] Rewrite importconf upgrade tests to modify live install before
+      re-running install.sh; tests were creating fake backups that
+      pkg_backup overwrites, masking real upgrade behavior
 
   -- Changes --
 

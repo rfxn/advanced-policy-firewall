@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# pkg_lib.sh — Shared Packaging & Installer Library 1.0.0
+# pkg_lib.sh — Shared Packaging & Installer Library 1.0.1
 ###
 # Copyright (C) 2002-2026 R-fx Networks <proj@rfxn.com>
 #                         Ryan MacDonald <ryan@rfxn.com>
@@ -29,7 +29,7 @@
 [[ -n "${_PKG_LIB_LOADED:-}" ]] && return 0 2>/dev/null
 _PKG_LIB_LOADED=1
 # shellcheck disable=SC2034 # version checked by consumers
-PKG_LIB_VERSION="1.0.0"
+PKG_LIB_VERSION="1.0.1"
 
 # Configurable defaults — consuming projects override via environment
 PKG_NO_COLOR="${PKG_NO_COLOR:-0}"
@@ -706,7 +706,7 @@ pkg_backup_prune() {
 			rm -rf "$entry_path"
 			pruned=$((pruned + 1))
 		fi
-	done < <(ls -1 "$parent_dir" 2>/dev/null)
+	done < <(find "$parent_dir" -maxdepth 1 -mindepth 1 -printf '%f\n' 2>/dev/null)
 
 	if [[ "$pruned" -gt 0 ]]; then
 		pkg_info "pruned ${pruned} old backup(s)"
@@ -895,10 +895,10 @@ pkg_set_perms() {
 	fi
 
 	# Set directory permissions
-	find "$base_path" -type d -exec chmod "$dir_mode" {} + 2>/dev/null
+	find "$base_path" -type d -exec chmod "$dir_mode" {} + 2>/dev/null  # best-effort: traversal errors on restricted dirs safe to ignore
 
 	# Set regular file permissions
-	find "$base_path" -type f -exec chmod "$file_mode" {} + 2>/dev/null
+	find "$base_path" -type f -exec chmod "$file_mode" {} + 2>/dev/null  # best-effort: traversal errors on restricted dirs safe to ignore
 
 	# Override executable files (use dir_mode as executable mode)
 	local exec_file
@@ -1016,13 +1016,18 @@ pkg_sed_replace() {
 		return 1
 	fi
 
+	# Escape both arguments for sed with | delimiter (handle &, |, /, \)
+	local esc_old esc_new
+	esc_old=$(printf '%s' "$old_path" | sed 's/[&|/\]/\\&/g')
+	esc_new=$(printf '%s' "$new_path" | sed 's/[&|/\]/\\&/g')
+
 	local file
 	for file in "$@"; do
 		if [[ ! -f "$file" ]]; then
 			pkg_warn "pkg_sed_replace: file not found, skipping: ${file}"
 			continue
 		fi
-		sed -i "s|${old_path}|${new_path}|g" "$file" || {
+		sed -i "s|${esc_old}|${esc_new}|g" "$file" || {
 			pkg_warn "pkg_sed_replace: sed failed on ${file}"
 		}
 	done
@@ -1525,7 +1530,7 @@ pkg_service_enable() {
 
 	# 1. systemd
 	if [[ "$_PKG_INIT_SYSTEM" = "systemd" ]]; then
-		systemctl enable "$name" 2>/dev/null
+		systemctl enable "$name" 2>/dev/null  # may fail if unit missing
 		return $?
 	fi
 
@@ -1603,7 +1608,7 @@ pkg_service_disable() {
 
 	# 1. systemd
 	if [[ "$_PKG_INIT_SYSTEM" = "systemd" ]]; then
-		systemctl disable "$name" 2>/dev/null
+		systemctl disable "$name" 2>/dev/null  # may fail if unit missing
 		return $?
 	fi
 

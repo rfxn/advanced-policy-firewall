@@ -143,18 +143,17 @@ teardown_file() {
 # =====================================================================
 # importconf upgrade path tests
 #
-# Simulate upgrade by creating a backup directory with .bk.last symlink
-# (matching pkg_backup behavior) and re-running install.sh, which
-# triggers importconf to merge old config into new.
+# Simulate upgrade by modifying the live install, then re-running
+# install.sh. pkg_backup creates a backup of the modified install
+# (updating .bk.last), and importconf merges old config from that
+# backup into the fresh install.
 # =====================================================================
 
 @test "importconf preserves user config values during upgrade" {
     _clean_test_backup
-    local bk_dir
-    bk_dir=$(_create_test_backup)
-    # Modify a config value in the backup
-    sed -i 's/^IG_TCP_CPORTS=.*/IG_TCP_CPORTS="22,80,443"/' "$bk_dir/conf.apf"
-    # Re-run install (triggers importconf)
+    # Modify a config value in the live install (simulating user customization)
+    sed -i 's/^IG_TCP_CPORTS=.*/IG_TCP_CPORTS="22,80,443"/' "$APF_DIR/conf.apf"
+    # Re-run install — pkg_backup backs up the modified install, importconf merges
     cd /opt/apf-src
     INSTALL_PATH="$APF_DIR" bash install.sh >/dev/null 2>&1
     # Verify the user's custom value was preserved
@@ -165,11 +164,9 @@ teardown_file() {
 
 @test "importconf provides defaults for new variables" {
     _clean_test_backup
-    local bk_dir
-    bk_dir=$(_create_test_backup)
-    # Remove new variables from backup config (simulating upgrade from older version)
-    sed -i '/^SYNFLOOD=/d' "$bk_dir/conf.apf"
-    sed -i '/^SMTP_BLOCK=/d' "$bk_dir/conf.apf"
+    # Remove variables from live install (simulating upgrade from older version)
+    sed -i '/^SYNFLOOD=/d' "$APF_DIR/conf.apf"
+    sed -i '/^SMTP_BLOCK=/d' "$APF_DIR/conf.apf"
     cd /opt/apf-src
     INSTALL_PATH="$APF_DIR" bash install.sh >/dev/null 2>&1
     # Verify new variables got their defaults via .ca.def preamble
@@ -182,10 +179,8 @@ teardown_file() {
 
 @test "importconf preserves hook script permissions" {
     _clean_test_backup
-    local bk_dir
-    bk_dir=$(_create_test_backup)
-    # Make hook executable in backup (simulating user-activated hook)
-    chmod 750 "$bk_dir/hook_pre.sh"
+    # Make hook executable in live install (simulating user-activated hook)
+    chmod 750 "$APF_DIR/hook_pre.sh"
     cd /opt/apf-src
     INSTALL_PATH="$APF_DIR" bash install.sh >/dev/null 2>&1
     # Verify hook retained executable permission (importconf uses cp -pf)
@@ -195,11 +190,9 @@ teardown_file() {
 
 @test "importconf preserves trust and rule files" {
     _clean_test_backup
-    local bk_dir
-    bk_dir=$(_create_test_backup)
-    # Add entries to backup trust/rule files
-    echo "192.0.2.50 # test entry" >> "$bk_dir/allow_hosts.rules"
-    echo "198.51.100.1" >> "$bk_dir/silent_ips.rules"
+    # Add entries to live trust/rule files (simulating user customization)
+    echo "192.0.2.50 # test entry" >> "$APF_DIR/allow_hosts.rules"
+    echo "198.51.100.1" >> "$APF_DIR/silent_ips.rules"
     cd /opt/apf-src
     INSTALL_PATH="$APF_DIR" bash install.sh >/dev/null 2>&1
     # Verify entries were preserved
@@ -212,11 +205,9 @@ teardown_file() {
 
 @test "importconf preserves preroute and postroute rules" {
     _clean_test_backup
-    local bk_dir
-    bk_dir=$(_create_test_backup)
-    # Add custom rules to preroute and postroute in backup
-    echo "-A PREROUTING -p tcp --dport 80 -j TOS --set-tos 0x10" >> "$bk_dir/preroute.rules"
-    echo "-A POSTROUTING -p tcp --sport 80 -j TOS --set-tos 0x10" >> "$bk_dir/postroute.rules"
+    # Add custom rules to live preroute and postroute (simulating user customization)
+    echo "-A PREROUTING -p tcp --dport 80 -j TOS --set-tos 0x10" >> "$APF_DIR/preroute.rules"
+    echo "-A POSTROUTING -p tcp --sport 80 -j TOS --set-tos 0x10" >> "$APF_DIR/postroute.rules"
     cd /opt/apf-src
     INSTALL_PATH="$APF_DIR" bash install.sh >/dev/null 2>&1
     # Verify custom preroute content preserved
@@ -298,10 +289,8 @@ teardown_file() {
 
 @test "upgrade produces no 'cannot stat' errors with empty vnet" {
     _clean_test_backup
-    local bk_dir
-    bk_dir=$(_create_test_backup)
-    # Remove any .rules files from backup vnet dir to trigger glob failure
-    rm -f "$bk_dir"/vnet/*.rules 2>/dev/null || true
+    # Remove any .rules files from live vnet dir to test glob failure case
+    rm -f "$APF_DIR"/vnet/*.rules 2>/dev/null || true
     cd /opt/apf-src
     local output
     output=$(INSTALL_PATH="$APF_DIR" bash install.sh 2>&1)
@@ -321,10 +310,8 @@ teardown_file() {
 
 @test "existing IFACE_UNTRUSTED preserved on upgrade" {
     _clean_test_backup
-    local bk_dir
-    bk_dir=$(_create_test_backup)
-    # Set custom interface in backup
-    sed -i 's/^IFACE_UNTRUSTED=.*/IFACE_UNTRUSTED="ens192"/' "$bk_dir/conf.apf"
+    # Set custom interface in live install (simulating user customization)
+    sed -i 's/^IFACE_UNTRUSTED=.*/IFACE_UNTRUSTED="ens192"/' "$APF_DIR/conf.apf"
     cd /opt/apf-src
     INSTALL_PATH="$APF_DIR" bash install.sh >/dev/null 2>&1
     # importconf should have preserved the user's custom value
