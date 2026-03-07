@@ -325,3 +325,10 @@
 [New] elog_lib integration tests (34-elog-integration.bats): audit log
       creation, JSONL event writing, eout backward compat, source guard,
       firewall subprocess audit path inheritance
+[Change] validate_config tests use --validate instead of full firewall
+      start; saves ~55-60s from the critical path
+[Change] uid-egress tests check capability before firewall start
+[Fix] Remove duplicate GRE linkid tests (already covered by
+      18-gre.bats)
+[Fix] Remove Bash 4.2+ static check from behavioral test suite (belongs
+      in lint/CI workflow)
