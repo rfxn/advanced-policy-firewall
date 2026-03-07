@@ -201,6 +201,19 @@
 [Fix] Move ELOG_LOG_DIR and ELOG_AUDIT_FILE from files/apf to
       internals.conf so the firewall subprocess inherits audit trail
       paths; rule_loaded events were silently dropped
+[Fix] Change all install.sh invocations from sh to bash in Dockerfiles,
+      test helpers, tests, and documentation; install.sh uses bash-only
+      constructs (via pkg_lib.sh) incompatible with sh/dash
+[Fix] Add /var/log/apf/audit.log to logrotate coverage with
+      copytruncate; audit log was growing unbounded
+[Change] Update vendored elog_lib.sh from v1.0.0 to v1.0.2; includes
+      upstream fix for ELOG_AUDIT_FILE expansion (:-  to -) allowing
+      consumers to explicitly set empty audit path
+[Fix] Add inline comment to internals.conf documenting intentional
+      ELOG_LOG_FILE vs ELOG_LOG_DIR path mismatch for backward
+      compatibility
+[Change] Update vendored pkg_lib.sh from v1.0.0 to v1.0.1; includes
+      sed escaping fix in pkg_sed_path and inline error comments
 
   -- Changes --
 

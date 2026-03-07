@@ -43,7 +43,7 @@ Contents:
 Quick Start:
 
   # Install
-  sh install.sh
+  bash install.sh
 
   # Configure — edit ports, interfaces, options
   vi /etc/apf/conf.apf
@@ -182,9 +182,9 @@ The installation setup of APF is very straight forward, there is an included
 install.sh script that will perform all the tasks of installing APF for you.
 
 Begin Install:
-# sh install.sh
+# bash install.sh
 or
-# INSTALL_PATH=/etc/yourpath sh install.sh
+# INSTALL_PATH=/etc/yourpath bash install.sh
 
 
 If one so desires they may customize the setup of APF by editing the variables

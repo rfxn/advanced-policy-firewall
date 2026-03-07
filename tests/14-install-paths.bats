@@ -113,7 +113,7 @@ teardown_file() {
     cd /opt/apf-src
     # install.sh may exit non-zero in Docker (service setup fails) — tolerate it;
     # we're testing the cron file removal side effect, not install.sh exit code
-    INSTALL_PATH="$APF_DIR" sh install.sh >/dev/null 2>&1 || true
+    INSTALL_PATH="$APF_DIR" bash install.sh >/dev/null 2>&1 || true
     [ ! -f "/etc/cron.d/refresh.apf" ]
 }
 
@@ -126,7 +126,7 @@ teardown_file() {
     [ -f "/etc/cron.d/apf_develmode" ]
     cd /opt/apf-src
     # install.sh may exit non-zero in Docker (service setup fails) — tolerate it
-    INSTALL_PATH="$APF_DIR" sh install.sh >/dev/null 2>&1 || true
+    INSTALL_PATH="$APF_DIR" bash install.sh >/dev/null 2>&1 || true
     [ ! -f "/etc/cron.d/apf_develmode" ]
 }
 
@@ -156,7 +156,7 @@ teardown_file() {
     sed -i 's/^IG_TCP_CPORTS=.*/IG_TCP_CPORTS="22,80,443"/' "$bk_dir/conf.apf"
     # Re-run install (triggers importconf)
     cd /opt/apf-src
-    INSTALL_PATH="$APF_DIR" sh install.sh >/dev/null 2>&1
+    INSTALL_PATH="$APF_DIR" bash install.sh >/dev/null 2>&1
     # Verify the user's custom value was preserved
     run grep '^IG_TCP_CPORTS="22,80,443"' "$APF_DIR/conf.apf"
     assert_success
@@ -171,7 +171,7 @@ teardown_file() {
     sed -i '/^SYNFLOOD=/d' "$bk_dir/conf.apf"
     sed -i '/^SMTP_BLOCK=/d' "$bk_dir/conf.apf"
     cd /opt/apf-src
-    INSTALL_PATH="$APF_DIR" sh install.sh >/dev/null 2>&1
+    INSTALL_PATH="$APF_DIR" bash install.sh >/dev/null 2>&1
     # Verify new variables got their defaults via .ca.def preamble
     run grep '^SYNFLOOD="0"' "$APF_DIR/conf.apf"
     assert_success
@@ -187,7 +187,7 @@ teardown_file() {
     # Make hook executable in backup (simulating user-activated hook)
     chmod 750 "$bk_dir/hook_pre.sh"
     cd /opt/apf-src
-    INSTALL_PATH="$APF_DIR" sh install.sh >/dev/null 2>&1
+    INSTALL_PATH="$APF_DIR" bash install.sh >/dev/null 2>&1
     # Verify hook retained executable permission (importconf uses cp -pf)
     [ -x "$APF_DIR/hook_pre.sh" ]
     _clean_test_backup
@@ -201,7 +201,7 @@ teardown_file() {
     echo "192.0.2.50 # test entry" >> "$bk_dir/allow_hosts.rules"
     echo "198.51.100.1" >> "$bk_dir/silent_ips.rules"
     cd /opt/apf-src
-    INSTALL_PATH="$APF_DIR" sh install.sh >/dev/null 2>&1
+    INSTALL_PATH="$APF_DIR" bash install.sh >/dev/null 2>&1
     # Verify entries were preserved
     run grep "192.0.2.50" "$APF_DIR/allow_hosts.rules"
     assert_success
@@ -218,7 +218,7 @@ teardown_file() {
     echo "-A PREROUTING -p tcp --dport 80 -j TOS --set-tos 0x10" >> "$bk_dir/preroute.rules"
     echo "-A POSTROUTING -p tcp --sport 80 -j TOS --set-tos 0x10" >> "$bk_dir/postroute.rules"
     cd /opt/apf-src
-    INSTALL_PATH="$APF_DIR" sh install.sh >/dev/null 2>&1
+    INSTALL_PATH="$APF_DIR" bash install.sh >/dev/null 2>&1
     # Verify custom preroute content preserved
     run grep "PREROUTING.*TOS" "$APF_DIR/preroute.rules"
     assert_success
@@ -292,7 +292,7 @@ teardown_file() {
     _clean_test_backup
     cd /opt/apf-src
     local stderr_out
-    stderr_out=$(INSTALL_PATH="$APF_DIR" sh install.sh 2>&1 1>/dev/null)
+    stderr_out=$(INSTALL_PATH="$APF_DIR" bash install.sh 2>&1 1>/dev/null)
     [[ ! "$stderr_out" =~ "Device" ]]
 }
 
@@ -304,7 +304,7 @@ teardown_file() {
     rm -f "$bk_dir"/vnet/*.rules 2>/dev/null || true
     cd /opt/apf-src
     local output
-    output=$(INSTALL_PATH="$APF_DIR" sh install.sh 2>&1)
+    output=$(INSTALL_PATH="$APF_DIR" bash install.sh 2>&1)
     [[ ! "$output" =~ "cannot stat" ]]
     _clean_test_backup
 }
@@ -314,7 +314,7 @@ teardown_file() {
     _create_test_backup >/dev/null
     cd /opt/apf-src
     local output
-    output=$(INSTALL_PATH="$APF_DIR" sh install.sh 2>&1)
+    output=$(INSTALL_PATH="$APF_DIR" bash install.sh 2>&1)
     [[ "$output" =~ "Restored configuration from backup" ]]
     _clean_test_backup
 }
@@ -326,7 +326,7 @@ teardown_file() {
     # Set custom interface in backup
     sed -i 's/^IFACE_UNTRUSTED=.*/IFACE_UNTRUSTED="ens192"/' "$bk_dir/conf.apf"
     cd /opt/apf-src
-    INSTALL_PATH="$APF_DIR" sh install.sh >/dev/null 2>&1
+    INSTALL_PATH="$APF_DIR" bash install.sh >/dev/null 2>&1
     # importconf should have preserved the user's custom value
     run grep '^IFACE_UNTRUSTED="ens192"' "$APF_DIR/conf.apf"
     assert_success
@@ -337,7 +337,7 @@ teardown_file() {
     _clean_test_backup
     cd /opt/apf-src
     local output
-    output=$(INSTALL_PATH="$APF_DIR" sh install.sh 2>&1)
+    output=$(INSTALL_PATH="$APF_DIR" bash install.sh 2>&1)
     [[ "$output" =~ "Default interface:" ]]
 }
 
@@ -346,7 +346,7 @@ teardown_file() {
     _create_test_backup >/dev/null
     cd /opt/apf-src
     local output
-    output=$(INSTALL_PATH="$APF_DIR" sh install.sh 2>&1)
+    output=$(INSTALL_PATH="$APF_DIR" bash install.sh 2>&1)
     [[ "$output" =~ "Default interface:" ]]
     _clean_test_backup
 }

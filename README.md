@@ -53,7 +53,7 @@ trust-based host management, reactive address blocking, and per-IP virtual netwo
 
 ```bash
 # Install
-sh install.sh
+bash install.sh
 
 # Configure — edit ports, interfaces, options
 vi /etc/apf/conf.apf
@@ -181,10 +181,10 @@ The installation setup of APF is very straight forward, there is an included `in
 
 ```bash
 # Default install
-sh install.sh
+bash install.sh
 
 # Custom install path
-INSTALL_PATH=/etc/yourpath sh install.sh
+INSTALL_PATH=/etc/yourpath bash install.sh
 ```
 
 If one so desires they may customize the setup of APF by editing the variables inside the `install.sh` script followed by also editing the path variables in the `conf.apf` and `internals.conf` files. This is however not recommended and the default paths should meet all user needs, they are:
