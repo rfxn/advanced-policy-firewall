@@ -53,7 +53,7 @@ trust-based host management, reactive address blocking, and per-IP virtual netwo
 
 ```bash
 # Install
-sh install.sh
+bash install.sh
 
 # Configure — edit ports, interfaces, options
 vi /etc/apf/conf.apf
@@ -181,10 +181,10 @@ The installation setup of APF is very straight forward, there is an included `in
 
 ```bash
 # Default install
-sh install.sh
+bash install.sh
 
 # Custom install path
-INSTALL_PATH=/etc/yourpath sh install.sh
+INSTALL_PATH=/etc/yourpath bash install.sh
 ```
 
 If one so desires they may customize the setup of APF by editing the variables inside the `install.sh` script followed by also editing the path variables in the `conf.apf` and `internals.conf` files. This is however not recommended and the default paths should meet all user needs, they are:
@@ -194,7 +194,7 @@ If one so desires they may customize the setup of APF by editing the variables i
 
 The package includes two convenience scripts, the first is `importconf` which will import all the variable settings from your previous version of APF into the new installation. The second is `get_ports`, a script which will output the system's currently in use 'server' ports for the user during the installation process in an effort to aid in configuring port settings.
 
-All previous versions of APF are saved upon the installation of newer versions and stored in `/etc/apf.bkDDMMYYYY-EPOCH` format (e.g., `/etc/apf.bk19022026-1771538400`). In addition, there is a `/etc/apf.bk.last` sym-link created to the last version of APF you had installed.
+All previous versions of APF are saved upon the installation of newer versions and stored in `/etc/apf.DDMMYYYY-EPOCH` format (e.g., `/etc/apf.19022026-1771538400`). In addition, there is a `/etc/.bk.last` symlink created pointing to the most recent backup directory.
 
 After installation is completed the documentation and convenience scripts are copied to `/etc/apf/doc` and `/etc/apf/extras` respectively.
 
@@ -236,7 +236,7 @@ It is **NOT** recommended that you use multiple startup methods together.
 
 When upgrading from a previous version of APF:
 
-- `install.sh` automatically backs up your existing installation to `/etc/apf.bkDDMMYYYY-EPOCH` before overwriting.
+- `install.sh` automatically backs up your existing installation to `/etc/apf.DDMMYYYY-EPOCH` before overwriting.
 - `importconf` migrates your `conf.apf` settings into the new version, preserving customized values while adding new variables.
 - New configuration variables introduced in later versions receive safe defaults from the `.ca.def` preamble, so upgrades never produce unbound variable errors.
 - Hook scripts (`hook_pre.sh`, `hook_post.sh`), `silent_ips.rules`, and trust files are preserved across upgrades via `importconf`.
@@ -575,7 +575,7 @@ APF provides configurable logging of filtered packets through the `LOG_*` variab
 |----------|---------|
 | `LOG_DROP` | Master toggle for firewall packet logging |
 | `LOG_LEVEL` | Syslog level for log entries (default: `crit`) |
-| `LOG_TARGET` | `LOG` (kernel syslog) or `ULOG` (ulogd userspace) |
+| `LOG_TARGET` | `LOG` (kernel syslog), `NFLOG` (ulogd2/nfnetlink), or `ULOG` (deprecated) |
 | `LOG_IA` | Log interactive access (SSH/Telnet, requires `LOG_DROP="1"`) |
 | `LOG_LGATE` | Log foreign gateway traffic |
 | `LOG_EXT` | Extended logging (TCP/IP options in output) |
@@ -694,7 +694,7 @@ Subsystems:
   --gre-status ................ show GRE tunnel status
 ```
 
-The **`--rules`** option dumps all active iptables rules to stdout in `iptables-save` format, suitable for piping (e.g., `apf --rules | grep DROP`). The **`-l|--list`** option opens rules in an editor for browsing.
+The **`--rules`** option dumps all active iptables rules to stdout in `iptables -S` format, suitable for piping (e.g., `apf --rules | grep DROP`). The **`-l|--list`** option opens rules in an editor for browsing.
 
 The **`--info`** option shows a firewall status summary organized into sections: status (active state, rule/chain counts), trust system (allow/deny/temp entry counts, ban expiry, block escalation, FQDN resolution), filtering (stop targets, port lists, packet sanity, connlimit, SYN flood, SMTP blocking), subsystems (fast load, RAB, VNET, Docker compat, ipset, GRE, remote lists), and logging (log file, log drops, recent entries). The **`-t|--status`** option pages through the full APF status log at `/var/log/apf_log`.
 
@@ -882,7 +882,7 @@ For example, setting `PERMBLOCK_COUNT="3"` and `PERMBLOCK_INTERVAL="86400"` will
 
 **ipset block lists not loading?** Install the ipset package (`apt-get install ipset` / `yum install ipset`), set `USE_IPSET="1"` in `conf.apf`, and verify with `apf -o | grep IPSET`.
 
-**How to see what is blocked?** Use `apf -g IP` to search iptables rules and trust files, or `apf -l | grep IP` to search loaded rules directly.
+**How to see what is blocked?** Use `apf -g IP` to search iptables rules and trust files, or `apf --rules | grep IP` to search loaded rules directly.
 
 **How to check if APF is running?** Run `apf -t` to view the status log, or `iptables -S | head` to check for loaded rules.
 

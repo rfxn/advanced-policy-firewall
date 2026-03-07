@@ -26,6 +26,14 @@ else
    exit 1
 fi
 
+# Initialize log environment (creates dirs, files, enables output modules)
+# ELOG_LOG_DIR/ELOG_AUDIT_FILE are set in internals.conf (shared with files/firewall)
+if ! elog_init; then
+	echo "warning: elog_init failed; structured event logging may be unavailable" >&2
+fi
+# elog_init enables file/audit_file but NOT stdout — enable it for eout() compat
+elog_output_enable "stdout" 2>/dev/null || true  # safe: stdout always registered in elog_lib.sh
+
 if [ ! -f "$LOG_APF" ]; then
         touch "$LOG_APF"
         chmod 640 "$LOG_APF"
@@ -57,6 +65,7 @@ fi
 start() {
 check_deps
 validate_config
+elog_event "config_loaded" "info" "APF configuration loaded"
 ##
 # Fast Load
 ##
@@ -154,6 +163,7 @@ if [ -z "$SKIP_FASTLOAD_FIRSTRUN" ] && [ -z "$SKIP_FASTLOAD_EXPIRED" ] && [ -z "
 				flush 1
 			else
 				eout "{glob} firewall initialized"
+				elog_event "service_state" "info" "APF firewall started (fast load)"
 				if [ "$SET_VERBOSE" == "1" ] && [ "$DEVEL_ON" == "1" ]; then
 					eout "{glob} !!DEVELOPMENT MODE ENABLED!! - firewall will flush every 5 minutes."
 				fi
@@ -162,6 +172,7 @@ if [ -z "$SKIP_FASTLOAD_FIRSTRUN" ] && [ -z "$SKIP_FASTLOAD_EXPIRED" ] && [ -z "
 			fi
 		else
 			eout "{glob} firewall initialized"
+			elog_event "service_state" "info" "APF firewall started (fast load)"
 			if [ "$SET_VERBOSE" == "1" ] && [ "$DEVEL_ON" == "1" ]; then
 				eout "{glob} !!DEVELOPMENT MODE ENABLED!! - firewall will flush every 5 minutes."
 			fi
@@ -214,6 +225,7 @@ if [ "$fw_rc" -ne 0 ]; then
 	exit "$fw_rc"
 fi
 eout "{glob} firewall initialized"
+elog_event "service_state" "info" "APF firewall started"
 if [ "$MD5_FIRSTRUN" == "1" ]; then
         $MD5 $MD5_FILES > "$INSTALL_PATH/internals/.md5.cores" 2> /dev/null
 fi
@@ -239,6 +251,7 @@ case "$1" in
 -f|--flush|--stop)
 	mutex_lock
 	flush
+	elog_event "service_state" "info" "APF firewall stopped"
 	;;
 -l|--list)
 	list

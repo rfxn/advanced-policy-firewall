@@ -8,7 +8,7 @@ APF_INSTALL="/opt/apf"
 
 install_apf() {
     cd "$APF_SRC"
-    INSTALL_PATH="$APF_INSTALL" sh install.sh
+    INSTALL_PATH="$APF_INSTALL" bash install.sh
 
     # Prevent cross-test contamination: importconf copies old *_hosts.rules
     # from backup, which may contain entries from previous test runs.

@@ -21,7 +21,7 @@ COPY . /opt/apf-src
 COPY tests/ /opt/tests/
 
 # Pre-install APF with test config
-RUN cd /opt/apf-src && INSTALL_PATH=/opt/apf sh install.sh && \
+RUN cd /opt/apf-src && INSTALL_PATH=/opt/apf bash install.sh && \
     conf="/opt/apf/conf.apf" && \
     sed -i 's/^SET_MONOKERN=.*/SET_MONOKERN="1"/' "$conf" && \
     sed -i 's/^DEVEL_MODE=.*/DEVEL_MODE="0"/' "$conf" && \

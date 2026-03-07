@@ -9,13 +9,15 @@
 #
 
 eout() {
-local arg="$1"
-        if [ -n "$arg" ]; then
-                echo "$(date +"%b %d %H:%M:%S") $(hostname -s) $APPN($$): $arg" >> "$LOG_APF"
-                if [ "$SET_VERBOSE" == "1" ] || [ "$2" == "1" ]; then
-                        echo "$APPN($$): $arg"
-                fi
-        fi
+	local _msg="$1"
+	local _force_stdout="${2:-0}"
+	if [ -n "$_msg" ]; then
+		if [ "$_force_stdout" = "1" ]; then
+			elog info "$_msg" 1
+		else
+			elog info "$_msg"
+		fi
+	fi
 }
 
 devm() {

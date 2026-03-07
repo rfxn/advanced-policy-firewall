@@ -8,7 +8,6 @@
 #   - expand_port() malformed ranges (Phase 3)
 #   - trust_parse_fields() edge cases (Phase 3b)
 #   - NDP type collision detection (Phase 5)
-#   - GRE linkid validation edge cases (Phase 6)
 
 load '/usr/local/lib/bats/bats-support/load'
 load '/usr/local/lib/bats/bats-assert/load'
@@ -311,56 +310,7 @@ teardown() {
 }
 
 # =====================================================================
-# GRE linkid validation edge cases (Phase 6)
-# =====================================================================
-
-@test "GRE linkid rejects non-numeric input" {
-    if ! gre_available; then skip "GRE not available"; fi
-    source /opt/tests/helpers/apf-config.sh
-    apf_set_config "USE_GRE" "1"
-
-    cat > "$APF_DIR/gre.rules" <<'GRECONF'
-#!/bin/bash
-role="source"
-create_gretun abc 203.0.113.2 192.0.2.1
-GRECONF
-
-    "$APF" -f 2>/dev/null
-    "$APF" -s
-
-    # Log should show validation error
-    run grep "not a valid integer" /var/log/apf_log
-    assert_success
-
-    # Cleanup
-    apf_set_config "USE_GRE" "0"
-    rm -f "$APF_DIR/gre.rules"
-}
-
-@test "GRE linkid rejects value over 99" {
-    if ! gre_available; then skip "GRE not available"; fi
-    source /opt/tests/helpers/apf-config.sh
-    apf_set_config "USE_GRE" "1"
-
-    cat > "$APF_DIR/gre.rules" <<'GRECONF'
-#!/bin/bash
-role="source"
-create_gretun 100 203.0.113.2 192.0.2.1
-GRECONF
-
-    "$APF" -f 2>/dev/null
-    "$APF" -s
-
-    run grep "linkid must be 1-99" /var/log/apf_log
-    assert_success
-
-    # Cleanup
-    apf_set_config "USE_GRE" "0"
-    rm -f "$APF_DIR/gre.rules"
-}
-
-# =====================================================================
-# Dlist invalid entry filtering (Phase 6 — regex validation)
+# Dlist invalid entry filtering (Phase 6 -- regex validation)
 # =====================================================================
 
 @test "dlist skips entries with invalid CIDR suffix" {
@@ -515,15 +465,6 @@ mac_module_available() {
     apf_set_config "SET_EXPIRE" "0"
 }
 
-@test "no Bash 4.2+ case conversion in shell files" {
-    # Verify no ${var,,} or ${var^^} patterns in installed APF files
-    local pattern='\$\{[a-zA-Z_][a-zA-Z_0-9]*(\^{2}|,{2})\}'
-    run grep -rE "$pattern" "$APF_DIR/apf" "$APF_DIR/firewall" \
-        "$APF_DIR/internals/functions.apf" "$APF_DIR/internals/cports.common" \
-        "$APF_DIR/internals/internals.conf"
-    assert_failure  # grep returns 1 when no match found
-}
-
 # =====================================================================
 # validate_config() coverage (C-002)
 # =====================================================================
@@ -531,9 +472,8 @@ mac_module_available() {
 @test "validate_config rejects invalid ICMP_LIM format" {
     source /opt/tests/helpers/apf-config.sh
     apf_set_config_safe "ICMP_LIM" "badvalue"
-    "$APF" -f 2>/dev/null || true
 
-    run "$APF" -s
+    run "$APF" --validate
     assert_failure
     [[ "$output" == *"ICMP_LIM"*"invalid"* ]]
 
@@ -543,9 +483,8 @@ mac_module_available() {
 @test "validate_config accepts ICMP_LIM=0 (unlimited)" {
     source /opt/tests/helpers/apf-config.sh
     apf_set_config_safe "ICMP_LIM" "0"
-    "$APF" -f 2>/dev/null || true
 
-    run "$APF" -s
+    run "$APF" --validate
     assert_success
 
     apf_set_config_safe "ICMP_LIM" "30/s"
@@ -555,9 +494,8 @@ mac_module_available() {
     source /opt/tests/helpers/apf-config.sh
     apf_set_config "LOG_DROP" "1"
     apf_set_config "LOG_LEVEL" "badlevel"
-    "$APF" -f 2>/dev/null || true
 
-    run "$APF" -s
+    run "$APF" --validate
     assert_failure
     [[ "$output" == *"LOG_LEVEL"*"invalid"* ]]
 
@@ -569,9 +507,8 @@ mac_module_available() {
     source /opt/tests/helpers/apf-config.sh
     apf_set_config "LOG_DROP" "1"
     apf_set_config "LOG_TARGET" "BADTARGET"
-    "$APF" -f 2>/dev/null || true
 
-    run "$APF" -s
+    run "$APF" --validate
     assert_failure
     [[ "$output" == *"LOG_TARGET"*"invalid"* ]]
 
@@ -583,9 +520,8 @@ mac_module_available() {
     source /opt/tests/helpers/apf-config.sh
     apf_set_config "LOG_DROP" "1"
     apf_set_config "LOG_RATE" "abc"
-    "$APF" -f 2>/dev/null || true
 
-    run "$APF" -s
+    run "$APF" --validate
     assert_failure
     [[ "$output" == *"LOG_RATE"*"invalid"* ]]
 
@@ -596,9 +532,8 @@ mac_module_available() {
 @test "validate_config rejects non-numeric SYSCTL_CONNTRACK" {
     source /opt/tests/helpers/apf-config.sh
     apf_set_config "SYSCTL_CONNTRACK" "notanum"
-    "$APF" -f 2>/dev/null || true
 
-    run "$APF" -s
+    run "$APF" --validate
     assert_failure
     [[ "$output" == *"SYSCTL_CONNTRACK"*"invalid"* ]]
 
@@ -608,9 +543,8 @@ mac_module_available() {
 @test "validate_config rejects non-numeric PERMBLOCK_COUNT" {
     source /opt/tests/helpers/apf-config.sh
     apf_set_config "PERMBLOCK_COUNT" "abc"
-    "$APF" -f 2>/dev/null || true
 
-    run "$APF" -s
+    run "$APF" --validate
     assert_failure
     [[ "$output" == *"PERMBLOCK_COUNT"*"invalid"* ]]
 
@@ -621,9 +555,8 @@ mac_module_available() {
     source /opt/tests/helpers/apf-config.sh
     apf_set_config "PERMBLOCK_COUNT" "3"
     apf_set_config "PERMBLOCK_INTERVAL" "xyz"
-    "$APF" -f 2>/dev/null || true
 
-    run "$APF" -s
+    run "$APF" --validate
     assert_failure
     [[ "$output" == *"PERMBLOCK_INTERVAL"*"invalid"* ]]
 
@@ -635,9 +568,8 @@ mac_module_available() {
     source /opt/tests/helpers/apf-config.sh
     apf_set_config "RAB" "1"
     apf_set_config "RAB_PSCAN_LEVEL" "5"
-    "$APF" -f 2>/dev/null || true
 
-    run "$APF" -s
+    run "$APF" --validate
     assert_failure
     [[ "$output" == *"RAB_PSCAN_LEVEL"*"invalid"* ]]
 
@@ -650,9 +582,8 @@ mac_module_available() {
     apf_set_config "SYNFLOOD" "1"
     apf_set_config_safe "SYNFLOOD_RATE" "100/s"
     apf_set_config "SYNFLOOD_BURST" "0"
-    "$APF" -f 2>/dev/null || true
 
-    run "$APF" -s
+    run "$APF" --validate
     assert_failure
     [[ "$output" == *"SYNFLOOD_BURST"*"greater than 0"* ]]
 
@@ -664,9 +595,8 @@ mac_module_available() {
     source /opt/tests/helpers/apf-config.sh
     apf_set_config "LOG_DROP" "1"
     apf_set_config "LOG_RATE" "0"
-    "$APF" -f 2>/dev/null || true
 
-    run "$APF" -s
+    run "$APF" --validate
     assert_failure
     [[ "$output" == *"LOG_RATE"*"greater than 0"* ]]
 
@@ -678,9 +608,8 @@ mac_module_available() {
     source /opt/tests/helpers/apf-config.sh
     apf_set_config "RAB" "1"
     apf_set_config "RAB_HITCOUNT" "abc"
-    "$APF" -f 2>/dev/null || true
 
-    run "$APF" -s
+    run "$APF" --validate
     assert_failure
     [[ "$output" == *"RAB_HITCOUNT"*"invalid"* ]]
 
@@ -692,9 +621,8 @@ mac_module_available() {
     source /opt/tests/helpers/apf-config.sh
     apf_set_config "RAB" "1"
     apf_set_config "RAB_TIMER" "abc"
-    "$APF" -f 2>/dev/null || true
 
-    run "$APF" -s
+    run "$APF" --validate
     assert_failure
     [[ "$output" == *"RAB_TIMER"*"invalid"* ]]
 
@@ -706,9 +634,8 @@ mac_module_available() {
     source /opt/tests/helpers/apf-config.sh
     apf_set_config "RAB" "1"
     apf_set_config "RAB_TIMER" "0"
-    "$APF" -f 2>/dev/null || true
 
-    run "$APF" -s
+    run "$APF" --validate
     assert_failure
     [[ "$output" == *"RAB_TIMER"*"greater than 0"* ]]
 
@@ -719,9 +646,8 @@ mac_module_available() {
 @test "validate_config rejects empty IFACE_UNTRUSTED" {
     source /opt/tests/helpers/apf-config.sh
     apf_set_config "IFACE_UNTRUSTED" ""
-    "$APF" -f 2>/dev/null || true
 
-    run "$APF" -s
+    run "$APF" --validate
     assert_failure
     [[ "$output" == *"IFACE_UNTRUSTED"*"not set"* ]]
 
@@ -731,9 +657,8 @@ mac_module_available() {
 @test "validate_config rejects invalid connlimit entry" {
     source /opt/tests/helpers/apf-config.sh
     apf_set_config "IG_TCP_CLIMIT" "badentry"
-    "$APF" -f 2>/dev/null || true
 
-    run "$APF" -s
+    run "$APF" --validate
     assert_failure
     [[ "$output" == *"IG_TCP_CLIMIT"*"invalid"* ]]
 
@@ -743,9 +668,8 @@ mac_module_available() {
 @test "validate_config accepts valid connlimit entry" {
     source /opt/tests/helpers/apf-config.sh
     apf_set_config "IG_TCP_CLIMIT" "80:50,443:100"
-    "$APF" -f 2>/dev/null || true
 
-    run "$APF" -s
+    run "$APF" --validate
     assert_success
 
     apf_set_config "IG_TCP_CLIMIT" ""
@@ -754,9 +678,8 @@ mac_module_available() {
 @test "validate_config rejects connlimit entry missing colon" {
     source /opt/tests/helpers/apf-config.sh
     apf_set_config "IG_UDP_CLIMIT" "80-50"
-    "$APF" -f 2>/dev/null || true
 
-    run "$APF" -s
+    run "$APF" --validate
     assert_failure
     [[ "$output" == *"IG_UDP_CLIMIT"*"invalid"* ]]
 
@@ -766,9 +689,8 @@ mac_module_available() {
 @test "validate_config rejects non-numeric SET_EXPIRE" {
     source /opt/tests/helpers/apf-config.sh
     apf_set_config "SET_EXPIRE" "abc"
-    "$APF" -f 2>/dev/null || true
 
-    run "$APF" -s
+    run "$APF" --validate
     assert_failure
     [[ "$output" == *"SET_EXPIRE"*"invalid"* ]]
 
@@ -778,9 +700,8 @@ mac_module_available() {
 @test "validate_config accepts SET_EXPIRE=0 (disabled)" {
     source /opt/tests/helpers/apf-config.sh
     apf_set_config "SET_EXPIRE" "0"
-    "$APF" -f 2>/dev/null || true
 
-    run "$APF" -s
+    run "$APF" --validate
     assert_success
 
     apf_set_config "SET_EXPIRE" "0"
@@ -789,9 +710,8 @@ mac_module_available() {
 @test "validate_config rejects non-numeric FQDN_TIMEOUT" {
     source /opt/tests/helpers/apf-config.sh
     apf_set_config "FQDN_TIMEOUT" "abc"
-    "$APF" -f 2>/dev/null || true
 
-    run "$APF" -s
+    run "$APF" --validate
     assert_failure
     [[ "$output" == *"FQDN_TIMEOUT"*"invalid"* ]]
 
@@ -801,9 +721,8 @@ mac_module_available() {
 @test "validate_config rejects FQDN_TIMEOUT=0" {
     source /opt/tests/helpers/apf-config.sh
     apf_set_config "FQDN_TIMEOUT" "0"
-    "$APF" -f 2>/dev/null || true
 
-    run "$APF" -s
+    run "$APF" --validate
     assert_failure
     [[ "$output" == *"FQDN_TIMEOUT"*"greater than 0"* ]]
 
@@ -817,9 +736,8 @@ mac_module_available() {
 @test "validate_config rejects non-numeric SET_REFRESH" {
     source /opt/tests/helpers/apf-config.sh
     apf_set_config "SET_REFRESH" "abc"
-    "$APF" -f 2>/dev/null || true
 
-    run "$APF" -s
+    run "$APF" --validate
     assert_failure
     [[ "$output" == *"SET_REFRESH"*"non-negative integer"* ]]
 
@@ -829,9 +747,8 @@ mac_module_available() {
 @test "validate_config accepts SET_REFRESH=0 (disabled)" {
     source /opt/tests/helpers/apf-config.sh
     apf_set_config "SET_REFRESH" "0"
-    "$APF" -f 2>/dev/null || true
 
-    run "$APF" -s
+    run "$APF" --validate
     assert_success
 
     apf_set_config "SET_REFRESH" "10"

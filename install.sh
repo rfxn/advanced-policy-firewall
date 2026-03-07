@@ -14,107 +14,125 @@ COMPAT_BINPATH=${COMPAT_BINPATH:-"/usr/local/sbin/fwmgr"}
 cd "$(dirname "$0")" || { echo "Error: cannot cd to script directory"; exit 1; }
 [ -f "files/VERSION" ] || { echo "Error: source files not found — run install.sh from the APF source directory"; exit 1; }
 
+# Source shared packaging library
+# shellcheck disable=SC1091
+. "files/internals/pkg_lib.sh"
+
+# Configure pkg_lib backup to use copy method (APF keeps original in place)
+# shellcheck disable=SC2034 # consumed by pkg_lib.sh pkg_backup()
+PKG_BACKUP_METHOD="copy"
+
 install() {
-        mkdir -p "$INSTALL_PATH" || { echo "Error: cannot create $INSTALL_PATH"; exit 1; }
-        cp -fR files/* "$INSTALL_PATH" || { echo "Error: file copy failed"; exit 1; }
-        if [ "$INSTALL_PATH" != "/etc/apf" ]; then
-                grep -rl '/etc/apf' "$INSTALL_PATH" 2>/dev/null | while IFS= read -r f; do
-                        sed -i "s:/etc/apf:$INSTALL_PATH:g" "$f"
-                done
-        fi
-        find "$INSTALL_PATH" -type d -exec chmod 750 {} +
-        find "$INSTALL_PATH" -type f -exec chmod 640 {} +
-        chmod 750 "$INSTALL_PATH/apf"
-        chmod 750 "$INSTALL_PATH/firewall"
-        chmod 750 "$INSTALL_PATH/vnet/vnetgen"
-	chmod 750 "$INSTALL_PATH/extras/get_ports"
-	cp -pf .ca.def importconf "$INSTALL_PATH/extras/"
-	mkdir -p "$INSTALL_PATH/doc"
-	cp README CHANGELOG COPYING.GPL apf.8 FLOW "$INSTALL_PATH/doc"
-        ln -fs "$INSTALL_PATH/apf" "$BINPATH"
-        ln -fs "$INSTALL_PATH/apf" "$COMPAT_BINPATH"
-	rm -f /etc/cron.hourly/fw /etc/cron.daily/fw /etc/cron.d/fwdev "$INSTALL_PATH/cron.fwdev"
-	# Clean up legacy cron entries (pre-2.0.2 used separate files)
-	rm -f /etc/cron.daily/apf /etc/cron.d/apf_ipset /etc/cron.d/apf_temp
-	# Runtime cron entries (refresh.apf, apf_develmode) already cleaned pre-backup
-	# Consolidated cron: daily restart, hourly ipset refresh, per-minute temp expiry
+	mkdir -p "$INSTALL_PATH" || { pkg_error "cannot create $INSTALL_PATH"; exit 1; }
+
+	# Copy source files to install path
+	pkg_copy_tree "files" "$INSTALL_PATH" || { pkg_error "file copy failed"; exit 1; }
+
+	# Replace hardcoded paths when installing to a custom location
+	if [ "$INSTALL_PATH" != "/etc/apf" ]; then
+		# shellcheck disable=SC2046
+		pkg_sed_replace "/etc/apf" "$INSTALL_PATH" \
+			$(grep -rl '/etc/apf' "$INSTALL_PATH" 2>/dev/null)
+	fi
+
+	# Set file permissions: dirs=750, files=640, executables=750
+	pkg_set_perms "$INSTALL_PATH" "750" "640" \
+		"apf" "firewall" "vnet/vnetgen" "extras/get_ports"
+
+	# Copy extras (importconf, config defaults template)
+	/usr/bin/cp -pf .ca.def importconf "$INSTALL_PATH/extras/"
+
+	# Install documentation to doc/ subdirectory
+	pkg_doc_install "$INSTALL_PATH/doc" README CHANGELOG COPYING.GPL apf.8 FLOW
+
+	# Create binary symlinks
+	pkg_symlink "$INSTALL_PATH/apf" "$BINPATH"
+	pkg_symlink "$INSTALL_PATH/apf" "$COMPAT_BINPATH"
+
+	# Clean up legacy cron entries (ancient + pre-2.0.2 variants)
+	pkg_cron_remove /etc/cron.hourly/fw /etc/cron.daily/fw /etc/cron.d/fwdev
+	rm -f "$INSTALL_PATH/cron.fwdev"
+	pkg_cron_remove /etc/cron.daily/apf /etc/cron.d/apf_ipset /etc/cron.d/apf_temp
+
+	# Install consolidated cron: daily restart, hourly ipset refresh, per-minute temp expiry
 	if [ -d "/etc/cron.d" ] && [ -f "cron.d.apf" ]; then
-		cp cron.d.apf /etc/cron.d/apf
-		chmod 644 /etc/cron.d/apf
+		pkg_cron_install "cron.d.apf" "/etc/cron.d/apf"
 		if [ "$INSTALL_PATH" != "/etc/apf" ]; then
-			sed -i "s:/etc/apf:$INSTALL_PATH:g" /etc/cron.d/apf
+			pkg_sed_replace "/etc/apf" "$INSTALL_PATH" "/etc/cron.d/apf"
 		fi
 	fi
-	# Service installation: prefer systemd, then SysV init, then rc.local
-	if [ -d "/run/systemd/system" ]; then
-		cp -f apf.service /etc/systemd/system/apf.service
+
+	# Service installation: systemd unit or SysV init script
+	pkg_detect_init
+	if [ "$_PKG_INIT_SYSTEM" = "systemd" ]; then
+		pkg_service_install "apf" "apf.service"
 		if [ "$INSTALL_PATH" != "/etc/apf" ]; then
-			sed -i "s:/etc/apf:$INSTALL_PATH:g" /etc/systemd/system/apf.service
+			local _unit_dir
+			_unit_dir=$(_pkg_systemd_unit_dir)
+			pkg_sed_replace "/etc/apf" "$INSTALL_PATH" "${_unit_dir}/apf.service"
 		fi
-		systemctl daemon-reload
-		systemctl enable apf.service >> /dev/null 2>&1
-	elif [ -d "/etc/rc.d/init.d" ]; then
-		cp -f apf.init /etc/rc.d/init.d/apf
-		if [ "$INSTALL_PATH" != "/etc/apf" ]; then
-			sed -i "s:/etc/apf:$INSTALL_PATH:g" /etc/rc.d/init.d/apf
+		pkg_service_enable "apf"
+	elif [ -d "/etc/rc.d/init.d" ] || [ -d "/etc/init.d" ]; then
+		pkg_service_install "apf" "apf.init"
+		local _init_path
+		_init_path=$(_pkg_init_script_path "apf") || true
+		if [ -n "${_init_path:-}" ] && [ "$INSTALL_PATH" != "/etc/apf" ]; then
+			pkg_sed_replace "/etc/apf" "$INSTALL_PATH" "$_init_path"
 		fi
-		if command -v chkconfig > /dev/null 2>&1; then
-			chkconfig --add apf
-			chkconfig --level 345 apf on
-		fi
-	elif [ -d "/etc/init.d" ]; then
-		cp -f apf.init /etc/init.d/apf
-		if [ "$INSTALL_PATH" != "/etc/apf" ]; then
-			sed -i "s:/etc/apf:$INSTALL_PATH:g" /etc/init.d/apf
-		fi
+		pkg_service_enable "apf"
 	else
-		if [ -f "/etc/rc.local" ]; then
-			val=$(grep -i apf /etc/rc.local)
-			if [ -z "$val" ]; then
-				echo "$INSTALL_PATH/apf -s >> /dev/null 2>&1" >> /etc/rc.local
-			fi
-		fi
+		# Fallback: rc.local entry
+		pkg_rclocal_add "$INSTALL_PATH/apf -s >> /dev/null 2>&1"
 	fi
+
 	# Disable conflicting firewall services (firewalld, ufw)
 	# These manage iptables/nftables independently and conflict with APF
-	if command -v systemctl > /dev/null 2>&1; then
-		if systemctl is-active firewalld > /dev/null 2>&1; then
-			systemctl stop firewalld > /dev/null 2>&1
-			systemctl disable firewalld > /dev/null 2>&1
-			echo "  Note: firewalld was active and has been stopped and disabled."
-			echo "        APF manages iptables directly; firewalld cannot coexist."
-		fi
-		if systemctl is-active ufw > /dev/null 2>&1; then
-			systemctl stop ufw > /dev/null 2>&1
-			systemctl disable ufw > /dev/null 2>&1
-			echo "  Note: ufw was active and has been stopped and disabled."
-			echo "        APF manages iptables directly; ufw cannot coexist."
-		fi
-	fi
+	_disable_conflicting_service "firewalld"
+	_disable_conflicting_service "ufw"
+
+	# Rotate old log file
 	if [ -f "/var/log/apf_log" ]; then
 		mv -f /var/log/apf_log /var/log/apf_log.prev
 	fi
 	rm -f /var/log/apfados_log
-	if [ -d "/etc/logrotate.d" ] && [ -f "logrotate.d.apf" ]; then
-		cp logrotate.d.apf /etc/logrotate.d/apf
+
+	# Install logrotate config
+	if [ -f "logrotate.d.apf" ]; then
+		pkg_logrotate_install "logrotate.d.apf" "apf"
 	fi
-	# Install man page
-	if [ -d "/usr/share/man/man8" ] && [ -f "apf.8" ]; then
-		cp apf.8 /usr/share/man/man8/apf.8
+
+	# Install man page (with path replacement if custom install path)
+	if [ -f "apf.8" ]; then
 		if [ "$INSTALL_PATH" != "/etc/apf" ]; then
-			sed -i "s:/etc/apf:$INSTALL_PATH:g" /usr/share/man/man8/apf.8
+			pkg_man_install "apf.8" "8" "apf" "/etc/apf|$INSTALL_PATH"
+		else
+			pkg_man_install "apf.8" "8" "apf"
 		fi
-		gzip -f /usr/share/man/man8/apf.8
-		chmod 644 /usr/share/man/man8/apf.8.gz
 	fi
-	"$INSTALL_PATH/vnet/vnetgen" 2>/dev/null
+
+	# Generate VNET rules
+	"$INSTALL_PATH/vnet/vnetgen" 2>/dev/null  # safe: may fail in containers without interfaces
+
+	# Install apf-m menu system if dialog is available
 	if [ -f "/usr/bin/dialog" ] && [ -d "$INSTALL_PATH/extras/apf-m" ]; then
-		last=$(pwd)
-		cd "$INSTALL_PATH/extras/apf-m/"
-		sh install -i
-		cd "$last"
+		(cd "$INSTALL_PATH/extras/apf-m/" && sh install -i)
 	fi
+
 	chmod 750 "$INSTALL_PATH"
+}
+
+# _disable_conflicting_service name — stop and disable a conflicting service
+# Only acts if the service is currently active (running).
+_disable_conflicting_service() {
+	local _svc="$1"
+	if command -v systemctl > /dev/null 2>&1; then
+		if systemctl is-active "$_svc" > /dev/null 2>&1; then
+			pkg_service_stop "$_svc" 2>/dev/null  # safe: best-effort
+			pkg_service_disable "$_svc" 2>/dev/null  # safe: best-effort
+			echo "  Note: $_svc was active and has been stopped and disabled."
+			echo "        APF manages iptables directly; $_svc cannot coexist."
+		fi
+	fi
 }
 
 detect_iface() {
@@ -152,17 +170,14 @@ VER=$(awk '/version/ {print$2}' files/VERSION)
 # Pre-install cleanup: remove runtime-created cron entries before backup
 # These are recreated by apf -s as needed; must happen before backup to
 # ensure cleanup even if backup step fails (e.g., rapid re-installs)
-rm -f /etc/cron.d/refresh.apf /etc/cron.d/apf_develmode
+pkg_cron_remove /etc/cron.d/refresh.apf /etc/cron.d/apf_develmode
+
 if [ -d "$INSTALL_PATH" ]; then
-	DVAL=$(date +"%d%m%Y-%s")
-	rm -rf "$INSTALL_PATH.bk$DVAL"
-	cp -R "$INSTALL_PATH" "$INSTALL_PATH.bk$DVAL" || { echo "Backup failed, aborting."; exit 1; }
-	rm -f "$INSTALL_PATH.bk.last"
-	ln -fs "$INSTALL_PATH.bk$DVAL" "${INSTALL_PATH}.bk.last"
+	pkg_backup "$INSTALL_PATH" "copy" || { echo "Backup failed, aborting."; exit 1; }
 	echo -n "Installing APF $VER: "
 	install
 else
-        echo -n "Installing APF $VER: "
+	echo -n "Installing APF $VER: "
 	install
 fi
 
@@ -177,8 +192,8 @@ if [ -f "/usr/share/man/man8/apf.8.gz" ]; then
 fi
 echo ""
 echo "Other Details:"
-if [ -d "$INSTALL_PATH.bk.last" ]; then
-	./importconf
+if pkg_backup_exists "$INSTALL_PATH"; then
+	BK_LAST=$(pkg_backup_path "$INSTALL_PATH") ./importconf
 	show_iface_info
 	. "$INSTALL_PATH/extras/get_ports"
 	echo "  Note: Please review $INSTALL_PATH/conf.apf for consistency, install default backed up to $INSTALL_PATH/conf.apf.orig"
@@ -198,42 +213,9 @@ fi
 
 # Post-install dependency warnings (non-fatal for chroot/container builds)
 _dep_warn=0
-if ! command -v iptables > /dev/null 2>&1; then
-	_dep_warn=1
-	echo ""
-	echo "  WARNING: iptables not found in PATH"
-	if command -v apt-get > /dev/null 2>&1; then
-		echo "           Install with: apt-get install iptables"
-	elif command -v dnf > /dev/null 2>&1; then
-		echo "           Install with: dnf install iptables"
-	elif command -v yum > /dev/null 2>&1; then
-		echo "           Install with: yum install iptables"
-	fi
-fi
-if ! command -v ip > /dev/null 2>&1; then
-	_dep_warn=1
-	echo ""
-	echo "  WARNING: ip (iproute2) not found in PATH"
-	if command -v apt-get > /dev/null 2>&1; then
-		echo "           Install with: apt-get install iproute2"
-	elif command -v dnf > /dev/null 2>&1; then
-		echo "           Install with: dnf install iproute"
-	elif command -v yum > /dev/null 2>&1; then
-		echo "           Install with: yum install iproute"
-	fi
-fi
-if ! command -v modprobe > /dev/null 2>&1; then
-	_dep_warn=1
-	echo ""
-	echo "  WARNING: modprobe (kmod) not found in PATH"
-	if command -v apt-get > /dev/null 2>&1; then
-		echo "           Install with: apt-get install kmod"
-	elif command -v dnf > /dev/null 2>&1; then
-		echo "           Install with: dnf install kmod"
-	elif command -v yum > /dev/null 2>&1; then
-		echo "           Install with: yum install kmod"
-	fi
-fi
+pkg_check_dep "iptables" "iptables" "iptables" "recommended" || _dep_warn=1
+pkg_check_dep "ip" "iproute" "iproute2" "recommended" || _dep_warn=1
+pkg_check_dep "modprobe" "kmod" "kmod" "recommended" || _dep_warn=1
 if [ "$_dep_warn" = "1" ]; then
 	echo ""
 	echo "  Note: Missing dependencies must be installed before running APF."

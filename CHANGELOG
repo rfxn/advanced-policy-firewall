@@ -2,6 +2,13 @@
 
   -- New Features --
 
+[New] elog_lib.sh v1.0.0 integrated: structured event logging with dual log
+      model (application log + JSONL audit trail), output module registry,
+      severity filtering, and {tag} extraction
+[Change] eout() reimplemented as elog_lib wrapper preserving existing
+      eout "msg" and eout "msg" 1 calling conventions
+[New] elog_event() audit trail for config_loaded, service_state, and
+      rule_loaded lifecycle events written as JSONL to /var/log/apf/audit.log
 [New] SYN flood protection: SYNFLOOD chain rate-limits inbound TCP SYN packets
       via iptables limit module; configurable rate/burst thresholds, LOG +
       DROP for excess, dual-stack support
@@ -90,6 +97,12 @@
       checking for DOCKER-USER chain in iptables filter table; resolves to
       "1" when Docker/Podman/containerd is actively managing iptables, "0"
       otherwise; explicit "0"/"1" still honored; zero overhead when forced
+[New] pkg_lib.sh v1.0.0 integrated: shared packaging library providing
+      standardized backup, service lifecycle, cron management, man page
+      installation, dependency checking, and OS detection primitives
+[New] RPM/DEB packaging infrastructure: pkg.manifest and generated pkg/
+      directory with RPM spec, DEB debian/ files, Docker build/test files,
+      Makefile, and GitHub Actions release workflow via pkg_gen.sh
 
   -- Bug Fixes --
 
@@ -101,6 +114,9 @@
       during upgrade
 [Fix] importconf: migrate EG_DROP_CMD from space-separated to
       comma-separated format in root and extras importconf
+[Fix] install.sh/importconf: fix upgrade detection using pkg_backup_exists
+      instead of hardcoded $INSTALL_PATH.bk.last; importconf uses BK_LAST
+      env var with legacy fallback for backward compatibility
 [Fix] Anchor grep/sed patterns across trust, expiry, and block escalation
       functions to prevent IP substring collisions; escape dots in IP
       addresses, use exact-match flags
@@ -171,9 +187,6 @@
 [Fix] --ipset-update: add informational message when USE_IPSET=0
 [Fix] --gre-up/--gre-down: report disabled state instead of silently exiting
 [Fix] install.sh: replace hardcoded /sbin/chkconfig with command -v discovery
-[Change] remove dead bandmin() integration (cPanel bandwidth monitor
-      discontinued ~2014); eliminates `command -v` call that triggers bash
-      SIGSEGV on GHA runners with newer kernels
 [Fix] help(): add missing -st alias to status line help text
 [Fix] trim(): exclude blank lines from data line count
 [Fix] vnetgen: strip Docker @ifN suffix from ip link output in
@@ -182,6 +195,22 @@
       to prevent environment variable contamination
 [Fix] .ca.def: add missing preamble defaults for IPT_LOCK_SUPPORT and
       IPT_LOCK_TIMEOUT; prevents unset variables on upgrade from pre-2.0.1
+[Fix] Move ELOG_LOG_DIR and ELOG_AUDIT_FILE from files/apf to
+      internals.conf so the firewall subprocess inherits audit trail
+      paths; rule_loaded events were silently dropped
+[Fix] Change all install.sh invocations from sh to bash in Dockerfiles,
+      test helpers, tests, and documentation; install.sh uses bash-only
+      constructs (via pkg_lib.sh) incompatible with sh/dash
+[Fix] Add /var/log/apf/audit.log to logrotate coverage with
+      copytruncate; audit log was growing unbounded
+[Fix] Add inline comment to internals.conf documenting intentional
+      ELOG_LOG_FILE vs ELOG_LOG_DIR path mismatch for backward
+      compatibility
+[Fix] Rewrite importconf upgrade tests to modify live install before
+      re-running install.sh; tests were creating fake backups that
+      pkg_backup overwrites, masking real upgrade behavior
+[Fix] firewall: simplify EGF output policy branch — remove redundant
+      -z test and elif (dead code)
 
   -- Changes --
 
@@ -233,6 +262,23 @@
       and log file created at runtime; matches install.sh convention
 [Change] cli_trust_temp(): extract _maybe_block_escalate() helper to replace
       4 repeated inline block-escalation blocks
+[Change] install.sh refactored to use pkg_lib primitives: pkg_backup,
+      pkg_copy_tree, pkg_set_perms, pkg_service_install, pkg_service_enable,
+      pkg_cron_install, pkg_man_install, pkg_logrotate_install, pkg_symlink,
+      pkg_doc_install, pkg_check_dep; all existing behavior preserved
+[Change] uninstall.sh refactored to use pkg_lib primitives:
+      pkg_service_uninstall, pkg_uninstall_cron, pkg_uninstall_man,
+      pkg_uninstall_logrotate, pkg_symlink_cleanup; all prompts preserved
+[Change] remove dead bandmin() integration (cPanel bandwidth monitor
+      discontinued ~2014); eliminates `command -v` call that triggers bash
+      SIGSEGV on GHA runners with newer kernels
+[Change] Update vendored elog_lib.sh from v1.0.0 to v1.0.2; includes
+      upstream fix for ELOG_AUDIT_FILE expansion (:-  to -) allowing
+      consumers to explicitly set empty audit path
+[Change] Update vendored pkg_lib.sh from v1.0.0 to v1.0.2; includes
+      sed escaping fix in pkg_sed_path, inline error comments, and
+      deep-legacy portability fix replacing /usr/bin/cp with command cp
+      for CentOS 6 and Ubuntu 12.04 compatibility
 
   -- Documentation --
 
@@ -253,15 +299,13 @@
       start and before flush, not on stop)
 [Fix] conf.apf: correct SET_EXPIRE comment (silent clamp to SET_REFRESH,
       not a hard constraint)
-[Fix] firewall: simplify EGF output policy branch — remove redundant
-      -z test and elif (dead code)
 
   -- Test Suite --
 
 [New] 12 new test files (21-32): uid-egress, devel-fastload, vnet,
       connlimit, hook-search-silent, temp-trust, synflood, block-escalation,
       advanced-trust-cli, fqdn-trust, cli-help, refactor-regression
-      (553 tests across 33 files)
+      (558 tests across 34 files)
 [New] LOG_DROP=0 negative tests: verify SYNFLOOD and SMTP_BLK chains omit
       LOG rules when LOG_DROP is disabled
 [New] Hook tests: execution order, environment variable access, error
@@ -280,6 +324,17 @@
       tosroute() mangle rules, Docker baseline file creation
 [Change] Add per-test teardown() to 21-refactor-regression.bats,
       25-connlimit.bats, 32-cli-help.bats to prevent cascading failures
+[New] elog_lib integration tests (34-elog-integration.bats): audit log
+      creation, JSONL event writing, eout backward compat, source guard,
+      firewall subprocess audit path inheritance
+[Change] validate_config tests use --validate instead of full firewall
+      start; saves ~55-60s from the critical path
+[Fix] Remove duplicate GRE linkid tests (already covered by
+      18-gre.bats)
+[New] Non-numeric GRE linkid test in 18-gre.bats covering integer
+      validation path (linkid=abc emits "not a valid integer")
+[Fix] Remove Bash 4.2+ static check from behavioral test suite (belongs
+      in lint/CI workflow)
 
 - 2.0.1 | Feb 20 2026:
 
