@@ -21,76 +21,41 @@ if [ ! -d "$INSTALL_PATH" ]; then
 	exit 1
 fi
 
+# Source shared packaging library
+# shellcheck disable=SC1091
+. "$INSTALL_PATH/internals/pkg_lib.sh"
+
 echo "APF Uninstaller"
 echo ""
 
 # Stop the firewall if running
 if [ -x "$INSTALL_PATH/apf" ]; then
 	echo "Stopping firewall..."
-	"$INSTALL_PATH/apf" --flush 2>/dev/null || true
+	"$INSTALL_PATH/apf" --flush 2>/dev/null || true  # safe: may already be stopped
 fi
 
-# Remove systemd service
-if [ -f "/etc/systemd/system/apf.service" ]; then
-	echo "Removing systemd service..."
-	systemctl stop apf.service 2>/dev/null || true
-	systemctl disable apf.service 2>/dev/null || true
-	rm -f /etc/systemd/system/apf.service
-	systemctl daemon-reload 2>/dev/null || true
-fi
-
-# Remove SysV init scripts
-if [ -f "/etc/rc.d/init.d/apf" ]; then
-	echo "Removing SysV init script (rc.d)..."
-	if command -v chkconfig > /dev/null 2>&1; then
-		chkconfig --del apf 2>/dev/null || true
-	fi
-	rm -f /etc/rc.d/init.d/apf
-fi
-if [ -f "/etc/init.d/apf" ]; then
-	echo "Removing SysV init script (init.d)..."
-	rm -f /etc/init.d/apf
-fi
-
-# Remove rc.local entry
-if [ -f "/etc/rc.local" ]; then
-	if grep -q "apf" /etc/rc.local 2>/dev/null; then
-		echo "Removing rc.local entry..."
-		_tmp=$(mktemp /tmp/.apf_rclocal.XXXXXX)
-		grep -v "apf" /etc/rc.local > "$_tmp"
-		cat "$_tmp" > /etc/rc.local
-		rm -f "$_tmp"
-	fi
-fi
+# Remove service (systemd units, SysV init scripts, rc.local entries)
+echo "Removing service..."
+pkg_service_uninstall "apf"
 
 # Remove cron entries (current + all legacy + runtime-created variants)
 echo "Removing cron entries..."
-rm -f /etc/cron.d/apf /etc/cron.d/apf_ipset /etc/cron.d/apf_temp
-rm -f /etc/cron.d/fwdev /etc/cron.daily/apf /etc/cron.daily/fw
-rm -f /etc/cron.hourly/fw
-rm -f /etc/cron.d/refresh.apf /etc/cron.d/apf_develmode
+pkg_uninstall_cron \
+	/etc/cron.d/apf /etc/cron.d/apf_ipset /etc/cron.d/apf_temp \
+	/etc/cron.d/fwdev /etc/cron.daily/apf /etc/cron.daily/fw \
+	/etc/cron.hourly/fw \
+	/etc/cron.d/refresh.apf /etc/cron.d/apf_develmode
 
 # Remove logrotate config
-if [ -f "/etc/logrotate.d/apf" ]; then
-	echo "Removing logrotate config..."
-	rm -f /etc/logrotate.d/apf
-fi
+pkg_uninstall_logrotate "apf"
 
 # Remove symlinks
-if [ -L "$BINPATH" ]; then
-	echo "Removing $BINPATH symlink..."
-	rm -f "$BINPATH"
-fi
-if [ -L "$COMPAT_BINPATH" ]; then
-	echo "Removing $COMPAT_BINPATH symlink..."
-	rm -f "$COMPAT_BINPATH"
-fi
+echo "Removing symlinks..."
+pkg_symlink_cleanup "$BINPATH" "$COMPAT_BINPATH"
 
 # Remove man page
-if [ -f "/usr/share/man/man8/apf.8.gz" ]; then
-	echo "Removing man page..."
-	rm -f /usr/share/man/man8/apf.8.gz
-fi
+echo "Removing man page..."
+pkg_uninstall_man "8" "apf"
 
 # Prompt to remove install directory
 printf "Remove install directory %s? [y/N] " "$INSTALL_PATH"
