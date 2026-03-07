@@ -189,6 +189,9 @@
       to prevent environment variable contamination
 [Fix] .ca.def: add missing preamble defaults for IPT_LOCK_SUPPORT and
       IPT_LOCK_TIMEOUT; prevents unset variables on upgrade from pre-2.0.1
+[Fix] Move ELOG_LOG_DIR and ELOG_AUDIT_FILE from files/apf to
+      internals.conf so the firewall subprocess inherits audit trail
+      paths; rule_loaded events were silently dropped
 
   -- Changes --
 
@@ -287,6 +290,9 @@
       tosroute() mangle rules, Docker baseline file creation
 [Change] Add per-test teardown() to 21-refactor-regression.bats,
       25-connlimit.bats, 32-cli-help.bats to prevent cascading failures
+[New] elog_lib integration tests (34-elog-integration.bats): audit log
+      creation, JSONL event writing, eout backward compat, source guard,
+      firewall subprocess audit path inheritance
 
 - 2.0.1 | Feb 20 2026:
 
