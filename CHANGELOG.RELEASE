@@ -2,6 +2,13 @@
 
   -- New Features --
 
+[New] elog_lib.sh v1.0.0 integrated: structured event logging with dual log
+      model (application log + JSONL audit trail), output module registry,
+      severity filtering, and {tag} extraction
+[Change] eout() reimplemented as elog_lib wrapper preserving existing
+      eout "msg" and eout "msg" 1 calling conventions
+[New] elog_event() audit trail for config_loaded, service_state, and
+      rule_loaded lifecycle events written as JSONL to /var/log/apf/audit.log
 [New] SYN flood protection: SYNFLOOD chain rate-limits inbound TCP SYN packets
       via iptables limit module; configurable rate/burst thresholds, LOG +
       DROP for excess, dual-stack support
