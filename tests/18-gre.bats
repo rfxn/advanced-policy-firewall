@@ -171,6 +171,32 @@ setup() {
     "$APF" -s
 }
 
+@test "Non-numeric linkid rejected with error" {
+    # Write a gre.rules with non-numeric linkid to exercise integer validation
+    cat > "$APF_DIR/gre.rules" <<'GRECONF'
+#!/bin/bash
+role="source"
+create_gretun abc 203.0.113.2 192.0.2.1
+GRECONF
+
+    "$APF" -f
+    ip tunnel del gre1 2>/dev/null || true
+    "$APF" -s
+
+    # Should hit the regex check (not a valid integer), not the range check
+    run grep "not a valid integer" /var/log/apf_log
+    assert_success
+
+    # Restore valid config
+    cat > "$APF_DIR/gre.rules" <<'GRECONF'
+#!/bin/bash
+role="source"
+create_gretun 1 203.0.113.2 192.0.2.1 /opt/apf/gre.ips.test
+GRECONF
+    "$APF" -f
+    "$APF" -s
+}
+
 @test "Invalid linkid rejected with error" {
     # Write a gre.rules with invalid linkid
     cat > "$APF_DIR/gre.rules" <<'GRECONF'
