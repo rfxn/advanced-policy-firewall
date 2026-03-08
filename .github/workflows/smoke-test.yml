@@ -13,3 +13,37 @@ jobs:
       project-name: apf
       os-matrix: '["debian12","centos6","centos7","rocky8","rocky9","ubuntu1204","ubuntu2004","ubuntu2404"]'
       docker-run-flags: '--privileged'
+
+  uat:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: docker/setup-buildx-action@v3
+      - name: Build base image
+        uses: docker/build-push-action@v6
+        with:
+          context: tests/infra
+          file: tests/infra/dockerfiles/Dockerfile.debian12
+          tags: apf-base-debian12
+          load: true
+          cache-from: type=gha,scope=base-debian12
+          cache-to: type=gha,mode=max,scope=base-debian12
+      - name: Build test image
+        run: |
+          docker build \
+            --build-arg BASE_IMAGE=apf-base-debian12 \
+            -f tests/Dockerfile \
+            -t apf-test-debian12 .
+      - name: Run UAT scenarios
+        run: make -C tests uat
+      - name: Upload UAT results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: uat-results
+          path: /tmp/uat-*.log
+          retention-days: 14
+          if-no-files-found: ignore
