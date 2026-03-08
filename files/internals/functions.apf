@@ -1106,7 +1106,14 @@ cli_trust_remove() {
 	fi
 
 	if ! valid_host "$DIP"; then
-		echo "Invalid host '$DIP': must be a valid IP/IPv6 address, CIDR block, or FQDN" >&2
+		# Not a valid host — check if it's a country code
+		if valid_cc "$DIP" || [[ "$DIP" == @* ]]; then
+			# shellcheck disable=SC1090,SC1091
+			. "$INSTALL_PATH/internals/geoip.apf"
+			cli_cc_remove "$DIP"
+			return $?
+		fi
+		echo "Invalid host '$DIP': must be a valid IP/IPv6 address, CIDR block, FQDN, or country code" >&2
 		return 1
 	fi
 
@@ -1178,6 +1185,14 @@ cli_trust() {
 
  # Advanced trust syntax (contains '=')
  if [[ "$HOST" == *=* ]]; then
+	# Check if last field is a country code → delegate to geoip.apf
+	local _ct_last_field="${HOST##*=}"
+	if valid_cc "$_ct_last_field" || [[ "$_ct_last_field" == @* ]]; then
+		# shellcheck disable=SC1090,SC1091
+		. "$INSTALL_PATH/internals/geoip.apf"
+		cli_cc_trust_advanced "$HOST" "$CHAIN" "$ACTION" "$FILE" "$CMT"
+		return $?
+	fi
 	if ! valid_trust_entry "$HOST"; then
 		echo "Invalid trust entry '$HOST'" >&2
 		return 1
@@ -1252,9 +1267,16 @@ cli_trust() {
 	return 0
  fi
 
- # Bare host path (IP/CIDR/FQDN)
+ # Bare host path (IP/CIDR/FQDN or country code)
  if ! valid_host "$HOST"; then
-	echo "Invalid host '$HOST': must be a valid IP/IPv6 address, CIDR block, or FQDN" >&2
+	# Not a valid host — check if it's a country code
+	if valid_cc "$HOST" || [[ "$HOST" == @* ]]; then
+		# shellcheck disable=SC1090,SC1091
+		. "$INSTALL_PATH/internals/geoip.apf"
+		cli_cc_trust "$HOST" "$CHAIN" "$ACTION" "$FILE" "$CMT"
+		return $?
+	fi
+	echo "Invalid host '$HOST': must be a valid IP/IPv6 address, CIDR block, FQDN, or country code" >&2
 	return 1
  fi
  tlist=""
@@ -1337,13 +1359,28 @@ cli_trust_temp() {
 
  # Validate entry (advanced or bare)
  if [[ "$HOST" == *=* ]]; then
+	# Check if last field is a country code → delegate to geoip.apf
+	local _ctt_last="${HOST##*=}"
+	if valid_cc "$_ctt_last" || [[ "$_ctt_last" == @* ]]; then
+		# shellcheck disable=SC1090,SC1091
+		. "$INSTALL_PATH/internals/geoip.apf"
+		cli_cc_trust_temp "$HOST" "$CHAIN" "$ACTION" "$FILE" "$TTL_STR" "$CMT"
+		return $?
+	fi
 	if ! valid_trust_entry "$HOST"; then
 		echo "Invalid trust entry '$HOST'" >&2
 		return 1
 	fi
  else
 	if ! valid_host "$HOST"; then
-		echo "Invalid host '$HOST': must be a valid IP/IPv6 address, CIDR block, or FQDN" >&2
+		# Not a valid host — check if it's a country code
+		if valid_cc "$HOST" || [[ "$HOST" == @* ]]; then
+			# shellcheck disable=SC1090,SC1091
+			. "$INSTALL_PATH/internals/geoip.apf"
+			cli_cc_trust_temp "$HOST" "$CHAIN" "$ACTION" "$FILE" "$TTL_STR" "$CMT"
+			return $?
+		fi
+		echo "Invalid host '$HOST': must be a valid IP/IPv6 address, CIDR block, FQDN, or country code" >&2
 		return 1
 	fi
 	_VTE_IP="$HOST"
@@ -1819,6 +1856,18 @@ firewall_info() {
 		echo "  Block escalation: ${PERMBLOCK_COUNT} repeats in ${PERMBLOCK_INTERVAL}s"
 	fi
 	echo "  FQDN resolution:  $([ -n "$GETENT" ] && echo "enabled (timeout=${FQDN_TIMEOUT:-10}s)" || echo "disabled (getent not found)")"
+	if cc_enabled; then
+		local cc_deny_count=0 cc_allow_count=0
+		if [ -f "$CC_DENY_HOSTS" ]; then
+			cc_deny_count=$(grep -cvE '^(#|$)' "$CC_DENY_HOSTS" 2>/dev/null) || cc_deny_count=0
+		fi
+		if [ -f "$CC_ALLOW_HOSTS" ]; then
+			cc_allow_count=$(grep -cvE '^(#|$)' "$CC_ALLOW_HOSTS" 2>/dev/null) || cc_allow_count=0
+		fi
+		echo "  CC deny entries:  $cc_deny_count"
+		echo "  CC allow entries: $cc_allow_count"
+		echo "  CC audit mode:    $([ "$CC_LOG_ONLY" = "1" ] && echo "enabled" || echo "disabled")"
+	fi
 
 	# --- Filtering ---
 	echo ""
@@ -1910,7 +1959,7 @@ trust_lookup() {
 	local found=0
 	local label file matches
 
-	for pair in "ALLOW:$ALLOW_HOSTS" "DENY:$DENY_HOSTS" "GLOBAL ALLOW:$GALLOW_HOSTS" "GLOBAL DENY:$GDENY_HOSTS"; do
+	for pair in "ALLOW:$ALLOW_HOSTS" "DENY:$DENY_HOSTS" "GLOBAL ALLOW:$GALLOW_HOSTS" "GLOBAL DENY:$GDENY_HOSTS" "CC DENY:$CC_DENY_HOSTS" "CC ALLOW:$CC_ALLOW_HOSTS"; do
 		label="${pair%%:*}"
 		file="${pair#*:}"
 		[ -f "$file" ] || continue
@@ -1967,19 +2016,23 @@ help() {
 	echo "  -e, --refresh ............... refresh & re-resolve DNS in trust rules"
 	echo ""
 	echo "Trust Management:"
-	echo "  -a HOST [CMT], --allow ...... add host to allow list and load rule"
-	echo "  -d HOST [CMT], --deny ....... add host to deny list and load rule"
-	echo "  -u HOST, --remove ........... remove host from all trust files"
+	echo "  -a HOST [CMT], --allow ...... add host/CC to allow list and load rule"
+	echo "  -d HOST [CMT], --deny ....... add host/CC to deny list and load rule"
+	echo "  -u HOST, --remove ........... remove host/CC from all trust files"
 	echo "  --list-allow ................ display allow list entries"
 	echo "  --list-deny ................. display deny list entries"
 	echo "  --lookup HOST ............... check if host exists in trust system"
 	echo ""
 	echo "  Advanced trust syntax:  apf -a \"tcp:in:d=22:s=10.0.0.0/8\""
 	echo "                          apf -d \"d=3306:s=192.168.1.5\""
+	echo "  Country codes:          apf -d CN      (deny China)"
+	echo "                          apf -a US      (allow United States)"
+	echo "                          apf -d @EU     (deny all of Europe)"
+	echo "                          apf -d \"tcp:in:d=22:s=CN\""
 	echo ""
 	echo "Temporary Trust:"
-	echo "  -ta HOST TTL [CMT] .......... temporarily allow host (5m, 1h, 7d)"
-	echo "  -td HOST TTL [CMT] .......... temporarily deny host"
+	echo "  -ta HOST TTL [CMT] .......... temporarily allow host/CC (5m, 1h, 7d)"
+	echo "  -td HOST TTL [CMT] .......... temporarily deny host/CC"
 	echo "  --temp-list ................. list temp entries with remaining TTL"
 	echo "  --temp-flush ................ remove all temporary entries"
 	echo ""
@@ -1989,6 +2042,10 @@ help() {
 	echo "  -o, --dump-config ........... output all configuration variables"
 	echo "  -v, --version ............... output version number"
 	echo "  -h, --help .................. show this help message"
+	echo ""
+	echo "Country Code Filtering:"
+	echo "  --cc [CC] ................... show GeoIP status (optional: detail for CC)"
+	echo "  --cc-update ................. refresh GeoIP data and ipsets"
 	echo ""
 	echo "Subsystems:"
 	echo "  --ipset-update .............. hot-reload ipset block lists"
@@ -2084,7 +2141,7 @@ search() {
  fi
 
  # Trust files
- for tf in $ALLOW_HOSTS $DENY_HOSTS $GALLOW_HOSTS $GDENY_HOSTS; do
+ for tf in $ALLOW_HOSTS $DENY_HOSTS $GALLOW_HOSTS $GDENY_HOSTS $CC_DENY_HOSTS $CC_ALLOW_HOSTS; do
   if [ -f "$tf" ]; then
    local tf_matches
    tf_matches=$(grep -in -- "$pattern" "$tf" 2>/dev/null)
@@ -2925,7 +2982,7 @@ expire_temp_entries() {
 	local current_time file line count=0
 	local -a _et_expired=()
 	current_time=$(date +%s)
-	for file in "$ALLOW_HOSTS" "$DENY_HOSTS"; do
+	for file in "$ALLOW_HOSTS" "$DENY_HOSTS" "$CC_DENY_HOSTS" "$CC_ALLOW_HOSTS"; do
 		[ -f "$file" ] || continue
 		while IFS= read -r line; do
 			_parse_temp_comment "$line"
@@ -2950,9 +3007,9 @@ expire_temp_entries() {
 list_temp_entries() {
 	local current_time file type cmt remaining line found=0
 	current_time=$(date +%s)
-	for file in "$ALLOW_HOSTS" "$DENY_HOSTS"; do
+	for file in "$ALLOW_HOSTS" "$DENY_HOSTS" "$CC_DENY_HOSTS" "$CC_ALLOW_HOSTS"; do
 		[ -f "$file" ] || continue
-		if [ "$file" == "$ALLOW_HOSTS" ]; then
+		if [ "$file" == "$ALLOW_HOSTS" ] || [ "$file" == "$CC_ALLOW_HOSTS" ]; then
 			type="ALLOW"
 		else
 			type="DENY"
@@ -2990,7 +3047,7 @@ list_temp_entries() {
 flush_temp_entries() {
 	local file line count=0
 	local -a _ft_expired=()
-	for file in "$ALLOW_HOSTS" "$DENY_HOSTS"; do
+	for file in "$ALLOW_HOSTS" "$DENY_HOSTS" "$CC_DENY_HOSTS" "$CC_ALLOW_HOSTS"; do
 		[ -f "$file" ] || continue
 		while IFS= read -r line; do
 			_parse_temp_comment "$line"

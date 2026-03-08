@@ -45,7 +45,7 @@ trap '_apf_cleanup_tmp; mutex_unlock' EXIT
 
 # Acquire exclusive lock for mutating operations via file-based flock.
 # Re-invokes this script under flock; child sees _APF_LOCKED=1 and skips gate.
-# Read-only ops (-l, -t, -o, -v, -g, -h, --templ, --gre-status, --la, --ld, --validate, --rules, --info, --lookup) excluded.
+# Read-only ops (-l, -t, -o, -v, -g, -h, --templ, --gre-status, --la, --ld, --validate, --rules, --info, --lookup, --cc) excluded.
 # Restart (-r) excluded — sub-invocations lock individually to avoid deadlock.
 if [ "$_APF_LOCKED" != "1" ]; then
   case "$1" in
@@ -53,7 +53,7 @@ if [ "$_APF_LOCKED" != "1" ]; then
     -a|--allow|-d|--deny|-u|--remove|--unban|\
     -ta|--temp-allow|-td|--temp-deny|\
     --tempf|--temp-flush|--temp-expire|\
-    --ipset-update|--gre-up|--gre-down)
+    --ipset-update|--gre-up|--gre-down|--cc-update)
       if command -v flock >/dev/null 2>&1; then
         _APF_LOCKED=1 flock -w "$ENTER_LOCK_TIMEOUT" "$LOCK_FILE" "$0" "$@"
         exit $?
@@ -341,7 +341,7 @@ case "$1" in
 	flush_temp_entries
 	;;
 --temp-expire)
-	if grep -q 'ttl=' "$ALLOW_HOSTS" "$DENY_HOSTS" 2>/dev/null; then
+	if grep -q 'ttl=' "$ALLOW_HOSTS" "$DENY_HOSTS" "$CC_DENY_HOSTS" "$CC_ALLOW_HOSTS" 2>/dev/null; then
 		mutex_lock
 		expire_temp_entries
 	fi
@@ -367,6 +367,17 @@ case "$1" in
 	;;
 --lookup)
 	trust_lookup "$2" || exit 1
+	;;
+--cc)
+	# shellcheck disable=SC1090,SC1091
+	. "$INSTALL_PATH/internals/geoip.apf"
+	geoip_info "$2"
+	;;
+--cc-update)
+	mutex_lock
+	# shellcheck disable=SC1090,SC1091
+	. "$INSTALL_PATH/internals/geoip.apf"
+	geoip_update
 	;;
 *)
 	apf_banner
