@@ -212,8 +212,10 @@
 [Fix] Add inline comment to internals.conf documenting intentional
       ELOG_LOG_FILE vs ELOG_LOG_DIR path mismatch for backward
       compatibility
-[Change] Update vendored pkg_lib.sh from v1.0.0 to v1.0.1; includes
-      sed escaping fix in pkg_sed_path and inline error comments
+[Change] Update vendored pkg_lib.sh from v1.0.0 to v1.0.2; includes
+      sed escaping fix in pkg_sed_path, inline error comments, and
+      deep-legacy portability fix replacing /usr/bin/cp with command cp
+      for CentOS 6 and Ubuntu 12.04 compatibility
 [Fix] Rewrite importconf upgrade tests to modify live install before
       re-running install.sh; tests were creating fake backups that
       pkg_backup overwrites, masking real upgrade behavior

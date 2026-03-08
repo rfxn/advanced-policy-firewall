@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# pkg_lib.sh — Shared Packaging & Installer Library 1.0.1
+# pkg_lib.sh — Shared Packaging & Installer Library 1.0.2
 ###
 # Copyright (C) 2002-2026 R-fx Networks <proj@rfxn.com>
 #                         Ryan MacDonald <ryan@rfxn.com>
@@ -29,7 +29,7 @@
 [[ -n "${_PKG_LIB_LOADED:-}" ]] && return 0 2>/dev/null
 _PKG_LIB_LOADED=1
 # shellcheck disable=SC2034 # version checked by consumers
-PKG_LIB_VERSION="1.0.1"
+PKG_LIB_VERSION="1.0.2"
 
 # Configurable defaults — consuming projects override via environment
 PKG_NO_COLOR="${PKG_NO_COLOR:-0}"
@@ -575,7 +575,7 @@ pkg_backup() {
 	local rc=0
 	case "$method" in
 		copy)
-			/usr/bin/cp -pR "$install_path" "$backup_path" || rc=$?
+			command cp -pR "$install_path" "$backup_path" || rc=$?
 			;;
 		move)
 			mv "$install_path" "$backup_path" || rc=$?
@@ -767,7 +767,7 @@ pkg_restore_files() {
 			fi
 
 			rc=0
-			/usr/bin/cp -p "$match" "$dest" || rc=$?
+			command cp -p "$match" "$dest" || rc=$?
 			if [[ "$rc" -eq 0 ]]; then
 				restored=$((restored + 1))
 			else
@@ -821,7 +821,7 @@ pkg_restore_dir() {
 		}
 	fi
 
-	/usr/bin/cp -pR "$src" "$dest" || {
+	command cp -pR "$src" "$dest" || {
 		pkg_error "pkg_restore_dir: failed to restore ${subdir}"
 		return 1
 	}
@@ -862,7 +862,7 @@ pkg_copy_tree() {
 		}
 	fi
 
-	/usr/bin/cp -pR "${src_dir}/." "$dest_dir/" || {
+	command cp -pR "${src_dir}/." "$dest_dir/" || {
 		pkg_error "pkg_copy_tree: failed to copy ${src_dir} to ${dest_dir}"
 		return 1
 	}
@@ -1179,7 +1179,7 @@ pkg_service_install() {
 		fi
 		local basename_file
 		basename_file=$(basename "$source_file")
-		/usr/bin/cp -f "$source_file" "${unit_dir}/${basename_file}" || {
+		command cp -f "$source_file" "${unit_dir}/${basename_file}" || {
 			pkg_error "pkg_service_install: failed to copy unit file to ${unit_dir}"
 			return 1
 		}
@@ -1192,7 +1192,7 @@ pkg_service_install() {
 	if [[ -d /etc/rc.d/init.d ]]; then
 		init_dir="/etc/rc.d/init.d"
 	fi
-	/usr/bin/cp -f "$source_file" "${init_dir}/${name}" || {
+	command cp -f "$source_file" "${init_dir}/${name}" || {
 		pkg_error "pkg_service_install: failed to copy init script to ${init_dir}"
 		return 1
 	}
@@ -1317,7 +1317,7 @@ pkg_service_install_timer() {
 
 	local basename_file
 	basename_file=$(basename "$source_file")
-	/usr/bin/cp -f "$source_file" "${unit_dir}/${basename_file}" || {
+	command cp -f "$source_file" "${unit_dir}/${basename_file}" || {
 		pkg_error "pkg_service_install_timer: failed to copy timer to ${unit_dir}"
 		return 1
 	}
@@ -1924,7 +1924,7 @@ pkg_cron_install() {
 		}
 	fi
 
-	/usr/bin/cp -f "$src" "$dest" || {
+	command cp -f "$src" "$dest" || {
 		pkg_error "pkg_cron_install: failed to copy ${src} to ${dest}"
 		return 1
 	}
@@ -2165,7 +2165,7 @@ pkg_man_install() {
 		return 1
 	}
 
-	/usr/bin/cp -f "$src" "$tmpfile" || {
+	command cp -f "$src" "$tmpfile" || {
 		pkg_error "pkg_man_install: failed to copy source to temp"
 		rm -f "$tmpfile"
 		return 1
@@ -2192,7 +2192,7 @@ pkg_man_install() {
 
 	# Install to man dir
 	local dest="${man_dir}/${name}.${section}.gz"
-	/usr/bin/cp -f "${tmpfile}.gz" "$dest" || {
+	command cp -f "${tmpfile}.gz" "$dest" || {
 		pkg_error "pkg_man_install: failed to install to ${dest}"
 		rm -f "${tmpfile}.gz"
 		return 1
@@ -2232,7 +2232,7 @@ _pkg_install_sysfile() {
 		}
 	fi
 
-	/usr/bin/cp -f "$src" "${dest_dir}/${name}" || {
+	command cp -f "$src" "${dest_dir}/${name}" || {
 		pkg_error "${func_name}: failed to install ${name}"
 		return 1
 	}
@@ -2295,7 +2295,7 @@ pkg_doc_install() {
 		fi
 		local basename_file
 		basename_file=$(basename "$file")
-		/usr/bin/cp -f "$file" "${dest_dir}/${basename_file}" || {
+		command cp -f "$file" "${dest_dir}/${basename_file}" || {
 			pkg_warn "pkg_doc_install: failed to copy ${basename_file}"
 			rc=1
 		}
@@ -2700,14 +2700,14 @@ pkg_fhs_install() {
 
 		# Handle directory-type sources (state dirs, etc.)
 		if [[ -d "$src_path" ]]; then
-			/usr/bin/cp -pR "$src_path" "$dest_path" || {
+			command cp -pR "$src_path" "$dest_path" || {
 				pkg_error "pkg_fhs_install: failed to copy directory ${_PKG_FHS_SRCS[$i]}"
 				rc=1
 				failed=$((failed + 1))
 				continue
 			}
 		elif [[ -f "$src_path" ]]; then
-			/usr/bin/cp -p "$src_path" "$dest_path" || {
+			command cp -p "$src_path" "$dest_path" || {
 				pkg_error "pkg_fhs_install: failed to copy ${_PKG_FHS_SRCS[$i]}"
 				rc=1
 				failed=$((failed + 1))
