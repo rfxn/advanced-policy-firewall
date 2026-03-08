@@ -575,7 +575,7 @@ APF provides configurable logging of filtered packets through the `LOG_*` variab
 |----------|---------|
 | `LOG_DROP` | Master toggle for firewall packet logging |
 | `LOG_LEVEL` | Syslog level for log entries (default: `crit`) |
-| `LOG_TARGET` | `LOG` (kernel syslog) or `ULOG` (ulogd userspace) |
+| `LOG_TARGET` | `LOG` (kernel syslog), `NFLOG` (ulogd2/nfnetlink), or `ULOG` (deprecated) |
 | `LOG_IA` | Log interactive access (SSH/Telnet, requires `LOG_DROP="1"`) |
 | `LOG_LGATE` | Log foreign gateway traffic |
 | `LOG_EXT` | Extended logging (TCP/IP options in output) |
@@ -694,7 +694,7 @@ Subsystems:
   --gre-status ................ show GRE tunnel status
 ```
 
-The **`--rules`** option dumps all active iptables rules to stdout in `iptables-save` format, suitable for piping (e.g., `apf --rules | grep DROP`). The **`-l|--list`** option opens rules in an editor for browsing.
+The **`--rules`** option dumps all active iptables rules to stdout in `iptables -S` format, suitable for piping (e.g., `apf --rules | grep DROP`). The **`-l|--list`** option opens rules in an editor for browsing.
 
 The **`--info`** option shows a firewall status summary organized into sections: status (active state, rule/chain counts), trust system (allow/deny/temp entry counts, ban expiry, block escalation, FQDN resolution), filtering (stop targets, port lists, packet sanity, connlimit, SYN flood, SMTP blocking), subsystems (fast load, RAB, VNET, Docker compat, ipset, GRE, remote lists), and logging (log file, log drops, recent entries). The **`-t|--status`** option pages through the full APF status log at `/var/log/apf_log`.
 
@@ -882,7 +882,7 @@ For example, setting `PERMBLOCK_COUNT="3"` and `PERMBLOCK_INTERVAL="86400"` will
 
 **ipset block lists not loading?** Install the ipset package (`apt-get install ipset` / `yum install ipset`), set `USE_IPSET="1"` in `conf.apf`, and verify with `apf -o | grep IPSET`.
 
-**How to see what is blocked?** Use `apf -g IP` to search iptables rules and trust files, or `apf -l | grep IP` to search loaded rules directly.
+**How to see what is blocked?** Use `apf -g IP` to search iptables rules and trust files, or `apf --rules | grep IP` to search loaded rules directly.
 
 **How to check if APF is running?** Run `apf -t` to view the status log, or `iptables -S | head` to check for loaded rules.
 
