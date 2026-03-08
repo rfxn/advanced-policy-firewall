@@ -28,6 +28,9 @@ install() {
 	# Copy source files to install path
 	pkg_copy_tree "files" "$INSTALL_PATH" || { pkg_error "file copy failed"; exit 1; }
 
+	# Create GeoIP data cache directory
+	mkdir -p "$INSTALL_PATH/geoip"
+
 	# Replace hardcoded paths when installing to a custom location
 	if [ "$INSTALL_PATH" != "/etc/apf" ]; then
 		# shellcheck disable=SC2046

@@ -1,0 +1,41 @@
+##
+# cc_allow
+#
+# WARNING: This file operates as a STRICT ALLOWLIST. When ANY entries are
+# present, ALL countries NOT listed here are implicitly BLOCKED. Adding
+# even one country code below locks the entire server to traffic from only
+# the listed countries.
+#
+# Before adding entries, ensure your admin IPs are in allow_hosts.rules
+# (apf -a YOUR_IP) so you are not locked out. Use DEVEL_MODE="1" in
+# conf.apf for auto-flush safety during initial testing.
+#
+# When both cc_deny.rules and cc_allow.rules have entries, deny takes
+# precedence (a country in both files is blocked).
+#
+# Requires ipset (USE_IPSET="auto" or "1") for high-performance matching.
+#
+# Format: one entry per line, blank lines and lines starting with # are ignored.
+#
+# Simple syntax — allow all traffic from/to a country:
+#   US
+#   CA
+#   GB
+#
+# Continent shorthand — expands to all countries in the continent:
+#   @NA
+#   @EU
+#
+# Supported continents: @AF (Africa), @AS (Asia), @EU (Europe),
+# @NA (North America), @SA (South America), @OC (Oceania)
+#
+# Advanced syntax — allow specific protocol/port/direction per country:
+#   proto:flow:[s/d]=port:[s/d]=CC
+#
+# Examples:
+#   Allow inbound SSH only from US:     tcp:in:d=22:s=US
+#   Allow inbound HTTP from EU:         tcp:in:d=80:s=@EU
+#
+# Temporary entries use the same ttl=/expire= syntax as allow/deny_hosts.rules.
+#
+##

@@ -47,9 +47,12 @@ SET_VERBOSE="1"
 # Note: a) if system uptime is 10 minutes or less, the snapshot is expired
 #       b) if snapshot age exceeds 12 hours, the snapshot is expired
 #       c) if conf or a .rule has changed since last load, snapshot is expired
-#       d) if it is your first run of APF since install, snapshot is generated
+#       d) if it is your first run since install, fast load is skipped (no
+#          prior snapshot exists); a snapshot is saved after the full load
 #       e) if DEVEL_MODE is enabled, the snapshot is bypassed
-#       - an expired snapshot means APF will do a full start rule-by-rule
+#       f) if the iptables backend has changed since the snapshot was saved
+#          (legacy vs nft), the snapshot is discarded
+#       - an expired/discarded snapshot means APF will do a full start
 SET_FASTLOAD="0"
 
 # Virtual Network Sub-System (VNET) creates independent policy rule set for
@@ -89,6 +92,7 @@ DOCKER_COMPAT="auto"
 # system. This only applies to local bans from deny_hosts.rules and not global
 # import rules. If less than SET_REFRESH (in seconds), the effective value is
 # automatically raised to match (e.g., 10 min = 600s).
+# Entries with "static" or "noexpire" in their comment are exempt from expiry.
 # [value in seconds, 0 to disable, recommended 600]
 SET_EXPIRE="0"
 
@@ -639,6 +643,58 @@ IPSET_LOG_RATE="30"
 # Lists with interval=0 in ipset.rules use this value. Default: 21600 (6 hours).
 # The ipset cron job runs hourly; minimum effective interval is 1 hour (3600s).
 IPSET_REFRESH="21600"
+
+##
+# [Country Code Filtering]
+##
+# GeoIP-based country blocking/allowing using ipset hash tables for
+# high-performance matching. Countries are specified in cc_deny.rules
+# and cc_allow.rules using ISO 3166-1 alpha-2 codes (e.g., CN, RU, US)
+# or continent shorthand (@EU, @AS, @NA, @SA, @AF, @OC).
+#
+# Requires ipset (USE_IPSET="auto" or "1"). Country IP data is downloaded
+# from public registries and cached locally in the geoip/ directory.
+#
+# When cc_deny.rules has entries, those countries are blocked.
+#
+# WARNING: cc_allow.rules operates as a strict allowlist — when it has ANY
+# entries, ALL countries NOT listed are implicitly DENIED. This is a
+# whole-server lockdown to only the specified countries. Ensure your
+# admin IPs are in allow_hosts.rules (apf -a YOUR_IP) BEFORE enabling,
+# or use DEVEL_MODE="1" for auto-flush safety during testing.
+#
+# When both files have entries, deny takes precedence (a country in both
+# cc_deny.rules and cc_allow.rules is blocked).
+
+# Log country-blocked packets. Requires LOG_DROP="1" to be globally enabled.
+# Uses the global LOG_RATE for rate limiting.
+CC_LOG="1"
+
+# Audit mode: LOG blocked packets without actually dropping them.
+# Useful for measuring impact before enforcing. When enabled, rules use
+# LOG target with [CC_AUDIT:{CC}] prefix instead of DROP.
+CC_LOG_ONLY="0"
+
+# Data source for country IP blocks.
+# "auto"    = try ipverse.net first, fall back to ipdeny.com (recommended)
+# "ipverse" = ipverse.net only
+# "ipdeny"  = ipdeny.com only
+CC_SRC="auto"
+
+# Hours before re-downloading cached country data on firewall start.
+# Country IP allocations change infrequently; 24h avoids redundant downloads.
+# Set to 0 to always download fresh data (previous behavior).
+# Distinct from CC_INTERVAL (days between explicit --cc-update runs).
+CC_CACHE_TTL="24"
+
+# Minimum days between GeoIP data refreshes via apf --cc-update. Country IP
+# allocations change infrequently; 7 days is a good balance. Set 0 to always
+# refresh.
+CC_INTERVAL="7"
+
+# Include IPv6 country blocks when USE_IPV6="1". Requires ip6tables and
+# ipset family inet6 support. When disabled, only IPv4 country data is used.
+CC_IPV6="1"
 
 ##
 # [GRE Tunnels]

@@ -26,11 +26,12 @@ Contents:
 3.8 ........... Configuration: Silent IP Blocking
 3.9 ........... Configuration: Docker/Container Compatibility
 3.10 .......... Configuration: ipset Block Lists
-3.11 .......... Configuration: GRE Tunnels
-3.12 .......... Configuration: Remote Block Lists
-3.13 .......... Configuration: Logging & Control
-3.14 .......... Configuration: Implicit Blocking
-3.15 .......... Configuration: Firewall Order of Operations
+3.11 .......... Configuration: Country Code Filtering (GeoIP)
+3.12 .......... Configuration: GRE Tunnels
+3.13 .......... Configuration: Remote Block Lists
+3.14 .......... Configuration: Logging & Control
+3.15 .......... Configuration: Implicit Blocking
+3.16 .......... Configuration: Firewall Order of Operations
 4 ............. General Usage
 4.1 ........... General Usage: Trust System
 4.2 ........... General Usage: Global Trust System
@@ -277,6 +278,10 @@ The following files are located under your install path (/etc/apf by default):
   deny_hosts.rules     Local deny trust list
   glob_allow.rules     Global (downloaded) allow list
   glob_deny.rules      Global (downloaded) deny list
+  cc_deny.rules        Country code deny list (ISO 3166-1 alpha-2 codes)
+  cc_allow.rules       Country code allow list (STRICT allowlist)
+  geoip/               Cached GeoIP country IP data
+  internals/           Internal libraries (geoip_lib, elog_lib, pkg_lib, etc.)
   ipset.rules          ipset block list definitions
   gre.rules            GRE tunnel definitions
   hook_pre.sh          Pre-configuration hook script (640 = inactive)
@@ -288,6 +293,7 @@ The following files are located under your install path (/etc/apf by default):
   /etc/cron.d/apf      Consolidated cron: daily restart, hourly ipset
                        refresh, per-minute temp trust expiry
   /var/log/apf_log     Default status log location
+  /var/log/apf/audit.log  Structured JSONL audit log (config, service, rule events)
 
 2.4) Uninstallation
 To fully remove APF from the system, run the uninstall script from the source
@@ -633,7 +639,48 @@ CLI: Run 'apf --ipset-update' to hot-reload all ipset block lists without
 restarting the firewall. A cron job (cron.d/apf) runs hourly; actual
 refresh timing is governed by per-list intervals and IPSET_REFRESH.
 
-3.11) Configuration: GRE Tunnels
+3.11) Configuration: Country Code Filtering (GeoIP)
+APF can block or allow traffic by country using GeoIP IP-to-country data and
+ipset hash:net sets for high-performance matching. Country data is downloaded
+from ipverse.net (primary) or ipdeny.com (fallback), cached locally, and
+refreshed periodically.
+
+Configure these variables in conf.apf:
+
+  CC_LOG       - log country-blocked packets (default: 1)
+  CC_LOG_ONLY  - audit mode: LOG without DROP (default: 0)
+  CC_SRC       - data source: auto, ipverse, or ipdeny (default: auto)
+  CC_CACHE_TTL - hours before re-downloading cached data on start (default: 24)
+  CC_INTERVAL  - days between auto-refresh via --cc-update (default: 7)
+  CC_IPV6      - include IPv6 country blocks (default: 1)
+
+Rules files:
+  cc_deny.rules  - countries to block (one CC per line, e.g., CN)
+  cc_allow.rules - STRICT ALLOWLIST: all countries NOT listed are blocked.
+                   Add admin IPs to allow_hosts.rules first (apf -a YOUR_IP)
+                   or use DEVEL_MODE="1" to prevent lockout during testing.
+
+Entries may be bare country codes (e.g., CN), continent shorthand (e.g.,
+@EU for all European countries), or advanced syntax matching the trust
+system format (e.g., tcp:in:d=22:s=CN).
+
+Supported continent shorthand: @AF (Africa), @AS (Asia), @EU (Europe),
+@NA (North America), @SA (South America), @OC (Oceania).
+
+CLI:
+  apf -d CN "block China"       - add CN to cc_deny.rules and live chains
+  apf -a US "allow US only"     - add US to cc_allow.rules (WARNING: blocks all others)
+  apf -td CN 24h "temp block"   - temporarily deny CN for 24 hours
+  apf -u CN                     - remove CN from all CC rules files
+  apf --cc                      - show country code filtering status
+  apf --cc CN                   - show detail for country (works when inactive)
+  apf --cc 8.8.8.8              - look up country for an IP address
+  apf --cc-update               - refresh GeoIP data for all active countries
+
+Requires USE_IPSET="1" (or "auto") and the ipset binary. Data is cached in
+the geoip/ subdirectory under the APF install path.
+
+3.12) Configuration: GRE Tunnels
 APF can manage GRE (Generic Routing Encapsulation) point-to-point tunnels
 with dedicated firewall chains and protocol 47 rules. This is useful for
 servers that need encapsulated point-to-point links to remote endpoints.
@@ -686,7 +733,7 @@ CLI commands:
   apf --gre-down     - tear down all tunnels and remove firewall rules
   apf --gre-status   - show current tunnel interface status
 
-3.12) Configuration: Remote Block Lists
+3.13) Configuration: Remote Block Lists
 APF can automatically download and apply IP block lists from external sources.
 Each list is loaded into a dedicated iptables chain on full firewall start.
 The following DLIST_* variables in conf.apf control these lists:
@@ -704,7 +751,7 @@ backup to prevent data loss. Note that DLIST_RESERVED interacts with
 BLK_RESNET — when both are enabled, the downloaded reserved.networks list
 supplements the built-in private.networks blocking.
 
-3.13) Configuration: Logging & Control
+3.14) Configuration: Logging & Control
 APF provides configurable logging of filtered packets through the LOG_*
 variables in conf.apf:
 
@@ -716,12 +763,13 @@ variables in conf.apf:
   LOG_EXT       - extended logging (TCP/IP options in output)
   LOG_RATE      - max logged events per minute (default: 30)
   LOG_APF       - path to APF status log (default: /var/log/apf_log)
+  ELOG_AUDIT_FILE - structured JSONL audit log (default: /var/log/apf/audit.log)
 
 For iptables concurrency control, IPT_LOCK_SUPPORT and IPT_LOCK_TIMEOUT
 configure the -w lock flag behavior for iptables >= 1.4.20. This prevents
 concurrent iptables modifications from corrupting rule state.
 
-3.14) Configuration: Implicit Blocking
+3.15) Configuration: Implicit Blocking
 The BLK_* variables in conf.apf control implicit blocking of specific traffic
 patterns without explicit port rules. These apply globally to all interfaces:
 
@@ -737,7 +785,7 @@ patterns without explicit port rules. These apply globally to all interfaces:
   BLK_IDENT          - REJECT ident (TCP 113) requests instead of silently
                         dropping; some services stall without ident response
 
-3.15) Configuration: Firewall Order of Operations
+3.16) Configuration: Firewall Order of Operations
 When APF starts ('apf -s'), rules are loaded in a specific order that
 determines how packets are evaluated. Understanding this order is essential
 for troubleshooting and for knowing which features take precedence.
@@ -804,8 +852,8 @@ Firewall Control:
   -e, --refresh ............... refresh & re-resolve DNS in trust rules
 
 Trust Management:
-  -a HOST [CMT], --allow ...... add host to allow list and load rule
-  -d HOST [CMT], --deny ....... add host to deny list and load rule
+  -a HOST [CMT], --allow ...... add host/CC to allow list and load rule
+  -d HOST [CMT], --deny ....... add host/CC to deny list and load rule
   -u HOST, --remove ........... remove host from all trust files
   --list-allow ................ display allow list entries
   --list-deny ................. display deny list entries
@@ -815,8 +863,8 @@ Trust Management:
                           apf -d "d=3306:s=192.168.1.5"
 
 Temporary Trust:
-  -ta HOST TTL [CMT] .......... temporarily allow host (5m, 1h, 7d)
-  -td HOST TTL [CMT] .......... temporarily deny host
+  -ta HOST TTL [CMT] .......... temporarily allow host/CC (5m, 1h, 7d)
+  -td HOST TTL [CMT] .......... temporarily deny host/CC
   --temp-list ................. list temp entries with remaining TTL
   --temp-flush ................ remove all temporary entries
 
@@ -826,6 +874,15 @@ Diagnostics:
   -o, --dump-config ........... output all configuration variables
   -v, --version ............... output version number
   -h, --help .................. show this help message
+
+Country Code Filtering:
+  --cc ........................ show GeoIP status overview
+  --cc CC ..................... show detail for country/continent (e.g., CN, @EU)
+  --cc IP ..................... look up country for an IP or CIDR
+  --cc-update ................. refresh GeoIP data and ipsets
+
+  NOTE: cc_allow.rules is a STRICT allowlist — all countries NOT listed
+        are blocked. Add admin IPs to allow_hosts.rules first.
 
 Subsystems:
   --ipset-update .............. hot-reload ipset block lists

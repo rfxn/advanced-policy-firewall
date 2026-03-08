@@ -45,7 +45,7 @@ trap '_apf_cleanup_tmp; mutex_unlock' EXIT
 
 # Acquire exclusive lock for mutating operations via file-based flock.
 # Re-invokes this script under flock; child sees _APF_LOCKED=1 and skips gate.
-# Read-only ops (-l, -t, -o, -v, -g, -h, --templ, --gre-status, --la, --ld, --validate, --rules, --info, --lookup) excluded.
+# Read-only ops (-l, -t, -o, -v, -g, -h, --templ, --gre-status, --la, --ld, --validate, --rules, --info, --lookup, --cc) excluded.
 # Restart (-r) excluded — sub-invocations lock individually to avoid deadlock.
 if [ "$_APF_LOCKED" != "1" ]; then
   case "$1" in
@@ -53,7 +53,7 @@ if [ "$_APF_LOCKED" != "1" ]; then
     -a|--allow|-d|--deny|-u|--remove|--unban|\
     -ta|--temp-allow|-td|--temp-deny|\
     --tempf|--temp-flush|--temp-expire|\
-    --ipset-update|--gre-up|--gre-down)
+    --ipset-update|--gre-up|--gre-down|--cc-update)
       if command -v flock >/dev/null 2>&1; then
         _APF_LOCKED=1 flock -w "$ENTER_LOCK_TIMEOUT" "$LOCK_FILE" "$0" "$@"
         exit $?
@@ -144,6 +144,16 @@ if [ -z "$SKIP_FASTLOAD_FIRSTRUN" ] && [ -z "$SKIP_FASTLOAD_EXPIRED" ] && [ -z "
 			eout "{glob} fast load snapshot empty or invalid, going full load"
 		else
 		devm
+		# Recreate ipsets before restore (snapshot references --match-set)
+		if [ "$USE_IPSET" == "1" ] && [ -n "$IPSET" ] && [ -f "$INSTALL_PATH/ipset.rules" ]; then
+			ipset_load
+		fi
+		# Recreate GeoIP ipsets from cached data (no downloads)
+		if cc_enabled; then
+			# shellcheck disable=SC1090,SC1091
+			. "$INSTALL_PATH/internals/geoip.apf"
+			_geoip_fast_load_ipsets
+		fi
 		eout "{glob} activating firewall, fast load ($IPT_BACKEND)"
 		if ! $IPTR $IPT_FLAGS "$INSTALL_PATH/internals/.apf.restore" 2>/dev/null; then
 			eout "{glob} fast load failed (iptables-restore error), going full load"
@@ -197,6 +207,8 @@ fi
 ##
 # Full Load
 ##
+# Remove orphaned temp files from previous versions (no-op if none exist)
+_apf_cleanup_stale_tmp
 eout "{glob} activating firewall"
 # record our last full load
 date +"%s" > "$INSTALL_PATH/internals/.last.full"
@@ -341,7 +353,7 @@ case "$1" in
 	flush_temp_entries
 	;;
 --temp-expire)
-	if grep -q 'ttl=' "$ALLOW_HOSTS" "$DENY_HOSTS" 2>/dev/null; then
+	if grep -q '# added .* ttl=' "$ALLOW_HOSTS" "$DENY_HOSTS" "$CC_DENY_HOSTS" "$CC_ALLOW_HOSTS" 2>/dev/null; then
 		mutex_lock
 		expire_temp_entries
 	fi
@@ -367,6 +379,17 @@ case "$1" in
 	;;
 --lookup)
 	trust_lookup "$2" || exit 1
+	;;
+--cc)
+	# shellcheck disable=SC1090,SC1091
+	. "$INSTALL_PATH/internals/geoip.apf"
+	geoip_info "$2"
+	;;
+--cc-update)
+	mutex_lock
+	# shellcheck disable=SC1090,SC1091
+	. "$INSTALL_PATH/internals/geoip.apf"
+	geoip_update
 	;;
 *)
 	apf_banner

@@ -3,12 +3,12 @@
 .\"             (C) 2026, Ryan MacDonald <ryan@rfxn.com>
 .\" This program may be freely redistributed under the terms of the GNU GPL v2
 .\"
-.TH APF 8 "February 2026" "APF 2.0.2" "System Administration"
+.TH APF 8 "March 2026" "APF 2.0.2" "System Administration"
 .SH NAME
 apf \- Advanced Policy Firewall
 .SH SYNOPSIS
 .B apf
-.RB [ \-s | \-r | \-f | \-l | \-t | \-e | \-o | \-v | \-h | \-\-rules | \-\-info | \-\-validate ]
+.RB [ \-s | \-r | \-f | \-l | \-t | \-e | \-o | \-v | \-h | \-\-rules | \-\-info | \-\-validate | \-\-la | \-\-ld ]
 .br
 .B apf
 .RB { \-a | \-d }
@@ -28,6 +28,9 @@ apf \- Advanced Policy Firewall
 .B apf
 .RB { \-\-lookup | \-g }
 .I PATTERN
+.br
+.B apf
+.RB [ \-\-cc " [\fICC\fR | \fIIP\fR]] | " \-\-cc\-update ]
 .br
 .B apf
 .RB [ \-\-ipset\-update | \-\-gre\-up | \-\-gre\-down | \-\-gre\-status ]
@@ -84,17 +87,22 @@ Refresh and re\-resolve DNS names in trust rules.
 .BR \-a " \fIHOST\fR [\fICOMMENT\fR], " \-\-allow " \fIHOST\fR [\fICOMMENT\fR]"
 Add
 .I HOST
-(IPv4, IPv6, CIDR, or FQDN) to
+(IPv4, IPv6, CIDR, FQDN, or country code) to
 .I allow_hosts.rules
 and immediately load the rule into the live firewall.
 .I HOST
 may also be an advanced trust expression (see
 .B TRUST SYSTEM
+below) or a country code (see
+.B COUNTRY CODE FILTERING
 below):
 .RS
 .nf
 apf \-a "tcp:in:d=22:s=10.0.0.0/8"
 apf \-a "d=3306:s=192.168.1.5"
+apf \-a US              # allow United States
+apf \-a @EU             # allow all of Europe
+apf \-d "tcp:in:d=22:s=CN"  # deny SSH from China
 .fi
 .RE
 .TP
@@ -104,7 +112,7 @@ Add
 to
 .I deny_hosts.rules
 and immediately load the rule into the live firewall.
-Also accepts advanced trust syntax.
+Also accepts advanced trust syntax and country codes.
 .TP
 .BR \-u " \fIHOST\fR, " \-\-remove " \fIHOST\fR, " \-\-unban " \fIHOST\fR"
 Remove
@@ -174,6 +182,28 @@ Output the version number.
 .TP
 .BR \-h ", " \-\-help
 Show usage help and exit.
+.SS Country Code Filtering
+.TP
+.BR \-\-cc " [\fICC\fR | \fIIP\fR]"
+Show GeoIP country code filtering status. Without arguments, displays an
+overview of all active country blocks with CIDR counts. With a country code
+argument (e.g.,
+.BR "apf \-\-cc CN" ),
+shows detailed information for that country including continent, rules
+status, cached data stats, and live ipset counts. Country detail works
+even when filtering is inactive (no entries in rules files).
+.IP
+With an IP address or CIDR argument (e.g.,
+.BR "apf \-\-cc 8.8.8.8" ),
+looks up which country the address belongs to using cached GeoIP data.
+Uses portable awk\-based CIDR containment for accurate matching.
+On first lookup, downloads comprehensive world data (~1MB) for full coverage.
+.TP
+.B \-\-cc\-update
+Refresh GeoIP data from upstream sources and atomically update all active
+ipsets with zero downtime. Respects the
+.B CC_INTERVAL
+setting.
 .SS ipset Block Lists
 .TP
 .B \-\-ipset\-update
@@ -232,6 +262,95 @@ Temporary entries (added via
 or
 .BR \-td )
 include TTL and expiry metadata and are automatically removed by cron.
+.SH COUNTRY CODE FILTERING
+APF supports GeoIP\-based country blocking using ipset hash tables for
+high\-performance matching. Country codes are specified in
+.I cc_deny.rules
+(block) and
+.I cc_allow.rules
+(permit), using ISO 3166\-1 alpha\-2 codes.
+.PP
+Continent shorthand expands to all countries in a continent:
+.B @AF
+(Africa),
+.B @AS
+(Asia),
+.B @EU
+(Europe),
+.B @NA
+(North America),
+.B @SA
+(South America),
+.B @OC
+(Oceania).
+.PP
+Simple entries block/allow all traffic from/to a country:
+.PP
+.RS
+.nf
+# cc_deny.rules
+CN
+RU
+@EU
+.fi
+.RE
+.PP
+Advanced entries filter specific protocol/port/direction:
+.PP
+.RS
+.nf
+tcp:in:d=22:s=CN        # deny inbound SSH from China
+tcp:in:d=25:s=RU        # deny inbound SMTP from Russia
+tcp:in:d=22:s=*          # deny SSH from ALL denied countries
+.fi
+.RE
+.PP
+.B WARNING:
+When
+.I cc_allow.rules
+has entries, it operates as a strict allowlist \(em
+.B all countries NOT listed are implicitly blocked.
+Adding even one country code locks the server to traffic from only the listed
+countries. Ensure admin IPs are in
+.I allow_hosts.rules
+.RB ( "apf \-a YOUR_IP" )
+before enabling, or use
+.B DEVEL_MODE="1"
+for auto\-flush safety during testing.
+When both files have entries, deny takes precedence.
+.PP
+Country IP data is downloaded from public registries (ipverse.net, ipdeny.com)
+and cached locally in the
+.I geoip/
+directory. Data is refreshed per
+.B CC_INTERVAL
+(default 7 days).
+.PP
+Configuration variables in
+.I conf.apf:
+.TP
+.B CC_LOG
+Log country\-blocked packets (requires LOG_DROP=1).
+.TP
+.B CC_LOG_ONLY
+Audit mode: LOG without DROP. Useful for measuring impact before enforcing.
+.TP
+.B CC_SRC
+Data source:
+.B auto
+(ipverse then ipdeny),
+.BR ipverse ,
+.BR ipdeny .
+.TP
+.B CC_CACHE_TTL
+Hours before re-downloading cached country data on firewall start (default 24).
+Set 0 to always download fresh data. Distinct from CC_INTERVAL (days).
+.TP
+.B CC_INTERVAL
+Days between automatic data refresh via \-\-cc\-update (0 to disable).
+.TP
+.B CC_IPV6
+Include IPv6 country blocks when USE_IPV6=1.
 .SH CONFIGURATION
 All configuration is in a single file,
 .IR conf.apf ,
@@ -256,7 +375,13 @@ DNS resolution, P2P, multicast.
 UID\-based egress, command\-owner blocking, SMTP outbound restrictions.
 .TP
 .B Remote Lists & ipset
-DShield, Spamhaus DROP, Project Honey Pot, ECN, global trust, ipset lists, GRE.
+DShield, Spamhaus DROP, Project Honey Pot, ECN, global trust, ipset lists.
+.TP
+.B Country Code Filtering
+CC_LOG, CC_LOG_ONLY, CC_SRC, CC_CACHE_TTL, CC_INTERVAL, CC_IPV6.
+.TP
+.B GRE Tunnels
+USE_GRE, GRE_PERSIST, GRE_KEEPALIVE, GRE_MTU, GRE_TTL.
 .TP
 .B Logging & Kernel Tuning
 Log targets (LOG, NFLOG, or deprecated ULOG), rate limits, sysctl tunables,
@@ -277,6 +402,15 @@ Global (downloaded) allow list.
 .TP
 .I /etc/apf/glob_deny.rules
 Global (downloaded) deny list.
+.TP
+.I /etc/apf/cc_deny.rules
+Country code deny list (ISO 3166\-1 alpha\-2 codes and continent shorthand).
+.TP
+.I /etc/apf/cc_allow.rules
+Country code allow list.
+.TP
+.I /etc/apf/geoip/
+Cached GeoIP country IP data (downloaded from public registries).
 .TP
 .I /etc/apf/ipset.rules
 ipset block list definitions.
@@ -307,6 +441,9 @@ Consolidated cron: daily restart, hourly ipset refresh, per\-minute temp expiry.
 .TP
 .I /var/log/apf_log
 Default status log location.
+.TP
+.I /var/log/apf/audit.log
+Structured JSONL audit log (config, service state, rule events).
 .SH EXIT STATUS
 .TP
 .B 0

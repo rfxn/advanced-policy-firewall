@@ -33,11 +33,12 @@ trust-based host management, reactive address blocking, and per-IP virtual netwo
   - [3.8 Silent IP Blocking](#38-silent-ip-blocking)
   - [3.9 Docker/Container Compatibility](#39-dockercontainer-compatibility)
   - [3.10 ipset Block Lists](#310-ipset-block-lists)
-  - [3.11 GRE Tunnels](#311-gre-tunnels)
-  - [3.12 Remote Block Lists](#312-remote-block-lists)
-  - [3.13 Logging & Control](#313-logging--control)
-  - [3.14 Implicit Blocking](#314-implicit-blocking)
-  - [3.15 Firewall Order of Operations](#315-firewall-order-of-operations)
+  - [3.11 Country Code Filtering (GeoIP)](#311-country-code-filtering-geoip)
+  - [3.12 GRE Tunnels](#312-gre-tunnels)
+  - [3.13 Remote Block Lists](#313-remote-block-lists)
+  - [3.14 Logging & Control](#314-logging--control)
+  - [3.15 Implicit Blocking](#315-implicit-blocking)
+  - [3.16 Firewall Order of Operations](#316-firewall-order-of-operations)
 - [4. General Usage](#4-general-usage)
   - [4.1 Trust System](#41-trust-system)
   - [4.2 Global Trust System](#42-global-trust-system)
@@ -253,6 +254,9 @@ The following files are located under your install path (`/etc/apf` by default):
 | `deny_hosts.rules` | Local deny trust list |
 | `glob_allow.rules` | Global (downloaded) allow list |
 | `glob_deny.rules` | Global (downloaded) deny list |
+| `cc_deny.rules` | Country code deny list (ISO 3166-1 alpha-2 codes) |
+| `cc_allow.rules` | Country code allow list (STRICT allowlist) |
+| `geoip/` | Cached GeoIP country IP data |
 | `ipset.rules` | ipset block list definitions |
 | `gre.rules` | GRE tunnel definitions |
 | `hook_pre.sh` | Pre-configuration hook script (640 = inactive) |
@@ -263,6 +267,7 @@ The following files are located under your install path (`/etc/apf` by default):
 | `vnet/` | Per-IP virtual network policy files |
 | `/etc/cron.d/apf` | Consolidated cron: daily restart, hourly ipset refresh, per-minute temp trust expiry |
 | `/var/log/apf_log` | Default status log location |
+| `/var/log/apf/audit.log` | Structured JSONL audit log (config, service state, rule events) |
 
 ### 2.4 Uninstallation
 
@@ -463,7 +468,7 @@ Positioned after loopback and trusted interface acceptance — loopback and trus
 
 When running APF alongside Docker, Podman, Kubernetes, or other container runtimes, the default flush behavior (which wipes all iptables rules and chains) will destroy the container runtime's networking rules. The `DOCKER_COMPAT` option solves this by switching APF to a surgical flush mode.
 
-**`DOCKER_COMPAT`** - When set to `"1"`, APF's flush operation only removes APF-owned chains from the filter table, leaving all external chains intact. Specifically:
+**`DOCKER_COMPAT`** - Controls container-safe flush mode. Set to `"auto"` (default) to detect Docker/Podman/containerd at startup by checking for the DOCKER-USER chain. Set to `"1"` to force enable or `"0"` to force disable. When active, APF's flush operation only removes APF-owned chains from the filter table, leaving all external chains intact. Specifically:
 
 - FORWARD chain policy and rules are preserved (Docker routing)
 - nat table is left untouched (Docker port mapping and MASQUERADE rules)
@@ -508,7 +513,57 @@ firehol_level2:src:net:1:0:0:https://iplists.firehol.org/files/firehol_level2.ne
 
 Run `apf --ipset-update` to hot-reload all ipset block lists without restarting the firewall. A cron job (`cron.d/apf`) runs hourly; actual refresh timing is governed by per-list intervals and `IPSET_REFRESH`.
 
-### 3.11 GRE Tunnels
+### 3.11 Country Code Filtering (GeoIP)
+
+APF supports GeoIP-based country blocking using ipset hash tables. Countries are specified using ISO 3166-1 alpha-2 codes (e.g., `CN`, `RU`, `US`) or continent shorthand (`@EU`, `@AS`, `@NA`, `@SA`, `@AF`, `@OC`). Requires ipset (`USE_IPSET="auto"` or `"1"`).
+
+Country IP data is downloaded from public registries (ipverse.net, ipdeny.com) and cached locally in the `geoip/` directory. Data refreshes automatically per `CC_INTERVAL` (default: 7 days).
+
+**Quick start:**
+```bash
+# Block all traffic from China
+apf -d CN
+
+# Block all traffic from Europe
+apf -d @EU
+
+# Allow only US traffic (WARNING: all other countries blocked)
+apf -a US
+
+# Block inbound SSH from Russia
+apf -d "tcp:in:d=22:s=RU"
+
+# Temporary deny for 7 days
+apf -td CN 7d "suspicious activity"
+
+# View status
+apf --cc
+
+# Country detail (works even when filtering is inactive)
+apf --cc CN
+
+# Look up country for an IP address
+apf --cc 8.8.8.8
+
+# Manual data refresh
+apf --cc-update
+
+# Remove a country block
+apf -u CN
+```
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `CC_LOG` | `1` | Log country-blocked packets (requires `LOG_DROP="1"`) |
+| `CC_LOG_ONLY` | `0` | Audit mode: LOG without DROP (measure impact first) |
+| `CC_SRC` | `auto` | Data source: `auto`, `ipverse`, `ipdeny` |
+| `CC_CACHE_TTL` | `24` | Hours before re-downloading cached data on start (0 = always) |
+| `CC_INTERVAL` | `7` | Days between auto-refresh via `--cc-update` (0 to disable) |
+| `CC_IPV6` | `1` | Include IPv6 country blocks when `USE_IPV6="1"` |
+
+Rules files: `cc_deny.rules` (block listed countries) and `cc_allow.rules` (strict allowlist — **all countries NOT listed are implicitly blocked**). Before using `cc_allow.rules`, add your admin IPs to `allow_hosts.rules` (`apf -a YOUR_IP`) to prevent lockout, or enable `DEVEL_MODE="1"` for auto-flush safety. Advanced syntax supports per-port/protocol rules. Wildcard `*` in advanced entries expands to all simple CCs in the same file.
+
+### 3.12 GRE Tunnels
 
 APF can manage GRE (Generic Routing Encapsulation) point-to-point tunnels with dedicated firewall chains and protocol 47 rules. This is useful for servers that need encapsulated point-to-point links to remote endpoints.
 
@@ -553,7 +608,7 @@ apf --gre-down     # tear down all tunnels and remove firewall rules
 apf --gre-status   # show current tunnel interface status
 ```
 
-### 3.12 Remote Block Lists
+### 3.13 Remote Block Lists
 
 APF can automatically download and apply IP block lists from external sources. Each list is loaded into a dedicated iptables chain on full firewall start. The following `DLIST_*` variables in `conf.apf` control these lists:
 
@@ -567,7 +622,7 @@ APF can automatically download and apply IP block lists from external sources. E
 
 Each has a companion `_URL` variable (e.g., `DLIST_PHP_URL`) for the download source. Set the toggle to `"1"` to enable a list. Lists are validated during parsing and backed up before each download. Failed downloads restore from backup to prevent data loss. Note that `DLIST_RESERVED` interacts with `BLK_RESNET` — when both are enabled, the downloaded reserved.networks list supplements the built-in private.networks blocking.
 
-### 3.13 Logging & Control
+### 3.14 Logging & Control
 
 APF provides configurable logging of filtered packets through the `LOG_*` variables in `conf.apf`:
 
@@ -581,10 +636,11 @@ APF provides configurable logging of filtered packets through the `LOG_*` variab
 | `LOG_EXT` | Extended logging (TCP/IP options in output) |
 | `LOG_RATE` | Max logged events per minute (default: 30) |
 | `LOG_APF` | Path to APF status log (default: `/var/log/apf_log`) |
+| `ELOG_AUDIT_FILE` | Structured JSONL audit log (default: `/var/log/apf/audit.log`) |
 
 For iptables concurrency control, `IPT_LOCK_SUPPORT` and `IPT_LOCK_TIMEOUT` configure the `-w` lock flag behavior for iptables >= 1.4.20. This prevents concurrent iptables modifications from corrupting rule state.
 
-### 3.14 Implicit Blocking
+### 3.15 Implicit Blocking
 
 The `BLK_*` variables in `conf.apf` control implicit blocking of specific traffic patterns without explicit port rules. These apply globally to all interfaces:
 
@@ -598,7 +654,7 @@ The `BLK_*` variables in `conf.apf` control implicit blocking of specific traffi
 | `BLK_TCP_SACK_PANIC` | Block low-MSS TCP SACK exploit packets (CVE-2019-11477) |
 | `BLK_IDENT` | REJECT ident (TCP 113) requests instead of silently dropping; some services stall without ident response |
 
-### 3.15 Firewall Order of Operations
+### 3.16 Firewall Order of Operations
 
 When APF starts (`apf -s`), rules are loaded in a specific order that determines how packets are evaluated. Understanding this order is essential for troubleshooting and for knowing which features take precedence.
 
@@ -664,8 +720,8 @@ Firewall Control:
   -e, --refresh ............... refresh & re-resolve DNS in trust rules
 
 Trust Management:
-  -a HOST [CMT], --allow ...... add host to allow list and load rule
-  -d HOST [CMT], --deny ....... add host to deny list and load rule
+  -a HOST [CMT], --allow ...... add host/CC to allow list and load rule
+  -d HOST [CMT], --deny ....... add host/CC to deny list and load rule
   -u HOST, --remove ........... remove host from all trust files
   --list-allow ................ display allow list entries
   --list-deny ................. display deny list entries
@@ -675,8 +731,8 @@ Trust Management:
                           apf -d "d=3306:s=192.168.1.5"
 
 Temporary Trust:
-  -ta HOST TTL [CMT] .......... temporarily allow host (5m, 1h, 7d)
-  -td HOST TTL [CMT] .......... temporarily deny host
+  -ta HOST TTL [CMT] .......... temporarily allow host/CC (5m, 1h, 7d)
+  -td HOST TTL [CMT] .......... temporarily deny host/CC
   --temp-list ................. list temp entries with remaining TTL
   --temp-flush ................ remove all temporary entries
 
@@ -686,6 +742,15 @@ Diagnostics:
   -o, --dump-config ........... output all configuration variables
   -v, --version ............... output version number
   -h, --help .................. show this help message
+
+Country Code Filtering:
+  --cc ........................ show GeoIP status overview
+  --cc CC ..................... show detail for country/continent (e.g., CN, @EU)
+  --cc IP ..................... look up country for an IP or CIDR
+  --cc-update ................. refresh GeoIP data and ipsets
+
+  NOTE: cc_allow.rules is a STRICT allowlist — all countries NOT listed
+        are blocked. Add admin IPs to allow_hosts.rules first.
 
 Subsystems:
   --ipset-update .............. hot-reload ipset block lists
@@ -876,7 +941,7 @@ For example, setting `PERMBLOCK_COUNT="3"` and `PERMBLOCK_INTERVAL="86400"` will
 
 **Locked out of the server?** `DEVEL_MODE="1"` (the default) auto-flushes the firewall every 5 minutes. If DEVEL_MODE is off, rebooting will clear rules unless boot loading is configured (see [section 2.1](#21-boot-loading)).
 
-**Docker containers lost network after `apf -s`?** Set `DOCKER_COMPAT="1"` in `conf.apf` to preserve container networking rules during firewall operations. See [section 3.9](#39-dockercontainer-compatibility).
+**Docker containers lost network after `apf -s`?** `DOCKER_COMPAT="auto"` (the default) detects container runtimes automatically. If auto-detection fails, set `DOCKER_COMPAT="1"` in `conf.apf` to force container-safe mode. See [section 3.9](#39-dockercontainer-compatibility).
 
 **Firewall rules gone after reboot?** Ensure boot loading is configured — systemd service, chkconfig, or rc.local entry. See [section 2.1](#21-boot-loading).
 

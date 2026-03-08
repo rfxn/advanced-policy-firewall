@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 eout "{glob} loading log.rules"
 
 # Log NEW interactive access (SSH/telnet) reaching INPUT — requires LOG_DROP=1

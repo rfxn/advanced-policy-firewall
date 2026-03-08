@@ -1,0 +1,33 @@
+##
+# cc_deny
+#
+# Country Code deny list — block traffic from/to countries listed here.
+# Requires ipset (USE_IPSET="auto" or "1") for high-performance matching.
+#
+# Format: one entry per line, blank lines and lines starting with # are ignored.
+#
+# Simple syntax — block all traffic from/to a country:
+#   CN
+#   RU
+#
+# Continent shorthand — expands to all countries in the continent:
+#   @EU
+#   @AS
+#
+# Supported continents: @AF (Africa), @AS (Asia), @EU (Europe),
+# @NA (North America), @SA (South America), @OC (Oceania)
+#
+# Advanced syntax — block specific protocol/port/direction per country:
+#   proto:flow:[s/d]=port:[s/d]=CC
+#
+# Examples:
+#   Block inbound SSH from China:       tcp:in:d=22:s=CN
+#   Block inbound SMTP from Russia:     tcp:in:d=25:s=RU
+#   Block inbound to ports 80,443:      tcp:in:d=80:s=BR
+#
+# Wildcard (*) in advanced entries expands to all simple CCs in this file:
+#   Block inbound SSH from all denied countries: tcp:in:d=22:s=*
+#
+# Temporary entries use the same ttl=/expire= syntax as allow/deny_hosts.rules.
+#
+##
