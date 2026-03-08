@@ -104,56 +104,59 @@ teardown_file() {
 # Validation tests — functions.apf detection helpers
 # ============================================================
 
+# Source just functions.apf for lightweight unit tests (internals.conf does
+# network detection that fails without full interface setup)
+_source_funcs='source '"$APF_DIR"'/internals/functions.apf; CC_DENY_HOSTS='"$APF_DIR"'/cc_deny.rules; CC_ALLOW_HOSTS='"$APF_DIR"'/cc_allow.rules'
+
 @test "valid_cc accepts 2-letter uppercase country code" {
-    source "$APF_DIR/internals/internals.conf"
-    run bash -c 'source '"$APF_DIR"'/internals/internals.conf; valid_cc "CN" && echo "$_VCC_TYPE"'
+    run bash -c "$_source_funcs; valid_cc CN && echo \$_VCC_TYPE"
     assert_success
     assert_output "country"
 }
 
 @test "valid_cc rejects lowercase country code" {
-    run bash -c 'source '"$APF_DIR"'/internals/internals.conf; valid_cc "cn"'
+    run bash -c "$_source_funcs; valid_cc cn"
     assert_failure
 }
 
 @test "valid_cc rejects 3-letter input" {
-    run bash -c 'source '"$APF_DIR"'/internals/internals.conf; valid_cc "USA"'
+    run bash -c "$_source_funcs; valid_cc USA"
     assert_failure
 }
 
 @test "valid_cc rejects single letter" {
-    run bash -c 'source '"$APF_DIR"'/internals/internals.conf; valid_cc "A"'
+    run bash -c "$_source_funcs; valid_cc A"
     assert_failure
 }
 
 @test "valid_cc accepts continent shorthand @EU" {
-    run bash -c 'source '"$APF_DIR"'/internals/internals.conf; valid_cc "@EU" && echo "$_VCC_TYPE"'
+    run bash -c "$_source_funcs; valid_cc @EU && echo \$_VCC_TYPE"
     assert_success
     assert_output "continent"
 }
 
 @test "valid_cc rejects invalid continent @XX" {
-    run bash -c 'source '"$APF_DIR"'/internals/internals.conf; valid_cc "@XX"'
+    run bash -c "$_source_funcs; valid_cc @XX"
     assert_failure
 }
 
 @test "cc_enabled returns false when rules files are empty" {
     clean_cc_state
-    run bash -c 'source '"$APF_DIR"'/internals/internals.conf; cc_enabled'
+    run bash -c "$_source_funcs; cc_enabled"
     assert_failure
 }
 
 @test "cc_enabled returns true when cc_deny.rules has entry" {
     clean_cc_state
     echo "ZZ" >> "$APF_DIR/cc_deny.rules"
-    run bash -c 'source '"$APF_DIR"'/internals/internals.conf; cc_enabled'
+    run bash -c "$_source_funcs; cc_enabled"
     assert_success
     # Clean up
     sed -i '/^ZZ$/d' "$APF_DIR/cc_deny.rules"
 }
 
 @test "geoip_expand_codes expands @SA to South American countries" {
-    run bash -c 'source '"$APF_DIR"'/internals/internals.conf; geoip_expand_codes "@SA" && echo "$_VCC_CODES"'
+    run bash -c "$_source_funcs; geoip_expand_codes @SA && echo \$_VCC_CODES"
     assert_success
     assert_output --partial "BR"
     assert_output --partial "AR"
@@ -161,22 +164,22 @@ teardown_file() {
 }
 
 @test "geoip_expand_codes rejects unknown @XX" {
-    run bash -c 'source '"$APF_DIR"'/internals/internals.conf; geoip_expand_codes "@XX"'
+    run bash -c "$_source_funcs; geoip_expand_codes @XX"
     assert_failure
 }
 
 @test "geoip_cc_name maps CN to China" {
-    run bash -c 'source '"$APF_DIR"'/internals/internals.conf; geoip_cc_name "CN"'
+    run bash -c "$_source_funcs; geoip_cc_name CN"
     assert_output "China"
 }
 
 @test "geoip_cc_name maps US to United States" {
-    run bash -c 'source '"$APF_DIR"'/internals/internals.conf; geoip_cc_name "US"'
+    run bash -c "$_source_funcs; geoip_cc_name US"
     assert_output "United States"
 }
 
 @test "geoip_cc_name returns bare code for unknown CC" {
-    run bash -c 'source '"$APF_DIR"'/internals/internals.conf; geoip_cc_name "ZZ"'
+    run bash -c "$_source_funcs; geoip_cc_name ZZ"
     assert_output "ZZ"
 }
 
