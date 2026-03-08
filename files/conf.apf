@@ -625,7 +625,10 @@ GD_URL="https://yourhost.com/glob_deny.rules"
 # and matched with a single iptables rule per list instead of one rule per IP.
 # Requires the 'ipset' utility (apt-get install ipset / yum install ipset).
 # When disabled or ipset is not installed, ipset.rules is ignored.
-USE_IPSET="0"
+# "auto" = detect at startup (checks for ipset binary + ip_set kernel module)
+# "1"    = force enable
+# "0"    = force disable
+USE_IPSET="auto"
 
 # Default log rate limit for ipset blocklist matches (per minute per list).
 # Individual lists control logging via the log field in ipset.rules (0=off, 1=on).

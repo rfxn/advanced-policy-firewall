@@ -11,7 +11,7 @@ SYNFLOOD_BURST="${SYNFLOOD_BURST:-150}"
 DOCKER_COMPAT="${DOCKER_COMPAT:-auto}"
 IG_ICMPV6_TYPES="${IG_ICMPV6_TYPES:-1,2,3,4,128,129}"
 EG_ICMPV6_TYPES="${EG_ICMPV6_TYPES:-all}"
-USE_IPSET="${USE_IPSET:-0}"
+USE_IPSET="${USE_IPSET:-auto}"
 IPSET_LOG_RATE="${IPSET_LOG_RATE:-30}"
 IPSET_REFRESH="${IPSET_REFRESH:-21600}"
 USE_GRE="${USE_GRE:-0}"
@@ -660,6 +660,9 @@ GD_URL="$GD_URL"
 # and matched with a single iptables rule per list instead of one rule per IP.
 # Requires the 'ipset' utility (apt-get install ipset / yum install ipset).
 # When disabled or ipset is not installed, ipset.rules is ignored.
+# "auto" = detect at startup (checks for ipset binary + ip_set kernel module)
+# "1"    = force enable
+# "0"    = force disable
 USE_IPSET="$USE_IPSET"
 
 # Default log rate limit for ipset blocklist matches (per minute per list).

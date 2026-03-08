@@ -1,6 +1,10 @@
-- 2.0.2 | Feb 25 2026:
+- 2.0.2 | Mar 08 2026:
 
   -- New Features --
+
+[New] USE_IPSET auto-detection: resolves ipset binary and ip_set kernel module
+      availability at startup; follows IPT_LOCK_SUPPORT auto-detect pattern;
+      replaces hardcoded "0" default with "auto" (upgrade-safe via .ca.def)
 
 [New] Structured event logging via elog_lib.sh: dual log model (application log
       + JSONL audit trail at /var/log/apf/audit.log), output module registry,
