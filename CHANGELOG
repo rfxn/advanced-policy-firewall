@@ -187,9 +187,6 @@
 [Fix] --ipset-update: add informational message when USE_IPSET=0
 [Fix] --gre-up/--gre-down: report disabled state instead of silently exiting
 [Fix] install.sh: replace hardcoded /sbin/chkconfig with command -v discovery
-[Change] remove dead bandmin() integration (cPanel bandwidth monitor
-      discontinued ~2014); eliminates `command -v` call that triggers bash
-      SIGSEGV on GHA runners with newer kernels
 [Fix] help(): add missing -st alias to status line help text
 [Fix] trim(): exclude blank lines from data line count
 [Fix] vnetgen: strip Docker @ifN suffix from ip link output in
@@ -206,19 +203,14 @@
       constructs (via pkg_lib.sh) incompatible with sh/dash
 [Fix] Add /var/log/apf/audit.log to logrotate coverage with
       copytruncate; audit log was growing unbounded
-[Change] Update vendored elog_lib.sh from v1.0.0 to v1.0.2; includes
-      upstream fix for ELOG_AUDIT_FILE expansion (:-  to -) allowing
-      consumers to explicitly set empty audit path
 [Fix] Add inline comment to internals.conf documenting intentional
       ELOG_LOG_FILE vs ELOG_LOG_DIR path mismatch for backward
       compatibility
-[Change] Update vendored pkg_lib.sh from v1.0.0 to v1.0.2; includes
-      sed escaping fix in pkg_sed_path, inline error comments, and
-      deep-legacy portability fix replacing /usr/bin/cp with command cp
-      for CentOS 6 and Ubuntu 12.04 compatibility
 [Fix] Rewrite importconf upgrade tests to modify live install before
       re-running install.sh; tests were creating fake backups that
       pkg_backup overwrites, masking real upgrade behavior
+[Fix] firewall: simplify EGF output policy branch — remove redundant
+      -z test and elif (dead code)
 
   -- Changes --
 
@@ -277,6 +269,16 @@
 [Change] uninstall.sh refactored to use pkg_lib primitives:
       pkg_service_uninstall, pkg_uninstall_cron, pkg_uninstall_man,
       pkg_uninstall_logrotate, pkg_symlink_cleanup; all prompts preserved
+[Change] remove dead bandmin() integration (cPanel bandwidth monitor
+      discontinued ~2014); eliminates `command -v` call that triggers bash
+      SIGSEGV on GHA runners with newer kernels
+[Change] Update vendored elog_lib.sh from v1.0.0 to v1.0.2; includes
+      upstream fix for ELOG_AUDIT_FILE expansion (:-  to -) allowing
+      consumers to explicitly set empty audit path
+[Change] Update vendored pkg_lib.sh from v1.0.0 to v1.0.2; includes
+      sed escaping fix in pkg_sed_path, inline error comments, and
+      deep-legacy portability fix replacing /usr/bin/cp with command cp
+      for CentOS 6 and Ubuntu 12.04 compatibility
 
   -- Documentation --
 
@@ -297,8 +299,6 @@
       start and before flush, not on stop)
 [Fix] conf.apf: correct SET_EXPIRE comment (silent clamp to SET_REFRESH,
       not a hard constraint)
-[Fix] firewall: simplify EGF output policy branch — remove redundant
-      -z test and elif (dead code)
 
   -- Test Suite --
 
