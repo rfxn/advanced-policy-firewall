@@ -162,6 +162,13 @@ ipt -A OUTPUT -j TDENY
 ipt -A INPUT -j TGDENY
 ipt -A OUTPUT -j TGDENY
 
+# Country Code Filtering (GeoIP)
+if cc_enabled; then
+	# shellcheck disable=SC1090,SC1091
+	. "$INSTALL_PATH/internals/geoip.apf"
+	geoip_load
+fi
+
 # Load our Blocked Traffic rules
 . "$INSTALL_PATH/bt.rules"
 

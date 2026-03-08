@@ -1,0 +1,36 @@
+##
+# cc_allow
+#
+# Country Code allow list — permit traffic only from countries listed here,
+# blocking all other countries. This inverts the default: if cc_allow.rules
+# has entries, all countries NOT listed are blocked.
+#
+# When both cc_deny.rules and cc_allow.rules have entries, deny takes
+# precedence (deny is evaluated first in the chain order).
+#
+# Requires ipset (USE_IPSET="auto" or "1") for high-performance matching.
+#
+# Format: one entry per line, blank lines and lines starting with # are ignored.
+#
+# Simple syntax — allow all traffic from/to a country:
+#   US
+#   CA
+#   GB
+#
+# Continent shorthand — expands to all countries in the continent:
+#   @NA
+#   @EU
+#
+# Supported continents: @AF (Africa), @AS (Asia), @EU (Europe),
+# @NA (North America), @SA (South America), @OC (Oceania)
+#
+# Advanced syntax — allow specific protocol/port/direction per country:
+#   proto:flow:[s/d]=port:[s/d]=CC
+#
+# Examples:
+#   Allow inbound SSH only from US:     tcp:in:d=22:s=US
+#   Allow inbound HTTP from EU:         tcp:in:d=80:s=@EU
+#
+# Temporary entries use the same ttl=/expire= syntax as allow/deny_hosts.rules.
+#
+##

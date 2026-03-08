@@ -641,6 +641,44 @@ IPSET_LOG_RATE="30"
 IPSET_REFRESH="21600"
 
 ##
+# [Country Code Filtering]
+##
+# GeoIP-based country blocking/allowing using ipset hash tables for
+# high-performance matching. Countries are specified in cc_deny.rules
+# and cc_allow.rules using ISO 3166-1 alpha-2 codes (e.g., CN, RU, US)
+# or continent shorthand (@EU, @AS, @NA, @SA, @AF, @OC).
+#
+# Requires ipset (USE_IPSET="auto" or "1"). Country IP data is downloaded
+# from public registries and cached locally in the geoip/ directory.
+#
+# When cc_deny.rules has entries, those countries are blocked.
+# When cc_allow.rules has entries, only those countries are permitted.
+# When both have entries, deny takes precedence.
+
+# Log country-blocked packets. Requires LOG_DROP="1" to be globally enabled.
+# Uses the global LOG_RATE for rate limiting.
+CC_LOG="1"
+
+# Audit mode: LOG blocked packets without actually dropping them.
+# Useful for measuring impact before enforcing. When enabled, rules use
+# LOG target with [CC_AUDIT:{CC}] prefix instead of DROP.
+CC_LOG_ONLY="0"
+
+# Data source for country IP blocks.
+# "auto"    = try ipverse.net first, fall back to ipdeny.com (recommended)
+# "ipverse" = ipverse.net only
+# "ipdeny"  = ipdeny.com only
+CC_SRC="auto"
+
+# Days between automatic GeoIP data refresh. Country IP allocations change
+# infrequently; 7 days is a good balance. Set 0 to disable auto-refresh.
+CC_INTERVAL="7"
+
+# Include IPv6 country blocks when USE_IPV6="1". Requires ip6tables and
+# ipset family inet6 support. When disabled, only IPv4 country data is used.
+CC_IPV6="1"
+
+##
 # [GRE Tunnels]
 ##
 # GRE tunnel support provides encapsulated point-to-point links between hosts.

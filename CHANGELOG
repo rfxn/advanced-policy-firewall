@@ -5,6 +5,13 @@
 [New] USE_IPSET auto-detection: resolves ipset binary and ip_set kernel module
       availability at startup; follows IPT_LOCK_SUPPORT auto-detect pattern;
       replaces hardcoded "0" default with "auto" (upgrade-safe via .ca.def)
+[New] GeoIP country blocking: ipset-based high-performance country filtering
+      using cc_deny.rules/cc_allow.rules with ISO 3166-1 alpha-2 codes and
+      continent shorthand (@EU, @AS, @NA, @SA, @AF, @OC); tiered data sources
+      (ipverse.net, ipdeny.com) with local caching; atomic ipset swap for zero
+      downtime updates; audit mode (CC_LOG_ONLY) for impact measurement;
+      dual-stack IPv4/IPv6 support; advanced syntax for per-port/protocol rules;
+      first APF internal library convention (files/internals/geoip.apf)
 
 [New] Structured event logging via elog_lib.sh: dual log model (application log
       + JSONL audit trail at /var/log/apf/audit.log), output module registry,
