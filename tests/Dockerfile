@@ -41,7 +41,7 @@ RUN cd /opt/apf-src && INSTALL_PATH=/opt/apf bash install.sh && \
     sed -i 's/^USE_GRE=.*/USE_GRE="0"/' "$conf"
 
 # Save clean state for test resets
-RUN for f in allow_hosts.rules deny_hosts.rules; do \
+RUN for f in allow_hosts.rules deny_hosts.rules cc_deny.rules cc_allow.rules; do \
       sed '/^[^#]/d' "/opt/apf/$f" > "/opt/apf/$f.clean"; \
     done && \
     cp /opt/apf/conf.apf /opt/apf/conf.apf.clean && \

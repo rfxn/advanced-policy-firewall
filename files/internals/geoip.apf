@@ -259,8 +259,7 @@ cc_rules_load() {
 		[ -f "$file" ] || continue
 		while IFS= read -r line; do
 			case "$line" in '#'*|''|*=*) continue ;; esac
-			# Skip temp entries during chain load (they are handled separately)
-			# Temp metadata is on the preceding comment line, not the entry itself
+			# Bare CC entries (including temp — ttl/expire markers are on comment lines)
 			cc="$line"
 			if [[ "$cc" == @* ]]; then
 				if geoip_expand_codes "$cc"; then
