@@ -191,3 +191,8 @@
 [Change] UAT teardown hardening: uat_apf_teardown() ensures firewall flush
       and orphan process cleanup on test failure; all UAT scenarios use
       centralized teardown helper
+[New] UAT scenario expansion: 5 new scenario files (08-12) covering advanced
+      trust syntax, port filtering, DEVEL_MODE, IPv6 rules, and error paths;
+      27 new tests bringing UAT total to 83; new helpers
+      uat_apf_set_port_config() and uat_apf_enable_ipv6(); IPv6 tests use
+      ip6tables_available() skip guard for CI safety

@@ -125,6 +125,23 @@ uat_apf_teardown() {
     uat_apf_reset
 }
 
+# uat_apf_set_port_config VAR VALUE — Set a port filtering variable in conf.apf
+# Convenience wrapper for UAT port filtering tests.
+# Usage: uat_apf_set_port_config "IG_TCP_CPORTS" "80,443"
+uat_apf_set_port_config() {
+    local var="$1"
+    local val="$2"
+    uat_apf_set_config "$var" "$val"
+}
+
+# uat_apf_enable_ipv6 — Set USE_IPV6=1 in conf.apf after verifying ip6tables
+# is available. Callers MUST still use ip6tables_available() skip guards in
+# individual tests — this helper only sets the config; it does not guarantee
+# ip6tables works for the entire test run.
+uat_apf_enable_ipv6() {
+    uat_apf_set_config "USE_IPV6" "1"
+}
+
 # uat_apf_set_interface IFACE — Set the untrusted interface for APF
 uat_apf_set_interface() {
     uat_apf_set_config "IFACE_UNTRUSTED" "$1"
