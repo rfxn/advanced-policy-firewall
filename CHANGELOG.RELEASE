@@ -196,3 +196,5 @@
       27 new tests bringing UAT total to 83; new helpers
       uat_apf_set_port_config() and uat_apf_enable_ipv6(); IPv6 tests use
       ip6tables_available() skip guard for CI safety
+[Fix] CI: UAT job Docker build used wrong context directory; use -f
+      tests/Dockerfile with project root as build context

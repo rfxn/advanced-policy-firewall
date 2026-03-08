@@ -35,8 +35,8 @@ jobs:
         run: |
           docker build \
             --build-arg BASE_IMAGE=apf-base-debian12 \
+            -f tests/Dockerfile \
             -t apf-test-debian12 .
-        working-directory: tests
       - name: Run UAT scenarios
         run: make -C tests uat
       - name: Upload UAT results
