@@ -508,7 +508,50 @@ firehol_level2:src:net:1:0:0:https://iplists.firehol.org/files/firehol_level2.ne
 
 Run `apf --ipset-update` to hot-reload all ipset block lists without restarting the firewall. A cron job (`cron.d/apf`) runs hourly; actual refresh timing is governed by per-list intervals and `IPSET_REFRESH`.
 
-### 3.11 GRE Tunnels
+### 3.11 Country Code Filtering (GeoIP)
+
+APF supports GeoIP-based country blocking using ipset hash tables. Countries are specified using ISO 3166-1 alpha-2 codes (e.g., `CN`, `RU`, `US`) or continent shorthand (`@EU`, `@AS`, `@NA`, `@SA`, `@AF`, `@OC`). Requires ipset (`USE_IPSET="auto"` or `"1"`).
+
+Country IP data is downloaded from public registries (ipverse.net, ipdeny.com) and cached locally in the `geoip/` directory. Data refreshes automatically per `CC_INTERVAL` (default: 7 days).
+
+**Quick start:**
+```bash
+# Block all traffic from China
+apf -d CN
+
+# Block all traffic from Europe
+apf -d @EU
+
+# Allow only US traffic (all others blocked)
+apf -a US
+
+# Block inbound SSH from Russia
+apf -d "tcp:in:d=22:s=RU"
+
+# Temporary deny for 7 days
+apf -td CN 7d "suspicious activity"
+
+# View status
+apf --cc
+
+# Manual data refresh
+apf --cc-update
+
+# Remove a country block
+apf -u CN
+```
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `CC_LOG` | `1` | Log country-blocked packets (requires `LOG_DROP="1"`) |
+| `CC_LOG_ONLY` | `0` | Audit mode: LOG without DROP (measure impact first) |
+| `CC_SRC` | `auto` | Data source: `auto`, `ipverse`, `ipdeny` |
+| `CC_INTERVAL` | `7` | Days between auto-refresh (0 to disable) |
+| `CC_IPV6` | `1` | Include IPv6 country blocks when `USE_IPV6="1"` |
+
+Rules files: `cc_deny.rules` (block countries) and `cc_allow.rules` (permit-only mode). Advanced syntax supports per-port/protocol rules. Wildcard `*` in advanced entries expands to all simple CCs in the same file.
+
+### 3.12 GRE Tunnels
 
 APF can manage GRE (Generic Routing Encapsulation) point-to-point tunnels with dedicated firewall chains and protocol 47 rules. This is useful for servers that need encapsulated point-to-point links to remote endpoints.
 
@@ -553,7 +596,7 @@ apf --gre-down     # tear down all tunnels and remove firewall rules
 apf --gre-status   # show current tunnel interface status
 ```
 
-### 3.12 Remote Block Lists
+### 3.13 Remote Block Lists
 
 APF can automatically download and apply IP block lists from external sources. Each list is loaded into a dedicated iptables chain on full firewall start. The following `DLIST_*` variables in `conf.apf` control these lists:
 
@@ -567,7 +610,7 @@ APF can automatically download and apply IP block lists from external sources. E
 
 Each has a companion `_URL` variable (e.g., `DLIST_PHP_URL`) for the download source. Set the toggle to `"1"` to enable a list. Lists are validated during parsing and backed up before each download. Failed downloads restore from backup to prevent data loss. Note that `DLIST_RESERVED` interacts with `BLK_RESNET` — when both are enabled, the downloaded reserved.networks list supplements the built-in private.networks blocking.
 
-### 3.13 Logging & Control
+### 3.14 Logging & Control
 
 APF provides configurable logging of filtered packets through the `LOG_*` variables in `conf.apf`:
 
@@ -584,7 +627,7 @@ APF provides configurable logging of filtered packets through the `LOG_*` variab
 
 For iptables concurrency control, `IPT_LOCK_SUPPORT` and `IPT_LOCK_TIMEOUT` configure the `-w` lock flag behavior for iptables >= 1.4.20. This prevents concurrent iptables modifications from corrupting rule state.
 
-### 3.14 Implicit Blocking
+### 3.15 Implicit Blocking
 
 The `BLK_*` variables in `conf.apf` control implicit blocking of specific traffic patterns without explicit port rules. These apply globally to all interfaces:
 
@@ -598,7 +641,7 @@ The `BLK_*` variables in `conf.apf` control implicit blocking of specific traffi
 | `BLK_TCP_SACK_PANIC` | Block low-MSS TCP SACK exploit packets (CVE-2019-11477) |
 | `BLK_IDENT` | REJECT ident (TCP 113) requests instead of silently dropping; some services stall without ident response |
 
-### 3.15 Firewall Order of Operations
+### 3.16 Firewall Order of Operations
 
 When APF starts (`apf -s`), rules are loaded in a specific order that determines how packets are evaluated. Understanding this order is essential for troubleshooting and for knowing which features take precedence.
 

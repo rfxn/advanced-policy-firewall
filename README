@@ -633,7 +633,44 @@ CLI: Run 'apf --ipset-update' to hot-reload all ipset block lists without
 restarting the firewall. A cron job (cron.d/apf) runs hourly; actual
 refresh timing is governed by per-list intervals and IPSET_REFRESH.
 
-3.11) Configuration: GRE Tunnels
+3.11) Configuration: Country Code Filtering (GeoIP)
+APF can block or allow traffic by country using GeoIP IP-to-country data and
+ipset hash:net sets for high-performance matching. Country data is downloaded
+from ipverse.net (primary) or ipdeny.com (fallback), cached locally, and
+refreshed periodically.
+
+Configure these variables in conf.apf:
+
+  CC_LOG       - log country-blocked packets (default: 1)
+  CC_LOG_ONLY  - audit mode: LOG without DROP (default: 0)
+  CC_SRC       - data source: auto, ipverse, or ipdeny (default: auto)
+  CC_INTERVAL  - days between auto-refresh (default: 7)
+  CC_IPV6      - include IPv6 country blocks (default: 1)
+
+Rules files:
+  cc_deny.rules  - countries to block (one CC per line, e.g., CN)
+  cc_allow.rules - countries to allow (all others blocked)
+
+Entries may be bare country codes (e.g., CN), continent shorthand (e.g.,
+@EU for all European countries), or advanced syntax matching the trust
+system format (e.g., tcp:in:d=22:s=CN).
+
+Supported continent shorthand: @AF (Africa), @AS (Asia), @EU (Europe),
+@NA (North America), @SA (South America), @OC (Oceania).
+
+CLI:
+  apf -d CN "block China"       - add CN to cc_deny.rules and live chains
+  apf -a US "allow US only"     - add US to cc_allow.rules (allowlist mode)
+  apf -td CN 24h "temp block"   - temporarily deny CN for 24 hours
+  apf -u CN                     - remove CN from all CC rules files
+  apf --cc                      - show country code filtering status
+  apf --cc CN                   - show detail for specific country
+  apf --cc-update               - refresh GeoIP data for all active countries
+
+Requires USE_IPSET="1" (or "auto") and the ipset binary. Data is cached in
+the geoip/ subdirectory under the APF install path.
+
+3.12) Configuration: GRE Tunnels
 APF can manage GRE (Generic Routing Encapsulation) point-to-point tunnels
 with dedicated firewall chains and protocol 47 rules. This is useful for
 servers that need encapsulated point-to-point links to remote endpoints.
@@ -686,7 +723,7 @@ CLI commands:
   apf --gre-down     - tear down all tunnels and remove firewall rules
   apf --gre-status   - show current tunnel interface status
 
-3.12) Configuration: Remote Block Lists
+3.13) Configuration: Remote Block Lists
 APF can automatically download and apply IP block lists from external sources.
 Each list is loaded into a dedicated iptables chain on full firewall start.
 The following DLIST_* variables in conf.apf control these lists:
@@ -704,7 +741,7 @@ backup to prevent data loss. Note that DLIST_RESERVED interacts with
 BLK_RESNET — when both are enabled, the downloaded reserved.networks list
 supplements the built-in private.networks blocking.
 
-3.13) Configuration: Logging & Control
+3.14) Configuration: Logging & Control
 APF provides configurable logging of filtered packets through the LOG_*
 variables in conf.apf:
 
@@ -721,7 +758,7 @@ For iptables concurrency control, IPT_LOCK_SUPPORT and IPT_LOCK_TIMEOUT
 configure the -w lock flag behavior for iptables >= 1.4.20. This prevents
 concurrent iptables modifications from corrupting rule state.
 
-3.14) Configuration: Implicit Blocking
+3.15) Configuration: Implicit Blocking
 The BLK_* variables in conf.apf control implicit blocking of specific traffic
 patterns without explicit port rules. These apply globally to all interfaces:
 
@@ -737,7 +774,7 @@ patterns without explicit port rules. These apply globally to all interfaces:
   BLK_IDENT          - REJECT ident (TCP 113) requests instead of silently
                         dropping; some services stall without ident response
 
-3.15) Configuration: Firewall Order of Operations
+3.16) Configuration: Firewall Order of Operations
 When APF starts ('apf -s'), rules are loaded in a specific order that
 determines how packets are evaluated. Understanding this order is essential
 for troubleshooting and for knowing which features take precedence.
