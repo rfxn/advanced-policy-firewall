@@ -18,7 +18,6 @@ _APF_GEOIP_LOADED=1
 # geoip_load()         — main entry point (validate, download, build chains)
 # geoip_update()       — re-download + atomic ipset refresh (no downtime)
 # geoip_info()         — display CC status, per-country stats
-# geoip_flush()        — destroy all CC ipsets and chains
 
 # --- CLI handlers ---
 # cli_cc_trust()       — handle apf -a/-d for country codes
@@ -85,7 +84,7 @@ geoip_download() {
 	local cache_file="$CC_DATA_DIR/${cc}.${family}"
 	local dl_tmp valid_count
 
-	mkdir -p "$CC_DATA_DIR" 2>/dev/null
+	mkdir -p "$CC_DATA_DIR" 2>/dev/null  # safe: parent dir always exists
 	dl_tmp=$(mktemp "$INSTALL_PATH/.apf-geoip-XXXXXX")
 	_apf_reg_tmp "$dl_tmp"
 
@@ -194,8 +193,8 @@ geoip_populate_set() {
 	fi
 
 	# Create persistent + tmp sets
-	$IPSET create "$set_name" hash:net family "$ipset_family" maxelem "$maxelem" 2>/dev/null || true
-	$IPSET create "${set_name}-tmp" hash:net family "$ipset_family" maxelem "$maxelem" 2>/dev/null || true
+	$IPSET create "$set_name" hash:net family "$ipset_family" maxelem "$maxelem" 2>/dev/null || true  # ignore if set already exists
+	$IPSET create "${set_name}-tmp" hash:net family "$ipset_family" maxelem "$maxelem" 2>/dev/null || true  # ignore if set already exists
 	$IPSET flush "${set_name}-tmp"
 
 	# Populate tmp set via restore (fast batch)
@@ -222,7 +221,7 @@ geoip_populate_set() {
 		$IPSET swap "${set_name}-tmp" "$set_name"
 	fi
 	$IPSET flush "${set_name}-tmp"
-	$IPSET destroy "${set_name}-tmp" 2>/dev/null || true
+	$IPSET destroy "${set_name}-tmp" 2>/dev/null || true  # cleanup tmp set; may already be destroyed after swap
 	rm -f "$restore_tmp"
 	return 0
 }
@@ -244,12 +243,12 @@ cc_rules_load() {
 
 	# Create chains as needed
 	if [ "$_has_deny" = "1" ]; then
-		ipt -N CC_DENY 2>/dev/null
+		ipt -N CC_DENY 2>/dev/null  # ignore if chain already exists (idempotent)
 		ipt -A INPUT -j CC_DENY
 		ipt -A OUTPUT -j CC_DENY
 	fi
 	if [ "$_has_allow" = "1" ]; then
-		ipt -N CC_ALLOW 2>/dev/null
+		ipt -N CC_ALLOW 2>/dev/null  # ignore if chain already exists (idempotent)
 		ipt -A INPUT -j CC_ALLOW
 		ipt -A OUTPUT -j CC_ALLOW
 	fi
@@ -282,7 +281,9 @@ cc_rules_load() {
 	done
 
 	# Populate ipsets and add chain rules for simple deny entries
-	local IFS=',' seen=""
+	local seen=""
+	local _save_ifs="$IFS"
+	IFS=','
 	for cc in $simple_deny; do
 		[ -z "$cc" ] && continue
 		case ",$seen," in *",$cc,"*) continue ;; esac
@@ -298,6 +299,7 @@ cc_rules_load() {
 		seen="$seen,$cc"
 		_geoip_add_simple_rules "$cc" "CC_ALLOW" "ACCEPT"
 	done
+	IFS="$_save_ifs"
 
 	# --- Pass 2: Advanced entries (proto:flow:port:CC) ---
 	for file in "$CC_DENY_HOSTS" "$CC_ALLOW_HOSTS"; do
@@ -426,13 +428,8 @@ _geoip_add_advanced_rule() {
 	local entry="$1" cc="$2" chain="$3" action="$4"
 	local set4="apf_cc4_${cc}"
 
-	# Create chain if not exists
-	ipt -N "$chain" 2>/dev/null
-	# Ensure chain is jumped to (idempotent check)
-	if ! $IPT $IPT_FLAGS -S INPUT 2>/dev/null | grep -q -- "-j $chain"; then
-		ipt -A INPUT -j "$chain"
-		ipt -A OUTPUT -j "$chain"
-	fi
+	# Create chain if not exists (may already exist from prior entries)
+	ipt -N "$chain" 2>/dev/null  # fails silently if chain already exists
 
 	# Replace CC in entry with placeholder for parsing
 	local parse_entry="${entry%=*}=PLACEHOLDER"
@@ -441,21 +438,31 @@ _geoip_add_advanced_rule() {
 
 	local proto="" dir="" pflow="" port="" ipflow=""
 	case "$_TF_COUNT" in
-		4) pflow="$_TF1"; port="$_TF2"; ipflow="$_TF3" ;;
+		4) proto="tcp"; pflow="$_TF1"; port="$_TF2"; ipflow="$_TF3" ;;
 		5) dir="$_TF1"; pflow="$_TF2"; port="$_TF3"; ipflow="$_TF4" ;;
 		6) proto="$_TF1"; dir="$_TF2"; pflow="$_TF3"; port="$_TF4"; ipflow="$_TF5" ;;
 		*) return 1 ;;
 	esac
 
+	# 5-token entries (e.g., in:d=22:s=CN) default to tcp
+	[ -z "$proto" ] && proto="tcp"
+
 	expand_port "$port"; port="$_PORT"
 
 	# Build iptables match arguments
-	local match=""
-	[ -n "$proto" ] && match="$match -p $proto"
+	local match="-p $proto"
 	if [ "$pflow" = "d" ]; then
 		match="$match --dport $port"
 	else
 		match="$match --sport $port"
+	fi
+
+	# Determine which chains to apply rule to based on direction
+	local _chains="INPUT OUTPUT"
+	if [ "$dir" = "in" ]; then
+		_chains="INPUT"
+	elif [ "$dir" = "out" ]; then
+		_chains="OUTPUT"
 	fi
 
 	# Populate ipset
@@ -464,6 +471,14 @@ _geoip_add_advanced_rule() {
 	# ipset direction: if CC is source (s=CC) match src, if dest (d=CC) match dst
 	local ipset_dir="src"
 	[ "$ipflow" = "d" ] && ipset_dir="dst"
+
+	# Ensure chain jump exists in the appropriate INPUT/OUTPUT chains
+	local _ch
+	for _ch in $_chains; do
+		if ! $IPT $IPT_FLAGS -S "$_ch" 2>/dev/null | grep -q -- "-j $chain"; then
+			ipt -A "$_ch" -j "$chain"
+		fi
+	done
 
 	if $IPSET list "$set4" > /dev/null 2>&1; then
 		if [ "$CC_LOG_ONLY" = "1" ]; then
@@ -640,7 +655,7 @@ geoip_info() {
 			echo "Invalid country code: $cc_arg" >&2
 			return 1
 		fi
-		local cc_name set_name count4=0 count6=0
+		local cc cc_name set_name count4=0 count6=0
 		for cc in ${_VCC_CODES//,/ }; do
 			cc_name=$(geoip_cc_name "$cc")
 			echo "  $cc ($cc_name):"
@@ -764,9 +779,11 @@ cli_cc_trust() {
 		if [ -f "$CC_DATA_DIR/${cc}.4" ]; then
 			count4=$(grep -cE '^[0-9]' "$CC_DATA_DIR/${cc}.4" 2>/dev/null) || count4=0
 		fi
+		local action_lower
+		action_lower=$(echo "$action" | tr '[:upper:]' '[:lower:]')
 		eout "{trust} $action $cc_name ($cc): $count4 IPv4 CIDRs"
 		if [ "$SET_VERBOSE" != "1" ]; then
-			echo "${action,,} $cc_name ($cc): $count4 IPv4 CIDRs"
+			echo "$action_lower $cc_name ($cc): $count4 IPv4 CIDRs"
 		fi
 	done
 }
@@ -834,9 +851,11 @@ cli_cc_trust_advanced() {
 
 	local cc_name
 	cc_name=$(geoip_cc_name "$cc")
+	local action_lower
+	action_lower=$(echo "$action" | tr '[:upper:]' '[:lower:]')
 	eout "{trust} $action advanced CC rule: $entry ($cc_name)"
 	if [ "$SET_VERBOSE" != "1" ]; then
-		echo "${action,,} advanced CC rule: $entry ($cc_name)"
+		echo "$action_lower advanced CC rule: $entry ($cc_name)"
 	fi
 }
 
@@ -930,9 +949,11 @@ cli_cc_trust_temp() {
 		else
 			expire_disp="${_TTL_SECONDS}s"
 		fi
+		local action_lower
+		action_lower=$(echo "$action" | tr '[:upper:]' '[:lower:]')
 		eout "{trust} temp $action $cc_name ($cc) for $expire_disp"
 		if [ "$SET_VERBOSE" != "1" ]; then
-			echo "temp ${action,,} $cc_name ($cc) for $expire_disp"
+			echo "temp $action_lower $cc_name ($cc) for $expire_disp"
 		fi
 	done
 }
@@ -978,13 +999,8 @@ cli_cc_remove() {
 		sed -i "\%# added.*=${cc} %d" "$f"
 	done
 
-	# Destroy ipsets
-	if [ -n "$IPSET" ]; then
-		$IPSET destroy "apf_cc4_${cc}" 2>/dev/null || true
-		$IPSET destroy "apf_cc6_${cc}" 2>/dev/null || true
-	fi
-
-	# Remove ipset match rules from chains (scan all CC chains)
+	# Remove iptables rules BEFORE destroying ipsets (ipset refuses
+	# destroy when a set is still referenced by active iptables rules)
 	local chain
 	for chain in CC_DENY CC_ALLOW CC_DENYP CC_ALLOWP; do
 		if $IPT $IPT_FLAGS -L "$chain" -n > /dev/null 2>&1; then
@@ -993,19 +1009,25 @@ cli_cc_remove() {
 			while $IPT $IPT_FLAGS -D "$chain" -m set --match-set "apf_cc4_${cc}" src -j ACCEPT 2>/dev/null; do :; done
 			while $IPT $IPT_FLAGS -D "$chain" -m set --match-set "apf_cc4_${cc}" dst -j "$ALL_STOP" 2>/dev/null; do :; done
 			while $IPT $IPT_FLAGS -D "$chain" -m set --match-set "apf_cc4_${cc}" dst -j ACCEPT 2>/dev/null; do :; done
-			# LOG rules
+			# LOG rules (loop exits when no more matching rules found)
 			$IPT $IPT_FLAGS -S "$chain" 2>/dev/null | grep "apf_cc4_${cc}" | while IFS= read -r _rule; do
-				$IPT $IPT_FLAGS -D "$chain" ${_rule#-A $chain } 2>/dev/null || true
+				$IPT $IPT_FLAGS -D "$chain" ${_rule#-A $chain } 2>/dev/null || true  # best-effort LOG rule removal
 			done
 		fi
 		if [ "$USE_IPV6" = "1" ] && $IP6T $IPT_FLAGS -L "$chain" -n > /dev/null 2>&1; then
 			while $IP6T $IPT_FLAGS -D "$chain" -m set --match-set "apf_cc6_${cc}" src -j "$ALL_STOP" 2>/dev/null; do :; done
 			while $IP6T $IPT_FLAGS -D "$chain" -m set --match-set "apf_cc6_${cc}" src -j ACCEPT 2>/dev/null; do :; done
 			$IP6T $IPT_FLAGS -S "$chain" 2>/dev/null | grep "apf_cc6_${cc}" | while IFS= read -r _rule; do
-				$IP6T $IPT_FLAGS -D "$chain" ${_rule#-A $chain } 2>/dev/null || true
+				$IP6T $IPT_FLAGS -D "$chain" ${_rule#-A $chain } 2>/dev/null || true  # best-effort LOG rule removal
 			done
 		fi
 	done
+
+	# Destroy ipsets (safe now — iptables rules referencing them are removed)
+	if [ -n "$IPSET" ]; then
+		$IPSET destroy "apf_cc4_${cc}" 2>/dev/null || true  # may not exist if only in rules file
+		$IPSET destroy "apf_cc6_${cc}" 2>/dev/null || true  # may not exist if IPv6 disabled
+	fi
 
 	# Remove cached data
 	rm -f "$CC_DATA_DIR/${cc}.4" "$CC_DATA_DIR/${cc}.6"
