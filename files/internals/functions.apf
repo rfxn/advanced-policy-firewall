@@ -1843,7 +1843,7 @@ firewall_info() {
 		[ "$deny_count" -gt 0 ] 2>/dev/null || deny_count=0
 	fi
 	if [ -f "$ALLOW_HOSTS" ] || [ -f "$DENY_HOSTS" ]; then
-		temp_count=$(cat "$ALLOW_HOSTS" "$DENY_HOSTS" 2>/dev/null | grep -c 'ttl=.*expire=')
+		temp_count=$(cat "$ALLOW_HOSTS" "$DENY_HOSTS" "$CC_DENY_HOSTS" "$CC_ALLOW_HOSTS" 2>/dev/null | grep -c '# added .* ttl=.*expire=')
 		[ "$temp_count" -gt 0 ] 2>/dev/null || temp_count=0
 	fi
 	echo "  Allow entries:    $allow_count"
@@ -2991,7 +2991,7 @@ expire_temp_entries() {
 				_et_expired+=("$_PTC_IP")
 				count=$(($count + 1))
 			fi
-		done < <(grep "ttl=.*expire=" "$file")
+		done < <(grep '# added .* ttl=.*expire=' "$file")
 	done
 	# Deferred removal: avoids modifying trust files while iterating;
 	# cli_trust_remove handles both iptables rules and file cleanup
@@ -3037,7 +3037,7 @@ list_temp_entries() {
 			fi
 			echo "$type $_PTC_IP ttl=${_PTC_TTL}s remains=${disp} $cmt"
 			found=1
-		done < <(grep "ttl=.*expire=" "$file")
+		done < <(grep '# added .* ttl=.*expire=' "$file")
 	done
 	if [ "$found" -eq 0 ]; then
 		echo "No temporary entries."
@@ -3053,10 +3053,11 @@ flush_temp_entries() {
 			_parse_temp_comment "$line"
 			_ft_expired+=("$_PTC_IP")
 			count=$(($count + 1))
-		done < <(grep "ttl=.*expire=" "$file")
+		done < <(grep '# added .* ttl=.*expire=' "$file")
 		# Safety net: remove any orphaned ttl= comment lines not cleaned
-		# by per-IP cli_trust_remove (e.g., partial flush after restart)
-		sed -i '/ttl=.*expire=/d' "$file"
+		# by per-IP cli_trust_remove (e.g., partial flush after restart);
+		# matches only "# added" metadata lines, not documentation headers
+		sed -i '/# added .* ttl=.*expire=/d' "$file"
 	done
 	# Deferred removal: avoids modifying trust files while iterating;
 	# cli_trust_remove handles both iptables rules and file cleanup
