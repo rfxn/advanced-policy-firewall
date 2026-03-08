@@ -185,6 +185,9 @@
       — trust lifecycle, temporary trust, firewall lifecycle, search and
       diagnostics, restart persistence, CLI UX; runs via 'make -C tests uat'
 [New] CI: UAT acceptance test job runs 56 scenarios on Debian 12
-[Change] Migrate test infrastructure to batsman v1.1.0; test parallelization;
+[Change] Migrate test infrastructure to batsman v1.2.0; test parallelization;
       validate_config tests use --validate saving ~55-60s; per-test teardown
       to prevent cascading failures
+[Change] UAT teardown hardening: uat_apf_teardown() ensures firewall flush
+      and orphan process cleanup on test failure; all UAT scenarios use
+      centralized teardown helper

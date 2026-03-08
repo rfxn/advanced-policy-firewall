@@ -112,6 +112,19 @@ uat_apf_set_config() {
     sed -i "s/^${var}=.*/${var}=\"${val}\"/" "$APF_INSTALL/conf.apf"
 }
 
+# uat_apf_teardown — Robust teardown for UAT scenarios that start APF.
+# Ensures firewall is flushed and orphaned processes are cleaned up even
+# if a test failure leaves APF in an unexpected state.
+# Call from teardown_file() in any scenario that runs apf -s or apf -r.
+uat_apf_teardown() {
+    # Flush firewall — safe even if already stopped (exits 0 either way)
+    apf -f 2>/dev/null || true  # flush: safe if apf not running or not installed
+    # Kill any orphaned apf processes left by failed tests
+    uat_cleanup_processes apf
+    # Reset state files and config to clean baseline
+    uat_apf_reset
+}
+
 # uat_apf_set_interface IFACE — Set the untrusted interface for APF
 uat_apf_set_interface() {
     uat_apf_set_config "IFACE_UNTRUSTED" "$1"

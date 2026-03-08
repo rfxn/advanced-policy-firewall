@@ -19,8 +19,7 @@ setup_file() {
 }
 
 teardown_file() {
-    apf -f 2>/dev/null || true   # flush: safe if already stopped
-    uat_apf_reset
+    uat_apf_teardown
     source /opt/tests/helpers/teardown-netns.sh
 }
 
