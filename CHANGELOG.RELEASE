@@ -335,3 +335,12 @@
       validation path (linkid=abc emits "not a valid integer")
 [Fix] Remove Bash 4.2+ static check from behavioral test suite (belongs
       in lint/CI workflow)
+[New] UAT (User Acceptance Testing) suite: 7 scenario files exercising APF
+      from a sysadmin perspective — trust allow/deny lifecycle, temporary
+      trust with TTL, firewall start/stop/restart lifecycle, search and
+      diagnostics, restart persistence, and CLI UX; runs via 'make -C
+      tests uat' with --privileged Docker flag
+[New] uat-apf.bash helper: idempotent install verification, state reset
+      between scenarios, config convenience wrappers
+[Change] Update batsman submodule from v1.0.3 to v1.1.0 (UAT helpers)
+[Change] Dockerfile: add python3 for assert_valid_json UAT assertions

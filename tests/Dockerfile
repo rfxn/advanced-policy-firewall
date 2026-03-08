@@ -9,6 +9,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     iputils-ping \
     netcat-openbsd \
     ipset \
+    python3 \
     && rm -rf /var/lib/apt/lists/*
 
 # Prepare for network namespace support
