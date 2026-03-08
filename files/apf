@@ -144,6 +144,16 @@ if [ -z "$SKIP_FASTLOAD_FIRSTRUN" ] && [ -z "$SKIP_FASTLOAD_EXPIRED" ] && [ -z "
 			eout "{glob} fast load snapshot empty or invalid, going full load"
 		else
 		devm
+		# Recreate ipsets before restore (snapshot references --match-set)
+		if [ "$USE_IPSET" == "1" ] && [ -n "$IPSET" ] && [ -f "$INSTALL_PATH/ipset.rules" ]; then
+			ipset_load
+		fi
+		# Recreate GeoIP ipsets from cached data (no downloads)
+		if cc_enabled; then
+			# shellcheck disable=SC1090,SC1091
+			. "$INSTALL_PATH/internals/geoip.apf"
+			_geoip_fast_load_ipsets
+		fi
 		eout "{glob} activating firewall, fast load ($IPT_BACKEND)"
 		if ! $IPTR $IPT_FLAGS "$INSTALL_PATH/internals/.apf.restore" 2>/dev/null; then
 			eout "{glob} fast load failed (iptables-restore error), going full load"

@@ -310,13 +310,25 @@ cc_rules_load() {
 			chain="CC_ALLOWP"
 			action="ACCEPT"
 		fi
+		# Collect simple CCs from this file for wildcard expansion
+		local _file_simple_ccs=""
+		if [ "$file" = "$CC_DENY_HOSTS" ]; then
+			_file_simple_ccs="$simple_deny"
+		else
+			_file_simple_ccs="$simple_allow"
+		fi
 		while IFS= read -r line; do
 			case "$line" in '#'*|'') continue ;; esac
 			[[ "$line" == *=* ]] || continue
 			# Extract CC from last field
 			cc="${line##*=}"
 			if [ "$cc" = "*" ]; then
-				# Wildcard: skip during chain load (expanded at runtime)
+				# Wildcard: expand to all simple CCs from this file
+				local _wc_cc _wc_base="${line%=*}="
+				for _wc_cc in ${_file_simple_ccs//,/ }; do
+					[ -z "$_wc_cc" ] && continue
+					_geoip_add_advanced_rule "${_wc_base}${_wc_cc}" "$_wc_cc" "$chain" "$action"
+				done
 				continue
 			fi
 			if [[ "$cc" == @* ]]; then
@@ -489,6 +501,46 @@ _geoip_add_advanced_rule() {
 	fi
 }
 
+## Fast load: recreate ipsets from cached data (no downloads).
+# Called from fast load path in files/apf before iptables-restore.
+# The snapshot references --match-set, so ipsets must exist first.
+_geoip_fast_load_ipsets() {
+	if [ "$USE_IPSET" != "1" ] || [ -z "$IPSET" ]; then
+		return 0
+	fi
+	local file line cc cc_list="" seen=""
+	for file in "$CC_DENY_HOSTS" "$CC_ALLOW_HOSTS"; do
+		[ -f "$file" ] || continue
+		while IFS= read -r line; do
+			case "$line" in '#'*|'') continue ;; esac
+			if [[ "$line" == *=* ]]; then
+				cc="${line##*=}"
+			else
+				cc="$line"
+			fi
+			if [[ "$cc" == @* ]]; then
+				if geoip_expand_codes "$cc"; then
+					cc_list="$cc_list,$_VCC_CODES"
+				fi
+			elif valid_cc "$cc"; then
+				cc_list="$cc_list,$cc"
+			fi
+		done < "$file"
+	done
+
+	local IFS=','
+	for cc in $cc_list; do
+		[ -z "$cc" ] && continue
+		case ",$seen," in *",$cc,"*) continue ;; esac
+		seen="$seen,$cc"
+		geoip_populate_set "$cc" "4"
+		if [ "$CC_IPV6" = "1" ] && [ "$USE_IPV6" = "1" ]; then
+			geoip_populate_set "$cc" "6"
+		fi
+	done
+	eout "{geoip} ipsets restored from cache for fast load"
+}
+
 ## Main GeoIP load orchestrator.
 # Called from firewall script when cc_enabled() returns true.
 geoip_load() {
@@ -498,6 +550,17 @@ geoip_load() {
 	fi
 	eout "{geoip} loading country code filtering"
 	geoip_download_all
+
+	# Warn if cached data is stale (>30 days)
+	if [ -f "$CC_DATA_DIR/.last_update" ]; then
+		local _gl_last _gl_age
+		read -r _gl_last < "$CC_DATA_DIR/.last_update"
+		_gl_age=$(( $(date +%s) - _gl_last ))
+		if [ "$_gl_age" -gt 2592000 ]; then
+			eout "{geoip} WARNING: GeoIP data is $((_gl_age / 86400)) days old; run apf --cc-update"
+		fi
+	fi
+
 	cc_rules_load
 	elog_event "rule_loaded" "info" "{geoip} country code chains loaded" \
 		"deny=$CC_DENY_HOSTS" "allow=$CC_ALLOW_HOSTS"
