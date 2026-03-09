@@ -618,3 +618,54 @@ _source_funcs='source '"$APF_DIR"'/internals/functions.apf; CC_DENY_HOSTS='"$APF
     "$APF" -u ZZ 2>/dev/null || true
     clean_cc_state
 }
+
+# ============================================================
+# IPv6 chain rules
+# ============================================================
+
+@test "CC deny creates IPv6 chain rules when USE_IPV6=1" {
+    if ! ip6tables_available; then skip "ip6tables not available"; fi
+    clean_cc_state
+    create_cc_fixture_v4 "ZZ"
+    create_cc_fixture_v6 "ZZ"
+    source /opt/tests/helpers/apf-config.sh
+    apf_set_config "USE_IPV6" "1"
+    apf_set_config "CC_IPV6" "1"
+    echo "ZZ" >> "$APF_DIR/cc_deny.rules"
+
+    "$APF" -f 2>/dev/null || true
+    "$APF" -s
+
+    # IPv6 CC_DENY chain should exist with match-set rule
+    assert_rule_exists_ip6s CC_DENY "match-set apf_cc6_ZZ"
+
+    # Clean up
+    "$APF" -f 2>/dev/null || true
+    clean_cc_state
+    "$APF" -s
+}
+
+# ============================================================
+# Wildcard expansion in advanced entries
+# ============================================================
+
+@test "wildcard * in advanced entry expands to all simple CCs" {
+    clean_cc_state
+    create_cc_fixture_v4 "ZZ"
+    create_cc_fixture_v4_yy
+    # Two simple deny entries + one wildcard advanced entry
+    printf '%s\n' "ZZ" "YY" "tcp:in:d=22:s=*" >> "$APF_DIR/cc_deny.rules"
+
+    "$APF" -f 2>/dev/null || true
+    "$APF" -s
+
+    # CC_DENYP should have rules for both ZZ and YY (expanded from *)
+    assert_chain_exists CC_DENYP
+    assert_rule_exists_ips CC_DENYP "match-set apf_cc4_ZZ"
+    assert_rule_exists_ips CC_DENYP "match-set apf_cc4_YY"
+
+    # Clean up
+    "$APF" -f 2>/dev/null || true
+    clean_cc_state
+    "$APF" -s
+}

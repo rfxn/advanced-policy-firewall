@@ -584,7 +584,7 @@ geoip_load() {
 }
 
 ## Update GeoIP data and refresh ipsets atomically (zero downtime).
-# Called from apf --cc-update and cron.
+# Called from apf --cc-update.
 geoip_update() {
 	if ! geoip_validate_config; then
 		return 1
@@ -1039,6 +1039,8 @@ cli_cc_remove() {
 		if [ "$USE_IPV6" = "1" ] && $IP6T $IPT_FLAGS -L "$chain" -n > /dev/null 2>&1; then
 			while $IP6T $IPT_FLAGS -D "$chain" -m set --match-set "apf_cc6_${cc}" src -j "$ALL_STOP" 2>/dev/null; do :; done
 			while $IP6T $IPT_FLAGS -D "$chain" -m set --match-set "apf_cc6_${cc}" src -j ACCEPT 2>/dev/null; do :; done
+			while $IP6T $IPT_FLAGS -D "$chain" -m set --match-set "apf_cc6_${cc}" dst -j "$ALL_STOP" 2>/dev/null; do :; done
+			while $IP6T $IPT_FLAGS -D "$chain" -m set --match-set "apf_cc6_${cc}" dst -j ACCEPT 2>/dev/null; do :; done
 			# LOG rules — eval for shell-quoted --log-prefix values (see IPv4 comment above)
 			$IP6T $IPT_FLAGS -S "$chain" 2>/dev/null | grep "apf_cc6_${cc}" | while IFS= read -r _rule; do
 				eval "$IP6T $IPT_FLAGS -D \"$chain\" ${_rule#-A $chain }" 2>/dev/null || true  # best-effort LOG rule removal

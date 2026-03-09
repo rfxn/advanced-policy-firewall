@@ -44,8 +44,7 @@ pkg_uninstall_cron \
 	/etc/cron.d/apf /etc/cron.d/apf_ipset /etc/cron.d/apf_temp \
 	/etc/cron.d/fwdev /etc/cron.daily/apf /etc/cron.daily/fw \
 	/etc/cron.hourly/fw \
-	/etc/cron.d/refresh.apf /etc/cron.d/apf_develmode \
-	/etc/cron.d/apf_geoip
+	/etc/cron.d/refresh.apf /etc/cron.d/apf_develmode
 
 # Remove logrotate config
 pkg_uninstall_logrotate "apf"
