@@ -1008,16 +1008,19 @@ cli_cc_remove() {
 			while $IPT $IPT_FLAGS -D "$chain" -m set --match-set "apf_cc4_${cc}" src -j ACCEPT 2>/dev/null; do :; done
 			while $IPT $IPT_FLAGS -D "$chain" -m set --match-set "apf_cc4_${cc}" dst -j "$ALL_STOP" 2>/dev/null; do :; done
 			while $IPT $IPT_FLAGS -D "$chain" -m set --match-set "apf_cc4_${cc}" dst -j ACCEPT 2>/dev/null; do :; done
-			# LOG rules (loop exits when no more matching rules found)
+			# LOG rules — use eval because iptables -S output contains
+			# shell-quoted --log-prefix values (e.g., "** CC_DENY:ZZ ** ")
+			# that must be parsed as shell words, not split on whitespace
 			$IPT $IPT_FLAGS -S "$chain" 2>/dev/null | grep "apf_cc4_${cc}" | while IFS= read -r _rule; do
-				$IPT $IPT_FLAGS -D "$chain" ${_rule#-A $chain } 2>/dev/null || true  # best-effort LOG rule removal
+				eval "$IPT $IPT_FLAGS -D \"$chain\" ${_rule#-A $chain }" 2>/dev/null || true  # best-effort LOG rule removal
 			done
 		fi
 		if [ "$USE_IPV6" = "1" ] && $IP6T $IPT_FLAGS -L "$chain" -n > /dev/null 2>&1; then
 			while $IP6T $IPT_FLAGS -D "$chain" -m set --match-set "apf_cc6_${cc}" src -j "$ALL_STOP" 2>/dev/null; do :; done
 			while $IP6T $IPT_FLAGS -D "$chain" -m set --match-set "apf_cc6_${cc}" src -j ACCEPT 2>/dev/null; do :; done
+			# LOG rules — eval for shell-quoted --log-prefix values (see IPv4 comment above)
 			$IP6T $IPT_FLAGS -S "$chain" 2>/dev/null | grep "apf_cc6_${cc}" | while IFS= read -r _rule; do
-				$IP6T $IPT_FLAGS -D "$chain" ${_rule#-A $chain } 2>/dev/null || true  # best-effort LOG rule removal
+				eval "$IP6T $IPT_FLAGS -D \"$chain\" ${_rule#-A $chain }" 2>/dev/null || true  # best-effort LOG rule removal
 			done
 		fi
 	done
