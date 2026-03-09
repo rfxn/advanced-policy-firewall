@@ -26,11 +26,12 @@ Contents:
 3.8 ........... Configuration: Silent IP Blocking
 3.9 ........... Configuration: Docker/Container Compatibility
 3.10 .......... Configuration: ipset Block Lists
-3.11 .......... Configuration: GRE Tunnels
-3.12 .......... Configuration: Remote Block Lists
-3.13 .......... Configuration: Logging & Control
-3.14 .......... Configuration: Implicit Blocking
-3.15 .......... Configuration: Firewall Order of Operations
+3.11 .......... Configuration: Country Code Filtering (GeoIP)
+3.12 .......... Configuration: GRE Tunnels
+3.13 .......... Configuration: Remote Block Lists
+3.14 .......... Configuration: Logging & Control
+3.15 .......... Configuration: Implicit Blocking
+3.16 .......... Configuration: Firewall Order of Operations
 4 ............. General Usage
 4.1 ........... General Usage: Trust System
 4.2 ........... General Usage: Global Trust System

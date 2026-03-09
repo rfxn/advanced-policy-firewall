@@ -142,7 +142,7 @@ geoip_download_all() {
 	for file in "$CC_DENY_HOSTS" "$CC_ALLOW_HOSTS"; do
 		[ -f "$file" ] || continue
 		while IFS= read -r line; do
-			case "$line" in '#'*|''|*ttl=*expire=*) continue ;; esac
+			case "$line" in '#'*|'') continue ;; esac
 			# Extract CC from advanced or simple entries
 			if [[ "$line" == *=* ]]; then
 				# Advanced: last field after last '='
@@ -219,11 +219,14 @@ geoip_populate_set() {
 	local count
 	count=$(wc -l < "$restore_tmp")
 	if [ "$count" -gt 0 ]; then
-		$IPSET restore -exist < "$restore_tmp" 2>/dev/null
-		$IPSET swap "${set_name}-tmp" "$set_name"
+		if $IPSET restore -exist < "$restore_tmp" 2>/dev/null; then  # -exist ignores duplicate entries
+			$IPSET swap "${set_name}-tmp" "$set_name"
+		else
+			eout "{geoip} WARNING: ipset restore failed for $set_name, keeping existing set"
+		fi
 	fi
-	$IPSET flush "${set_name}-tmp"
-	$IPSET destroy "${set_name}-tmp" 2>/dev/null || true  # cleanup tmp set; may already be destroyed after swap
+	$IPSET flush "${set_name}-tmp" 2>/dev/null || true    # cleanup tmp set
+	$IPSET destroy "${set_name}-tmp" 2>/dev/null || true  # may already be destroyed after swap
 	rm -f "$restore_tmp"
 	return 0
 }
@@ -369,6 +372,29 @@ cc_rules_load() {
 				ipt6 -A CC_ALLOW -j "$ALL_STOP"
 			fi
 		fi
+	fi
+}
+
+## Ensure a CC chain exists and has INPUT/OUTPUT jumps.
+# Creates the chain if needed and adds jump rules for both stacks.
+# Args: action (DENY or ALLOW)
+# Sets: _EGCC_CHAIN to the resolved chain name
+_geoip_ensure_cc_chain() {
+	local action="$1"
+	if [ "$action" = "DENY" ]; then
+		_EGCC_CHAIN="CC_DENY"
+	else
+		_EGCC_CHAIN="CC_ALLOW"
+	fi
+	ipt -N "$_EGCC_CHAIN" 2>/dev/null  # ignore if chain already exists (idempotent)
+	# Ensure jump exists in INPUT/OUTPUT (check both stacks independently)
+	if ! $IPT $IPT_FLAGS -S INPUT 2>/dev/null | grep -q -- "-j $_EGCC_CHAIN"; then
+		ipt4 -A INPUT -j "$_EGCC_CHAIN"
+		ipt4 -A OUTPUT -j "$_EGCC_CHAIN"
+	fi
+	if [ "$USE_IPV6" = "1" ] && ! $IP6T $IPT_FLAGS -S INPUT 2>/dev/null | grep -q -- "-j $_EGCC_CHAIN"; then
+		ipt6 -A INPUT -j "$_EGCC_CHAIN"
+		ipt6 -A OUTPUT -j "$_EGCC_CHAIN"
 	fi
 }
 
@@ -711,6 +737,7 @@ geoip_info() {
 ## CLI handler for bare country code trust (apf -d CN, apf -a US).
 # Routes to CC rules files, downloads data, populates ipsets, creates rules.
 # Args: host chain action file comment
+# Note: $file unused — CC entries route to CC_DENY_HOSTS/CC_ALLOW_HOSTS based on $action
 cli_cc_trust() {
 	local host="$1" chain="$2" action="$3" file="$4" comment="$5"
 	local cc_list="" cc TIME ADDED_EPOCH CMT="$comment"
@@ -763,23 +790,9 @@ cli_cc_trust() {
 			geoip_populate_set "$cc" "6"
 		fi
 
-		# Create chain if not exists (for live add without restart)
-		local cc_chain
-		if [ "$action" = "DENY" ]; then
-			cc_chain="CC_DENY"
-		else
-			cc_chain="CC_ALLOW"
-		fi
-		ipt -N "$cc_chain" 2>/dev/null
-		# Ensure jump exists in INPUT/OUTPUT (check both stacks independently)
-		if ! $IPT $IPT_FLAGS -S INPUT 2>/dev/null | grep -q -- "-j $cc_chain"; then
-			ipt4 -A INPUT -j "$cc_chain"
-			ipt4 -A OUTPUT -j "$cc_chain"
-		fi
-		if [ "$USE_IPV6" = "1" ] && ! $IP6T $IPT_FLAGS -S INPUT 2>/dev/null | grep -q -- "-j $cc_chain"; then
-			ipt6 -A INPUT -j "$cc_chain"
-			ipt6 -A OUTPUT -j "$cc_chain"
-		fi
+		# Create chain + jump rules if not exists (for live add without restart)
+		_geoip_ensure_cc_chain "$action"
+		local cc_chain="$_EGCC_CHAIN"
 
 		# Add ipset match rules to live chain
 		_geoip_add_simple_rules "$cc" "$cc_chain" "$([ "$action" = "DENY" ] && echo "$ALL_STOP" || echo "ACCEPT")"
@@ -812,6 +825,7 @@ cli_cc_trust() {
 
 ## CLI handler for advanced syntax CC trust (e.g., tcp:in:d=22:s=CN).
 # Args: entry chain action file comment
+# Note: $file unused — CC entries route to CC_DENY_HOSTS/CC_ALLOW_HOSTS based on $action
 cli_cc_trust_advanced() {
 	local entry="$1" chain="$2" action="$3" file="$4" comment="$5"
 	local cc TIME ADDED_EPOCH CMT="$comment"
@@ -883,6 +897,7 @@ cli_cc_trust_advanced() {
 
 ## CLI handler for temporary CC trust entries.
 # Args: host chain action file ttl_str comment
+# Note: $file unused — CC entries route to CC_DENY_HOSTS/CC_ALLOW_HOSTS based on $action
 cli_cc_trust_temp() {
 	local host="$1" chain="$2" action="$3" file="$4" ttl_str="$5" comment="$6"
 	local cc_list="" cc TIME ADDED_EPOCH EXPIRE_EPOCH CMT="$comment"
@@ -934,23 +949,9 @@ cli_cc_trust_temp() {
 			geoip_populate_set "$cc" "6"
 		fi
 
-		# Create chain + rules (same as cli_cc_trust)
-		local cc_chain
-		if [ "$action" = "DENY" ]; then
-			cc_chain="CC_DENY"
-		else
-			cc_chain="CC_ALLOW"
-		fi
-		ipt -N "$cc_chain" 2>/dev/null
-		# Check both stacks independently for chain jump
-		if ! $IPT $IPT_FLAGS -S INPUT 2>/dev/null | grep -q -- "-j $cc_chain"; then
-			ipt4 -A INPUT -j "$cc_chain"
-			ipt4 -A OUTPUT -j "$cc_chain"
-		fi
-		if [ "$USE_IPV6" = "1" ] && ! $IP6T $IPT_FLAGS -S INPUT 2>/dev/null | grep -q -- "-j $cc_chain"; then
-			ipt6 -A INPUT -j "$cc_chain"
-			ipt6 -A OUTPUT -j "$cc_chain"
-		fi
+		# Create chain + jump rules if not exists
+		_geoip_ensure_cc_chain "$action"
+		local cc_chain="$_EGCC_CHAIN"
 		_geoip_add_simple_rules "$cc" "$cc_chain" "$([ "$action" = "DENY" ] && echo "$ALL_STOP" || echo "ACCEPT")"
 
 		# Persist with temp markers
