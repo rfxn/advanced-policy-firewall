@@ -207,6 +207,8 @@ fi
 ##
 # Full Load
 ##
+# Remove orphaned temp files from previous versions (no-op if none exist)
+_apf_cleanup_stale_tmp
 eout "{glob} activating firewall"
 # record our last full load
 date +"%s" > "$INSTALL_PATH/internals/.last.full"

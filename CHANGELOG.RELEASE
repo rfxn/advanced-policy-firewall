@@ -143,6 +143,11 @@
       for scripting
 [Fix] list(): remove "No editor found" noise message; use cat for non-TTY
       output (pipe-friendly) and silent pager fallback for TTY sessions
+[Fix] Temp file hygiene: register mktemp calls in record_block(),
+      ipset_migrate_rules(), and ipset_update_timestamp() with
+      _apf_reg_tmp() for signal-safe cleanup; add _apf_cleanup_stale_tmp()
+      to remove orphaned refresh.allow.*/refresh.drop.* and .apf-* temp
+      files from pre-2.0.2 installations on startup and refresh
 
   -- Changes --
 

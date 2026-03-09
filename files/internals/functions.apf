@@ -45,6 +45,18 @@ _apf_cleanup_tmp() {
 	_APF_TMPFILES=""
 }
 
+## Remove orphaned temp files from previous APF versions.
+# Pre-2.0.2 refresh() created refresh.allow.*/refresh.drop.* temp files via
+# mktemp without cleanup registration; these accumulate across restarts.
+# Also cleans stale .apf-* temp files left by interrupted operations.
+# Safe to call repeatedly (rm -f on non-existent files is a no-op).
+_apf_cleanup_stale_tmp() {
+	rm -f "$INSTALL_PATH"/internals/refresh.allow.* 2>/dev/null
+	rm -f "$INSTALL_PATH"/internals/refresh.drop.* 2>/dev/null
+	rm -f "$INSTALL_PATH"/.apf-* 2>/dev/null
+	rm -f "$INSTALL_PATH"/.apf-geoip-* 2>/dev/null
+}
+
 ## Detect iptables backend (nft vs legacy)
 # Sets global IPT_BACKEND to "nft" or "legacy" based on iptables --version output.
 # Called by snapshot_save() and fast load path to avoid duplicated detection.
@@ -1509,6 +1521,7 @@ record_block() {
 	now=$(date +%s)
 	local tmpfile
 	tmpfile=$(mktemp "$INSTALL_PATH/internals/.block_history.XXXXXX")
+	_apf_reg_tmp "$tmpfile"
 
 	if [ -f "$history_file" ]; then
 		while IFS='|' read -r h_ip count first last; do
@@ -2509,6 +2522,7 @@ local migrated=0
 local _imr_int='^[0-9]+$'
 local tmp
 tmp=$(mktemp "$INSTALL_PATH/.apf-XXXXXX")
+_apf_reg_tmp "$tmp"
 while IFS= read -r line; do
 	case "$line" in
 		\#*|"")
@@ -2699,6 +2713,7 @@ local ts_epoch="$2"
 local ts_file="$INSTALL_PATH/internals/.ipset.timestamps"
 local ts_tmp
 ts_tmp=$(mktemp "$INSTALL_PATH/.apf-XXXXXX")
+_apf_reg_tmp "$ts_tmp"
 if [ -f "$ts_file" ]; then
 	grep -v "^${ts_name}:" "$ts_file" > "$ts_tmp" 2>/dev/null || true
 fi
@@ -3079,6 +3094,8 @@ flush_temp_entries() {
 }
 
 refresh() {
+	# Clean up orphaned temp files from pre-2.0.2 refresh() implementation
+	_apf_cleanup_stale_tmp
 	apf_loaded=$($IPT $IPT_FLAGS --list --numeric 2>/dev/null | grep TALLOW)
 	if [ -z "$apf_loaded" ] && [ "$USE_IPV6" == "1" ]; then
 		apf_loaded=$($IP6T $IPT_FLAGS --list --numeric 2>/dev/null | grep TALLOW)
