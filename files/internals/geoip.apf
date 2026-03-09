@@ -135,6 +135,8 @@ geoip_download() {
 
 ## Download data for all active country codes from both rules files.
 # Parses rules, expands continents, downloads each unique CC.
+# Called on every full load — always downloads fresh data regardless of
+# CC_INTERVAL (which only gates the explicit geoip_update() path).
 geoip_download_all() {
 	local file line cc cc_list="" seen=""
 	for file in "$CC_DENY_HOSTS" "$CC_ALLOW_HOSTS"; do
@@ -230,8 +232,9 @@ geoip_populate_set() {
 # Creates CC_DENY, CC_ALLOW, CC_DENYP, CC_ALLOWP chains.
 # Two passes: simple entries (bare CCs) then advanced entries.
 cc_rules_load() {
-	local file line cc entry
+	local file line cc entry chain action
 	local _has_deny=0 _has_allow=0 _has_denyp=0 _has_allowp=0
+	local _file_simple_ccs _wc_cc _wc_base _exp_cc
 
 	# Pre-scan to determine which chains are needed
 	if [ -f "$CC_DENY_HOSTS" ] && grep -qvE '^(#|$)' "$CC_DENY_HOSTS" 2>/dev/null; then
@@ -303,7 +306,6 @@ cc_rules_load() {
 	# --- Pass 2: Advanced entries (proto:flow:port:CC) ---
 	for file in "$CC_DENY_HOSTS" "$CC_ALLOW_HOSTS"; do
 		[ -f "$file" ] || continue
-		local chain action
 		if [ "$file" = "$CC_DENY_HOSTS" ]; then
 			chain="CC_DENYP"
 			action="$ALL_STOP"
@@ -312,7 +314,7 @@ cc_rules_load() {
 			action="ACCEPT"
 		fi
 		# Collect simple CCs from this file for wildcard expansion
-		local _file_simple_ccs=""
+		_file_simple_ccs=""
 		if [ "$file" = "$CC_DENY_HOSTS" ]; then
 			_file_simple_ccs="$simple_deny"
 		else
@@ -325,7 +327,7 @@ cc_rules_load() {
 			cc="${line##*=}"
 			if [ "$cc" = "*" ]; then
 				# Wildcard: expand to all simple CCs from this file
-				local _wc_cc _wc_base="${line%=*}="
+				_wc_base="${line%=*}="
 				for _wc_cc in ${_file_simple_ccs//,/ }; do
 					[ -z "$_wc_cc" ] && continue
 					_geoip_add_advanced_rule "${_wc_base}${_wc_cc}" "$_wc_cc" "$chain" "$action"
@@ -334,7 +336,6 @@ cc_rules_load() {
 			fi
 			if [[ "$cc" == @* ]]; then
 				if ! geoip_expand_codes "$cc"; then continue; fi
-				local _exp_cc
 				for _exp_cc in ${_VCC_CODES//,/ }; do
 					_geoip_add_advanced_rule "$line" "$_exp_cc" "$chain" "$action"
 				done
@@ -545,7 +546,9 @@ _geoip_fast_load_ipsets() {
 		done < "$file"
 	done
 
-	local IFS=','
+	local _fl_count=0
+	local _save_ifs="$IFS"
+	IFS=','
 	for cc in $cc_list; do
 		[ -z "$cc" ] && continue
 		case ",$seen," in *",$cc,"*) continue ;; esac
@@ -554,8 +557,12 @@ _geoip_fast_load_ipsets() {
 		if [ "$CC_IPV6" = "1" ] && [ "$USE_IPV6" = "1" ]; then
 			geoip_populate_set "$cc" "6"
 		fi
+		_fl_count=$(($_fl_count + 1))
 	done
-	eout "{geoip} ipsets restored from cache for fast load"
+	IFS="$_save_ifs"
+	if [ "$_fl_count" -gt 0 ]; then
+		eout "{geoip} $_fl_count country ipsets restored from cache for fast load"
+	fi
 }
 
 ## Main GeoIP load orchestrator.

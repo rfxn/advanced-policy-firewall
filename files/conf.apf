@@ -670,8 +670,9 @@ CC_LOG_ONLY="0"
 # "ipdeny"  = ipdeny.com only
 CC_SRC="auto"
 
-# Days between automatic GeoIP data refresh. Country IP allocations change
-# infrequently; 7 days is a good balance. Set 0 to disable auto-refresh.
+# Minimum days between GeoIP data refreshes via apf --cc-update. Country IP
+# allocations change infrequently; 7 days is a good balance. Set 0 to always
+# refresh. Note: full firewall loads (apf -s) always download fresh data.
 CC_INTERVAL="7"
 
 # Include IPv6 country blocks when USE_IPV6="1". Requires ip6tables and
