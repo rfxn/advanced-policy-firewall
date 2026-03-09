@@ -178,6 +178,12 @@
 [Change] download_url(): log TLS diagnostic hint on download failure for
       legacy system troubleshooting
 [Change] Drop Ubuntu 22.04 from CI matrix; redundant with 20.04+24.04
+[Change] --cc CC: show country detail (continent, rules status, cached data,
+      live ipset stats) even when country code filtering is inactive;
+      previously returned "inactive" with no information
+[New] --cc IP: GeoIP reverse lookup — look up which country and continent
+      an IP address or CIDR belongs to using cached GeoIP data; uses
+      grepcidr for accurate matching when available, prefix fallback otherwise
 
   -- Documentation --
 

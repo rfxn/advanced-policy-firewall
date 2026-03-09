@@ -658,13 +658,231 @@ geoip_update() {
 	eout "{geoip} country code data updated"
 }
 
+## Reverse-map a country code to its continent shorthand.
+# Args: cc (2-letter ISO 3166-1)
+# Prints: continent code (e.g., @AS) or "unknown"
+_geoip_cc_continent() {
+	local cc="$1"
+	# Reuse the same continent lists from geoip_expand_codes()
+	local _CC_AF="AO,BF,BI,BJ,BW,CD,CF,CG,CI,CM,CV,DJ,DZ,EG,EH,ER,ET,GA,GH,GM,GN,GQ,GW,KE,KM,LR,LS,LY,MA,MG,ML,MR,MU,MW,MZ,NA,NE,NG,RE,RW,SC,SD,SH,SL,SN,SO,SS,ST,SZ,TD,TG,TN,TZ,UG,YT,ZA,ZM,ZW"
+	local _CC_AS="AE,AF,AM,AZ,BD,BH,BN,BT,CN,CY,GE,HK,ID,IL,IN,IQ,IR,JO,JP,KG,KH,KP,KR,KW,KZ,LA,LB,LK,MM,MN,MO,MV,MY,NP,OM,PH,PK,PS,QA,SA,SG,SY,TH,TJ,TL,TM,TR,TW,UZ,VN,YE"
+	local _CC_EU="AD,AL,AT,AX,BA,BE,BG,BY,CH,CZ,DE,DK,EE,ES,FI,FO,FR,GB,GG,GI,GR,HR,HU,IE,IM,IS,IT,JE,LI,LT,LU,LV,MC,MD,ME,MK,MT,NL,NO,PL,PT,RO,RS,RU,SE,SI,SK,SM,UA,VA,XK"
+	local _CC_NA="AG,AI,AW,BB,BL,BM,BQ,BS,BZ,CA,CR,CU,CW,DM,DO,GD,GL,GP,GT,HN,HT,JM,KN,KY,LC,MF,MQ,MS,MX,NI,PA,PM,PR,SV,SX,TC,TT,US,VC,VG,VI"
+	local _CC_SA="AR,BO,BR,CL,CO,EC,FK,GF,GY,PE,PY,SR,UY,VE"
+	local _CC_OC="AS,AU,CK,FJ,FM,GU,KI,MH,MP,NC,NF,NR,NU,NZ,PF,PG,PN,PW,SB,TK,TO,TV,VU,WF,WS"
+	local cont codes
+	for cont in AF AS EU NA SA OC; do
+		eval "codes=\"\$_CC_${cont}\""
+		case ",$codes," in
+			*,"$cc",*) echo "@$cont"; return 0 ;;
+		esac
+	done
+	echo "unknown"
+}
+
+## Continent shorthand to full name.
+_geoip_continent_name() {
+	case "$1" in
+		@AF) echo "Africa" ;; @AS) echo "Asia" ;; @EU) echo "Europe" ;;
+		@NA) echo "North America" ;; @SA) echo "South America" ;; @OC) echo "Oceania" ;;
+		*) echo "$1" ;;
+	esac
+}
+
+## Look up which country an IP or CIDR belongs to from cached GeoIP data.
+# Searches all cached {CC}.4 / {CC}.6 data files for a match.
+# Args: ip_or_cidr
+# Prints matching country info; returns 1 if no data or no match.
+_geoip_lookup_ip() {
+	local query="$1"
+	local family="4" is_ipv6=0
+	# Detect IPv6
+	if [[ "$query" == *:* ]]; then
+		family="6"
+		is_ipv6=1
+	fi
+
+	if [ ! -d "$CC_DATA_DIR" ]; then
+		echo "No GeoIP data cached. Run: apf --cc-update" >&2
+		return 1
+	fi
+
+	# Strip CIDR mask for matching — we search for the network address
+	local query_ip="${query%%/*}"
+
+	# Convert IP to integer for range comparison (IPv4 only for exact matching)
+	# For both IPv4 and IPv6, use grep against cached CIDR lists
+	local cc_file cc matched=0
+	local _cc_re='^[A-Z]{2}$'
+	for cc_file in "$CC_DATA_DIR"/*."$family"; do
+		[ -f "$cc_file" ] || continue
+		local cc_base
+		cc_base=$(basename "$cc_file" ".$family")
+		# Skip non-CC files (e.g., .last_update)
+		if ! [[ "$cc_base" =~ $_cc_re ]]; then
+			continue
+		fi
+		# Check if the query IP/CIDR appears in this country's data
+		# For exact IP: check if any CIDR in the file contains it
+		# For CIDR query: check if the exact CIDR is listed
+		if [ -n "${query##*/*}" ]; then
+			# Bare IP (no mask) — use grepcidr if available, else prefix match
+			if command -v grepcidr >/dev/null 2>&1; then
+				if grepcidr -f "$cc_file" <<< "$query_ip" >/dev/null 2>&1; then
+					_geoip_print_lookup "$cc_base" "$query"
+					matched=1
+				fi
+			else
+				# Fallback: prefix-based match on first 3 octets (IPv4) or first half (IPv6)
+				local prefix
+				if [ "$is_ipv6" = "0" ]; then
+					prefix="${query_ip%.*}"
+					if grep -q "^${prefix}\." "$cc_file" 2>/dev/null; then
+						_geoip_print_lookup "$cc_base" "$query"
+						matched=1
+					fi
+				else
+					prefix="${query_ip%%:*}"
+					if grep -q "^${prefix}:" "$cc_file" 2>/dev/null; then
+						_geoip_print_lookup "$cc_base" "$query"
+						matched=1
+					fi
+				fi
+			fi
+		else
+			# CIDR query — look for exact match
+			if grep -qxF "$query" "$cc_file" 2>/dev/null; then
+				_geoip_print_lookup "$cc_base" "$query"
+				matched=1
+			fi
+		fi
+	done
+
+	if [ "$matched" = "0" ]; then
+		echo "No country match found for $query in cached GeoIP data."
+		echo "Data may need refresh: apf --cc-update"
+		return 1
+	fi
+}
+
+## Print formatted lookup result for a matched CC.
+_geoip_print_lookup() {
+	local cc="$1" query="$2"
+	local cc_name continent continent_name rules_status
+	cc_name=$(geoip_cc_name "$cc")
+	continent=$(_geoip_cc_continent "$cc")
+	continent_name=$(_geoip_continent_name "$continent")
+	rules_status=$(_geoip_rules_status "$cc")
+	echo "  $query => $cc ($cc_name)"
+	echo "    Continent: $continent ($continent_name)"
+	echo "    Status:    $rules_status"
+}
+
+## Check CC rules status — whether a CC is in deny, allow, or neither.
+_geoip_rules_status() {
+	local cc="$1"
+	local in_deny=0 in_allow=0
+	# shellcheck disable=SC2154
+	if [ -f "$CC_DENY_HOSTS" ] && grep -qxF "$cc" "$CC_DENY_HOSTS" 2>/dev/null; then
+		in_deny=1
+	fi
+	if [ -f "$CC_ALLOW_HOSTS" ] && grep -qxF "$cc" "$CC_ALLOW_HOSTS" 2>/dev/null; then
+		in_allow=1
+	fi
+	# Also check for advanced entries referencing this CC (skip comments)
+	if [ "$in_deny" = "0" ] && [ -f "$CC_DENY_HOSTS" ]; then
+		if grep -vE '^(#|$)' "$CC_DENY_HOSTS" 2>/dev/null | grep -qE "(^|:)${cc}\$"; then
+			in_deny=1
+		fi
+	fi
+	if [ "$in_allow" = "0" ] && [ -f "$CC_ALLOW_HOSTS" ]; then
+		if grep -vE '^(#|$)' "$CC_ALLOW_HOSTS" 2>/dev/null | grep -qE "(^|:)${cc}\$"; then
+			in_allow=1
+		fi
+	fi
+
+	if [ "$in_deny" = "1" ] && [ "$in_allow" = "1" ]; then
+		echo "in cc_deny.rules AND cc_allow.rules (deny takes precedence)"
+	elif [ "$in_deny" = "1" ]; then
+		echo "in cc_deny.rules (blocked)"
+	elif [ "$in_allow" = "1" ]; then
+		echo "in cc_allow.rules (allowed)"
+	else
+		echo "not in cc_deny.rules or cc_allow.rules"
+	fi
+}
+
 ## Display GeoIP status and per-country statistics.
-# Args: optional cc_arg (specific country to show detail for)
+# Args: optional argument — country code, continent shorthand, or IP/CIDR to look up
 geoip_info() {
 	local cc_arg="${1:-}"
 
+	# IP/CIDR lookup mode — detect IP or CIDR input and route to lookup
+	# FQDNs are excluded (valid_host matches them but they're not IPs)
+	if [ -n "$cc_arg" ] && ! is_fqdn "$cc_arg" && valid_host "$cc_arg" && ! valid_cc "$cc_arg"; then
+		echo "GeoIP Lookup"
+		echo "============"
+		echo ""
+		_geoip_lookup_ip "$cc_arg"
+		return $?
+	fi
+
+	# When a specific CC is requested, show its detail even if filtering is inactive
+	if [ -n "$cc_arg" ]; then
+		if ! valid_cc "$cc_arg"; then
+			echo "Invalid country code or IP address: $cc_arg" >&2
+			return 1
+		fi
+		echo "Country Code Detail"
+		echo "==================="
+		echo ""
+		local cc cc_name set_name count4=0 count6=0 continent continent_name rules_status
+		for cc in ${_VCC_CODES//,/ }; do
+			cc_name=$(geoip_cc_name "$cc")
+			continent=$(_geoip_cc_continent "$cc")
+			continent_name=$(_geoip_continent_name "$continent")
+			rules_status=$(_geoip_rules_status "$cc")
+			echo "  $cc ($cc_name):"
+			echo "    Continent: $continent ($continent_name)"
+			echo "    Status:    $rules_status"
+			# Show cached data file stats
+			if [ -f "$CC_DATA_DIR/${cc}.4" ]; then
+				count4=$(grep -cE '^[0-9]' "$CC_DATA_DIR/${cc}.4" 2>/dev/null) || count4=0
+				echo "    Cached IPv4 CIDRs: $count4"
+			else
+				echo "    Cached IPv4 CIDRs: (no data — run apf --cc-update)"
+			fi
+			if [ "$CC_IPV6" = "1" ] && [ "$USE_IPV6" = "1" ]; then
+				if [ -f "$CC_DATA_DIR/${cc}.6" ]; then
+					count6=$(grep -cE '^[0-9a-fA-F]' "$CC_DATA_DIR/${cc}.6" 2>/dev/null) || count6=0
+					echo "    Cached IPv6 CIDRs: $count6"
+				else
+					echo "    Cached IPv6 CIDRs: (no data)"
+				fi
+			fi
+			# Show live ipset stats if loaded
+			set_name="apf_cc4_${cc}"
+			if $IPSET list "$set_name" > /dev/null 2>&1; then
+				count4=$($IPSET list "$set_name" 2>/dev/null | grep -c '^[0-9]') || count4=0
+				echo "    Live IPv4 ipset:   $count4 entries"
+			fi
+			if [ "$CC_IPV6" = "1" ] && [ "$USE_IPV6" = "1" ]; then
+				set_name="apf_cc6_${cc}"
+				if $IPSET list "$set_name" > /dev/null 2>&1; then
+					count6=$($IPSET list "$set_name" 2>/dev/null | grep -c '^[0-9a-fA-F]') || count6=0
+					echo "    Live IPv6 ipset:   $count6 entries"
+				fi
+			fi
+		done
+		return 0
+	fi
+
+	# Overview mode — no argument
 	if ! cc_enabled; then
 		echo "Country code filtering: inactive (no entries in cc_deny/cc_allow.rules)"
+		echo ""
+		echo "Usage: apf --cc CC    show detail for a country code (e.g., apf --cc CN)"
+		echo "       apf --cc IP    look up country for an IP address (e.g., apf --cc 8.8.8.8)"
 		return 0
 	fi
 
@@ -688,50 +906,22 @@ geoip_info() {
 	fi
 	echo ""
 
-	# Per-country summary
-	if [ -n "$cc_arg" ]; then
-		# Detail for specific CC
-		if ! valid_cc "$cc_arg"; then
-			echo "Invalid country code: $cc_arg" >&2
-			return 1
+	# Overview: list all active CC ipsets
+	echo "Active country blocks:"
+	local set_name cc family count
+	$IPSET list -n 2>/dev/null | grep '^apf_cc' | sort | while IFS= read -r set_name; do
+		family="${set_name#apf_cc}"
+		family="${family%%_*}"
+		cc="${set_name#apf_cc${family}_}"
+		if [ "$family" = "6" ]; then
+			count=$($IPSET list "$set_name" 2>/dev/null | grep -c '^[0-9a-fA-F]') || count=0
+		else
+			count=$($IPSET list "$set_name" 2>/dev/null | grep -c '^[0-9]') || count=0
 		fi
-		local cc cc_name set_name count4=0 count6=0
-		for cc in ${_VCC_CODES//,/ }; do
-			cc_name=$(geoip_cc_name "$cc")
-			echo "  $cc ($cc_name):"
-			set_name="apf_cc4_${cc}"
-			if $IPSET list "$set_name" > /dev/null 2>&1; then
-				count4=$($IPSET list "$set_name" 2>/dev/null | grep -c '^[0-9]') || count4=0
-				echo "    IPv4 CIDRs: $count4"
-			else
-				echo "    IPv4 CIDRs: (not loaded)"
-			fi
-			if [ "$CC_IPV6" = "1" ] && [ "$USE_IPV6" = "1" ]; then
-				set_name="apf_cc6_${cc}"
-				if $IPSET list "$set_name" > /dev/null 2>&1; then
-					count6=$($IPSET list "$set_name" 2>/dev/null | grep -c '^[0-9a-fA-F]') || count6=0
-					echo "    IPv6 CIDRs: $count6"
-				fi
-			fi
-		done
-	else
-		# Overview: list all active CC ipsets
-		echo "Active country blocks:"
-		local set_name cc family count
-		$IPSET list -n 2>/dev/null | grep '^apf_cc' | sort | while IFS= read -r set_name; do
-			family="${set_name#apf_cc}"
-			family="${family%%_*}"
-			cc="${set_name#apf_cc${family}_}"
-			if [ "$family" = "6" ]; then
-				count=$($IPSET list "$set_name" 2>/dev/null | grep -c '^[0-9a-fA-F]') || count=0
-			else
-				count=$($IPSET list "$set_name" 2>/dev/null | grep -c '^[0-9]') || count=0
-			fi
-			local cc_name
-			cc_name=$(geoip_cc_name "$cc")
-			printf "  %-4s %-20s IPv%s  %6d CIDRs\n" "$cc" "$cc_name" "$family" "$count"
-		done
-	fi
+		local cc_name
+		cc_name=$(geoip_cc_name "$cc")
+		printf "  %-4s %-20s IPv%s  %6d CIDRs\n" "$cc" "$cc_name" "$family" "$count"
+	done
 }
 
 ## CLI handler for bare country code trust (apf -d CN, apf -a US).

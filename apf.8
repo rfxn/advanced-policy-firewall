@@ -184,12 +184,22 @@ Output the version number.
 Show usage help and exit.
 .SS Country Code Filtering
 .TP
-.BR \-\-cc " [\fICC\fR]"
+.BR \-\-cc " [\fICC\fR | \fIIP\fR]"
 Show GeoIP country code filtering status. Without arguments, displays an
 overview of all active country blocks with CIDR counts. With a country code
 argument (e.g.,
 .BR "apf \-\-cc CN" ),
-shows detailed information for that country.
+shows detailed information for that country including continent, rules
+status, cached data stats, and live ipset counts. Country detail works
+even when filtering is inactive (no entries in rules files).
+.IP
+With an IP address or CIDR argument (e.g.,
+.BR "apf \-\-cc 8.8.8.8" ),
+looks up which country the address belongs to using cached GeoIP data.
+Uses
+.BR grepcidr (1)
+for accurate CIDR matching when available, otherwise falls back to
+prefix\-based matching.
 .TP
 .B \-\-cc\-update
 Refresh GeoIP data from upstream sources and atomically update all active

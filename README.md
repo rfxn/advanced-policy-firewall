@@ -535,6 +535,12 @@ apf -td CN 7d "suspicious activity"
 # View status
 apf --cc
 
+# Country detail (works even when filtering is inactive)
+apf --cc CN
+
+# Look up country for an IP address
+apf --cc 8.8.8.8
+
 # Manual data refresh
 apf --cc-update
 

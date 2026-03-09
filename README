@@ -667,7 +667,8 @@ CLI:
   apf -td CN 24h "temp block"   - temporarily deny CN for 24 hours
   apf -u CN                     - remove CN from all CC rules files
   apf --cc                      - show country code filtering status
-  apf --cc CN                   - show detail for specific country
+  apf --cc CN                   - show detail for country (works when inactive)
+  apf --cc 8.8.8.8              - look up country for an IP address
   apf --cc-update               - refresh GeoIP data for all active countries
 
 Requires USE_IPSET="1" (or "auto") and the ipset binary. Data is cached in
