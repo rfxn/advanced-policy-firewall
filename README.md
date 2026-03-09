@@ -523,7 +523,7 @@ apf -d CN
 # Block all traffic from Europe
 apf -d @EU
 
-# Allow only US traffic (all others blocked)
+# Allow only US traffic (WARNING: all other countries blocked)
 apf -a US
 
 # Block inbound SSH from Russia
@@ -550,7 +550,7 @@ apf -u CN
 | `CC_INTERVAL` | `7` | Days between auto-refresh (0 to disable) |
 | `CC_IPV6` | `1` | Include IPv6 country blocks when `USE_IPV6="1"` |
 
-Rules files: `cc_deny.rules` (block countries) and `cc_allow.rules` (permit-only mode). Advanced syntax supports per-port/protocol rules. Wildcard `*` in advanced entries expands to all simple CCs in the same file.
+Rules files: `cc_deny.rules` (block listed countries) and `cc_allow.rules` (strict allowlist — **all countries NOT listed are implicitly blocked**). Before using `cc_allow.rules`, add your admin IPs to `allow_hosts.rules` (`apf -a YOUR_IP`) to prevent lockout, or enable `DEVEL_MODE="1"` for auto-flush safety. Advanced syntax supports per-port/protocol rules. Wildcard `*` in advanced entries expands to all simple CCs in the same file.
 
 ### 3.12 GRE Tunnels
 

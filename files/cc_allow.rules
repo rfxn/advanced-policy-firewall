@@ -1,12 +1,17 @@
 ##
 # cc_allow
 #
-# Country Code allow list — permit traffic only from countries listed here,
-# blocking all other countries. This inverts the default: if cc_allow.rules
-# has entries, all countries NOT listed are blocked.
+# WARNING: This file operates as a STRICT ALLOWLIST. When ANY entries are
+# present, ALL countries NOT listed here are implicitly BLOCKED. Adding
+# even one country code below locks the entire server to traffic from only
+# the listed countries.
+#
+# Before adding entries, ensure your admin IPs are in allow_hosts.rules
+# (apf -a YOUR_IP) so you are not locked out. Use DEVEL_MODE="1" in
+# conf.apf for auto-flush safety during initial testing.
 #
 # When both cc_deny.rules and cc_allow.rules have entries, deny takes
-# precedence (deny is evaluated first in the chain order).
+# precedence (a country in both files is blocked).
 #
 # Requires ipset (USE_IPSET="auto" or "1") for high-performance matching.
 #

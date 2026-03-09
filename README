@@ -650,7 +650,9 @@ Configure these variables in conf.apf:
 
 Rules files:
   cc_deny.rules  - countries to block (one CC per line, e.g., CN)
-  cc_allow.rules - countries to allow (all others blocked)
+  cc_allow.rules - STRICT ALLOWLIST: all countries NOT listed are blocked.
+                   Add admin IPs to allow_hosts.rules first (apf -a YOUR_IP)
+                   or use DEVEL_MODE="1" to prevent lockout during testing.
 
 Entries may be bare country codes (e.g., CN), continent shorthand (e.g.,
 @EU for all European countries), or advanced syntax matching the trust
@@ -661,7 +663,7 @@ Supported continent shorthand: @AF (Africa), @AS (Asia), @EU (Europe),
 
 CLI:
   apf -d CN "block China"       - add CN to cc_deny.rules and live chains
-  apf -a US "allow US only"     - add US to cc_allow.rules (allowlist mode)
+  apf -a US "allow US only"     - add US to cc_allow.rules (WARNING: blocks all others)
   apf -td CN 24h "temp block"   - temporarily deny CN for 24 hours
   apf -u CN                     - remove CN from all CC rules files
   apf --cc                      - show country code filtering status

@@ -652,8 +652,15 @@ IPSET_REFRESH="21600"
 # from public registries and cached locally in the geoip/ directory.
 #
 # When cc_deny.rules has entries, those countries are blocked.
-# When cc_allow.rules has entries, only those countries are permitted.
-# When both have entries, deny takes precedence.
+#
+# WARNING: cc_allow.rules operates as a strict allowlist — when it has ANY
+# entries, ALL countries NOT listed are implicitly DENIED. This is a
+# whole-server lockdown to only the specified countries. Ensure your
+# admin IPs are in allow_hosts.rules (apf -a YOUR_IP) BEFORE enabling,
+# or use DEVEL_MODE="1" for auto-flush safety during testing.
+#
+# When both files have entries, deny takes precedence (a country in both
+# cc_deny.rules and cc_allow.rules is blocked).
 
 # Log country-blocked packets. Requires LOG_DROP="1" to be globally enabled.
 # Uses the global LOG_RATE for rate limiting.

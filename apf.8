@@ -297,9 +297,18 @@ tcp:in:d=22:s=*          # deny SSH from ALL denied countries
 .fi
 .RE
 .PP
+.B WARNING:
 When
 .I cc_allow.rules
-has entries, all countries NOT listed are blocked (allowlist mode).
+has entries, it operates as a strict allowlist \(em
+.B all countries NOT listed are implicitly blocked.
+Adding even one country code locks the server to traffic from only the listed
+countries. Ensure admin IPs are in
+.I allow_hosts.rules
+.RB ( "apf \-a YOUR_IP" )
+before enabling, or use
+.B DEVEL_MODE="1"
+for auto\-flush safety during testing.
 When both files have entries, deny takes precedence.
 .PP
 Country IP data is downloaded from public registries (ipverse.net, ipdeny.com)
