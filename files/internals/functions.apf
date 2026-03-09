@@ -1783,9 +1783,10 @@ if [ -n "$EDITOR_CMD" ]; then
 	echo "Opening editor"
 	$EDITOR_CMD "$iptc"
 	command -v clear > /dev/null 2>&1 && clear
-else
-	echo "No editor found; displaying rules with pager"
+elif [ -t 1 ]; then
 	${PAGER:-more} "$iptc"
+else
+	cat "$iptc"
 fi
 rm -f "$iptc"
 }
@@ -1973,7 +1974,7 @@ trust_lookup() {
 	done
 
 	if [ "$found" -eq 0 ]; then
-		echo "$host not found in any trust file." >&2
+		echo "$host not found in any trust file."
 		return 1
 	fi
 }
@@ -2091,7 +2092,7 @@ fi
 }
 
 ovars() {
-	for var in $(nice -n 16 grep -hv "^#" "$INSTALL_PATH/conf.apf" "$INSTALL_PATH/internals/internals.conf" | grep "=" | awk -F'=' '{print $1}' | tr -d ' '); do
+	for var in $(nice -n 16 grep -hv "^#" "$INSTALL_PATH/conf.apf" "$INSTALL_PATH/internals/internals.conf" | grep "=" | awk -F'=' '{print $1}' | tr -d ' ' | grep -E '^[A-Za-z_][A-Za-z0-9_]*$'); do
 		echo "$var=${!var}"
 	done
 }

@@ -135,6 +135,14 @@
       subprocess inheritance; add audit.log to logrotate; fix sh-to-bash
       invocations for pkg_lib.sh compatibility
 [Fix] firewall: remove dead EGF output policy branch
+[Fix] ovars(): filter shell conditionals from variable name extraction;
+      internals.conf if/elif lines produced invalid variable name errors on
+      stderr during apf -o and fast load startup
+[Fix] trust_lookup(): move "not found" message from stderr to stdout; the
+      negative result is informational, not an error; exit code 1 remains
+      for scripting
+[Fix] list(): remove "No editor found" noise message; use cat for non-TTY
+      output (pipe-friendly) and silent pager fallback for TTY sessions
 
   -- Changes --
 
