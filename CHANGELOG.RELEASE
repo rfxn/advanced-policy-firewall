@@ -51,7 +51,8 @@
 [New] New CLI commands: --rules (dump active rules for piping), --info
       (firewall status summary), --lookup HOST (trust file search),
       --validate/--check (config dry-run), --list-allow/--list-deny
-      (filtered trust display), --dump-config, -h/--help (exits 0)
+      (filtered trust display), --cc/--cc-update (GeoIP status and refresh),
+      --dump-config, -h/--help (exits 0)
 [New] Ban expiry: structured addedtime=EPOCH markers in permanent trust
       entries for reliable expiry; backward-compatible with pre-2.0.2 entries
 [New] install.sh improvements: auto-detect default network interface on
