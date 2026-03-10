@@ -689,8 +689,87 @@ _geoip_continent_name() {
 	esac
 }
 
+## Search an IPv4 address across multiple CIDR data files using awk.
+# Portable CIDR containment — no grepcidr required.
+# Args: ip file [file ...]
+# Prints the matching file path; returns 0 on match, 1 on no match.
+_geoip_cidr4_search() {
+	local qip="$1"
+	shift
+	awk -v qip="$qip" '
+	BEGIN {
+		split(qip, a, ".")
+		qint = (a[1]*16777216) + (a[2]*65536) + (a[3]*256) + a[4]
+		found = ""
+	}
+	/^[0-9]/ {
+		n = split($0, p, "[./]")
+		net = (p[1]*16777216) + (p[2]*65536) + (p[3]*256) + p[4]
+		bits = (n >= 5) ? int(p[5]+0) : 32
+		s = 2^(32-bits)
+		if (int(qint/s) == int(net/s)) { found = FILENAME; exit }
+	}
+	END { if (found != "") print found; exit(found == "") }
+	' "$@"
+}
+
+## Download IPv4 CIDR data for all countries from ipdeny.com all-zones tarball.
+# Populates $CC_DATA_DIR with CC.4 files for all countries in the tarball.
+# Only writes files not already cached (preserves rules-active downloads).
+# Sets .world_cached marker on success.
+# Returns 0 on success, 1 on failure.
+_geoip_world_fetch() {
+	local url="https://www.ipdeny.com/ipblocks/data/countries/all-zones.tar.gz"
+	local tmp_tar tmp_dir count=0
+
+	mkdir -p "$CC_DATA_DIR" 2>/dev/null  # safe: parent dir always exists
+	tmp_tar=$(mktemp "$INSTALL_PATH/.apf-geoip-XXXXXX") || return 1
+	_apf_reg_tmp "$tmp_tar"
+	tmp_dir=$(mktemp -d "$INSTALL_PATH/.apf-geoip-world-XXXXXX") || { rm -f "$tmp_tar"; return 1; }
+
+	eout "{geoip} fetching world IPv4 data from ipdeny.com (~1MB)"
+	if ! download_url "$url" "$tmp_tar"; then
+		eout "{geoip} world data download failed"
+		rm -f "$tmp_tar"
+		rm -rf "$tmp_dir"
+		return 1
+	fi
+
+	if ! tar -xzf "$tmp_tar" -C "$tmp_dir" 2>/dev/null; then
+		eout "{geoip} world data extract failed"
+		rm -f "$tmp_tar"
+		rm -rf "$tmp_dir"
+		return 1
+	fi
+
+	local _cc_lre='^[a-z]{2}$'
+	local f cc_lower cc
+	for f in "$tmp_dir"/*.zone; do
+		[ -f "$f" ] || continue
+		cc_lower=$(basename "$f" .zone)
+		if ! [[ "$cc_lower" =~ $_cc_lre ]]; then
+			continue
+		fi
+		cc=$(echo "$cc_lower" | tr '[:lower:]' '[:upper:]')
+		# Preserve existing cached data (rules-active CCs may be fresher)
+		if [ ! -f "$CC_DATA_DIR/${cc}.4" ]; then
+			cat "$f" > "$CC_DATA_DIR/${cc}.4"
+			chmod 640 "$CC_DATA_DIR/${cc}.4"
+			count=$((count + 1))
+		fi
+	done
+
+	rm -f "$tmp_tar"
+	rm -rf "$tmp_dir"
+
+	date +%s > "$CC_DATA_DIR/.world_cached"
+	eout "{geoip} world GeoIP data cached: $count new countries"
+	return 0
+}
+
 ## Look up which country an IP or CIDR belongs to from cached GeoIP data.
 # Searches all cached {CC}.4 / {CC}.6 data files for a match.
+# On first IPv4 miss with no world data cached, downloads all-zones and retries.
 # Args: ip_or_cidr
 # Prints matching country info; returns 1 if no data or no match.
 _geoip_lookup_ip() {
@@ -707,60 +786,63 @@ _geoip_lookup_ip() {
 		return 1
 	fi
 
-	# Strip CIDR mask for matching — we search for the network address
+	# Strip CIDR mask — network address used for containment check in both cases
 	local query_ip="${query%%/*}"
 
-	# Convert IP to integer for range comparison (IPv4 only for exact matching)
-	# For both IPv4 and IPv6, use grep against cached CIDR lists
-	local cc_file cc matched=0
-	local _cc_re='^[A-Z]{2}$'
-	for cc_file in "$CC_DATA_DIR"/*."$family"; do
-		[ -f "$cc_file" ] || continue
-		local cc_base
-		cc_base=$(basename "$cc_file" ".$family")
-		# Skip non-CC files (e.g., .last_update)
-		if ! [[ "$cc_base" =~ $_cc_re ]]; then
-			continue
-		fi
-		# Check if the query IP/CIDR appears in this country's data
-		# For exact IP: check if any CIDR in the file contains it
-		# For CIDR query: check if the exact CIDR is listed
-		if [ -n "${query##*/*}" ]; then
-			# Bare IP (no mask) — use grepcidr if available, else prefix match
-			if command -v grepcidr >/dev/null 2>&1; then
-				if grepcidr -f "$cc_file" <<< "$query_ip" >/dev/null 2>&1; then
-					_geoip_print_lookup "$cc_base" "$query"
-					matched=1
-				fi
-			else
-				# Fallback: prefix-based match on first 3 octets (IPv4) or first half (IPv6)
-				local prefix
-				if [ "$is_ipv6" = "0" ]; then
-					prefix="${query_ip%.*}"
-					if grep -q "^${prefix}\." "$cc_file" 2>/dev/null; then
-						_geoip_print_lookup "$cc_base" "$query"
-						matched=1
-					fi
-				else
-					prefix="${query_ip%%:*}"
-					if grep -q "^${prefix}:" "$cc_file" 2>/dev/null; then
+	local matched=0 attempt=0
+	while [ "$attempt" -le 1 ]; do
+		matched=0
+
+		if [ "$is_ipv6" = "0" ]; then
+			# IPv4: single awk pass across all cached country files
+			local -a cc4_files=()
+			local _f
+			for _f in "$CC_DATA_DIR"/*.4; do
+				[ -f "$_f" ] && cc4_files+=("$_f")
+			done
+			if [ "${#cc4_files[@]}" -gt 0 ]; then
+				local match_file cc_base
+				local _cc_re='^[A-Z]{2}$'
+				match_file=$(_geoip_cidr4_search "$query_ip" "${cc4_files[@]}")
+				if [ -n "$match_file" ] && [ -f "$match_file" ]; then
+					cc_base=$(basename "$match_file" ".4")
+					if [[ "$cc_base" =~ $_cc_re ]]; then
 						_geoip_print_lookup "$cc_base" "$query"
 						matched=1
 					fi
 				fi
 			fi
 		else
-			# CIDR query — look for exact match
-			if grep -qxF "$query" "$cc_file" 2>/dev/null; then
-				_geoip_print_lookup "$cc_base" "$query"
-				matched=1
-			fi
+			# IPv6: prefix-based match (no all-zones tarball available for IPv6)
+			local cc_file cc_base prefix
+			local _cc_re='^[A-Z]{2}$'
+			prefix="${query_ip%%:*}"
+			for cc_file in "$CC_DATA_DIR"/*.6; do
+				[ -f "$cc_file" ] || continue
+				cc_base=$(basename "$cc_file" ".6")
+				if ! [[ "$cc_base" =~ $_cc_re ]]; then
+					continue
+				fi
+				if grep -q "^${prefix}:" "$cc_file" 2>/dev/null; then
+					_geoip_print_lookup "$cc_base" "$query"
+					matched=1
+				fi
+			done
 		fi
+
+		# Stop if matched, IPv6 (no world tarball), or world data already fetched
+		if [ "$matched" = "1" ] || [ "$is_ipv6" = "1" ] || [ -f "$CC_DATA_DIR/.world_cached" ]; then
+			break
+		fi
+
+		# First IPv4 miss with no world data — fetch all countries and retry once
+		echo "Fetching world GeoIP data for comprehensive IP lookup (~1MB, one-time)..."
+		_geoip_world_fetch || break
+		attempt=$((attempt + 1))
 	done
 
 	if [ "$matched" = "0" ]; then
 		echo "No country match found for $query in cached GeoIP data."
-		echo "Data may need refresh: apf --cc-update"
 		return 1
 	fi
 }

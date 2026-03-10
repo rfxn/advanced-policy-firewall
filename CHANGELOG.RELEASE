@@ -154,6 +154,11 @@
 [Fix] is_fqdn(): IPv4 addresses incorrectly matched FQDN regex due to
       dot-separated numeric labels; add IPv4 exclusion guard so apf --cc IP
       routes to GeoIP lookup instead of CC validation error path
+[Fix] GeoIP --cc IP: replace broken 3-octet prefix fallback (missed /17-/23
+      CIDRs) with portable awk CIDR containment; add _geoip_world_fetch() to
+      download ipdeny all-zones tarball (~1MB, one-time) on first lookup miss
+      so any IPv4 address resolves to its country regardless of which CCs are
+      in cc_deny/cc_allow.rules
 
   -- Changes --
 
