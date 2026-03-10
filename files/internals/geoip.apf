@@ -845,19 +845,30 @@ geoip_info() {
 			echo "  $cc ($cc_name):"
 			echo "    Continent: $continent ($continent_name)"
 			echo "    Status:    $rules_status"
+			# On-demand download: fetch data for uncached CCs
+			if [ ! -f "$CC_DATA_DIR/${cc}.4" ]; then
+				echo "    Fetching IPv4 data for $cc..."
+				geoip_download "$cc" "4" > /dev/null 2>&1
+			fi
+			if [ "$CC_IPV6" = "1" ] && [ "$USE_IPV6" = "1" ]; then
+				if [ ! -f "$CC_DATA_DIR/${cc}.6" ]; then
+					echo "    Fetching IPv6 data for $cc..."
+					geoip_download "$cc" "6" > /dev/null 2>&1
+				fi
+			fi
 			# Show cached data file stats
 			if [ -f "$CC_DATA_DIR/${cc}.4" ]; then
 				count4=$(grep -cE '^[0-9]' "$CC_DATA_DIR/${cc}.4" 2>/dev/null) || count4=0
 				echo "    Cached IPv4 CIDRs: $count4"
 			else
-				echo "    Cached IPv4 CIDRs: (no data — run apf --cc-update)"
+				echo "    Cached IPv4 CIDRs: (no data - download failed or CC not supported)"
 			fi
 			if [ "$CC_IPV6" = "1" ] && [ "$USE_IPV6" = "1" ]; then
 				if [ -f "$CC_DATA_DIR/${cc}.6" ]; then
 					count6=$(grep -cE '^[0-9a-fA-F]' "$CC_DATA_DIR/${cc}.6" 2>/dev/null) || count6=0
 					echo "    Cached IPv6 CIDRs: $count6"
 				else
-					echo "    Cached IPv6 CIDRs: (no data)"
+					echo "    Cached IPv6 CIDRs: (no data - download failed or CC not supported)"
 				fi
 			fi
 			# Show live ipset stats if loaded

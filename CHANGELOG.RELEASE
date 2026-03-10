@@ -148,6 +148,9 @@
       _apf_reg_tmp() for signal-safe cleanup; add _apf_cleanup_stale_tmp()
       to remove orphaned refresh.allow.*/refresh.drop.* and .apf-* temp
       files from pre-2.0.2 installations on startup and refresh
+[Fix] GeoIP --cc: on-demand download for CCs not in rules files; apf --cc CN
+      now fetches data automatically when cache is missing instead of showing
+      a misleading "run apf --cc-update" message that could never help
 
   -- Changes --
 
