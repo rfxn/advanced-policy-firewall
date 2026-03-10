@@ -682,7 +682,10 @@ valid_host() {
 
 # Detect whether input is an FQDN (not an IP or CIDR).
 # Reuses the FQDN regex from valid_host().
+# Excludes IPv4 addresses — they match the dot-separated alphanumeric pattern.
 is_fqdn() {
+	local _if_ipv4='^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}(/[0-9]{1,2})?$'
+	[[ "$1" =~ $_if_ipv4 ]] && return 1
 	local _if_fqdn='^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?)+$'
 	[[ "$1" =~ $_if_fqdn ]]
 }

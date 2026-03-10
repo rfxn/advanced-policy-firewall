@@ -151,6 +151,9 @@
 [Fix] GeoIP --cc: on-demand download for CCs not in rules files; apf --cc CN
       now fetches data automatically when cache is missing instead of showing
       a misleading "run apf --cc-update" message that could never help
+[Fix] is_fqdn(): IPv4 addresses incorrectly matched FQDN regex due to
+      dot-separated numeric labels; add IPv4 exclusion guard so apf --cc IP
+      routes to GeoIP lookup instead of CC validation error path
 
   -- Changes --
 
