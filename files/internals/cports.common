@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # Helper: port filter loop
 # Args: ports proto ipt_fn chain direction
 # shellcheck disable=SC2086

@@ -266,7 +266,8 @@ ml() {
  fi
 
  # Fallback: manual path check for systems where --dry-run behaves oddly
- local KMOD="/lib/modules/$(uname -r)/kernel/net"
+ local KMOD
+ KMOD="/lib/modules/$(uname -r)/kernel/net"
  local ext subdir
  for ext in "$MEXT" "${MEXT}.xz" "${MEXT}.zst"; do
         for subdir in "ipv4/netfilter" "netfilter"; do

@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 eout "{glob} loading bt.rules"
 
 # Load our Deny Hosts rules

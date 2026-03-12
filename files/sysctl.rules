@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 eout "{glob} loading sysctl.rules"
 
 # START SYSCTL config

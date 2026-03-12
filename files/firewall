@@ -26,7 +26,7 @@ flush 1
 if [ -x "$INSTALL_PATH/hook_pre.sh" ]; then
 	eout "{glob} executing pre-configuration hook"
 	# shellcheck disable=SC1090,SC1091
-	. "$INSTALL_PATH/hook_pre.sh" || true
+	. "$INSTALL_PATH/hook_pre.sh" || true  # safe: sourced hook exit code is advisory, never block firewall load
 fi
 
 # Verify that an interface has a route to a network; abort if not.
@@ -379,5 +379,5 @@ ipt -A INPUT -p all -j $ALL_STOP
 if [ -x "$INSTALL_PATH/hook_post.sh" ]; then
 	eout "{glob} executing post-configuration hook"
 	# shellcheck disable=SC1090,SC1091
-	. "$INSTALL_PATH/hook_post.sh" || true
+	. "$INSTALL_PATH/hook_post.sh" || true  # safe: sourced hook exit code is advisory, never block firewall load
 fi
