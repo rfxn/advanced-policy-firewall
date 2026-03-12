@@ -237,6 +237,8 @@
 [Fix] Add shellcheck shell=bash directive to sourced fragments
       (cports.common, sysctl.rules, bt.rules, log.rules)
 [Fix] functions.apf: split local+assign in ml() KMOD variable (anti-pattern #25)
+[Fix] functions.apf: move SC1090 shellcheck disable to dot-source line for
+      geoip_lib.sh (directive was on variable assignment, not the source statement)
 
   -- Test Suite --
 

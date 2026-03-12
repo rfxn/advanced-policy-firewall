@@ -695,9 +695,9 @@ is_fqdn() {
 # Source shared GeoIP metadata library (country names, continents, validation,
 # download). Uses BASH_SOURCE-relative path for portability (works both when
 # sourced via internals.conf with $INSTALL_PATH and in test context without it).
-# shellcheck disable=SC1090,SC1091
 _geoip_lib_path="${BASH_SOURCE[0]%/*}/geoip_lib.sh"
 if [ -f "$_geoip_lib_path" ]; then
+	# shellcheck disable=SC1090,SC1091
 	. "$_geoip_lib_path"
 fi
 unset _geoip_lib_path
