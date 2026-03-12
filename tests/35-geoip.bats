@@ -83,6 +83,14 @@ setup_file() {
     apf_set_config "CC_SRC" "auto"
     apf_set_config "CC_IPV6" "1"
 
+    # Disable geoip_lib network downloads so test fixtures are preserved.
+    # geoip_lib.sh discovers curl/wget at source time via GEOIP_CURL_BIN/WGET_BIN;
+    # pointing them at /bin/false forces _geoip_download_cmd() to fail, leaving
+    # the pre-populated fixture data in $CC_DATA_DIR intact. Must be non-empty
+    # because geoip_lib uses :- (empty triggers default discovery).
+    export GEOIP_CURL_BIN="/bin/false"
+    export GEOIP_WGET_BIN="/bin/false"
+
     # Create test data fixtures
     create_cc_fixture_v4 "ZZ"
     create_cc_fixture_v6 "ZZ"
@@ -181,6 +189,50 @@ _source_funcs='source '"$APF_DIR"'/internals/functions.apf; CC_DENY_HOSTS='"$APF
 @test "geoip_cc_name returns bare code for unknown CC" {
     run bash -c "$_source_funcs; geoip_cc_name ZZ"
     assert_output "ZZ"
+}
+
+# ============================================================
+# geoip_lib integration regression — verify library-backed functions
+# ============================================================
+
+@test "geoip_lib is sourced by functions.apf" {
+    run bash -c "$_source_funcs; [[ -n \$_GEOIP_LIB_LOADED ]]"
+    assert_success
+}
+
+@test "valid_cc bridges _GEOIP_VCC_CODES to _VCC_CODES for country" {
+    run bash -c "$_source_funcs; valid_cc CN && echo \$_VCC_CODES"
+    assert_success
+    assert_output "CN"
+}
+
+@test "valid_cc bridges _GEOIP_VCC_CODES to _VCC_CODES for continent" {
+    run bash -c "$_source_funcs; valid_cc @AF && echo \$_VCC_CODES"
+    assert_success
+    # Verify @AF expands to include some known African countries
+    assert_output --partial "ZA"
+    assert_output --partial "NG"
+}
+
+@test "geoip_expand_codes uses geoip_lib module-level continent lists" {
+    run bash -c "$_source_funcs; geoip_expand_codes @AF && echo \$_VCC_CODES"
+    assert_success
+    # Count CCs — Africa has 57 countries in the list
+    local cc_count
+    cc_count=$(echo "$output" | tr ',' '\n' | wc -l)
+    [ "$cc_count" -ge 50 ]
+}
+
+@test "geoip_cc_continent available via geoip_lib" {
+    run bash -c "$_source_funcs; geoip_cc_continent CN"
+    assert_success
+    assert_output "@AS"
+}
+
+@test "geoip_continent_name available via geoip_lib" {
+    run bash -c "$_source_funcs; geoip_continent_name @EU"
+    assert_success
+    assert_output "Europe"
 }
 
 # ============================================================

@@ -209,6 +209,11 @@
 [New] --cc IP: GeoIP reverse lookup — look up which country and continent
       an IP address or CIDR belongs to using cached GeoIP data; portable
       awk CIDR containment with on-demand world data download
+[Change] Integrate geoip_lib.sh v1.0.0: shared GeoIP metadata library replaces
+      embedded country name table, continent lists, CC validation, download
+      functions, and CIDR search with thin wrappers delegating to geoip_lib;
+      staleness checks via geoip_is_stale()/geoip_mark_updated(); ~300 lines
+      of duplicated code removed from functions.apf and geoip.apf
 
   -- Documentation --
 

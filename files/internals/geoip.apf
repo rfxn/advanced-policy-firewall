@@ -42,40 +42,9 @@ geoip_validate_config() {
 	return 0
 }
 
-## Download country IP data from ipverse.net (Tier 1 source).
-# Args: cc family(4|6) output_file
-# Returns 0 on success with data written, 1 on failure.
-_geoip_download_ipverse() {
-	local cc="$1" family="$2" output="$3"
-	local url
-	local _cc_lower
-	_cc_lower=$(echo "$cc" | tr '[:upper:]' '[:lower:]')
-	if [ "$family" = "6" ]; then
-		url="https://www.ipverse.net/ipblocks/data/countries/${_cc_lower}.zone6"
-	else
-		url="https://www.ipverse.net/ipblocks/data/countries/${_cc_lower}.zone"
-	fi
-	download_url "$url" "$output"
-}
-
-## Download country IP data from ipdeny.com (Tier 2 source).
-# Args: cc family(4|6) output_file
-# Returns 0 on success with data written, 1 on failure.
-_geoip_download_ipdeny() {
-	local cc="$1" family="$2" output="$3"
-	local url
-	local _cc_lower
-	_cc_lower=$(echo "$cc" | tr '[:upper:]' '[:lower:]')
-	if [ "$family" = "6" ]; then
-		url="https://www.ipdeny.com/ipv6/ipaddresses/blocks/${_cc_lower}.zone"
-	else
-		url="https://www.ipdeny.com/ipblocks/data/countries/${_cc_lower}.zone"
-	fi
-	download_url "$url" "$output"
-}
-
-## Download country IP data using configured source cascade.
-# Validates downloaded data (non-empty, CIDR format).
+## Download country IP data using geoip_lib vendor cascade.
+# Wrapper: calls geoip_lib's internal download helpers (_geoip_download_ipverse,
+# _geoip_download_ipdeny) directly to avoid name collision with this function.
 # Caches to $CC_DATA_DIR/{CC}.{4,6}
 # Args: cc family(4|6)
 # Returns 0 on success (data cached), 1 on failure.
@@ -83,24 +52,26 @@ geoip_download() {
 	local cc="$1" family="$2"
 	local cache_file="$CC_DATA_DIR/${cc}.${family}"
 	local dl_tmp valid_count
+	local _cc_lower
 
 	mkdir -p "$CC_DATA_DIR" 2>/dev/null  # safe: parent dir always exists
 	dl_tmp=$(mktemp "$INSTALL_PATH/.apf-geoip-XXXXXX")
 	_apf_reg_tmp "$dl_tmp"
+	_cc_lower=$(echo "$cc" | tr '[:upper:]' '[:lower:]')
 
 	local rc=1
-	case "$CC_SRC" in
+	case "${CC_SRC:-auto}" in
 		ipverse)
-			_geoip_download_ipverse "$cc" "$family" "$dl_tmp" && rc=0
+			_geoip_download_ipverse "$_cc_lower" "$family" "$dl_tmp" && rc=0
 			;;
 		ipdeny)
-			_geoip_download_ipdeny "$cc" "$family" "$dl_tmp" && rc=0
+			_geoip_download_ipdeny "$_cc_lower" "$family" "$dl_tmp" && rc=0
 			;;
 		auto|*)
 			# Tier 1: ipverse, Tier 2: ipdeny
-			if _geoip_download_ipverse "$cc" "$family" "$dl_tmp"; then
+			if _geoip_download_ipverse "$_cc_lower" "$family" "$dl_tmp"; then
 				rc=0
-			elif _geoip_download_ipdeny "$cc" "$family" "$dl_tmp"; then
+			elif _geoip_download_ipdeny "$_cc_lower" "$family" "$dl_tmp"; then
 				rc=0
 			fi
 			;;
@@ -602,13 +573,8 @@ geoip_load() {
 	geoip_download_all
 
 	# Warn if cached data is stale (>30 days)
-	if [ -f "$CC_DATA_DIR/.last_update" ]; then
-		local _gl_last _gl_age
-		read -r _gl_last < "$CC_DATA_DIR/.last_update"
-		_gl_age=$(( $(date +%s) - _gl_last ))
-		if [ "$_gl_age" -gt 2592000 ]; then
-			eout "{geoip} WARNING: GeoIP data is $((_gl_age / 86400)) days old; run apf --cc-update"
-		fi
+	if geoip_is_stale "$CC_DATA_DIR" 30; then
+		eout "{geoip} WARNING: GeoIP data is stale; run apf --cc-update"
 	fi
 
 	cc_rules_load
@@ -624,21 +590,14 @@ geoip_update() {
 	fi
 
 	# Check interval: skip if last update was recent enough
-	if [ -f "$CC_DATA_DIR/.last_update" ]; then
-		local last_update current_time age interval_sec
-		read -r last_update < "$CC_DATA_DIR/.last_update"
-		current_time=$(date +%s)
-		age=$(($current_time - $last_update))
-		# Guard against non-numeric CC_INTERVAL (default: 7 days)
-		local _ci_re='^[0-9]+$'
-		if ! [[ "$CC_INTERVAL" =~ $_ci_re ]]; then
-			CC_INTERVAL=7
-		fi
-		interval_sec=$(($CC_INTERVAL * 86400))
-		if [ "$interval_sec" -gt 0 ] && [ "$age" -lt "$interval_sec" ]; then
-			eout "{geoip} data is ${age}s old (interval: ${interval_sec}s), skipping update"
-			return 0
-		fi
+	# Guard against non-numeric CC_INTERVAL (default: 7 days)
+	local _ci_re='^[0-9]+$'
+	if ! [[ "${CC_INTERVAL:-7}" =~ $_ci_re ]]; then
+		CC_INTERVAL=7
+	fi
+	if ! geoip_is_stale "$CC_DATA_DIR" "${CC_INTERVAL:-7}"; then
+		eout "{geoip} data is fresh (interval: ${CC_INTERVAL:-7}d), skipping update"
+		return 0
 	fi
 
 	eout "{geoip} updating country code data"
@@ -654,63 +613,30 @@ geoip_update() {
 		geoip_populate_set "$cc" "$family"
 	done
 
-	date +%s > "$CC_DATA_DIR/.last_update"
+	geoip_mark_updated "$CC_DATA_DIR"
 	eout "{geoip} country code data updated"
 }
 
 ## Reverse-map a country code to its continent shorthand.
+# Thin wrapper: delegates to geoip_cc_continent() from geoip_lib.
 # Args: cc (2-letter ISO 3166-1)
 # Prints: continent code (e.g., @AS) or "unknown"
 _geoip_cc_continent() {
-	local cc="$1"
-	# Reuse the same continent lists from geoip_expand_codes()
-	local _CC_AF="AO,BF,BI,BJ,BW,CD,CF,CG,CI,CM,CV,DJ,DZ,EG,EH,ER,ET,GA,GH,GM,GN,GQ,GW,KE,KM,LR,LS,LY,MA,MG,ML,MR,MU,MW,MZ,NA,NE,NG,RE,RW,SC,SD,SH,SL,SN,SO,SS,ST,SZ,TD,TG,TN,TZ,UG,YT,ZA,ZM,ZW"
-	local _CC_AS="AE,AF,AM,AZ,BD,BH,BN,BT,CN,CY,GE,HK,ID,IL,IN,IQ,IR,JO,JP,KG,KH,KP,KR,KW,KZ,LA,LB,LK,MM,MN,MO,MV,MY,NP,OM,PH,PK,PS,QA,SA,SG,SY,TH,TJ,TL,TM,TR,TW,UZ,VN,YE"
-	local _CC_EU="AD,AL,AT,AX,BA,BE,BG,BY,CH,CZ,DE,DK,EE,ES,FI,FO,FR,GB,GG,GI,GR,HR,HU,IE,IM,IS,IT,JE,LI,LT,LU,LV,MC,MD,ME,MK,MT,NL,NO,PL,PT,RO,RS,RU,SE,SI,SK,SM,UA,VA,XK"
-	local _CC_NA="AG,AI,AW,BB,BL,BM,BQ,BS,BZ,CA,CR,CU,CW,DM,DO,GD,GL,GP,GT,HN,HT,JM,KN,KY,LC,MF,MQ,MS,MX,NI,PA,PM,PR,SV,SX,TC,TT,US,VC,VG,VI"
-	local _CC_SA="AR,BO,BR,CL,CO,EC,FK,GF,GY,PE,PY,SR,UY,VE"
-	local _CC_OC="AS,AU,CK,FJ,FM,GU,KI,MH,MP,NC,NF,NR,NU,NZ,PF,PG,PN,PW,SB,TK,TO,TV,VU,WF,WS"
-	local cont codes
-	for cont in AF AS EU NA SA OC; do
-		eval "codes=\"\$_CC_${cont}\""
-		case ",$codes," in
-			*,"$cc",*) echo "@$cont"; return 0 ;;
-		esac
-	done
-	echo "unknown"
+	geoip_cc_continent "$1"
 }
 
 ## Continent shorthand to full name.
+# Thin wrapper: delegates to geoip_continent_name() from geoip_lib.
 _geoip_continent_name() {
-	case "$1" in
-		@AF) echo "Africa" ;; @AS) echo "Asia" ;; @EU) echo "Europe" ;;
-		@NA) echo "North America" ;; @SA) echo "South America" ;; @OC) echo "Oceania" ;;
-		*) echo "$1" ;;
-	esac
+	geoip_continent_name "$1"
 }
 
 ## Search an IPv4 address across multiple CIDR data files using awk.
-# Portable CIDR containment — no grepcidr required.
+# Thin wrapper: delegates to geoip_cidr_search() from geoip_lib.
 # Args: ip file [file ...]
 # Prints the matching file path; returns 0 on match, 1 on no match.
 _geoip_cidr4_search() {
-	local qip="$1"
-	shift
-	awk -v qip="$qip" '
-	BEGIN {
-		split(qip, a, ".")
-		qint = (a[1]*16777216) + (a[2]*65536) + (a[3]*256) + a[4]
-		found = ""
-	}
-	/^[0-9]/ {
-		n = split($0, p, "[./]")
-		net = (p[1]*16777216) + (p[2]*65536) + (p[3]*256) + p[4]
-		bits = (n >= 5) ? int(p[5]+0) : 32
-		s = 2^(32-bits)
-		if (int(qint/s) == int(net/s)) { found = FILENAME; exit }
-	}
-	END { if (found != "") print found; exit(found == "") }
-	' "$@"
+	geoip_cidr_search "$@"
 }
 
 ## Download IPv4 CIDR data for all countries from ipdeny.com all-zones tarball.
