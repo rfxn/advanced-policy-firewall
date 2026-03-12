@@ -237,7 +237,7 @@
       description; actual implementation uses portable awk CIDR containment
 [Fix] README/README.md: add Country Code Filtering section to usage block
       matching help() output (--cc, --cc CC, --cc IP, --cc-update, NOTE);
-      add cc_deny.rules, cc_allow.rules, geoip/ to Key Files section
+      add cc_deny.rules, cc_allow.rules, geoip/, internals/ to Key Files section
 [Fix] apf.8: update .TH date from February to March 2026 for release
 [Fix] firewall: add inline comments to hook || true lines per CLAUDE.md
 [Fix] Add shellcheck shell=bash directive to sourced fragments

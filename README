@@ -281,6 +281,7 @@ The following files are located under your install path (/etc/apf by default):
   cc_deny.rules        Country code deny list (ISO 3166-1 alpha-2 codes)
   cc_allow.rules       Country code allow list (STRICT allowlist)
   geoip/               Cached GeoIP country IP data
+  internals/           Internal libraries (geoip_lib, elog_lib, pkg_lib, etc.)
   ipset.rules          ipset block list definitions
   gre.rules            GRE tunnel definitions
   hook_pre.sh          Pre-configuration hook script (640 = inactive)
