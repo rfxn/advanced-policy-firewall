@@ -222,6 +222,11 @@
       NFLOG documented as LOG_TARGET value; missing CLI options added to
       man page SYNOPSIS and help(); SET_FASTLOAD and SET_EXPIRE comments
       corrected in conf.apf
+[Fix] apf.8: remove incorrect grepcidr dependency claim from --cc IP
+      description; actual implementation uses portable awk CIDR containment
+[Fix] README/README.md: add Country Code Filtering section to usage block
+      matching help() output (--cc, --cc CC, --cc IP, --cc-update, NOTE);
+      add cc_deny.rules, cc_allow.rules, geoip/ to Key Files section
 
   -- Test Suite --
 

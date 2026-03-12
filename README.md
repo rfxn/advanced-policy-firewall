@@ -254,6 +254,9 @@ The following files are located under your install path (`/etc/apf` by default):
 | `deny_hosts.rules` | Local deny trust list |
 | `glob_allow.rules` | Global (downloaded) allow list |
 | `glob_deny.rules` | Global (downloaded) deny list |
+| `cc_deny.rules` | Country code deny list (ISO 3166-1 alpha-2 codes) |
+| `cc_allow.rules` | Country code allow list (STRICT allowlist) |
+| `geoip/` | Cached GeoIP country IP data |
 | `ipset.rules` | ipset block list definitions |
 | `gre.rules` | GRE tunnel definitions |
 | `hook_pre.sh` | Pre-configuration hook script (640 = inactive) |
@@ -736,6 +739,15 @@ Diagnostics:
   -o, --dump-config ........... output all configuration variables
   -v, --version ............... output version number
   -h, --help .................. show this help message
+
+Country Code Filtering:
+  --cc ........................ show GeoIP status overview
+  --cc CC ..................... show detail for country/continent (e.g., CN, @EU)
+  --cc IP ..................... look up country for an IP or CIDR
+  --cc-update ................. refresh GeoIP data and ipsets
+
+  NOTE: cc_allow.rules is a STRICT allowlist — all countries NOT listed
+        are blocked. Add admin IPs to allow_hosts.rules first.
 
 Subsystems:
   --ipset-update .............. hot-reload ipset block lists

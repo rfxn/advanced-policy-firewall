@@ -196,10 +196,8 @@ even when filtering is inactive (no entries in rules files).
 With an IP address or CIDR argument (e.g.,
 .BR "apf \-\-cc 8.8.8.8" ),
 looks up which country the address belongs to using cached GeoIP data.
-Uses
-.BR grepcidr (1)
-for accurate CIDR matching when available, otherwise falls back to
-prefix\-based matching.
+Uses portable awk\-based CIDR containment for accurate matching.
+On first lookup, downloads comprehensive world data (~1MB) for full coverage.
 .TP
 .B \-\-cc\-update
 Refresh GeoIP data from upstream sources and atomically update all active
