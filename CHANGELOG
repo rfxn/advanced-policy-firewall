@@ -214,6 +214,9 @@
       functions, and CIDR search with thin wrappers delegating to geoip_lib;
       staleness checks via geoip_is_stale()/geoip_mark_updated(); ~300 lines
       of duplicated code removed from functions.apf and geoip.apf
+[Change] Update vendored geoip_lib.sh to v1.0.1: adds geoip_all_cc(),
+      geoip_ip_lookup(), geoip_build_ipdb(), _geoip_cidr4_to_ranges(),
+      _geoip_download_ipdeny_bulk(); IFS contamination fix in geoip_all_cc()
 [Change] GeoIP thin wrapper cleanup: remove 3 passthrough wrappers
       (_geoip_cc_continent, _geoip_continent_name, _geoip_cidr4_search);
       callers now invoke geoip_lib functions directly; consistent with

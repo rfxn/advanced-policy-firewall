@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# geoip_lib.sh — GeoIP Metadata Library 1.0.0
+# geoip_lib.sh — GeoIP Metadata Library 1.0.1
 ###
 # Copyright (C) 2026 R-fx Networks <proj@rfxn.com>
 #                     Ryan MacDonald <ryan@rfxn.com>
@@ -29,7 +29,7 @@
 _GEOIP_LIB_LOADED=1
 
 # shellcheck disable=SC2034
-GEOIP_LIB_VERSION="1.0.0"
+GEOIP_LIB_VERSION="1.0.1"
 
 # ---------------------------------------------------------------------------
 # Module-level continent CC lists (ISO 3166 assignments per UN geoscheme)
@@ -190,6 +190,21 @@ geoip_validate_cc() {
 		fi
 	fi
 	return 1
+}
+
+# ---------------------------------------------------------------------------
+# geoip_all_cc — emit all known ISO 3166-1 country codes (one per line).
+# Iterates the 6 continent CC lists from module-level variables.
+# Prints: one uppercase 2-letter CC per line to stdout
+# ---------------------------------------------------------------------------
+geoip_all_cc() {
+	local _cont _code
+	for _cont in "$_GEOIP_CC_AF" "$_GEOIP_CC_AS" "$_GEOIP_CC_EU" \
+	             "$_GEOIP_CC_NA" "$_GEOIP_CC_SA" "$_GEOIP_CC_OC"; do
+		while IFS= read -r _code; do
+			[[ -n "$_code" ]] && echo "$_code"
+		done <<< "${_cont//,/$'\n'}"
+	done
 }
 
 # ===========================================================================
@@ -457,4 +472,215 @@ geoip_cidr_search() {
 	}
 	END { if (found != "") print found; exit(found == "") }
 	' "$@"
+}
+
+# ===========================================================================
+# IP Database Layer — consolidated integer-range database build and lookup
+# ===========================================================================
+
+# ---------------------------------------------------------------------------
+# _geoip_cidr4_to_ranges — convert IPv4 CIDR file to integer-range format.
+# Input: CIDR_FILE CC
+#   CIDR_FILE: file with one IPv4 CIDR per line (comments/blanks skipped)
+#   CC: 2-letter country code tag for each range
+# Output: "START_INT END_INT CC" lines to stdout (unsorted).
+# mawk-compatible: no gensub, no strftime. 2^(32-n) safe in mawk.
+# ---------------------------------------------------------------------------
+_geoip_cidr4_to_ranges() {
+	local cidr_file="$1" cc="$2"
+
+	[[ -n "$GEOIP_AWK_BIN" ]] || { echo "_geoip_cidr4_to_ranges: awk not available" >&2; return 1; }
+	[[ -f "$cidr_file" ]] || return 1
+
+	"$GEOIP_AWK_BIN" -v cc="$cc" '
+/^[0-9]/ {
+	n = split($0, p, "[./]")
+	if (n < 5) next
+	net = (p[1]+0) * 16777216 + (p[2]+0) * 65536 + (p[3]+0) * 256 + (p[4]+0)
+	bits = int(p[5]+0)
+	if (bits < 0 || bits > 32) next
+	size = 2 ^ (32 - bits)
+	end = net + size - 1
+	printf "%d %d %s\n", net, end, cc
+}' "$cidr_file"
+}
+
+# ---------------------------------------------------------------------------
+# geoip_ip_lookup — look up IPv4 address in integer-range database.
+# Searches a "START_INT END_INT CC" database file for containment.
+# Args: IP DB_FILE
+#   IP: IPv4 dotted-quad address
+#   DB_FILE: integer-range database (output of geoip_build_ipdb)
+# Prints: 2-letter country code on match (to stdout)
+# Returns: 0 on match, 1 on no match or invalid input
+# No caching — consumers implement their own caching strategy.
+# Complexity: O(N) linear scan; high-frequency callers should cache results.
+# ---------------------------------------------------------------------------
+geoip_ip_lookup() {
+	local ip="$1" db_file="$2"
+
+	[[ -n "$ip" ]] || return 1
+	[[ -n "$db_file" ]] || return 1
+	# IPv6 not supported
+	[[ "$ip" != *:* ]] || return 1
+	[[ -f "$db_file" ]] || return 1
+	[[ -s "$db_file" ]] || return 1
+	[[ -n "$GEOIP_AWK_BIN" ]] || { echo "geoip_ip_lookup: awk not available" >&2; return 1; }
+
+	local cc
+	cc=$("$GEOIP_AWK_BIN" -v ip="$ip" '
+	BEGIN {
+		n = split(ip, p, ".")
+		if (n != 4) exit
+		target = (p[1]+0) * 16777216 + (p[2]+0) * 65536 + (p[3]+0) * 256 + (p[4]+0)
+	}
+	/^#/ { next }
+	{
+		if ($1+0 <= target && target <= $2+0) {
+			print $3
+			exit
+		}
+	}' "$db_file")
+
+	if [[ -n "$cc" ]]; then
+		echo "$cc"
+		return 0
+	fi
+	return 1
+}
+
+# ---------------------------------------------------------------------------
+# _geoip_download_ipdeny_bulk — download ipdeny.com all-zones tarball.
+# Extracts per-country IPv4 zone files to OUTPUT_DIR/{CC}.zone.
+# Validates filenames and CIDR content before writing.
+# Args: OUTPUT_DIR
+# Returns: 0 on success (at least one valid zone file), 1 on failure
+# IPv4 only — no bulk IPv6 tarball available from ipdeny.
+# ---------------------------------------------------------------------------
+_geoip_download_ipdeny_bulk() {
+	local output_dir="$1"
+	local url="https://www.ipdeny.com/ipblocks/data/countries/all-zones.tar.gz"
+	local tmp_tar tmp_dir count=0
+
+	[[ -n "$output_dir" ]] || return 1
+	mkdir -p "$output_dir" 2>/dev/null || return 1
+
+	tmp_tar=$(mktemp "${output_dir}/.bulk-XXXXXX") || return 1
+	tmp_dir=$(mktemp -d "${output_dir}/.bulk-extract-XXXXXX") || { rm -f "$tmp_tar"; return 1; }
+
+	if ! _geoip_download_cmd "$url" "$tmp_tar"; then
+		rm -f "$tmp_tar"
+		rm -rf "$tmp_dir"
+		return 1
+	fi
+
+	if ! tar -xzf "$tmp_tar" -C "$tmp_dir" 2>/dev/null; then
+		rm -f "$tmp_tar"
+		rm -rf "$tmp_dir"
+		return 1
+	fi
+	rm -f "$tmp_tar"
+
+	local _cc_lre='^[a-z]{2}$'
+	local f cc_lower cc_upper
+	for f in "$tmp_dir"/*.zone; do
+		[ -f "$f" ] || continue
+		cc_lower=$(basename "$f" .zone)
+		[[ "$cc_lower" =~ $_cc_lre ]] || continue
+		# Skip zz.zone — ipdeny's unassigned/reserved catch-all (/8 blocks
+		# that overlap real country allocations and poison lookup results)
+		[[ "$cc_lower" != "zz" ]] || continue
+		if ! _geoip_validate_cidr_file "$f" "4"; then
+			continue
+		fi
+		cc_upper=$(echo "$cc_lower" | tr '[:lower:]' '[:upper:]')
+		cp "$f" "$output_dir/${cc_upper}.zone"
+		count=$((count + 1))
+	done
+
+	rm -rf "$tmp_dir"
+	[[ "$count" -gt 0 ]]
+}
+
+# ---------------------------------------------------------------------------
+# geoip_build_ipdb — build consolidated IPv4 integer-range database.
+# Downloads CIDR data for all countries, converts to integer ranges,
+# sorts by start address, and writes to OUTPUT.
+# Uses ipdeny bulk tarball when available; falls back to per-country
+# cascade (ipverse → ipdeny) for any missing countries.
+# Args: OUTPUT [MIN_RANGES]
+#   OUTPUT: destination file path for the integer-range database
+#   MIN_RANGES: minimum expected range count (default: 1000; abort if below)
+# Returns: 0 on success, 1 on failure
+# Sets: _GEOIP_BUILD_COUNT  — countries successfully processed
+#       _GEOIP_BUILD_FAIL   — countries that failed download
+#       _GEOIP_BUILD_RANGES — total ranges in output
+# ---------------------------------------------------------------------------
+geoip_build_ipdb() {
+	local output="$1" min_ranges="${2:-1000}"
+	local tmpdir count=0 fail_count=0
+
+	_GEOIP_BUILD_COUNT=0
+	_GEOIP_BUILD_FAIL=0
+	_GEOIP_BUILD_RANGES=0
+
+	[[ -n "$output" ]] || { echo "geoip_build_ipdb: OUTPUT required" >&2; return 1; }
+
+	tmpdir=$(mktemp -d "${output}.build-XXXXXX") || return 1
+	local zones_dir="$tmpdir/zones"
+	mkdir -p "$zones_dir"
+
+	# Strategy 1: bulk tarball (~1MB, one download for all countries)
+	local bulk_ok=0
+	if _geoip_download_ipdeny_bulk "$zones_dir"; then
+		bulk_ok=1
+	fi
+
+	# Strategy 2: per-country cascade for any CCs not covered by bulk
+	local cc cidr_file
+	while IFS= read -r cc; do
+		# Skip if bulk already provided this CC
+		if [[ "$bulk_ok" -eq 1 ]] && [[ -f "$zones_dir/${cc}.zone" ]]; then
+			count=$((count + 1))
+			continue
+		fi
+		cidr_file="$zones_dir/${cc}.zone"
+		if geoip_download "$cc" "4" "$cidr_file"; then
+			count=$((count + 1))
+		else
+			fail_count=$((fail_count + 1))
+		fi
+	done < <(geoip_all_cc)
+
+	# Convert all zone files to integer ranges
+	local merged="$tmpdir/merged.dat"
+	: > "$merged"
+	local cc_base
+	for cidr_file in "$zones_dir"/*.zone; do
+		[ -f "$cidr_file" ] || continue
+		cc_base=$(basename "$cidr_file" .zone)
+		_geoip_cidr4_to_ranges "$cidr_file" "$cc_base" >> "$merged"
+	done
+
+	# Sort by start integer
+	sort -n -k1 "$merged" > "$tmpdir/sorted.dat"
+
+	local lines
+	lines=$(wc -l < "$tmpdir/sorted.dat")
+	if [[ "$lines" -lt "$min_ranges" ]]; then
+		echo "geoip_build_ipdb: only $lines ranges (minimum: $min_ranges)" >&2
+		rm -rf "$tmpdir"
+		return 1
+	fi
+
+	if ! mv -f "$tmpdir/sorted.dat" "$output"; then
+		rm -rf "$tmpdir"
+		return 1
+	fi
+	rm -rf "$tmpdir"
+
+	_GEOIP_BUILD_COUNT="$count"
+	_GEOIP_BUILD_FAIL="$fail_count"
+	_GEOIP_BUILD_RANGES="$lines"
+	return 0
 }
