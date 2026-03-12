@@ -159,6 +159,12 @@
       download ipdeny all-zones tarball (~1MB, one-time) on first lookup miss
       so any IPv4 address resolves to its country regardless of which CCs are
       in cc_deny/cc_allow.rules
+[Fix] _geoip_world_fetch(): register mktemp -d temp directory with
+      _apf_reg_tmp() for signal-safe cleanup; _apf_cleanup_tmp() now handles
+      both files and directories; _apf_cleanup_stale_tmp() uses rm -rf for
+      geoip temp patterns to clean orphaned directories on startup
+[Fix] firewall_info(): add grep -c exit code fallback guards on rule_count
+      and chain_count to match the pattern used by all other grep -c callers
 
   -- Changes --
 
@@ -201,8 +207,8 @@
       live ipset stats) even when country code filtering is inactive;
       previously returned "inactive" with no information
 [New] --cc IP: GeoIP reverse lookup — look up which country and continent
-      an IP address or CIDR belongs to using cached GeoIP data; uses
-      grepcidr for accurate matching when available, prefix fallback otherwise
+      an IP address or CIDR belongs to using cached GeoIP data; portable
+      awk CIDR containment with on-demand world data download
 
   -- Documentation --
 

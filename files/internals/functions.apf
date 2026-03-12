@@ -40,7 +40,7 @@ _apf_reg_tmp() { _APF_TMPFILES="$_APF_TMPFILES $1"; }
 _apf_cleanup_tmp() {
 	local f
 	for f in $_APF_TMPFILES; do
-		[ -f "$f" ] && rm -f "$f"
+		[ -e "$f" ] && rm -rf "$f"
 	done
 	_APF_TMPFILES=""
 }
@@ -54,7 +54,8 @@ _apf_cleanup_stale_tmp() {
 	rm -f "$INSTALL_PATH"/internals/refresh.allow.* 2>/dev/null
 	rm -f "$INSTALL_PATH"/internals/refresh.drop.* 2>/dev/null
 	rm -f "$INSTALL_PATH"/.apf-* 2>/dev/null
-	rm -f "$INSTALL_PATH"/.apf-geoip-* 2>/dev/null
+	# rm -rf for geoip: _geoip_world_fetch() creates temp directories via mktemp -d
+	rm -rf "$INSTALL_PATH"/.apf-geoip-* 2>/dev/null
 }
 
 ## Detect iptables backend (nft vs legacy)
@@ -1822,10 +1823,10 @@ firewall_info() {
 	# Check if firewall has rules loaded
 	local fw_rules
 	fw_rules=$($IPT $IPT_FLAGS -S 2>/dev/null)
-	rule_count=$(echo "$fw_rules" | grep -c '^-A')
+	rule_count=$(echo "$fw_rules" | grep -c '^-A') || rule_count=0
 	if [ "$rule_count" -gt 0 ]; then
 		running="yes"
-		chain_count=$(echo "$fw_rules" | grep -c '^-N')
+		chain_count=$(echo "$fw_rules" | grep -c '^-N') || chain_count=0
 	fi
 	if [ "$USE_IPV6" == "1" ] && [ -n "$IP6T" ]; then
 		ipv6_count=$($IP6T $IPT_FLAGS -S 2>/dev/null | grep -c '^-A')
