@@ -2,17 +2,15 @@
 
   -- New Features --
 
-[New] USE_IPSET auto-detection: resolves ipset binary and ip_set kernel module
-      availability at startup; follows IPT_LOCK_SUPPORT auto-detect pattern;
-      replaces hardcoded "0" default with "auto" (upgrade-safe via .ca.def)
 [New] GeoIP country blocking: ipset-based high-performance country filtering
       using cc_deny.rules/cc_allow.rules with ISO 3166-1 alpha-2 codes and
       continent shorthand (@EU, @AS, @NA, @SA, @AF, @OC); tiered data sources
       (ipverse.net, ipdeny.com) with local caching; atomic ipset swap for zero
       downtime updates; audit mode (CC_LOG_ONLY) for impact measurement;
-      dual-stack IPv4/IPv6 support; advanced syntax for per-port/protocol rules;
-      first APF internal library convention (files/internals/geoip.apf)
-
+      dual-stack IPv4/IPv6 support; advanced syntax for per-port/protocol rules
+[New] --cc IP: GeoIP reverse lookup — look up which country and continent
+      an IP address or CIDR belongs to using cached GeoIP data; portable
+      awk CIDR containment with on-demand world data download
 [New] Structured event logging via elog_lib.sh: dual log model (application log
       + JSONL audit trail at /var/log/apf/audit.log), output module registry,
       severity filtering; eout() backward-compatible as elog_lib wrapper;
@@ -55,14 +53,13 @@
       --dump-config, -h/--help (exits 0)
 [New] Ban expiry: structured addedtime=EPOCH markers in permanent trust
       entries for reliable expiry; backward-compatible with pre-2.0.2 entries
+[New] Auto-detection for USE_IPSET, IPT_LOCK_SUPPORT, and DOCKER_COMPAT:
+      each resolves at startup based on system capabilities; CentOS 6
+      (iptables 1.4.7, no -w) safely degrades; replaces hardcoded defaults
+      with "auto" (upgrade-safe via .ca.def)
 [New] install.sh improvements: auto-detect default network interface on
       fresh install; auto-detect and disable conflicting firewall services
       (firewalld, ufw); post-install dependency warnings; CentOS 6 safe
-[New] IPT_LOCK_SUPPORT="auto": auto-detect iptables -w lock support at
-      startup; CentOS 6 (1.4.7, no -w) safely resolves to disabled
-[New] DOCKER_COMPAT="auto": auto-detect container runtimes by checking for
-      DOCKER-USER chain; resolves to "1" when Docker/Podman/containerd is
-      active, "0" otherwise
 [New] pkg_lib.sh v1.0.2 integrated: shared packaging library for backup,
       service lifecycle, cron, man page, and OS detection; RPM/DEB packaging
       infrastructure via pkg.manifest and pkg_gen.sh
@@ -103,10 +100,9 @@
       before iptables-restore; flush partial rules on restore failure; check
       firewall exit code to prevent saving broken state; backend marker
       tracking for nft/legacy compatibility
-[Fix] Unknown CLI options now exit with code 1 instead of 0; propagate
-      cli_trust/cli_trust_temp return codes to CLI exit status
-[Fix] Variable quoting across iptables command context, dot-source paths,
-      and config references in core files
+[Fix] CLI feedback: unknown options exit 1; error messages to stderr;
+      trust_lookup() negative result to stdout; list() uses cat for pipes
+      and silent pager fallback for TTY; checks $EDITOR before hardcoded list
 [Fix] Strip control characters from trust comment field to prevent line
       injection in allow/deny hosts files
 [Fix] refresh(): populate REFRESH_TEMP from trust files instead of
@@ -123,48 +119,22 @@
 [Fix] sysctl.rules: fix wrong proc paths for secure_redirects,
       send_redirects, and proxy_arp; per-interface sysctls were silently
       never applied
-[Fix] Code hygiene: revert bash 4.2+ case conversion for CentOS 6; add
-      missing local declarations; mktemp for all temp files with signal-safe
-      cleanup; rename head() to apf_banner() to stop shadowing /usr/bin/head
-[Fix] CLI feedback: redirect error messages to stderr; list() checks $EDITOR
-      before hardcoded editor list; --ipset-update and --gre-up/--gre-down
-      report disabled state instead of silently exiting
+[Fix] Code hygiene: variable quoting in iptables context; revert bash 4.2+
+      constructs for CentOS 6 compatibility; mktemp for all temp files with
+      signal-safe cleanup; rename head() to apf_banner()
 [Fix] vnetgen: strip Docker @ifN suffix from ip link output to prevent
       duplicate VNET rules in containers
-[Fix] elog_lib integration: move log path config to internals.conf for
-      subprocess inheritance; add audit.log to logrotate; fix sh-to-bash
-      invocations for pkg_lib.sh compatibility
-[Fix] firewall: remove dead EGF output policy branch
 [Fix] ovars(): filter shell conditionals from variable name extraction;
       internals.conf if/elif lines produced invalid variable name errors on
       stderr during apf -o and fast load startup
-[Fix] trust_lookup(): move "not found" message from stderr to stdout; the
-      negative result is informational, not an error; exit code 1 remains
-      for scripting
-[Fix] list(): remove "No editor found" noise message; use cat for non-TTY
-      output (pipe-friendly) and silent pager fallback for TTY sessions
-[Fix] Temp file hygiene: register mktemp calls in record_block(),
-      ipset_migrate_rules(), and ipset_update_timestamp() with
-      _apf_reg_tmp() for signal-safe cleanup; add _apf_cleanup_stale_tmp()
-      to remove orphaned refresh.allow.*/refresh.drop.* and .apf-* temp
-      files from pre-2.0.2 installations on startup and refresh
 [Fix] GeoIP --cc: on-demand download for CCs not in rules files; apf --cc CN
-      now fetches data automatically when cache is missing instead of showing
-      a misleading "run apf --cc-update" message that could never help
-[Fix] is_fqdn(): IPv4 addresses incorrectly matched FQDN regex due to
-      dot-separated numeric labels; add IPv4 exclusion guard so apf --cc IP
-      routes to GeoIP lookup instead of CC validation error path
-[Fix] GeoIP --cc IP: replace broken 3-octet prefix fallback (missed /17-/23
-      CIDRs) with portable awk CIDR containment; add _geoip_world_fetch() to
-      download ipdeny all-zones tarball (~1MB, one-time) on first lookup miss
-      so any IPv4 address resolves to its country regardless of which CCs are
-      in cc_deny/cc_allow.rules
-[Fix] _geoip_world_fetch(): register mktemp -d temp directory with
-      _apf_reg_tmp() for signal-safe cleanup; _apf_cleanup_tmp() now handles
-      both files and directories; _apf_cleanup_stale_tmp() uses rm -rf for
-      geoip temp patterns to clean orphaned directories on startup
-[Fix] firewall_info(): add grep -c exit code fallback guards on rule_count
-      and chain_count to match the pattern used by all other grep -c callers
+      now fetches data automatically when cache is missing
+[Fix] GeoIP --cc IP: fix IPv4-as-FQDN false positive in is_fqdn(); replace
+      broken 3-octet prefix fallback with portable awk CIDR containment;
+      on-demand world data download (~1MB, one-time) resolves any IPv4 to
+      country regardless of which CCs are in cc_deny/cc_allow.rules
+[Fix] GeoIP staleness warning: restore age precision — message now shows
+      "GeoIP data is N days old" instead of generic "stale" phrasing
 
   -- Changes --
 
@@ -184,9 +154,7 @@
 [Change] Performance: replace subprocess chains with bash builtins across
       hot paths; VNET parsing with builtins and glob patterns
 [Change] Code consolidation: extract shared helpers across trust, ipset,
-      bt.rules, cports, and firewall subsystems; _log_drop(), _rab_log(),
-      port-filter/uid-filter loops, _maybe_block_escalate(); remove dead
-      variables and code
+      bt.rules, cports, and firewall subsystems; remove dead variables and code
 [Change] help(): show readable option names; add new commands; hide aliases
 [Change] nft backend detection: extract detect_ipt_backend() to eliminate
       duplicated iptables --version parsing
@@ -196,33 +164,17 @@
       sed path replacement optimized with grep -rl pre-filter
 [Change] Remove dead bandmin() integration (cPanel, discontinued ~2014);
       eliminates bash SIGSEGV on GHA runners with newer kernels
-[Change] Update vendored elog_lib.sh to v1.0.3: FQDN host field in JSON and
-      syslog UDP output via hostname -f with short-name fallback; RFC 5424
-      HOSTNAME alignment for multi-domain log aggregation
-[Change] Update vendored elog_lib.sh to v1.0.2 and pkg_lib.sh to v1.0.2
+[Change] Update vendored elog_lib.sh to v1.0.3: FQDN host field in JSON
+      and syslog output; pkg_lib.sh to v1.0.2
 [Change] download_url(): log TLS diagnostic hint on download failure for
       legacy system troubleshooting
 [Change] Drop Ubuntu 22.04 from CI matrix; redundant with 20.04+24.04
 [Change] --cc CC: show country detail (continent, rules status, cached data,
       live ipset stats) even when country code filtering is inactive;
       previously returned "inactive" with no information
-[New] --cc IP: GeoIP reverse lookup — look up which country and continent
-      an IP address or CIDR belongs to using cached GeoIP data; portable
-      awk CIDR containment with on-demand world data download
-[Change] Integrate geoip_lib.sh v1.0.0: shared GeoIP metadata library replaces
-      embedded country name table, continent lists, CC validation, download
-      functions, and CIDR search with thin wrappers delegating to geoip_lib;
-      staleness checks via geoip_is_stale()/geoip_mark_updated(); ~300 lines
-      of duplicated code removed from functions.apf and geoip.apf
-[Change] Update vendored geoip_lib.sh to v1.0.1: adds geoip_all_cc(),
-      geoip_ip_lookup(), geoip_build_ipdb(), _geoip_cidr4_to_ranges(),
-      _geoip_download_ipdeny_bulk(); IFS contamination fix in geoip_all_cc()
-[Change] GeoIP thin wrapper cleanup: remove 3 passthrough wrappers
-      (_geoip_cc_continent, _geoip_continent_name, _geoip_cidr4_search);
-      callers now invoke geoip_lib functions directly; consistent with
-      geoip_cc_name() which was already removed in Phase 4
-[Fix] GeoIP staleness warning: restore age precision — message now shows
-      "GeoIP data is N days old" instead of generic "stale" phrasing
+[Change] Integrate geoip_lib.sh v1.0.1: shared GeoIP metadata library
+      replaces embedded country name table, continent lists, CC validation,
+      download functions, and CIDR search; ~300 lines removed
 
   -- Documentation --
 
@@ -241,37 +193,18 @@
 [Fix] README/README.md: add Country Code Filtering section to usage block
       matching help() output (--cc, --cc CC, --cc IP, --cc-update, NOTE);
       add cc_deny.rules, cc_allow.rules, geoip/, internals/ to Key Files section
-[Fix] apf.8: update .TH date from February to March 2026 for release
-[Fix] firewall: add inline comments to hook || true lines per CLAUDE.md
-[Fix] Add shellcheck shell=bash directive to sourced fragments
-      (cports.common, sysctl.rules, bt.rules, log.rules)
-[Fix] functions.apf: split local+assign in ml() KMOD variable (anti-pattern #25)
-[Fix] functions.apf: move SC1090 shellcheck disable to dot-source line for
-      geoip_lib.sh (directive was on variable assignment, not the source statement)
 
   -- Test Suite --
 
-[New] 12 new test files (22-33): uid-egress, devel-fastload, vnet,
-      connlimit, hook-search-silent, temp-trust, synflood, block-escalation,
-      advanced-trust-cli, fqdn-trust, cli-help, refactor-regression
-[New] Additional test coverage: LOG_DROP=0 negative tests, hook execution,
-      search special characters, ipset migration edge cases, uninstall
-      verification, config mutual exclusion, firewall failure propagation,
-      elog_lib integration (559 tests across 34 files)
-[New] UAT suite: 7 scenario files exercising APF from a sysadmin perspective
-      — trust lifecycle, temporary trust, firewall lifecycle, search and
-      diagnostics, restart persistence, CLI UX; runs via 'make -C tests uat'
-[New] CI: UAT acceptance test job runs 56 scenarios on Debian 12
+[New] 12 new test files (22-33) and expanded coverage across existing files:
+      uid-egress, devel-fastload, vnet, connlimit, hooks, temp-trust,
+      synflood, block-escalation, advanced-trust, FQDN, CLI, and regression
+      (612 tests across 35 files)
+[New] UAT acceptance suite: 12 scenario files with 83 tests exercising
+      trust lifecycle, temporary trust, firewall lifecycle, port filtering,
+      advanced trust syntax, IPv6, and error paths; CI job on Debian 12
 [Change] Migrate test infrastructure to batsman v1.2.0; test parallelization;
       validate_config tests use --validate saving ~55-60s; per-test teardown
-      to prevent cascading failures
-[Change] UAT teardown hardening: uat_apf_teardown() ensures firewall flush
-      and orphan process cleanup on test failure; all UAT scenarios use
-      centralized teardown helper
-[New] UAT scenario expansion: 5 new scenario files (08-12) covering advanced
-      trust syntax, port filtering, DEVEL_MODE, IPv6 rules, and error paths;
-      27 new tests bringing UAT total to 83; new helpers
-      uat_apf_set_port_config() and uat_apf_enable_ipv6(); IPv6 tests use
-      ip6tables_available() skip guard for CI safety
+      and centralized UAT cleanup to prevent cascading failures
 [Fix] CI: UAT job Docker build used wrong context directory; use -f
       tests/Dockerfile with project root as build context
