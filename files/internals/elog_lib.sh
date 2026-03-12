@@ -29,7 +29,7 @@
 [[ -n "${_ELOG_LIB_LOADED:-}" ]] && return 0 2>/dev/null
 _ELOG_LIB_LOADED=1
 # shellcheck disable=SC2034 # version checked by consumers
-ELOG_LIB_VERSION="1.0.2"
+ELOG_LIB_VERSION="1.0.3"
 
 # --- Configuration variables (set by consumer before sourcing) ---
 # All use ${VAR:-default} — safe when sourced from inside functions (BATS).
@@ -629,7 +629,7 @@ _elog_out_syslog_udp() {
 	_pri=$(_elog_syslog_pri "$_facility" "$_sev")
 
 	local _host _app _pid _ts
-	_host=$(hostname -s 2>/dev/null || hostname)
+	_host=$(hostname -f 2>/dev/null || hostname -s 2>/dev/null || hostname)
 	_app="${ELOG_APP:-${0##*/}}"
 	_pid="$$"
 
@@ -1073,7 +1073,7 @@ elog() {
 	# info+ levels: format and route
 	local _ts _host _app _pid
 	_ts=$(date +"${ELOG_TS_FORMAT:-%b %e %H:%M:%S}")
-	_host=$(hostname -s 2>/dev/null || hostname)
+	_host=$(hostname -f 2>/dev/null || hostname -s 2>/dev/null || hostname)
 	_app="${ELOG_APP:-${0##*/}}"
 	_pid="$$"
 
@@ -1214,7 +1214,7 @@ elog_event() {
 	# Timestamp and identity
 	local _ts _host _app _pid
 	_ts=$(date +"${ELOG_TS_FORMAT:-%b %e %H:%M:%S}")
-	_host=$(hostname -s 2>/dev/null || hostname)
+	_host=$(hostname -f 2>/dev/null || hostname -s 2>/dev/null || hostname)
 	_app="${ELOG_APP:-${0##*/}}"
 	_pid="$$"
 

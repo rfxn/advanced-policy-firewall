@@ -190,6 +190,9 @@
       sed path replacement optimized with grep -rl pre-filter
 [Change] Remove dead bandmin() integration (cPanel, discontinued ~2014);
       eliminates bash SIGSEGV on GHA runners with newer kernels
+[Change] Update vendored elog_lib.sh to v1.0.3: FQDN host field in JSON and
+      syslog UDP output via hostname -f with short-name fallback; RFC 5424
+      HOSTNAME alignment for multi-domain log aggregation
 [Change] Update vendored elog_lib.sh to v1.0.2 and pkg_lib.sh to v1.0.2
 [Change] download_url(): log TLS diagnostic hint on download failure for
       legacy system troubleshooting
