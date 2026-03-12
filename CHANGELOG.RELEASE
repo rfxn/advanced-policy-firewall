@@ -214,6 +214,12 @@
       functions, and CIDR search with thin wrappers delegating to geoip_lib;
       staleness checks via geoip_is_stale()/geoip_mark_updated(); ~300 lines
       of duplicated code removed from functions.apf and geoip.apf
+[Change] GeoIP thin wrapper cleanup: remove 3 passthrough wrappers
+      (_geoip_cc_continent, _geoip_continent_name, _geoip_cidr4_search);
+      callers now invoke geoip_lib functions directly; consistent with
+      geoip_cc_name() which was already removed in Phase 4
+[Fix] GeoIP staleness warning: restore age precision — message now shows
+      "GeoIP data is N days old" instead of generic "stale" phrasing
 
   -- Documentation --
 

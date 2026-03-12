@@ -45,6 +45,9 @@ geoip_validate_config() {
 ## Download country IP data using geoip_lib vendor cascade.
 # Wrapper: calls geoip_lib's internal download helpers (_geoip_download_ipverse,
 # _geoip_download_ipdeny) directly to avoid name collision with this function.
+# Note: geoip_lib's download path includes TLS fallback (--insecure) for
+# CentOS 6 and other systems with outdated CA bundles, which differs from
+# APF's download_url() that only logs a diagnostic hint on TLS failure.
 # Caches to $CC_DATA_DIR/{CC}.{4,6}
 # Args: cc family(4|6)
 # Returns 0 on success (data cached), 1 on failure.
@@ -574,7 +577,14 @@ geoip_load() {
 
 	# Warn if cached data is stale (>30 days)
 	if geoip_is_stale "$CC_DATA_DIR" 30; then
-		eout "{geoip} WARNING: GeoIP data is stale; run apf --cc-update"
+		local _last_update _age_days
+		if [ -f "$CC_DATA_DIR/.last_update" ]; then
+			read -r _last_update < "$CC_DATA_DIR/.last_update"
+			_age_days=$(( ($(date +%s) - _last_update) / 86400 ))
+			eout "{geoip} WARNING: GeoIP data is $_age_days days old; run apf --cc-update"
+		else
+			eout "{geoip} WARNING: GeoIP data is stale; run apf --cc-update"
+		fi
 	fi
 
 	cc_rules_load
@@ -615,28 +625,6 @@ geoip_update() {
 
 	geoip_mark_updated "$CC_DATA_DIR"
 	eout "{geoip} country code data updated"
-}
-
-## Reverse-map a country code to its continent shorthand.
-# Thin wrapper: delegates to geoip_cc_continent() from geoip_lib.
-# Args: cc (2-letter ISO 3166-1)
-# Prints: continent code (e.g., @AS) or "unknown"
-_geoip_cc_continent() {
-	geoip_cc_continent "$1"
-}
-
-## Continent shorthand to full name.
-# Thin wrapper: delegates to geoip_continent_name() from geoip_lib.
-_geoip_continent_name() {
-	geoip_continent_name "$1"
-}
-
-## Search an IPv4 address across multiple CIDR data files using awk.
-# Thin wrapper: delegates to geoip_cidr_search() from geoip_lib.
-# Args: ip file [file ...]
-# Prints the matching file path; returns 0 on match, 1 on no match.
-_geoip_cidr4_search() {
-	geoip_cidr_search "$@"
 }
 
 ## Download IPv4 CIDR data for all countries from ipdeny.com all-zones tarball.
@@ -730,7 +718,7 @@ _geoip_lookup_ip() {
 			if [ "${#cc4_files[@]}" -gt 0 ]; then
 				local match_file cc_base
 				local _cc_re='^[A-Z]{2}$'
-				match_file=$(_geoip_cidr4_search "$query_ip" "${cc4_files[@]}")
+				match_file=$(geoip_cidr_search "$query_ip" "${cc4_files[@]}")
 				if [ -n "$match_file" ] && [ -f "$match_file" ]; then
 					cc_base=$(basename "$match_file" ".4")
 					if [[ "$cc_base" =~ $_cc_re ]]; then
@@ -779,8 +767,8 @@ _geoip_print_lookup() {
 	local cc="$1" query="$2"
 	local cc_name continent continent_name rules_status
 	cc_name=$(geoip_cc_name "$cc")
-	continent=$(_geoip_cc_continent "$cc")
-	continent_name=$(_geoip_continent_name "$continent")
+	continent=$(geoip_cc_continent "$cc")
+	continent_name=$(geoip_continent_name "$continent")
 	rules_status=$(_geoip_rules_status "$cc")
 	echo "  $query => $cc ($cc_name)"
 	echo "    Continent: $continent ($continent_name)"
@@ -848,8 +836,8 @@ geoip_info() {
 		local cc cc_name set_name count4=0 count6=0 continent continent_name rules_status
 		for cc in ${_VCC_CODES//,/ }; do
 			cc_name=$(geoip_cc_name "$cc")
-			continent=$(_geoip_cc_continent "$cc")
-			continent_name=$(_geoip_continent_name "$continent")
+			continent=$(geoip_cc_continent "$cc")
+			continent_name=$(geoip_continent_name "$continent")
 			rules_status=$(_geoip_rules_status "$cc")
 			echo "  $cc ($cc_name):"
 			echo "    Continent: $continent ($continent_name)"
