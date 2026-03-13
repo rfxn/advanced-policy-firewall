@@ -8,7 +8,7 @@
 apf \- Advanced Policy Firewall
 .SH SYNOPSIS
 .B apf
-.RB [ \-s | \-r | \-f | \-l | \-t | \-e | \-o | \-v | \-h | \-\-rules | \-\-info | \-\-validate ]
+.RB [ \-s | \-r | \-f | \-l | \-t | \-e | \-o | \-v | \-h | \-\-rules | \-\-info | \-\-validate | \-\-la | \-\-ld ]
 .br
 .B apf
 .RB { \-a | \-d }
@@ -30,7 +30,7 @@ apf \- Advanced Policy Firewall
 .I PATTERN
 .br
 .B apf
-.RB [ \-\-cc " [\fICC\fR]] | " \-\-cc\-update ]
+.RB [ \-\-cc " [\fICC\fR | \fIIP\fR]] | " \-\-cc\-update ]
 .br
 .B apf
 .RB [ \-\-ipset\-update | \-\-gre\-up | \-\-gre\-down | \-\-gre\-status ]
@@ -437,6 +437,9 @@ Consolidated cron: daily restart, hourly ipset refresh, per\-minute temp expiry.
 .TP
 .I /var/log/apf_log
 Default status log location.
+.TP
+.I /var/log/apf/audit.log
+Structured JSONL audit log (config, service state, rule events).
 .SH EXIT STATUS
 .TP
 .B 0

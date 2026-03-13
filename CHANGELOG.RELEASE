@@ -197,6 +197,13 @@
 [Fix] README/README.md: add Country Code Filtering section to usage block
       matching help() output (--cc, --cc CC, --cc IP, --cc-update, NOTE);
       add cc_deny.rules, cc_allow.rules, geoip/, internals/ to Key Files section
+[Fix] Doc sync: README.md DOCKER_COMPAT section now documents all three values
+      (auto/1/0); usage blocks show host/CC for -a/-d/-ta/-td matching help();
+      man page SYNOPSIS shows --cc [CC | IP] and --la/--ld; audit.log added to
+      Key Files and Logging sections; SET_FASTLOAD notes add backend mismatch;
+      SET_EXPIRE comment documents static/noexpire exemption; help() adds
+      --unban, --temp-allow/--temp-deny, --ovars aliases; --cc CC line trimmed
+      to 80 columns
 
   -- Test Suite --
 

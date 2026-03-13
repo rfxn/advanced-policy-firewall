@@ -267,6 +267,7 @@ The following files are located under your install path (`/etc/apf` by default):
 | `vnet/` | Per-IP virtual network policy files |
 | `/etc/cron.d/apf` | Consolidated cron: daily restart, hourly ipset refresh, per-minute temp trust expiry |
 | `/var/log/apf_log` | Default status log location |
+| `/var/log/apf/audit.log` | Structured JSONL audit log (config, service state, rule events) |
 
 ### 2.4 Uninstallation
 
@@ -467,7 +468,7 @@ Positioned after loopback and trusted interface acceptance — loopback and trus
 
 When running APF alongside Docker, Podman, Kubernetes, or other container runtimes, the default flush behavior (which wipes all iptables rules and chains) will destroy the container runtime's networking rules. The `DOCKER_COMPAT` option solves this by switching APF to a surgical flush mode.
 
-**`DOCKER_COMPAT`** - When set to `"1"`, APF's flush operation only removes APF-owned chains from the filter table, leaving all external chains intact. Specifically:
+**`DOCKER_COMPAT`** - Controls container-safe flush mode. Set to `"auto"` (default) to detect Docker/Podman/containerd at startup by checking for the DOCKER-USER chain. Set to `"1"` to force enable or `"0"` to force disable. When active, APF's flush operation only removes APF-owned chains from the filter table, leaving all external chains intact. Specifically:
 
 - FORWARD chain policy and rules are preserved (Docker routing)
 - nat table is left untouched (Docker port mapping and MASQUERADE rules)
@@ -634,6 +635,7 @@ APF provides configurable logging of filtered packets through the `LOG_*` variab
 | `LOG_EXT` | Extended logging (TCP/IP options in output) |
 | `LOG_RATE` | Max logged events per minute (default: 30) |
 | `LOG_APF` | Path to APF status log (default: `/var/log/apf_log`) |
+| `ELOG_AUDIT_FILE` | Structured JSONL audit log (default: `/var/log/apf/audit.log`) |
 
 For iptables concurrency control, `IPT_LOCK_SUPPORT` and `IPT_LOCK_TIMEOUT` configure the `-w` lock flag behavior for iptables >= 1.4.20. This prevents concurrent iptables modifications from corrupting rule state.
 
@@ -717,8 +719,8 @@ Firewall Control:
   -e, --refresh ............... refresh & re-resolve DNS in trust rules
 
 Trust Management:
-  -a HOST [CMT], --allow ...... add host to allow list and load rule
-  -d HOST [CMT], --deny ....... add host to deny list and load rule
+  -a HOST [CMT], --allow ...... add host/CC to allow list and load rule
+  -d HOST [CMT], --deny ....... add host/CC to deny list and load rule
   -u HOST, --remove ........... remove host from all trust files
   --list-allow ................ display allow list entries
   --list-deny ................. display deny list entries
@@ -728,8 +730,8 @@ Trust Management:
                           apf -d "d=3306:s=192.168.1.5"
 
 Temporary Trust:
-  -ta HOST TTL [CMT] .......... temporarily allow host (5m, 1h, 7d)
-  -td HOST TTL [CMT] .......... temporarily deny host
+  -ta HOST TTL [CMT] .......... temporarily allow host/CC (5m, 1h, 7d)
+  -td HOST TTL [CMT] .......... temporarily deny host/CC
   --temp-list ................. list temp entries with remaining TTL
   --temp-flush ................ remove all temporary entries
 
@@ -938,7 +940,7 @@ For example, setting `PERMBLOCK_COUNT="3"` and `PERMBLOCK_INTERVAL="86400"` will
 
 **Locked out of the server?** `DEVEL_MODE="1"` (the default) auto-flushes the firewall every 5 minutes. If DEVEL_MODE is off, rebooting will clear rules unless boot loading is configured (see [section 2.1](#21-boot-loading)).
 
-**Docker containers lost network after `apf -s`?** Set `DOCKER_COMPAT="1"` in `conf.apf` to preserve container networking rules during firewall operations. See [section 3.9](#39-dockercontainer-compatibility).
+**Docker containers lost network after `apf -s`?** `DOCKER_COMPAT="auto"` (the default) detects container runtimes automatically. If auto-detection fails, set `DOCKER_COMPAT="1"` in `conf.apf` to force container-safe mode. See [section 3.9](#39-dockercontainer-compatibility).
 
 **Firewall rules gone after reboot?** Ensure boot loading is configured — systemd service, chkconfig, or rc.local entry. See [section 2.1](#21-boot-loading).
 

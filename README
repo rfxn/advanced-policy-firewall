@@ -293,6 +293,7 @@ The following files are located under your install path (/etc/apf by default):
   /etc/cron.d/apf      Consolidated cron: daily restart, hourly ipset
                        refresh, per-minute temp trust expiry
   /var/log/apf_log     Default status log location
+  /var/log/apf/audit.log  Structured JSONL audit log (config, service, rule events)
 
 2.4) Uninstallation
 To fully remove APF from the system, run the uninstall script from the source
@@ -761,6 +762,7 @@ variables in conf.apf:
   LOG_EXT       - extended logging (TCP/IP options in output)
   LOG_RATE      - max logged events per minute (default: 30)
   LOG_APF       - path to APF status log (default: /var/log/apf_log)
+  ELOG_AUDIT_FILE - structured JSONL audit log (default: /var/log/apf/audit.log)
 
 For iptables concurrency control, IPT_LOCK_SUPPORT and IPT_LOCK_TIMEOUT
 configure the -w lock flag behavior for iptables >= 1.4.20. This prevents
@@ -849,8 +851,8 @@ Firewall Control:
   -e, --refresh ............... refresh & re-resolve DNS in trust rules
 
 Trust Management:
-  -a HOST [CMT], --allow ...... add host to allow list and load rule
-  -d HOST [CMT], --deny ....... add host to deny list and load rule
+  -a HOST [CMT], --allow ...... add host/CC to allow list and load rule
+  -d HOST [CMT], --deny ....... add host/CC to deny list and load rule
   -u HOST, --remove ........... remove host from all trust files
   --list-allow ................ display allow list entries
   --list-deny ................. display deny list entries
@@ -860,8 +862,8 @@ Trust Management:
                           apf -d "d=3306:s=192.168.1.5"
 
 Temporary Trust:
-  -ta HOST TTL [CMT] .......... temporarily allow host (5m, 1h, 7d)
-  -td HOST TTL [CMT] .......... temporarily deny host
+  -ta HOST TTL [CMT] .......... temporarily allow host/CC (5m, 1h, 7d)
+  -td HOST TTL [CMT] .......... temporarily deny host/CC
   --temp-list ................. list temp entries with remaining TTL
   --temp-flush ................ remove all temporary entries
 
