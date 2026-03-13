@@ -1069,6 +1069,10 @@ cli_trust_remove() {
 			return $?
 		fi
 		echo "Invalid host '$DIP': must be a valid IP/IPv6 address, CIDR block, FQDN, or country code" >&2
+		local _abbr_cidr='^[0-9]+/[0-9]+$'
+		if [[ "$DIP" =~ $_abbr_cidr ]]; then
+			echo "  Hint: abbreviated CIDR (e.g. '0/0') is not valid; use full notation (e.g. '0.0.0.0/0')" >&2
+		fi
 		return 1
 	fi
 
@@ -1236,6 +1240,10 @@ cli_trust() {
 		return $?
 	fi
 	echo "Invalid host '$HOST': must be a valid IP/IPv6 address, CIDR block, FQDN, or country code" >&2
+	local _abbr_cidr='^[0-9]+/[0-9]+$'
+	if [[ "$HOST" =~ $_abbr_cidr ]]; then
+		echo "  Hint: abbreviated CIDR (e.g. '0/0') is not valid; use full notation (e.g. '0.0.0.0/0')" >&2
+	fi
 	return 1
  fi
  tlist=""
@@ -1344,6 +1352,10 @@ cli_trust_temp() {
 			return $?
 		fi
 		echo "Invalid host '$HOST': must be a valid IP/IPv6 address, CIDR block, FQDN, or country code" >&2
+		local _abbr_cidr='^[0-9]+/[0-9]+$'
+		if [[ "$HOST" =~ $_abbr_cidr ]]; then
+			echo "  Hint: abbreviated CIDR (e.g. '0/0') is not valid; use full notation (e.g. '0.0.0.0/0')" >&2
+		fi
 		return 1
 	fi
 	_VTE_IP="$HOST"
