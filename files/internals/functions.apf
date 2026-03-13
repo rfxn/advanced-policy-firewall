@@ -1024,6 +1024,10 @@ cli_trust_remove() {
 	if [[ "$DIP" == *=* ]]; then
 		if ! valid_trust_entry "$DIP"; then
 			echo "Invalid trust entry '$DIP'" >&2
+			local _abbr_cidr='^[0-9]+/[0-9]+$'
+			if [[ "${DIP##*=}" =~ $_abbr_cidr ]]; then
+				echo "  Hint: abbreviated CIDR (e.g. '0/0') is not valid; use full notation (e.g. '0.0.0.0/0')" >&2
+			fi
 			return 1
 		fi
 		local found=0
@@ -1146,6 +1150,10 @@ cli_trust() {
 	fi
 	if ! valid_trust_entry "$HOST"; then
 		echo "Invalid trust entry '$HOST'" >&2
+		local _abbr_cidr='^[0-9]+/[0-9]+$'
+		if [[ "${HOST##*=}" =~ $_abbr_cidr ]]; then
+			echo "  Hint: abbreviated CIDR (e.g. '0/0') is not valid; use full notation (e.g. '0.0.0.0/0')" >&2
+		fi
 		return 1
 	fi
 	tlist=""
@@ -1320,6 +1328,10 @@ cli_trust_temp() {
 	fi
 	if ! valid_trust_entry "$HOST"; then
 		echo "Invalid trust entry '$HOST'" >&2
+		local _abbr_cidr='^[0-9]+/[0-9]+$'
+		if [[ "${HOST##*=}" =~ $_abbr_cidr ]]; then
+			echo "  Hint: abbreviated CIDR (e.g. '0/0') is not valid; use full notation (e.g. '0.0.0.0/0')" >&2
+		fi
 		return 1
 	fi
  else

@@ -135,6 +135,8 @@
       country regardless of which CCs are in cc_deny/cc_allow.rules
 [Fix] GeoIP staleness warning: restore age precision — message now shows
       "GeoIP data is N days old" instead of generic "stale" phrasing
+[Fix] trust validation: add hint for abbreviated CIDR notation (e.g. '0/0'
+      -> '0.0.0.0/0') in cli_trust(), cli_trust_remove(), cli_trust_temp()
 
   -- Changes --
 
