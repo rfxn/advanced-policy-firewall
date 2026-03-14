@@ -21,6 +21,7 @@ VNET="$addr"
 # SMTP_BLOCK="1"           (system-wide scope, not per-IP)
 # SMTP_ALLOWUSER="cpanel"
 # SMTP_ALLOWGROUP="mail"
+# CT_LIMIT="500"           (per-IP override for connection tracking limit)
 #
 # Or you can define standard iptables rules such as:
 # \$IPT -A INPUT -p tcp -s 192.0.2.1 -d \$VNET --dport 10024 -j ACCEPT

@@ -204,6 +204,24 @@ Refresh GeoIP data from upstream sources and atomically update all active
 ipsets with zero downtime. Respects the
 .B CC_INTERVAL
 setting.
+.SS Connection Tracking Limit
+.TP
+.B \-\-ct\-scan
+Run a CT_LIMIT scan: read the conntrack table, count connections per source IP,
+and temp\-block any IP exceeding the
+.B CT_LIMIT
+threshold. Requires CT_LIMIT > 0 in
+.IR conf.apf .
+Uses
+.B conntrack \-L
+when available, falling back to
+.IR /proc/net/nf_conntrack .
+Blocked IPs are added via
+.BR "apf \-td" .
+.TP
+.B \-\-ct\-status
+Show CT_LIMIT configuration, last scan timestamp, data source, and count of
+active CT_LIMIT blocks. Does not require CT_LIMIT to be enabled.
 .SS ipset Block Lists
 .TP
 .B \-\-ipset\-update
@@ -380,6 +398,12 @@ DShield, Spamhaus DROP, Project Honey Pot, ECN, global trust, ipset lists.
 .B Country Code Filtering
 CC_LOG, CC_LOG_ONLY, CC_SRC, CC_CACHE_TTL, CC_INTERVAL, CC_IPV6.
 .TP
+.B Connection Tracking Limit
+CT_LIMIT (max connections per IP, 0=disabled), CT_INTERVAL (scan interval
+seconds), CT_BLOCK_TIME (temp\-block duration), CT_PORTS (port filter),
+CT_STATES (state filter), CT_SKIP_TIME_WAIT, CT_PERMANENT, CT_SKIP
+(exempt IPs/CIDRs). VNET per\-IP overrides supported.
+.TP
 .B GRE Tunnels
 USE_GRE, GRE_PERSIST, GRE_KEEPALIVE, GRE_MTU, GRE_TTL.
 .TP
@@ -435,6 +459,12 @@ Post\-routing custom rules.
 .TP
 .I /etc/apf/vnet/
 Per\-IP virtual network policy files.
+.TP
+.I /etc/apf/internals/ctlimit.apf
+Connection tracking limit internal library (sourced on demand).
+.TP
+.I /etc/cron.d/ctlimit.apf
+CT_LIMIT scan cron job (created when CT_LIMIT > 0).
 .TP
 .I /etc/cron.d/apf
 Consolidated cron: daily restart, hourly ipset refresh, per\-minute temp expiry.

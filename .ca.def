@@ -18,6 +18,14 @@ CC_SRC="${CC_SRC:-auto}"
 CC_CACHE_TTL="${CC_CACHE_TTL:-24}"
 CC_INTERVAL="${CC_INTERVAL:-7}"
 CC_IPV6="${CC_IPV6:-1}"
+CT_LIMIT="${CT_LIMIT:-0}"
+CT_INTERVAL="${CT_INTERVAL:-30}"
+CT_BLOCK_TIME="${CT_BLOCK_TIME:-1800}"
+CT_PORTS="${CT_PORTS:-}"
+CT_STATES="${CT_STATES:-}"
+CT_SKIP_TIME_WAIT="${CT_SKIP_TIME_WAIT:-0}"
+CT_PERMANENT="${CT_PERMANENT:-0}"
+CT_SKIP="${CT_SKIP:-}"
 IPSET_LOG_RATE="${IPSET_LOG_RATE:-30}"
 IPSET_REFRESH="${IPSET_REFRESH:-21600}"
 USE_GRE="${USE_GRE:-0}"
@@ -697,6 +705,22 @@ CC_SRC="$CC_SRC"
 CC_CACHE_TTL="$CC_CACHE_TTL"
 CC_INTERVAL="$CC_INTERVAL"
 CC_IPV6="$CC_IPV6"
+
+##
+# [Connection Tracking Limit]
+##
+# Global per-IP connection limit via periodic conntrack table scanning.
+# Unlike IG_TCP_CLIMIT (per-port inline connlimit), CT_LIMIT counts ALL
+# connections from each source IP across all ports and protocols. IPs
+# exceeding the limit are temporarily blocked via the trust system.
+CT_LIMIT="$CT_LIMIT"
+CT_INTERVAL="$CT_INTERVAL"
+CT_BLOCK_TIME="$CT_BLOCK_TIME"
+CT_PORTS="$CT_PORTS"
+CT_STATES="$CT_STATES"
+CT_SKIP_TIME_WAIT="$CT_SKIP_TIME_WAIT"
+CT_PERMANENT="$CT_PERMANENT"
+CT_SKIP="$CT_SKIP"
 
 ##
 # [GRE Tunnels]

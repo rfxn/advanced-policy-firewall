@@ -175,6 +175,9 @@ fi
 # Set refresh cron
 cron_refresh
 
+# Set CT_LIMIT scan cron
+cron_ctlimit
+
 # Load our Allow Hosts rules
 glob_allow_download
 allow_hosts $GALLOW_HOSTS TGALLOW
@@ -249,10 +252,10 @@ trim $GDENY_HOSTS $SET_TRIM
 # malformed, and attack traffic is blocked regardless of connection state.
 # Conntrack validates TCP flags for ESTABLISHED packets (invalid flags →
 # INVALID state, not ESTABLISHED), so these skip safely.
-ipt -A INPUT  -p tcp -m state --state ESTABLISHED,RELATED -j ACCEPT
-ipt -A INPUT  -p udp -m state --state ESTABLISHED,RELATED -j ACCEPT
-ipt -A OUTPUT -p tcp --dport 1024:65535 -m state --state ESTABLISHED,RELATED -j ACCEPT
-ipt -A OUTPUT -p udp --dport 1024:65535 -m state --state ESTABLISHED,RELATED -j ACCEPT
+ipt -A INPUT  -p tcp $STATE_MATCH ESTABLISHED,RELATED -j ACCEPT
+ipt -A INPUT  -p udp $STATE_MATCH ESTABLISHED,RELATED -j ACCEPT
+ipt -A OUTPUT -p tcp --dport 1024:65535 $STATE_MATCH ESTABLISHED,RELATED -j ACCEPT
+ipt -A OUTPUT -p udp --dport 1024:65535 $STATE_MATCH ESTABLISHED,RELATED -j ACCEPT
 
 # Load our LOG rules
 . "$INSTALL_PATH/log.rules"
@@ -273,7 +276,7 @@ fi
 . "$INSTALL_PATH/main.rules"
 
 # Drop NEW tcp connections after this point
-ipt -A INPUT  -p tcp ! --syn -m state --state NEW -j $ALL_STOP
+ipt -A INPUT  -p tcp ! --syn $STATE_MATCH NEW -j $ALL_STOP
 
 # DNS
 if [ -f "/etc/resolv.conf" ] && [ "$RESV_DNS" == "1" ]; then
@@ -284,15 +287,15 @@ LDNS=$(grep -v "#" /etc/resolv.conf | grep -w nameserver | awk '{print$2}' | gre
         if [[ "$i" == *:* ]]; then
                 # IPv6 nameserver
                 if [ "$USE_IPV6" == "1" ]; then
-                ipt6 -A INPUT -p udp -s "$i" --sport 53 --dport 1024:65535 -m state --state ESTABLISHED,RELATED -j ACCEPT
-                ipt6 -A INPUT -p tcp -s "$i" --sport 53 --dport 1024:65535 -m state --state ESTABLISHED,RELATED -j ACCEPT
+                ipt6 -A INPUT -p udp -s "$i" --sport 53 --dport 1024:65535 $STATE_MATCH ESTABLISHED,RELATED -j ACCEPT
+                ipt6 -A INPUT -p tcp -s "$i" --sport 53 --dport 1024:65535 $STATE_MATCH ESTABLISHED,RELATED -j ACCEPT
                 ipt6 -A OUTPUT -p udp -d "$i" --dport 53 --sport 1024:65535 -j ACCEPT
                 ipt6 -A OUTPUT -p tcp -d "$i" --dport 53 --sport 1024:65535 -j ACCEPT
                 fi
         else
                 # IPv4 nameserver
-                ipt4 -A INPUT -p udp -s "$i" --sport 53 --dport 1024:65535 -m state --state ESTABLISHED,RELATED -j ACCEPT
-                ipt4 -A INPUT -p tcp -s "$i" --sport 53 --dport 1024:65535 -m state --state ESTABLISHED,RELATED -j ACCEPT
+                ipt4 -A INPUT -p udp -s "$i" --sport 53 --dport 1024:65535 $STATE_MATCH ESTABLISHED,RELATED -j ACCEPT
+                ipt4 -A INPUT -p tcp -s "$i" --sport 53 --dport 1024:65535 $STATE_MATCH ESTABLISHED,RELATED -j ACCEPT
                 ipt4 -A OUTPUT -p udp -d "$i" --dport 53 --sport 1024:65535 -j ACCEPT
                 ipt4 -A OUTPUT -p tcp -d "$i" --dport 53 --sport 1024:65535 -j ACCEPT
         fi
@@ -307,31 +310,31 @@ LDNS=$(grep -v "#" /etc/resolv.conf | grep -w nameserver | awk '{print$2}' | gre
         fi
   fi
 else
-        ipt -A INPUT  -p udp --sport 53 --dport 1024:65535 -m state --state ESTABLISHED,RELATED -j ACCEPT
-        ipt -A INPUT  -p tcp --sport 53 --dport 1024:65535 -m state --state ESTABLISHED,RELATED -j ACCEPT
+        ipt -A INPUT  -p udp --sport 53 --dport 1024:65535 $STATE_MATCH ESTABLISHED,RELATED -j ACCEPT
+        ipt -A INPUT  -p tcp --sport 53 --dport 1024:65535 $STATE_MATCH ESTABLISHED,RELATED -j ACCEPT
         ipt -A OUTPUT -p udp --dport 53 --sport 1024:65535 -j ACCEPT
         ipt -A OUTPUT -p tcp --dport 53 --sport 1024:65535 -j ACCEPT
 fi
 
 # FTP
 if [ "$HELPER_FTP" == "1" ]; then
-ipt -A INPUT  -p tcp --sport 1024:65535 --dport $HELPER_FTP_PORT -m state --state RELATED,ESTABLISHED -j ACCEPT
-ipt -A INPUT  -p tcp -m multiport --dport $HELPER_FTP_PORT,$HELPER_FTP_DATA -m state --state ESTABLISHED,RELATED -j ACCEPT
-ipt -A INPUT  -p udp -m multiport --dport $HELPER_FTP_PORT,$HELPER_FTP_DATA -m state --state ESTABLISHED,RELATED -j ACCEPT
-ipt -A OUTPUT  -p tcp --dport 1024:65535 --sport $HELPER_FTP_PORT -m state --state RELATED,ESTABLISHED -j ACCEPT
-ipt -A OUTPUT  -p tcp -m multiport --dport $HELPER_FTP_PORT,$HELPER_FTP_DATA -m state --state ESTABLISHED,RELATED -j ACCEPT
-ipt -A OUTPUT  -p udp -m multiport --dport $HELPER_FTP_PORT,$HELPER_FTP_DATA -m state --state ESTABLISHED,RELATED -j ACCEPT
+ipt -A INPUT  -p tcp --sport 1024:65535 --dport $HELPER_FTP_PORT $STATE_MATCH RELATED,ESTABLISHED -j ACCEPT
+ipt -A INPUT  -p tcp -m multiport --dport $HELPER_FTP_PORT,$HELPER_FTP_DATA $STATE_MATCH ESTABLISHED,RELATED -j ACCEPT
+ipt -A INPUT  -p udp -m multiport --dport $HELPER_FTP_PORT,$HELPER_FTP_DATA $STATE_MATCH ESTABLISHED,RELATED -j ACCEPT
+ipt -A OUTPUT  -p tcp --dport 1024:65535 --sport $HELPER_FTP_PORT $STATE_MATCH RELATED,ESTABLISHED -j ACCEPT
+ipt -A OUTPUT  -p tcp -m multiport --dport $HELPER_FTP_PORT,$HELPER_FTP_DATA $STATE_MATCH ESTABLISHED,RELATED -j ACCEPT
+ipt -A OUTPUT  -p udp -m multiport --dport $HELPER_FTP_PORT,$HELPER_FTP_DATA $STATE_MATCH ESTABLISHED,RELATED -j ACCEPT
 fi
 
 # SSH
 if [ "$HELPER_SSH" == "1" ]; then
-	ipt -A INPUT  -p tcp --sport $HELPER_SSH_PORT --dport 1024:65535 -m state --state ESTABLISHED,RELATED -j ACCEPT
+	ipt -A INPUT  -p tcp --sport $HELPER_SSH_PORT --dport 1024:65535 $STATE_MATCH ESTABLISHED,RELATED -j ACCEPT
 fi
 
 # Traceroute
 if [ "$TCR_PASS" == "1" ]; then
-	ipt -A INPUT  -p udp -m state --state NEW --dport $TCR_PORTS -j ACCEPT
-        ipt -A OUTPUT  -p udp -m state --state NEW --dport $TCR_PORTS -j ACCEPT
+	ipt -A INPUT  -p udp $STATE_MATCH NEW --dport $TCR_PORTS -j ACCEPT
+        ipt -A OUTPUT  -p udp $STATE_MATCH NEW --dport $TCR_PORTS -j ACCEPT
 fi
 
 

@@ -2,6 +2,16 @@
 
   -- New Features --
 
+[New] Connection tracking limit (CT_LIMIT): global per-IP connection limit via
+      periodic conntrack table scanning; configurable threshold, scan interval,
+      block duration, port/state filters, TIME_WAIT exclusion, CIDR exemptions;
+      data source auto-detection (conntrack -L / /proc/net/nf_conntrack);
+      VNET per-IP threshold overrides; cron-based scanning; temp-deny blocking
+      with PERMBLOCK escalation support; CSF CT_LIMIT equivalent
+[New] --ct-scan: manual connection tracking scan — counts per-IP connections and
+      temp-blocks IPs exceeding CT_LIMIT threshold
+[New] --ct-status: display CT_LIMIT configuration, last scan timestamp, data
+      source, and count of active CT_LIMIT blocks
 [New] GeoIP country blocking: ipset-based high-performance country filtering
       using cc_deny.rules/cc_allow.rules with ISO 3166-1 alpha-2 codes and
       continent shorthand (@EU, @AS, @NA, @SA, @AF, @OC); tiered data sources
@@ -142,6 +152,11 @@
 
   -- Changes --
 
+[Change] Conntrack module migration: replace -m state --state with $STATE_MATCH
+         variable throughout firewall rules; auto-detects xt_conntrack module
+         and uses -m conntrack --ctstate when available, falling back to
+         -m state --state for legacy systems; 24 occurrences migrated across
+         firewall, bt.rules, and log.rules
 [Change] trust_hosts(): single-pass loop replacing four-pass grep cascade;
       advanced syntax delegated to trust_entry_rule(); batch all rules via
       iptables-restore --noflush reducing lock acquisitions from O(n) to O(1)

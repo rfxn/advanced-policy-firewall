@@ -34,11 +34,12 @@ trust-based host management, reactive address blocking, and per-IP virtual netwo
   - [3.9 Docker/Container Compatibility](#39-dockercontainer-compatibility)
   - [3.10 ipset Block Lists](#310-ipset-block-lists)
   - [3.11 Country Code Filtering (GeoIP)](#311-country-code-filtering-geoip)
-  - [3.12 GRE Tunnels](#312-gre-tunnels)
-  - [3.13 Remote Block Lists](#313-remote-block-lists)
-  - [3.14 Logging & Control](#314-logging--control)
-  - [3.15 Implicit Blocking](#315-implicit-blocking)
-  - [3.16 Firewall Order of Operations](#316-firewall-order-of-operations)
+  - [3.12 Connection Tracking Limit](#312-connection-tracking-limit)
+  - [3.13 GRE Tunnels](#313-gre-tunnels)
+  - [3.14 Remote Block Lists](#314-remote-block-lists)
+  - [3.15 Logging & Control](#315-logging--control)
+  - [3.16 Implicit Blocking](#316-implicit-blocking)
+  - [3.17 Firewall Order of Operations](#316-firewall-order-of-operations)
 - [4. General Usage](#4-general-usage)
   - [4.1 Trust System](#41-trust-system)
   - [4.2 Global Trust System](#42-global-trust-system)
@@ -563,7 +564,26 @@ apf -u CN
 
 Rules files: `cc_deny.rules` (block listed countries) and `cc_allow.rules` (strict allowlist — **all countries NOT listed are implicitly blocked**). Before using `cc_allow.rules`, add your admin IPs to `allow_hosts.rules` (`apf -a YOUR_IP`) to prevent lockout, or enable `DEVEL_MODE="1"` for auto-flush safety. Advanced syntax supports per-port/protocol rules. Wildcard `*` in advanced entries expands to all simple CCs in the same file.
 
-### 3.12 GRE Tunnels
+### 3.12 Connection Tracking Limit
+
+Global per-IP connection limit via periodic conntrack table scanning. Unlike `IG_TCP_CLIMIT` (per-port inline connlimit), CT_LIMIT counts **all** connections from each source IP across all ports and protocols. IPs exceeding the limit are temporarily blocked via the trust system (`apf -td`). This is the CSF `CT_LIMIT` equivalent.
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `CT_LIMIT` | `0` | Max connections per source IP (0 = disabled) |
+| `CT_INTERVAL` | `30` | Scan interval in seconds (cron minimum 60s) |
+| `CT_BLOCK_TIME` | `1800` | Temp-block duration in seconds (30 min) |
+| `CT_PORTS` | (empty) | Port filter, comma-separated (empty = all ports) |
+| `CT_STATES` | (empty) | State filter, comma-separated (empty = all states) |
+| `CT_SKIP_TIME_WAIT` | `0` | Exclude TIME_WAIT from count (reduces false positives) |
+| `CT_PERMANENT` | `0` | Count toward PERMBLOCK escalation |
+| `CT_SKIP` | (empty) | Exempt IPs/CIDRs (CDNs, monitoring, load balancers) |
+
+Data source: `conntrack -L` preferred, automatic fallback to `/proc/net/nf_conntrack`. VNET per-IP overrides supported: set `CT_LIMIT="500"` in `vnet/IP.rules` to use a different threshold for that IP.
+
+CLI: `apf --ct-scan` (manual scan), `apf --ct-status` (show config and last scan info). When enabled, a cron job runs scans at the configured interval.
+
+### 3.13 GRE Tunnels
 
 APF can manage GRE (Generic Routing Encapsulation) point-to-point tunnels with dedicated firewall chains and protocol 47 rules. This is useful for servers that need encapsulated point-to-point links to remote endpoints.
 
@@ -608,7 +628,7 @@ apf --gre-down     # tear down all tunnels and remove firewall rules
 apf --gre-status   # show current tunnel interface status
 ```
 
-### 3.13 Remote Block Lists
+### 3.14 Remote Block Lists
 
 APF can automatically download and apply IP block lists from external sources. Each list is loaded into a dedicated iptables chain on full firewall start. The following `DLIST_*` variables in `conf.apf` control these lists:
 
@@ -622,7 +642,7 @@ APF can automatically download and apply IP block lists from external sources. E
 
 Each has a companion `_URL` variable (e.g., `DLIST_PHP_URL`) for the download source. Set the toggle to `"1"` to enable a list. Lists are validated during parsing and backed up before each download. Failed downloads restore from backup to prevent data loss. Note that `DLIST_RESERVED` interacts with `BLK_RESNET` — when both are enabled, the downloaded reserved.networks list supplements the built-in private.networks blocking.
 
-### 3.14 Logging & Control
+### 3.15 Logging & Control
 
 APF provides configurable logging of filtered packets through the `LOG_*` variables in `conf.apf`:
 
@@ -640,7 +660,7 @@ APF provides configurable logging of filtered packets through the `LOG_*` variab
 
 For iptables concurrency control, `IPT_LOCK_SUPPORT` and `IPT_LOCK_TIMEOUT` configure the `-w` lock flag behavior for iptables >= 1.4.20. This prevents concurrent iptables modifications from corrupting rule state.
 
-### 3.15 Implicit Blocking
+### 3.16 Implicit Blocking
 
 The `BLK_*` variables in `conf.apf` control implicit blocking of specific traffic patterns without explicit port rules. These apply globally to all interfaces:
 
@@ -654,7 +674,7 @@ The `BLK_*` variables in `conf.apf` control implicit blocking of specific traffi
 | `BLK_TCP_SACK_PANIC` | Block low-MSS TCP SACK exploit packets (CVE-2019-11477) |
 | `BLK_IDENT` | REJECT ident (TCP 113) requests instead of silently dropping; some services stall without ident response |
 
-### 3.16 Firewall Order of Operations
+### 3.17 Firewall Order of Operations
 
 When APF starts (`apf -s`), rules are loaded in a specific order that determines how packets are evaluated. Understanding this order is essential for troubleshooting and for knowing which features take precedence.
 
@@ -751,6 +771,10 @@ Country Code Filtering:
 
   NOTE: cc_allow.rules is a STRICT allowlist — all countries NOT listed
         are blocked. Add admin IPs to allow_hosts.rules first.
+
+Connection Tracking Limit:
+  --ct-scan ................... run CT_LIMIT scan and block offenders
+  --ct-status ................. show CT_LIMIT config and last scan info
 
 Subsystems:
   --ipset-update .............. hot-reload ipset block lists

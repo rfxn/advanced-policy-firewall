@@ -27,11 +27,12 @@ Contents:
 3.9 ........... Configuration: Docker/Container Compatibility
 3.10 .......... Configuration: ipset Block Lists
 3.11 .......... Configuration: Country Code Filtering (GeoIP)
-3.12 .......... Configuration: GRE Tunnels
-3.13 .......... Configuration: Remote Block Lists
-3.14 .......... Configuration: Logging & Control
-3.15 .......... Configuration: Implicit Blocking
-3.16 .......... Configuration: Firewall Order of Operations
+3.12 .......... Configuration: Connection Tracking Limit
+3.13 .......... Configuration: GRE Tunnels
+3.14 .......... Configuration: Remote Block Lists
+3.15 .......... Configuration: Logging & Control
+3.16 .......... Configuration: Implicit Blocking
+3.17 .......... Configuration: Firewall Order of Operations
 4 ............. General Usage
 4.1 ........... General Usage: Trust System
 4.2 ........... General Usage: Global Trust System
@@ -680,7 +681,26 @@ CLI:
 Requires USE_IPSET="1" (or "auto") and the ipset binary. Data is cached in
 the geoip/ subdirectory under the APF install path.
 
-3.12) Configuration: GRE Tunnels
+3.12) Configuration: Connection Tracking Limit
+Global per-IP connection limit via periodic conntrack table scanning. Unlike
+IG_TCP_CLIMIT (per-port inline connlimit), CT_LIMIT counts ALL connections
+from each source IP across all ports and protocols. IPs exceeding the limit
+are temporarily blocked via the trust system (apf -td).
+
+CT_LIMIT - Maximum connections per source IP before blocking. 0 = disabled.
+CT_INTERVAL - Scan interval in seconds (cron minimum 60s). Default: 30.
+CT_BLOCK_TIME - Temp-block duration in seconds. Default: 1800 (30 min).
+CT_PORTS - Only count connections to these ports (comma-separated, empty=all).
+CT_STATES - Only count connections in these states (comma-separated, empty=all).
+CT_SKIP_TIME_WAIT - Exclude TIME_WAIT from count. 0 = count all, 1 = skip.
+CT_PERMANENT - Count CT_LIMIT blocks toward PERMBLOCK escalation.
+CT_SKIP - Exempt IPs/CIDRs (CDNs, monitoring, load balancers).
+
+Data source: conntrack -L preferred, fallback to /proc/net/nf_conntrack.
+VNET per-IP overrides: set CT_LIMIT="500" in vnet/IP.rules.
+CLI: apf --ct-scan (manual scan), apf --ct-status (show config).
+
+3.13) Configuration: GRE Tunnels
 APF can manage GRE (Generic Routing Encapsulation) point-to-point tunnels
 with dedicated firewall chains and protocol 47 rules. This is useful for
 servers that need encapsulated point-to-point links to remote endpoints.
@@ -733,7 +753,7 @@ CLI commands:
   apf --gre-down     - tear down all tunnels and remove firewall rules
   apf --gre-status   - show current tunnel interface status
 
-3.13) Configuration: Remote Block Lists
+3.14) Configuration: Remote Block Lists
 APF can automatically download and apply IP block lists from external sources.
 Each list is loaded into a dedicated iptables chain on full firewall start.
 The following DLIST_* variables in conf.apf control these lists:
@@ -751,7 +771,7 @@ backup to prevent data loss. Note that DLIST_RESERVED interacts with
 BLK_RESNET — when both are enabled, the downloaded reserved.networks list
 supplements the built-in private.networks blocking.
 
-3.14) Configuration: Logging & Control
+3.15) Configuration: Logging & Control
 APF provides configurable logging of filtered packets through the LOG_*
 variables in conf.apf:
 
@@ -769,7 +789,7 @@ For iptables concurrency control, IPT_LOCK_SUPPORT and IPT_LOCK_TIMEOUT
 configure the -w lock flag behavior for iptables >= 1.4.20. This prevents
 concurrent iptables modifications from corrupting rule state.
 
-3.15) Configuration: Implicit Blocking
+3.16) Configuration: Implicit Blocking
 The BLK_* variables in conf.apf control implicit blocking of specific traffic
 patterns without explicit port rules. These apply globally to all interfaces:
 
@@ -785,7 +805,7 @@ patterns without explicit port rules. These apply globally to all interfaces:
   BLK_IDENT          - REJECT ident (TCP 113) requests instead of silently
                         dropping; some services stall without ident response
 
-3.16) Configuration: Firewall Order of Operations
+3.17) Configuration: Firewall Order of Operations
 When APF starts ('apf -s'), rules are loaded in a specific order that
 determines how packets are evaluated. Understanding this order is essential
 for troubleshooting and for knowing which features take precedence.
@@ -883,6 +903,10 @@ Country Code Filtering:
 
   NOTE: cc_allow.rules is a STRICT allowlist — all countries NOT listed
         are blocked. Add admin IPs to allow_hosts.rules first.
+
+Connection Tracking Limit:
+  --ct-scan ................... run CT_LIMIT scan and block offenders
+  --ct-status ................. show CT_LIMIT config and last scan info
 
 Subsystems:
   --ipset-update .............. hot-reload ipset block lists

@@ -697,6 +697,55 @@ CC_INTERVAL="7"
 CC_IPV6="1"
 
 ##
+# [Connection Tracking Limit]
+##
+# Global per-IP connection limit via periodic conntrack table scanning.
+# Unlike IG_TCP_CLIMIT (per-port inline connlimit), CT_LIMIT counts ALL
+# connections from each source IP across all ports and protocols. IPs
+# exceeding the limit are temporarily blocked via the trust system
+# (apf -td). This is the CSF CT_LIMIT equivalent.
+#
+# Data source: conntrack -L (preferred), fallback to /proc/net/nf_conntrack.
+# Blocking: uses temp deny (apf -td) with CT_BLOCK_TIME TTL; supports
+# PERMBLOCK_COUNT escalation when CT_PERMANENT="1".
+#
+# Set CT_LIMIT to 0 to disable (default). Recommended starting values:
+# CT_LIMIT="200" for web servers, CT_LIMIT="100" for mail servers.
+
+# Maximum connections per source IP before blocking. 0 = disabled.
+CT_LIMIT="0"
+
+# Scan interval in seconds. Minimum effective interval is 60s (cron).
+# Recommended: 30-120 seconds.
+CT_INTERVAL="30"
+
+# Duration (seconds) to temp-block offending IPs. Default: 1800 (30 min).
+CT_BLOCK_TIME="1800"
+
+# Only count connections to these ports (comma-separated). Empty = all ports.
+# Example: CT_PORTS="80,443,25" to only count web/mail connections.
+CT_PORTS=""
+
+# Only count connections in these states (comma-separated). Empty = all states.
+# Valid states: ESTABLISHED, SYN_SENT, SYN_RECV, FIN_WAIT, CLOSE_WAIT,
+# LAST_ACK, TIME_WAIT, CLOSE, LISTEN, CLOSING.
+CT_STATES=""
+
+# Exclude TIME_WAIT connections from count. TIME_WAIT connections are
+# already closed and waiting for cleanup; counting them can cause false
+# positives on busy web servers. 0 = count all, 1 = skip TIME_WAIT.
+CT_SKIP_TIME_WAIT="0"
+
+# Count CT_LIMIT blocks toward PERMBLOCK escalation. When enabled and
+# PERMBLOCK_COUNT > 0, repeat CT_LIMIT violations auto-promote to permanent.
+CT_PERMANENT="0"
+
+# Exempt IPs/CIDRs from CT_LIMIT scanning (comma-separated). Use for CDNs,
+# monitoring systems, load balancers, or other known-high-connection sources.
+# Example: CT_SKIP="10.0.0.0/8,192.168.1.100"
+CT_SKIP=""
+
+##
 # [GRE Tunnels]
 ##
 # GRE tunnel support provides encapsulated point-to-point links between hosts.

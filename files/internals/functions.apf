@@ -404,6 +404,11 @@ check_deps() {
   warn="$warn getent(fqdn-trust)"
  fi
 
+ # Warn: conntrack (when CT_LIMIT enabled)
+ if ct_enabled && [ -z "$CONNTRACK" ] && [ ! -f /proc/net/nf_conntrack ]; then
+  warn="$warn conntrack(ct-limit)"
+ fi
+
  # Warn: conflicting firewall services
  if command -v systemctl > /dev/null 2>&1; then
   if systemctl is-active firewalld > /dev/null 2>&1; then
@@ -568,6 +573,26 @@ validate_config() {
         err="${err}SET_REFRESH='$SET_REFRESH' is invalid (must be a non-negative integer); "
     fi
  fi
+ # Validate CT_LIMIT settings (only when enabled)
+ if ct_enabled; then
+    if [[ ! "$CT_LIMIT" =~ $_vc_int ]]; then
+        err="${err}CT_LIMIT='$CT_LIMIT' is invalid (must be a positive integer or 0); "
+    fi
+    if [ -n "$CT_INTERVAL" ]; then
+        if [[ ! "$CT_INTERVAL" =~ $_vc_int ]]; then
+            err="${err}CT_INTERVAL='$CT_INTERVAL' is invalid (must be a positive integer); "
+        elif [ "$CT_INTERVAL" == "0" ]; then
+            err="${err}CT_INTERVAL='0' is invalid (must be greater than 0); "
+        fi
+    fi
+    if [ -n "$CT_BLOCK_TIME" ]; then
+        if [[ ! "$CT_BLOCK_TIME" =~ $_vc_int ]]; then
+            err="${err}CT_BLOCK_TIME='$CT_BLOCK_TIME' is invalid (must be a positive integer); "
+        elif [ "$CT_BLOCK_TIME" == "0" ]; then
+            err="${err}CT_BLOCK_TIME='0' is invalid (must be greater than 0); "
+        fi
+    fi
+ fi
  if [ -n "$err" ]; then
     eout "{glob} configuration error: $err"
     [ "$SET_VERBOSE" != "1" ] && echo "apf($$): configuration error: $err"
@@ -725,6 +750,10 @@ cc_enabled() {
 	{ [ -f "$CC_DENY_HOSTS" ] && grep -qvE '^(#|$)' "$CC_DENY_HOSTS" 2>/dev/null; } || \
 	{ [ -f "$CC_ALLOW_HOSTS" ] && grep -qvE '^(#|$)' "$CC_ALLOW_HOSTS" 2>/dev/null; }
 }
+
+# Check if CT_LIMIT (connection tracking limit) is enabled.
+# Returns 0 if CT_LIMIT is set to a positive integer.
+ct_enabled() { [ -n "$CT_LIMIT" ] && [ "$CT_LIMIT" != "0" ]; }
 
 # Expand continent shorthand to comma-separated country codes.
 # Thin wrapper: uses geoip_lib module-level continent variables, then bridges
@@ -1733,6 +1762,7 @@ fi
 
 gre_flush
 rm -f /etc/cron.d/refresh.apf
+rm -f /etc/cron.d/ctlimit.apf "$INSTALL_PATH/internals/cron.ctlimit"
 rm -f "$INSTALL_PATH/internals/.block_history"
 
 if [ ! "$1" = "1" ]; then
@@ -1896,6 +1926,9 @@ firewall_info() {
 	if [ "$USE_GRE" == "1" ]; then
 		echo "  GRE tunnels:      enabled"
 	fi
+	if ct_enabled; then
+		echo "  CT_LIMIT:         enabled (limit=${CT_LIMIT}, scan=${CT_INTERVAL}s, block=${CT_BLOCK_TIME}s)"
+	fi
 
 	# Remote block lists
 	local dlists=""
@@ -2036,6 +2069,10 @@ help() {
 	echo ""
 	echo "  NOTE: cc_allow.rules is a STRICT allowlist — all countries NOT listed"
 	echo "        are blocked. Add admin IPs to allow_hosts.rules first."
+	echo ""
+	echo "Connection Tracking Limit:"
+	echo "  --ct-scan ................... run CT_LIMIT scan and block offenders"
+	echo "  --ct-status ................. show CT_LIMIT config and last scan info"
 	echo ""
 	echo "Subsystems:"
 	echo "  --ipset-update .............. hot-reload ipset block lists"
@@ -3206,5 +3243,20 @@ else
 	rm -f /etc/cron.d/refresh.apf
 	eout "{glob} SET_REFRESH is set disabled"
 
+fi
+}
+
+cron_ctlimit() {
+if ct_enabled; then
+	local ct_min=$(( ${CT_INTERVAL:-30} / 60 ))
+	[ "$ct_min" -lt 1 ] && ct_min=1
+cat<<EOF > "$INSTALL_PATH/internals/cron.ctlimit"
+*/$ct_min * * * * root $INSTALL_PATH/apf --ct-scan >> /dev/null 2>&1
+EOF
+	chmod 644 "$INSTALL_PATH/internals/cron.ctlimit"
+	ln -fs "$INSTALL_PATH/internals/cron.ctlimit" /etc/cron.d/ctlimit.apf
+	eout "{ct_limit} CT_LIMIT is set to $CT_LIMIT (scan every ${ct_min}m)"
+else
+	rm -f /etc/cron.d/ctlimit.apf "$INSTALL_PATH/internals/cron.ctlimit"
 fi
 }

@@ -173,7 +173,7 @@ VER=$(awk '/version/ {print$2}' files/VERSION)
 # Pre-install cleanup: remove runtime-created cron entries before backup
 # These are recreated by apf -s as needed; must happen before backup to
 # ensure cleanup even if backup step fails (e.g., rapid re-installs)
-pkg_cron_remove /etc/cron.d/refresh.apf /etc/cron.d/apf_develmode
+pkg_cron_remove /etc/cron.d/refresh.apf /etc/cron.d/apf_develmode /etc/cron.d/ctlimit.apf
 
 if [ -d "$INSTALL_PATH" ]; then
 	pkg_backup "$INSTALL_PATH" "copy" || { echo "Backup failed, aborting."; exit 1; }
