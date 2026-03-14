@@ -342,8 +342,12 @@ Data source:
 .BR ipverse ,
 .BR ipdeny .
 .TP
+.B CC_CACHE_TTL
+Hours before re-downloading cached country data on firewall start (default 24).
+Set 0 to always download fresh data. Distinct from CC_INTERVAL (days).
+.TP
 .B CC_INTERVAL
-Days between automatic data refresh (0 to disable).
+Days between automatic data refresh via \-\-cc\-update (0 to disable).
 .TP
 .B CC_IPV6
 Include IPv6 country blocks when USE_IPV6=1.
@@ -374,7 +378,7 @@ UID\-based egress, command\-owner blocking, SMTP outbound restrictions.
 DShield, Spamhaus DROP, Project Honey Pot, ECN, global trust, ipset lists.
 .TP
 .B Country Code Filtering
-CC_LOG, CC_LOG_ONLY, CC_SRC, CC_INTERVAL, CC_IPV6.
+CC_LOG, CC_LOG_ONLY, CC_SRC, CC_CACHE_TTL, CC_INTERVAL, CC_IPV6.
 .TP
 .B GRE Tunnels
 USE_GRE, GRE_PERSIST, GRE_KEEPALIVE, GRE_MTU, GRE_TTL.

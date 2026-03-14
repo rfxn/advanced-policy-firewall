@@ -179,6 +179,13 @@
 [Change] Integrate geoip_lib.sh v1.0.1: shared GeoIP metadata library
       replaces embedded country name table, continent lists, CC validation,
       download functions, and CIDR search; ~300 lines removed
+[Change] GeoIP progress output: continent expansion and multi-CC downloads
+      now show per-CC progress (e.g., "processing US (3/51)") via eout;
+      eliminates silent 3-minute waits during @EU and similar operations
+[New] CC_CACHE_TTL: per-file cache freshness for GeoIP data (default 24h);
+      skips re-downloading unchanged country data on firewall start, reducing
+      full load time from ~30s to ~0s when cache is fresh; set 0 for previous
+      always-download behavior; distinct from CC_INTERVAL (days, --cc-update)
 
   -- Documentation --
 

@@ -681,9 +681,15 @@ CC_LOG_ONLY="0"
 # "ipdeny"  = ipdeny.com only
 CC_SRC="auto"
 
+# Hours before re-downloading cached country data on firewall start.
+# Country IP allocations change infrequently; 24h avoids redundant downloads.
+# Set to 0 to always download fresh data (previous behavior).
+# Distinct from CC_INTERVAL (days between explicit --cc-update runs).
+CC_CACHE_TTL="24"
+
 # Minimum days between GeoIP data refreshes via apf --cc-update. Country IP
 # allocations change infrequently; 7 days is a good balance. Set 0 to always
-# refresh. Note: full firewall loads (apf -s) always download fresh data.
+# refresh.
 CC_INTERVAL="7"
 
 # Include IPv6 country blocks when USE_IPV6="1". Requires ip6tables and

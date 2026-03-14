@@ -557,7 +557,8 @@ apf -u CN
 | `CC_LOG` | `1` | Log country-blocked packets (requires `LOG_DROP="1"`) |
 | `CC_LOG_ONLY` | `0` | Audit mode: LOG without DROP (measure impact first) |
 | `CC_SRC` | `auto` | Data source: `auto`, `ipverse`, `ipdeny` |
-| `CC_INTERVAL` | `7` | Days between auto-refresh (0 to disable) |
+| `CC_CACHE_TTL` | `24` | Hours before re-downloading cached data on start (0 = always) |
+| `CC_INTERVAL` | `7` | Days between auto-refresh via `--cc-update` (0 to disable) |
 | `CC_IPV6` | `1` | Include IPv6 country blocks when `USE_IPV6="1"` |
 
 Rules files: `cc_deny.rules` (block listed countries) and `cc_allow.rules` (strict allowlist — **all countries NOT listed are implicitly blocked**). Before using `cc_allow.rules`, add your admin IPs to `allow_hosts.rules` (`apf -a YOUR_IP`) to prevent lockout, or enable `DEVEL_MODE="1"` for auto-flush safety. Advanced syntax supports per-port/protocol rules. Wildcard `*` in advanced entries expands to all simple CCs in the same file.

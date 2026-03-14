@@ -701,6 +701,36 @@ _source_funcs='source '"$APF_DIR"'/internals/functions.apf; CC_DENY_HOSTS='"$APF
 # Wildcard expansion in advanced entries
 # ============================================================
 
+@test "apf -u removes advanced CC entry added via apf -d" {
+    clean_cc_state
+    create_cc_fixture_v4 "ZZ"
+
+    "$APF" -f 2>/dev/null || true
+    "$APF" -s
+
+    # Add advanced CC entry via CLI
+    run "$APF" -d "tcp:in:d=22:s=ZZ" "roundtrip test"
+    assert_success
+
+    # Verify it was persisted and loaded
+    run grep -c "^tcp:in:d=22:s=ZZ$" "$APF_DIR/cc_deny.rules"
+    assert_output "1"
+    assert_chain_exists CC_DENYP
+
+    # Remove via -u — this is the regression path (UAT-001)
+    run "$APF" -u "tcp:in:d=22:s=ZZ"
+    assert_success
+
+    # Verify removed from rules file
+    run grep -c "^tcp:in:d=22:s=ZZ$" "$APF_DIR/cc_deny.rules"
+    assert_output "0"
+
+    # Clean up
+    "$APF" -f 2>/dev/null || true
+    clean_cc_state
+    "$APF" -s
+}
+
 @test "wildcard * in advanced entry expands to all simple CCs" {
     clean_cc_state
     create_cc_fixture_v4 "ZZ"
@@ -720,4 +750,96 @@ _source_funcs='source '"$APF_DIR"'/internals/functions.apf; CC_DENY_HOSTS='"$APF
     "$APF" -f 2>/dev/null || true
     clean_cc_state
     "$APF" -s
+}
+
+# --- CC_CACHE_TTL tests ---
+
+@test "CC_CACHE_TTL: fresh cache skips download" {
+    clean_cc_state
+    create_cc_fixture_v4 "ZZ"
+    create_cc_fixture_v6 "ZZ"
+    : > /var/log/apf_log 2>/dev/null || true
+
+    "$APF" -d ZZ "cache hit test"
+
+    # Cache hit: no download failure logged (download never attempted)
+    local dl_failed=0
+    grep -q "download failed for ZZ" /var/log/apf_log && dl_failed=1
+
+    clean_cc_state
+    [ "$dl_failed" -eq 0 ]
+}
+
+@test "CC_CACHE_TTL: stale cache triggers download attempt" {
+    clean_cc_state
+    create_cc_fixture_v4 "ZZ"
+    create_cc_fixture_v6 "ZZ"
+    # Backdate fixtures to well beyond CC_CACHE_TTL (24h default)
+    touch -t 202001011200.00 "$APF_DIR/geoip/ZZ.4"
+    touch -t 202001011200.00 "$APF_DIR/geoip/ZZ.6"
+    : > /var/log/apf_log 2>/dev/null || true
+
+    "$APF" -d ZZ "stale cache test"
+
+    # Download was attempted (failed with /bin/false mock)
+    local dl_attempted=0
+    grep -q "download failed for ZZ" /var/log/apf_log && dl_attempted=1
+
+    clean_cc_state
+    [ "$dl_attempted" -eq 1 ]
+}
+
+@test "CC_CACHE_TTL=0 always attempts download" {
+    clean_cc_state
+    create_cc_fixture_v4 "ZZ"
+    create_cc_fixture_v6 "ZZ"
+    source /opt/tests/helpers/apf-config.sh
+    apf_set_config "CC_CACHE_TTL" "0"
+    : > /var/log/apf_log 2>/dev/null || true
+
+    "$APF" -d ZZ "bypass test"
+
+    # Even with fresh fixture, TTL=0 bypasses cache
+    local dl_attempted=0
+    grep -q "download failed for ZZ" /var/log/apf_log && dl_attempted=1
+
+    # Restore default before asserting
+    apf_set_config "CC_CACHE_TTL" "24"
+    clean_cc_state
+    [ "$dl_attempted" -eq 1 ]
+}
+
+@test "continent expansion shows per-CC progress" {
+    clean_cc_state
+    : > /var/log/apf_log 2>/dev/null || true
+
+    # @OC expands to ~20 CCs; downloads fail but progress is logged first
+    "$APF" -d @OC "progress test" 2>/dev/null || true
+
+    local has_progress=0
+    grep -q "(1/" /var/log/apf_log && has_progress=1
+
+    clean_cc_state
+    [ "$has_progress" -eq 1 ]
+}
+
+@test "geoip_download_all shows download summary for multi-CC" {
+    clean_cc_state
+    create_cc_fixture_v4 "ZZ"
+    create_cc_fixture_v4_yy
+    echo "ZZ" >> "$APF_DIR/cc_deny.rules"
+    echo "YY" >> "$APF_DIR/cc_deny.rules"
+
+    : > /var/log/apf_log 2>/dev/null || true
+
+    "$APF" -f 2>/dev/null || true
+    "$APF" -s
+
+    local has_summary=0
+    grep -q "IPv4 download summary:" /var/log/apf_log && has_summary=1
+
+    "$APF" -f 2>/dev/null || true
+    clean_cc_state
+    "$APF" -s
+    [ "$has_summary" -eq 1 ]
 }

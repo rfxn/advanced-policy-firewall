@@ -650,7 +650,8 @@ Configure these variables in conf.apf:
   CC_LOG       - log country-blocked packets (default: 1)
   CC_LOG_ONLY  - audit mode: LOG without DROP (default: 0)
   CC_SRC       - data source: auto, ipverse, or ipdeny (default: auto)
-  CC_INTERVAL  - days between auto-refresh (default: 7)
+  CC_CACHE_TTL - hours before re-downloading cached data on start (default: 24)
+  CC_INTERVAL  - days between auto-refresh via --cc-update (default: 7)
   CC_IPV6      - include IPv6 country blocks (default: 1)
 
 Rules files:

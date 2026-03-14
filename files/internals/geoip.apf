@@ -24,6 +24,12 @@ _APF_GEOIP_LOADED=1
 # cli_cc_trust_advanced() — advanced syntax CC trust
 # cli_cc_trust_temp()  — temporary CC trust entries
 
+# --- Module state ---
+# Set by geoip_download() to indicate cache freshness result (0=downloaded, 1=cache hit)
+_GEOIP_CACHE_HIT=0
+# Set by geoip_download_all() to count actual downloads (not cache hits)
+_GEOIP_DL_COUNT=0
+
 # --- Private helpers (prefix: _geoip_) ---
 
 ## Validate prerequisites for GeoIP operations.
@@ -56,6 +62,22 @@ geoip_download() {
 	local cache_file="$CC_DATA_DIR/${cc}.${family}"
 	local dl_tmp valid_count
 	local _cc_lower
+
+	# Cache freshness check: skip download if cached data is fresh
+	# Guard against non-numeric CC_CACHE_TTL (default: 24 hours)
+	local _ct_re='^[0-9]+$'
+	if ! [[ "${CC_CACHE_TTL:-24}" =~ $_ct_re ]]; then
+		CC_CACHE_TTL=24
+	fi
+	_GEOIP_CACHE_HIT=0
+	local _cache_mtime _max_age_secs
+	_cache_mtime=$(stat --printf='%Y' "$cache_file" 2>/dev/null) || _cache_mtime=0  # safe: file may not exist on first run
+	_max_age_secs=$(( ${CC_CACHE_TTL:-24} * 3600 ))
+	if [ "$_max_age_secs" -gt 0 ] && [ -s "$cache_file" ] && \
+	   [ $(( $(date +%s) - _cache_mtime )) -lt "$_max_age_secs" ]; then
+		_GEOIP_CACHE_HIT=1
+		return 0
+	fi
 
 	mkdir -p "$CC_DATA_DIR" 2>/dev/null  # safe: parent dir always exists
 	dl_tmp=$(mktemp "$INSTALL_PATH/.apf-geoip-XXXXXX")
@@ -109,8 +131,10 @@ geoip_download() {
 
 ## Download data for all active country codes from both rules files.
 # Parses rules, expands continents, downloads each unique CC.
-# Called on every full load — always downloads fresh data regardless of
-# CC_INTERVAL (which only gates the explicit geoip_update() path).
+# Called on every full load — downloads when cache is stale or CC_CACHE_TTL=0.
+# CC_INTERVAL (days) gates the explicit geoip_update() path; CC_CACHE_TTL
+# (hours) gates per-file freshness within this function.
+# Sets _GEOIP_DL_COUNT to the number of CCs that required fresh downloads.
 geoip_download_all() {
 	local file line cc cc_list="" seen=""
 	for file in "$CC_DENY_HOSTS" "$CC_ALLOW_HOSTS"; do
@@ -135,18 +159,58 @@ geoip_download_all() {
 		done < "$file"
 	done
 
-	# Deduplicate
+	# Deduplicate and download
+	local _total _cur=0 _dl_count=0 _cached_count=0 _bulk_downloaded=0
+	_total=$(echo "$cc_list" | tr ',' '\n' | sort -u | grep -c . || true)  # grep -c exits 1 on 0 matches
+
+	# Bulk-first: if multiple CCs, fetch all IPv4 data in one HTTP request
+	# (~844KB) instead of N individual downloads; per-CC loop then handles
+	# only IPv6 downloads (IPv4 files are fresh from bulk)
+	if [ "$_total" -gt 1 ]; then
+		local _world_fresh=0
+		# Guard against non-numeric CC_CACHE_TTL (default: 24 hours)
+		local _ct_re='^[0-9]+$'
+		if ! [[ "${CC_CACHE_TTL:-24}" =~ $_ct_re ]]; then
+			CC_CACHE_TTL=24
+		fi
+		if [ -f "$CC_DATA_DIR/.world_cached" ] && [ "${CC_CACHE_TTL:-24}" -gt 0 ]; then
+			local _wc_mtime
+			_wc_mtime=$(stat --printf='%Y' "$CC_DATA_DIR/.world_cached" 2>/dev/null) || _wc_mtime=0  # safe: marker may not exist yet
+			if [ $(( $(date +%s) - _wc_mtime )) -lt $(( ${CC_CACHE_TTL:-24} * 3600 )) ]; then
+				_world_fresh=1
+			fi
+		fi
+		if [ "$_world_fresh" = "0" ]; then
+			if _geoip_world_fetch 1; then
+				_bulk_downloaded=1
+			fi
+		fi
+	fi
+
 	local IFS=','
 	for cc in $cc_list; do
 		[ -z "$cc" ] && continue
 		case ",$seen," in *",$cc,"*) continue ;; esac
 		seen="$seen,$cc"
+		_cur=$((_cur + 1))
+		if [ "$_total" -gt 1 ]; then
+			eout "{geoip} processing $cc ($_cur/$_total)"
+		fi
 
 		geoip_download "$cc" "4"
+		if [ "$_GEOIP_CACHE_HIT" = "1" ]; then
+			_cached_count=$((_cached_count + 1))
+		else
+			_dl_count=$((_dl_count + 1))
+		fi
 		if [ "$CC_IPV6" = "1" ] && [ "$USE_IPV6" = "1" ]; then
 			geoip_download "$cc" "6"
 		fi
 	done
+	if [ "$_total" -gt 0 ]; then
+		eout "{geoip} IPv4 download summary: $_dl_count downloaded, $_cached_count cached (fresh)"
+	fi
+	_GEOIP_DL_COUNT=$((_dl_count + _bulk_downloaded))
 }
 
 ## Populate an ipset from cached country data using atomic swap.
@@ -581,9 +645,9 @@ geoip_load() {
 		if [ -f "$CC_DATA_DIR/.last_update" ]; then
 			read -r _last_update < "$CC_DATA_DIR/.last_update"
 			_age_days=$(( ($(date +%s) - _last_update) / 86400 ))
-			eout "{geoip} WARNING: GeoIP data is $_age_days days old; run apf --cc-update"
+			eout "{geoip} WARNING: no --cc-update in $_age_days days; run apf --cc-update"
 		else
-			eout "{geoip} WARNING: GeoIP data is stale; run apf --cc-update"
+			eout "{geoip} WARNING: no --cc-update on record; run apf --cc-update"
 		fi
 	fi
 
@@ -623,16 +687,23 @@ geoip_update() {
 		geoip_populate_set "$cc" "$family"
 	done
 
-	geoip_mark_updated "$CC_DATA_DIR"
-	eout "{geoip} country code data updated"
+	# Only mark updated if actual downloads occurred (prevents false
+	# .last_update reset when all CCs are cache hits)
+	if [ "${_GEOIP_DL_COUNT:-0}" -gt 0 ]; then
+		geoip_mark_updated "$CC_DATA_DIR"
+		eout "{geoip} country code data updated"
+	else
+		eout "{geoip} country code data is current, no downloads needed"
+	fi
 }
 
 ## Download IPv4 CIDR data for all countries from ipdeny.com all-zones tarball.
 # Populates $CC_DATA_DIR with CC.4 files for all countries in the tarball.
-# Only writes files not already cached (preserves rules-active downloads).
+# Args: overwrite(0|1) — 0 (default) preserves existing files; 1 overwrites all
 # Sets .world_cached marker on success.
 # Returns 0 on success, 1 on failure.
 _geoip_world_fetch() {
+	local _overwrite="${1:-0}"
 	local url="https://www.ipdeny.com/ipblocks/data/countries/all-zones.tar.gz"
 	local tmp_tar tmp_dir count=0
 
@@ -666,8 +737,7 @@ _geoip_world_fetch() {
 			continue
 		fi
 		cc=$(echo "$cc_lower" | tr '[:lower:]' '[:upper:]')
-		# Preserve existing cached data (rules-active CCs may be fresher)
-		if [ ! -f "$CC_DATA_DIR/${cc}.4" ]; then
+		if [ "$_overwrite" = "1" ] || [ ! -f "$CC_DATA_DIR/${cc}.4" ]; then
 			cat "$f" > "$CC_DATA_DIR/${cc}.4"
 			chmod 640 "$CC_DATA_DIR/${cc}.4"
 			count=$((count + 1))
@@ -966,9 +1036,15 @@ cli_cc_trust() {
 		cc_file="$CC_ALLOW_HOSTS"
 	fi
 
+	local _total _cur=0
+	_total=$(echo "$cc_list" | tr ',' '\n' | grep -c . || true)  # grep -c exits 1 on 0 matches
 	local IFS=','
 	for cc in $cc_list; do
 		[ -z "$cc" ] && continue
+		_cur=$((_cur + 1))
+		if [ "$_total" -gt 1 ]; then
+			eout "{geoip} processing $cc ($_cur/$_total)"
+		fi
 
 		# Duplicate check across both CC files
 		if grep -v '^#' "$CC_DENY_HOSTS" 2>/dev/null | grep -Fxq "$cc"; then
@@ -1051,8 +1127,13 @@ cli_cc_trust_advanced() {
 			echo "Invalid continent shorthand: $cc" >&2
 			return 1
 		fi
-		local _exp_cc
+		local _exp_cc _total _cur=0
+		_total=$(echo "$_VCC_CODES" | tr ',' '\n' | grep -c . || true)  # grep -c exits 1 on 0 matches
 		for _exp_cc in ${_VCC_CODES//,/ }; do
+			_cur=$((_cur + 1))
+			if [ "$_total" -gt 1 ]; then
+				eout "{geoip} processing $_exp_cc ($_cur/$_total)"
+			fi
 			geoip_download "$_exp_cc" "4"
 			if [ "$CC_IPV6" = "1" ] && [ "$USE_IPV6" = "1" ]; then
 				geoip_download "$_exp_cc" "6"
@@ -1135,9 +1216,15 @@ cli_cc_trust_temp() {
 		cc_file="$CC_ALLOW_HOSTS"
 	fi
 
+	local _total _cur=0
+	_total=$(echo "$cc_list" | tr ',' '\n' | grep -c . || true)  # grep -c exits 1 on 0 matches
 	local IFS=','
 	for cc in $cc_list; do
 		[ -z "$cc" ] && continue
+		_cur=$((_cur + 1))
+		if [ "$_total" -gt 1 ]; then
+			eout "{geoip} processing $cc ($_cur/$_total)"
+		fi
 
 		# Download and populate ipset
 		geoip_download "$cc" "4"
