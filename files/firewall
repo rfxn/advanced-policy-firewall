@@ -12,7 +12,7 @@ CNF="/etc/apf/conf.apf"
 if [ -f "$CNF" ] && [ -n "$CNF" ]; then
    source "$CNF"
 else
-   echo "\$CNF not found; aborting"
+   echo "$CNF not found; aborting" >&2
    exit 1
 fi
 
