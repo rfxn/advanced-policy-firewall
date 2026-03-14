@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# pkg_lib.sh — Shared Packaging & Installer Library 1.0.2
+# pkg_lib.sh — Shared Packaging & Installer Library 1.0.3
 ###
 # Copyright (C) 2002-2026 R-fx Networks <proj@rfxn.com>
 #                         Ryan MacDonald <ryan@rfxn.com>
@@ -2450,8 +2450,8 @@ pkg_config_merge() {
 	# stat -c is GNU coreutils (all supported Linux targets); FreeBSD uses stat -f '%OLp'
 	local _preserve_mode=""
 	if [[ -f "$new_conf" ]]; then
-		_preserve_mode=$(stat -c '%a' "$new_conf" 2>/dev/null) || \
-			_preserve_mode=$(stat -f '%OLp' "$new_conf" 2>/dev/null) || \
+		_preserve_mode=$(stat -Lc '%a' "$new_conf" 2>/dev/null) || \
+			_preserve_mode=$(stat -Lf '%OLp' "$new_conf" 2>/dev/null) || \
 			_preserve_mode=""
 	fi
 
