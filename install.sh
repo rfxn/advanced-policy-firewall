@@ -42,8 +42,8 @@ install() {
 	pkg_set_perms "$INSTALL_PATH" "750" "640" \
 		"apf" "firewall" "vnet/vnetgen" "extras/get_ports"
 
-	# Copy extras (importconf, config defaults template)
-	/usr/bin/cp -pf .ca.def importconf "$INSTALL_PATH/extras/"
+	# Copy extras (importconf)
+	command cp -pf importconf "$INSTALL_PATH/extras/"
 
 	# Install documentation to doc/ subdirectory
 	pkg_doc_install "$INSTALL_PATH/doc" README CHANGELOG COPYING.GPL apf.8 FLOW
@@ -225,5 +225,3 @@ if [ "$_dep_warn" = "1" ]; then
 	echo "        This is expected in chroot/container builds where binaries"
 	echo "        will be available at runtime."
 fi
-
-rm -f .conf.apf

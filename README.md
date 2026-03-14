@@ -240,7 +240,7 @@ When upgrading from a previous version of APF:
 
 - `install.sh` automatically backs up your existing installation to `/etc/apf.DDMMYYYY-EPOCH` before overwriting.
 - `importconf` migrates your `conf.apf` settings into the new version, preserving customized values while adding new variables.
-- New configuration variables introduced in later versions receive safe defaults from the `.ca.def` preamble, so upgrades never produce unbound variable errors.
+- New configuration variables introduced in later versions receive their defaults from the new config template, so upgrades never produce unbound variable errors.
 - Hook scripts (`hook_pre.sh`, `hook_post.sh`), `silent_ips.rules`, and trust files are preserved across upgrades via `importconf`.
 - Review the CHANGELOG for new features, changed defaults, and any manual steps required for your version.
 

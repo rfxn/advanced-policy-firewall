@@ -85,9 +85,11 @@
       backup collision on rapid re-installs; replace hardcoded /sbin/chkconfig
       with command -v discovery
 [Fix] importconf: guard vnet/*.rules glob, fix INSTALL_PATH default, preserve
-      custom files and hook permissions during upgrade; migrate EG_DROP_CMD
-      to comma-separated format; fix upgrade detection with pkg_backup_exists
-      and legacy fallback
+      custom files and hook permissions during upgrade; fix upgrade detection
+      with pkg_backup_exists and legacy fallback
+[Fix] importconf: EG_DROP_CMD space-to-comma migration was dead code — old
+      implementation wrote config file before shell variable mutation; rewrite
+      uses pkg_config_get/pkg_config_set to operate on the merged file directly
 [Fix] Anchor grep/sed patterns across trust, expiry, and block escalation
       functions to prevent IP substring collisions
 [Fix] cli_trust_remove(): spec-based iptables rule deletion with removal
@@ -183,8 +185,14 @@
       sed path replacement optimized with grep -rl pre-filter
 [Change] Remove dead bandmin() integration (cPanel, discontinued ~2014);
       eliminates bash SIGSEGV on GHA runners with newer kernels
-[Change] Update vendored elog_lib.sh to v1.0.3: FQDN host field in JSON
-      and syslog output; pkg_lib.sh to v1.0.2
+[Change] Delete .ca.def (803 lines): rewrite importconf to use
+      pkg_config_merge() from pkg_lib for config merging; eliminates
+      shell-eval-based heredoc template with AWK-based key=value merge;
+      preserves all existing upgrade behavior (trust files, hooks,
+      rules, permissions); adds cc_deny.rules and cc_allow.rules
+      preservation across upgrades
+[Change] Update vendored pkg_lib.sh to v1.0.3 (config merge API);
+      elog_lib.sh to v1.0.3: FQDN host field in JSON and syslog output
 [Change] download_url(): log TLS diagnostic hint on download failure for
       legacy system troubleshooting
 [Change] Drop Ubuntu 22.04 from CI matrix; redundant with 20.04+24.04
