@@ -2,6 +2,16 @@
 
   -- New Features --
 
+[New] Connection tracking limit (CT_LIMIT): global per-IP connection limit via
+      periodic conntrack table scanning; configurable threshold, scan interval,
+      block duration, port/state filters, TIME_WAIT exclusion, CIDR exemptions;
+      data source auto-detection (conntrack -L / /proc/net/nf_conntrack);
+      VNET per-IP threshold overrides; cron-based scanning; temp-deny blocking
+      with PERMBLOCK escalation support; CSF CT_LIMIT equivalent
+[New] --ct-scan: manual connection tracking scan — counts per-IP connections and
+      temp-blocks IPs exceeding CT_LIMIT threshold
+[New] --ct-status: display CT_LIMIT configuration, last scan timestamp, data
+      source, and count of active CT_LIMIT blocks
 [New] GeoIP country blocking: ipset-based high-performance country filtering
       using cc_deny.rules/cc_allow.rules with ISO 3166-1 alpha-2 codes and
       continent shorthand (@EU, @AS, @NA, @SA, @AF, @OC); tiered data sources
@@ -75,9 +85,11 @@
       backup collision on rapid re-installs; replace hardcoded /sbin/chkconfig
       with command -v discovery
 [Fix] importconf: guard vnet/*.rules glob, fix INSTALL_PATH default, preserve
-      custom files and hook permissions during upgrade; migrate EG_DROP_CMD
-      to comma-separated format; fix upgrade detection with pkg_backup_exists
-      and legacy fallback
+      custom files and hook permissions during upgrade; fix upgrade detection
+      with pkg_backup_exists and legacy fallback
+[Fix] importconf: EG_DROP_CMD space-to-comma migration was dead code — old
+      implementation wrote config file before shell variable mutation; rewrite
+      uses pkg_config_get/pkg_config_set to operate on the merged file directly
 [Fix] Anchor grep/sed patterns across trust, expiry, and block escalation
       functions to prevent IP substring collisions
 [Fix] cli_trust_remove(): spec-based iptables rule deletion with removal
@@ -142,6 +154,11 @@
 
   -- Changes --
 
+[Change] Conntrack module migration: replace -m state --state with $STATE_MATCH
+         variable throughout firewall rules; auto-detects xt_conntrack module
+         and uses -m conntrack --ctstate when available, falling back to
+         -m state --state for legacy systems; 24 occurrences migrated across
+         firewall, bt.rules, and log.rules
 [Change] trust_hosts(): single-pass loop replacing four-pass grep cascade;
       advanced syntax delegated to trust_entry_rule(); batch all rules via
       iptables-restore --noflush reducing lock acquisitions from O(n) to O(1)
@@ -168,8 +185,14 @@
       sed path replacement optimized with grep -rl pre-filter
 [Change] Remove dead bandmin() integration (cPanel, discontinued ~2014);
       eliminates bash SIGSEGV on GHA runners with newer kernels
-[Change] Update vendored elog_lib.sh to v1.0.3: FQDN host field in JSON
-      and syslog output; pkg_lib.sh to v1.0.2
+[Change] Delete .ca.def (803 lines): rewrite importconf to use
+      pkg_config_merge() from pkg_lib for config merging; eliminates
+      shell-eval-based heredoc template with AWK-based key=value merge;
+      preserves all existing upgrade behavior (trust files, hooks,
+      rules, permissions); adds cc_deny.rules and cc_allow.rules
+      preservation across upgrades
+[Change] Update vendored pkg_lib.sh to v1.0.3 (config merge API);
+      elog_lib.sh to v1.0.3: FQDN host field in JSON and syslog output
 [Change] download_url(): log TLS diagnostic hint on download failure for
       legacy system troubleshooting
 [Change] Drop Ubuntu 22.04 from CI matrix; redundant with 20.04+24.04

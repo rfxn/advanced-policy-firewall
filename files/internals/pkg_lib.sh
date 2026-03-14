@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# pkg_lib.sh — Shared Packaging & Installer Library 1.0.2
+# pkg_lib.sh — Shared Packaging & Installer Library 1.0.3
 ###
 # Copyright (C) 2002-2026 R-fx Networks <proj@rfxn.com>
 #                         Ryan MacDonald <ryan@rfxn.com>
@@ -29,7 +29,7 @@
 [[ -n "${_PKG_LIB_LOADED:-}" ]] && return 0 2>/dev/null
 _PKG_LIB_LOADED=1
 # shellcheck disable=SC2034 # version checked by consumers
-PKG_LIB_VERSION="1.0.2"
+PKG_LIB_VERSION="1.0.3"
 
 # Configurable defaults — consuming projects override via environment
 PKG_NO_COLOR="${PKG_NO_COLOR:-0}"
@@ -2446,6 +2446,15 @@ pkg_config_merge() {
 		}
 	fi
 
+	# Preserve permissions of new_conf for output file
+	# stat -c is GNU coreutils (all supported Linux targets); FreeBSD uses stat -f '%OLp'
+	local _preserve_mode=""
+	if [[ -f "$new_conf" ]]; then
+		_preserve_mode=$(stat -Lc '%a' "$new_conf" 2>/dev/null) || \
+			_preserve_mode=$(stat -Lf '%OLp' "$new_conf" 2>/dev/null) || \
+			_preserve_mode=""
+	fi
+
 	# AWK two-pass merge: old values into new template
 	# Uses FILENAME instead of FNR==NR to handle empty old config correctly
 	awk -v oldfile="$old_conf" '
@@ -2488,6 +2497,10 @@ pkg_config_merge() {
 		pkg_error "pkg_config_merge: awk merge failed"
 		return 1
 	}
+
+	if [[ -n "$_preserve_mode" ]]; then
+		chmod "$_preserve_mode" "$output" || pkg_warn "pkg_config_merge: failed to restore permissions on ${output}"
+	fi
 
 	return 0
 }

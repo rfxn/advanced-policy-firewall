@@ -43,12 +43,12 @@ if [ "$PKT_SANITY" == "1" ]; then
 	_sanity_inv_rules() {
 		local ipt_fn="$1" in_chain="$2" out_chain="$3" prefix="$4"
 		local include_tcp_opts="$5" rab_extra="$6"
-		_log_drop "$ipt_fn" "$in_chain" "-m state --state INVALID" "** $prefix ** " "$ALL_STOP" "$rab_extra"
+		_log_drop "$ipt_fn" "$in_chain" "$STATE_MATCH INVALID" "** $prefix ** " "$ALL_STOP" "$rab_extra"
 		if [ "$include_tcp_opts" == "1" ]; then
 			_log_drop "$ipt_fn" "$in_chain" "-p tcp --tcp-option 64" "** $prefix ** " "$TCP_STOP"
 			_log_drop "$ipt_fn" "$in_chain" "-p tcp --tcp-option 128" "** $prefix ** " "$TCP_STOP"
 		fi
-		_log_drop "$ipt_fn" "$out_chain" "-m state --state INVALID" "** $prefix ** " "$ALL_STOP"
+		_log_drop "$ipt_fn" "$out_chain" "$STATE_MATCH INVALID" "** $prefix ** " "$ALL_STOP"
 	}
 
 	# Helper: create port-zero blocking rules for a chain

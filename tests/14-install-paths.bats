@@ -169,7 +169,7 @@ teardown_file() {
     sed -i '/^SMTP_BLOCK=/d' "$APF_DIR/conf.apf"
     cd /opt/apf-src
     INSTALL_PATH="$APF_DIR" bash install.sh >/dev/null 2>&1
-    # Verify new variables got their defaults via .ca.def preamble
+    # Verify new variables got their defaults from the new config template
     run grep '^SYNFLOOD="0"' "$APF_DIR/conf.apf"
     assert_success
     run grep '^SMTP_BLOCK="0"' "$APF_DIR/conf.apf"
@@ -215,6 +215,40 @@ teardown_file() {
     assert_success
     # Verify custom postroute content preserved
     run grep "POSTROUTING.*TOS" "$APF_DIR/postroute.rules"
+    assert_success
+    _clean_test_backup
+}
+
+@test "importconf migrates EG_DROP_CMD from space to comma separated" {
+    _clean_test_backup
+    # Set space-separated EG_DROP_CMD in live install (simulating pre-2.0.2 config)
+    sed -i 's/^EG_DROP_CMD=.*/EG_DROP_CMD="eggdrop psybnc bitchx"/' "$APF_DIR/conf.apf"
+    cd /opt/apf-src
+    INSTALL_PATH="$APF_DIR" bash install.sh >/dev/null 2>&1
+    # Verify EG_DROP_CMD converted to comma-separated in installed conf.apf
+    run grep '^EG_DROP_CMD="eggdrop,psybnc,bitchx"' "$APF_DIR/conf.apf"
+    assert_success
+    _clean_test_backup
+}
+
+@test "importconf preserves already comma-separated EG_DROP_CMD" {
+    _clean_test_backup
+    # Set already comma-separated EG_DROP_CMD (should not be changed)
+    sed -i 's/^EG_DROP_CMD=.*/EG_DROP_CMD="eggdrop,psybnc,bitchx"/' "$APF_DIR/conf.apf"
+    cd /opt/apf-src
+    INSTALL_PATH="$APF_DIR" bash install.sh >/dev/null 2>&1
+    run grep '^EG_DROP_CMD="eggdrop,psybnc,bitchx"' "$APF_DIR/conf.apf"
+    assert_success
+    _clean_test_backup
+}
+
+@test "importconf preserves cc_deny.rules during upgrade" {
+    _clean_test_backup
+    # Add CC deny entry (simulating user's country blocking config)
+    echo "CN" >> "$APF_DIR/cc_deny.rules"
+    cd /opt/apf-src
+    INSTALL_PATH="$APF_DIR" bash install.sh >/dev/null 2>&1
+    run grep "CN" "$APF_DIR/cc_deny.rules"
     assert_success
     _clean_test_backup
 }

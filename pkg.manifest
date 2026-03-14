@@ -42,7 +42,7 @@ PKG_LOGROTATE_FILE="logrotate.d.apf"
 PKG_MAN_FILE="apf.8"
 
 # Supplementary source files
-PKG_EXTRAS="importconf .ca.def"
+PKG_EXTRAS="importconf"
 PKG_DOCS="README CHANGELOG COPYING.GPL FLOW"
 
 # Docker build flags (APF requires --privileged for iptables)

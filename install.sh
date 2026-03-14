@@ -42,8 +42,8 @@ install() {
 	pkg_set_perms "$INSTALL_PATH" "750" "640" \
 		"apf" "firewall" "vnet/vnetgen" "extras/get_ports"
 
-	# Copy extras (importconf, config defaults template)
-	/usr/bin/cp -pf .ca.def importconf "$INSTALL_PATH/extras/"
+	# Copy extras (importconf)
+	command cp -pf importconf "$INSTALL_PATH/extras/"
 
 	# Install documentation to doc/ subdirectory
 	pkg_doc_install "$INSTALL_PATH/doc" README CHANGELOG COPYING.GPL apf.8 FLOW
@@ -173,7 +173,7 @@ VER=$(awk '/version/ {print$2}' files/VERSION)
 # Pre-install cleanup: remove runtime-created cron entries before backup
 # These are recreated by apf -s as needed; must happen before backup to
 # ensure cleanup even if backup step fails (e.g., rapid re-installs)
-pkg_cron_remove /etc/cron.d/refresh.apf /etc/cron.d/apf_develmode
+pkg_cron_remove /etc/cron.d/refresh.apf /etc/cron.d/apf_develmode /etc/cron.d/ctlimit.apf
 
 if [ -d "$INSTALL_PATH" ]; then
 	pkg_backup "$INSTALL_PATH" "copy" || { echo "Backup failed, aborting."; exit 1; }
@@ -225,5 +225,3 @@ if [ "$_dep_warn" = "1" ]; then
 	echo "        This is expected in chroot/container builds where binaries"
 	echo "        will be available at runtime."
 fi
-
-rm -f .conf.apf
