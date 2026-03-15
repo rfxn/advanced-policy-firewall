@@ -208,6 +208,9 @@
 [Change] GeoIP progress output: continent expansion and multi-CC downloads
       now show per-CC progress (e.g., "processing US (3/51)") via eout;
       eliminates silent 3-minute waits during @EU and similar operations
+[Fix] GeoIP cli_cc_remove(): harden eval in LOG rule removal with format
+      validation; only process rules matching APF CC chain naming convention
+      (CC_DENY|CC_ALLOW|CC_DENYP|CC_ALLOWP) to prevent eval on unexpected input
 [Fix] Portability: replace bare cp/mv with command cp/command mv across all
       shipping files; bypasses shell aliases and resolves via PATH portably
       on both pre-usr-merge (CentOS 6) and modern distros
