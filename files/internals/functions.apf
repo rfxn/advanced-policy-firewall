@@ -1412,12 +1412,7 @@ cli_trust_temp() {
 	echo "Invalid TTL '$TTL_STR': must be a positive number with optional suffix (s/m/h/d)" >&2
 	return 1
  fi
- tlist=""
- for f in $DENY_HOSTS $ALLOW_HOSTS $GALLOW_HOSTS $GDENY_HOSTS; do
-	if [ -f "$f" ] && grep -v '^#' "$f" | grep -Fxq "$HOST"; then
-		tlist="$tlist$f "
-	fi
- done
+ _trust_check_duplicate "$HOST"
  valtrust="$tlist"
  load_local_addrs
  if [ "$valtrust" ]; then

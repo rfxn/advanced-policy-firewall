@@ -156,6 +156,17 @@
       longer destroy permanent CC entries when expiring temporary ones; new
       _expire_cc_temp_entry() removes only temp metadata and conditionally
       cleans up iptables/ipsets only when no permanent entry remains
+[Fix] GeoIP cli_cc_remove(): move eval guard regex declaration before the
+      chain loop so it is always defined in the IPv6 path; previously the
+      regex was only set inside the IPv4 if-block, leaving an empty match
+      (matches everything) when IPv4 chain was absent
+[Fix] cli_trust_temp(): adopt _trust_check_duplicate() helper instead of
+      inline duplicate-check loop; aligns with cli_trust() call sites
+[Fix] install.sh: replace remaining bare mv/rm with command mv/rm for
+      portable coreutils resolution on pre-usr-merge distros
+[Fix] importconf: gate auto-detect migration (DOCKER_COMPAT, USE_IPSET,
+      IPT_LOCK_SUPPORT "0" to "auto") on source version < 2.0.2; prevents
+      overwriting explicit user "0" settings on future upgrades
 [Change] GeoIP download: log WARNING when TLS verification fails and insecure
       fallback succeeds; GEOIP_LOG_FUNC callback in geoip_lib.sh routes
       warnings through consumer's logging system (eout in APF)

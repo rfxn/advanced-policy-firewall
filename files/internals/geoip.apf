@@ -1385,7 +1385,7 @@ cli_cc_remove() {
 
 	# Remove iptables rules BEFORE destroying ipsets (ipset refuses
 	# destroy when a set is still referenced by active iptables rules)
-	local chain
+	local chain _cc_eval_re='^-A (CC_DENY|CC_ALLOW|CC_DENYP|CC_ALLOWP) '
 	for chain in CC_DENY CC_ALLOW CC_DENYP CC_ALLOWP; do
 		if $IPT $IPT_FLAGS -L "$chain" -n > /dev/null 2>&1; then
 			# Remove rules referencing this CC's ipsets
@@ -1398,7 +1398,6 @@ cli_cc_remove() {
 			# that must be parsed as shell words, not split on whitespace.
 			# Format validation: only process rules matching APF's CC chain
 			# naming convention to prevent eval from processing unexpected input.
-			local _cc_eval_re='^-A (CC_DENY|CC_ALLOW|CC_DENYP|CC_ALLOWP) '
 			$IPT $IPT_FLAGS -S "$chain" 2>/dev/null | grep "apf_cc4_${cc}" | while IFS= read -r _rule; do
 				[[ "$_rule" =~ $_cc_eval_re ]] || continue
 				eval "$IPT $IPT_FLAGS -D \"$chain\" ${_rule#-A $chain }" 2>/dev/null || true  # best-effort LOG rule removal
