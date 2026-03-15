@@ -167,6 +167,10 @@
 [Fix] importconf: gate auto-detect migration (DOCKER_COMPAT, USE_IPSET,
       IPT_LOCK_SUPPORT "0" to "auto") on source version < 2.0.2; prevents
       overwriting explicit user "0" settings on future upgrades
+[Fix] importconf: sync top-level importconf from files/extras/importconf;
+      version-gated auto-detect migration (DOCKER_COMPAT, USE_IPSET,
+      IPT_LOCK_SUPPORT "0" to "auto") was only in the extras copy and never
+      ran during install — upgraders from pre-2.0.2 were not migrated
 [Change] GeoIP download: log WARNING when TLS verification fails and insecure
       fallback succeeds; GEOIP_LOG_FUNC callback in geoip_lib.sh routes
       warnings through consumer's logging system (eout in APF)
