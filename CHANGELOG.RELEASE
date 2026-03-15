@@ -139,6 +139,14 @@
 [Fix] GeoIP: IFS=',' leak from callers broke LOG rule LEXT word splitting in
       _geoip_add_simple_rules() and _geoip_add_advanced_rule(); defensive
       IFS reset at function entry prevents silent LOG rule corruption
+[Fix] GeoIP --cc-update: always mark data timestamp on cached update; when
+      all CCs are cache hits within CC_CACHE_TTL, geoip_mark_updated() was
+      skipped causing permanently stale "Last update" and repeated staleness
+      gate triggers on every subsequent --cc-update run
+[Fix] GeoIP --cc overview: split "Active country blocks" into labeled
+      subsections — "Denied countries" for cc_deny.rules entries and
+      "Allowed countries (strict-allowlist)" for cc_allow.rules entries;
+      shows implicit deny-all note when cc_allow.rules is active
 
   -- Changes --
 

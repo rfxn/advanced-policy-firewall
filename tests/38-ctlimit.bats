@@ -344,3 +344,107 @@ _source_ctlimit() {
     assert_success
     assert_output --partial "Last scan: never"
 }
+
+# ---- CT_PERMANENT behavior tests ----
+
+# Helper: create a mock conntrack binary that outputs fixture data.
+# Used to inject synthetic conntrack into ct_scan() via the CONNTRACK variable.
+# Args: fixture_file output_script_path
+_create_mock_conntrack() {
+    local fixture="$1" script="$2"
+    printf '#!/bin/bash\ncat "%s"\n' "$fixture" > "$script"
+    chmod 755 "$script"
+}
+
+# Helper: create a small fixture with a single offender IP exceeding threshold.
+# Args: fixture_path offender_ip conn_count
+_create_offender_fixture() {
+    local fixture="$1" offender_ip="$2" conn_count="$3"
+    local i
+    true > "$fixture"
+    for i in $(seq 1 "$conn_count"); do
+        echo "ipv4     2 tcp      6 300 ESTABLISHED src=${offender_ip} dst=10.0.0.1 sport=$((10000+i)) dport=80 src=10.0.0.1 dst=${offender_ip} sport=80 dport=$((10000+i)) [ASSURED] mark=0 use=2" >> "$fixture"
+    done
+}
+
+@test "CT_PERMANENT=0: block_history entry removed after ct_scan block" {
+    source /opt/tests/helpers/apf-config.sh
+    local offender_ip="198.51.100.99"
+
+    # Configure CT_LIMIT with low threshold; enable PERMBLOCK so that
+    # apf -td records block_history entries (PERMBLOCK_COUNT must be > 0)
+    apf_set_config "CT_LIMIT" "5"
+    apf_set_config "CT_INTERVAL" "60"
+    apf_set_config "CT_BLOCK_TIME" "300"
+    apf_set_config "CT_PERMANENT" "0"
+    apf_set_config "PERMBLOCK_COUNT" "5"
+
+    # Restart firewall with CT_LIMIT enabled
+    "$APF" -f 2>/dev/null || true
+    "$APF" -s
+
+    # Create fixture with offender exceeding threshold
+    _create_offender_fixture "$CT_FIXTURE_DIR/ct_perm_test" "$offender_ip" 20
+
+    # Create mock conntrack binary that outputs fixture data
+    # The -L flag is passed by _ct_read_conntrack but our mock ignores it
+    _create_mock_conntrack "$CT_FIXTURE_DIR/ct_perm_test" "$CT_FIXTURE_DIR/mock-conntrack"
+
+    # Override CONNTRACK after internals.conf is sourced — append after
+    # the '. "$CNFINT"' line at the end of conf.apf
+    echo "CONNTRACK=\"$CT_FIXTURE_DIR/mock-conntrack\"" >> "$APF_DIR/conf.apf"
+
+    # Run ct_scan via CLI
+    "$APF" --ct-scan
+
+    # Verify the offender was temp-denied
+    grep -Fq "$offender_ip" "$APF_DIR/deny_hosts.rules"
+
+    # CT_PERMANENT=0: block_history entry should have been removed
+    if [ -f "$APF_DIR/internals/.block_history" ]; then
+        ! grep -Fq "${offender_ip}|" "$APF_DIR/internals/.block_history"
+    fi
+    # else: no block_history file means no entry — correct for CT_PERMANENT=0
+
+    # Clean up: remove the temp deny
+    "$APF" -u "$offender_ip" 2>/dev/null || true
+}
+
+@test "CT_PERMANENT=1: block_history entry preserved after ct_scan block" {
+    source /opt/tests/helpers/apf-config.sh
+    local offender_ip="198.51.100.98"
+
+    # Configure CT_LIMIT with CT_PERMANENT=1; PERMBLOCK_COUNT > 0 enables
+    # block_history recording in apf -td
+    apf_set_config "CT_LIMIT" "5"
+    apf_set_config "CT_INTERVAL" "60"
+    apf_set_config "CT_BLOCK_TIME" "300"
+    apf_set_config "CT_PERMANENT" "1"
+    apf_set_config "PERMBLOCK_COUNT" "5"
+
+    # Restart firewall with CT_LIMIT enabled
+    "$APF" -f 2>/dev/null || true
+    "$APF" -s
+
+    # Create fixture with offender exceeding threshold
+    _create_offender_fixture "$CT_FIXTURE_DIR/ct_perm_test1" "$offender_ip" 20
+
+    # Create mock conntrack binary
+    _create_mock_conntrack "$CT_FIXTURE_DIR/ct_perm_test1" "$CT_FIXTURE_DIR/mock-conntrack1"
+
+    # Override CONNTRACK after internals.conf sourcing
+    echo "CONNTRACK=\"$CT_FIXTURE_DIR/mock-conntrack1\"" >> "$APF_DIR/conf.apf"
+
+    # Run ct_scan via CLI
+    "$APF" --ct-scan
+
+    # Verify the offender was temp-denied
+    grep -Fq "$offender_ip" "$APF_DIR/deny_hosts.rules"
+
+    # CT_PERMANENT=1: block_history entry should be preserved
+    [ -f "$APF_DIR/internals/.block_history" ]
+    grep -Fq "${offender_ip}|" "$APF_DIR/internals/.block_history"
+
+    # Clean up
+    "$APF" -u "$offender_ip" 2>/dev/null || true
+}

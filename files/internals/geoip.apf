@@ -704,13 +704,15 @@ geoip_update() {
 		geoip_populate_set "$cc" "$family"
 	done < <($IPSET list -n 2>/dev/null | grep '^apf_cc')
 
-	# Only mark updated if actual downloads occurred (prevents false
-	# .last_update reset when all CCs are cache hits)
+	# Always mark updated — we passed the staleness gate (geoip_is_stale
+	# returned true) and confirmed all data is current. If downloads
+	# occurred the data is fresh; if all CCs are cache hits, the data was
+	# already fresh. Either way the timestamp should reflect confirmation.
+	geoip_mark_updated "$CC_DATA_DIR"
 	if [ "${_GEOIP_DL_COUNT:-0}" -gt 0 ]; then
-		geoip_mark_updated "$CC_DATA_DIR"
 		eout "{geoip} country code data updated"
 	else
-		eout "{geoip} country code data is current, no downloads needed"
+		eout "{geoip} country code data confirmed current, no downloads needed"
 	fi
 }
 
@@ -1001,10 +1003,12 @@ geoip_info() {
 	fi
 	echo ""
 
-	# Overview: list all active CC ipsets
-	# Process substitution avoids subshell variable loss from pipeline
-	echo "Active country blocks:"
-	local set_name cc family count
+	# Overview: classify active CC ipsets into deny vs allow subsections.
+	# For each CC in the ipset list, grep the rules files to determine
+	# membership. This handles both simple (CN) and advanced (tcp:in:d=22:s=CN)
+	# entries by checking if the CC appears as a word in the file.
+	local _deny_out="" _allow_out="" _other_out=""
+	local set_name cc family count cc_name _in_deny _in_allow _entry
 	while IFS= read -r set_name; do
 		family="${set_name#apf_cc}"
 		family="${family%%_*}"
@@ -1014,10 +1018,55 @@ geoip_info() {
 		else
 			count=$($IPSET list "$set_name" 2>/dev/null | grep -c '^[0-9]') || count=0
 		fi
-		local cc_name
 		cc_name=$(geoip_cc_name "$cc")
-		printf "  %-4s %-20s IPv%s  %6d CIDRs\n" "$cc" "$cc_name" "$family" "$count"
+		_entry=$(printf "  %-4s %-20s IPv%s  %6d CIDRs\n" "$cc" "$cc_name" "$family" "$count")
+
+		# Check rules file membership (skip comments)
+		_in_deny=0; _in_allow=0
+		if [ -f "$CC_DENY_HOSTS" ]; then
+			if grep -vE '^(#|$)' "$CC_DENY_HOSTS" 2>/dev/null | grep -qE "(^|[=,])${cc}$"; then
+				_in_deny=1
+			fi
+		fi
+		if [ -f "$CC_ALLOW_HOSTS" ]; then
+			if grep -vE '^(#|$)' "$CC_ALLOW_HOSTS" 2>/dev/null | grep -qE "(^|[=,])${cc}$"; then
+				_in_allow=1
+			fi
+		fi
+
+		if [ "$_in_deny" = "1" ]; then
+			_deny_out="${_deny_out}${_entry}
+"
+		elif [ "$_in_allow" = "1" ]; then
+			_allow_out="${_allow_out}${_entry}
+"
+		else
+			_other_out="${_other_out}${_entry}
+"
+		fi
 	done < <($IPSET list -n 2>/dev/null | grep '^apf_cc' | sort)
+
+	# Print deny subsection
+	if [ -n "$_deny_out" ]; then
+		echo "Denied countries:"
+		printf '%s' "$_deny_out"
+	fi
+
+	# Print allow subsection
+	if [ -n "$_allow_out" ]; then
+		[ -n "$_deny_out" ] && echo ""
+		echo "Allowed countries (strict-allowlist):"
+		printf '%s' "$_allow_out"
+		echo "  NOTE: cc_allow.rules active — all unlisted countries are implicitly denied"
+	fi
+
+	# Fallback: show ipsets that don't match either file (shouldn't happen,
+	# but provides visibility if rules files were edited out-of-band)
+	if [ -n "$_other_out" ]; then
+		{ [ -n "$_deny_out" ] || [ -n "$_allow_out" ]; } && echo ""
+		echo "Other active ipsets (not in rules files):"
+		printf '%s' "$_other_out"
+	fi
 }
 
 ## CLI handler for bare country code trust (apf -d CN, apf -a US).
