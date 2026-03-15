@@ -877,12 +877,12 @@ _geoip_rules_status() {
 	fi
 	# Also check for advanced entries referencing this CC (skip comments)
 	if [ "$in_deny" = "0" ] && [ -f "$CC_DENY_HOSTS" ]; then
-		if grep -vE '^(#|$)' "$CC_DENY_HOSTS" 2>/dev/null | grep -qE "(^|:)${cc}\$"; then
+		if grep -vE '^(#|$)' "$CC_DENY_HOSTS" 2>/dev/null | grep -qE "(^|[=,])${cc}\$"; then
 			in_deny=1
 		fi
 	fi
 	if [ "$in_allow" = "0" ] && [ -f "$CC_ALLOW_HOSTS" ]; then
-		if grep -vE '^(#|$)' "$CC_ALLOW_HOSTS" 2>/dev/null | grep -qE "(^|:)${cc}\$"; then
+		if grep -vE '^(#|$)' "$CC_ALLOW_HOSTS" 2>/dev/null | grep -qE "(^|[=,])${cc}\$"; then
 			in_allow=1
 		fi
 	fi
