@@ -83,7 +83,9 @@
       with command -v discovery
 [Fix] importconf: guard vnet/*.rules glob; fix INSTALL_PATH default; preserve
       custom files and hook permissions during upgrade; fix upgrade detection;
-      fix dead-code EG_DROP_CMD migration with pkg_config_get/pkg_config_set
+      fix dead-code EG_DROP_CMD migration with pkg_config_get/pkg_config_set;
+      migrate DOCKER_COMPAT, USE_IPSET, IPT_LOCK_SUPPORT from "0" to "auto"
+      on upgrade so upgraders get runtime auto-detection defaults
 [Fix] Anchor grep/sed patterns across trust, expiry, and block escalation
       functions to prevent IP substring collisions
 [Fix] cli_trust_remove(): spec-based iptables rule deletion with removal
