@@ -56,6 +56,7 @@ fi
 # Args: types ipt_fn chain proto type_flag direction [addr_arg]
 _icmp_filter() {
 	local types="$1" ipt_fn="$2" chain="$3" proto="$4" type_flag="$5" direction="$6" addr_arg="$7"
+	local i
 	[ -z "$types" ] && return
 	if [ -z "$ICMP_LIM" ]; then ICMP_LIM=0; fi
 	local eargs=""

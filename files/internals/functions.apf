@@ -93,7 +93,7 @@ snapshot_save() {
 		rm -f "$snap_tmp"
 		return 1
 	fi
-	mv -f "$snap_tmp" "$snap_dir/.apf.restore"
+	command mv -f "$snap_tmp" "$snap_dir/.apf.restore"
 
 	# IPv6 snapshot (non-fatal — IPv4 snapshot survives if this fails)
 	if [ "$USE_IPV6" == "1" ] && [ -n "$IP6TS" ]; then
@@ -108,7 +108,7 @@ snapshot_save() {
 			eout "{glob} IPv6 snapshot save failed (empty or invalid output)"
 			rm -f "$snap_tmp"
 		else
-			mv -f "$snap_tmp" "$snap_dir/.apf6.restore"
+			command mv -f "$snap_tmp" "$snap_dir/.apf6.restore"
 		fi
 	fi
 
@@ -610,7 +610,12 @@ mutex_lock() {
     APF_MUTEX_LOCKED="1"
     return
   fi
-  # Fallback: noclobber-based file lock with stale PID detection
+  # Fallback: noclobber-based file lock with stale PID detection.
+  # TOCTOU note: the noclobber test-and-create is not fully atomic on all
+  # filesystems, but the race window is negligible in practice -- PID space
+  # is 4M+ on modern kernels, the exec-flock fast path (above) handles the
+  # common case, and APF operations are infrequent (typically minutes apart).
+  # The stale-PID check below covers the remaining failure mode (crashed holder).
   local start_time
   start_time=$(date +%s)
   while true; do
@@ -720,6 +725,9 @@ is_fqdn() {
 # Source shared GeoIP metadata library (country names, continents, validation,
 # download). Uses BASH_SOURCE-relative path for portability (works both when
 # sourced via internals.conf with $INSTALL_PATH and in test context without it).
+# Route geoip_lib warnings through eout when available (APF consumer integration).
+_geoip_lib_log_warning() { eout "{geoip} WARNING: $1"; }
+GEOIP_LOG_FUNC="_geoip_lib_log_warning"
 _geoip_lib_path="${BASH_SOURCE[0]%/*}/geoip_lib.sh"
 if [ -f "$_geoip_lib_path" ]; then
 	# shellcheck disable=SC1090,SC1091
@@ -828,6 +836,42 @@ resolve_fqdn() {
 	return 0
 }
 
+# Unpack advanced trust entry fields from trust_parse_fields() globals.
+# Caller must have called trust_protect_ipv6(entry) and
+# trust_parse_fields($_TPV6_RESULT) before invoking this helper.
+# Sets _TUF_PROTO, _TUF_DIR, _TUF_PFLOW, _TUF_PORT, _TUF_IPFLOW, _TUF_PIP.
+# Returns 1 on unrecognized token count.
+_trust_unpack_fields() {
+	_TUF_PROTO=""
+	_TUF_DIR=""
+	_TUF_PFLOW=""
+	_TUF_PORT=""
+	_TUF_IPFLOW=""
+	_TUF_PIP=""
+	case "$_TF_COUNT" in
+		4)
+			_TUF_PFLOW="$_TF1"; _TUF_PORT="$_TF2"
+			_TUF_IPFLOW="$_TF3"
+			trust_restore_ipv6 "$_TF4"; _TUF_PIP="$_TRV6_RESULT"
+			;;
+		5)
+			_TUF_DIR="$_TF1"; _TUF_PFLOW="$_TF2"
+			_TUF_PORT="$_TF3"; _TUF_IPFLOW="$_TF4"
+			trust_restore_ipv6 "$_TF5"; _TUF_PIP="$_TRV6_RESULT"
+			;;
+		6)
+			_TUF_PROTO="$_TF1"; _TUF_DIR="$_TF2"
+			_TUF_PFLOW="$_TF3"; _TUF_PORT="$_TF4"
+			_TUF_IPFLOW="$_TF5"
+			trust_restore_ipv6 "$_TF6"; _TUF_PIP="$_TRV6_RESULT"
+			;;
+		*)
+			return 1
+			;;
+	esac
+	return 0
+}
+
 # Validate an advanced trust entry (contains '=') or delegate to valid_host().
 # Sets _VTE_IP to the extracted IP for local-addr checks.
 # Returns 0 on valid, 1 on invalid.
@@ -840,34 +884,9 @@ valid_trust_entry() {
 	fi
 	trust_protect_ipv6 "$entry"; local safe="$_TPV6_RESULT"
 	trust_parse_fields "$safe"
-	local proto="" dir="" pflow="" port="" ipflow="" pip=""
-	# trust_parse_fields splits on ':' and '=' so token count differs from
-	# the logical field count:
-	#   3-field  d=PORT:s=IP             → 4 tokens
-	#   4-field  in:d=PORT:s=IP          → 5 tokens
-	#   5-field  tcp:in:d=PORT:s=IP      → 6 tokens
-	# IPv6 addresses with @ placeholders stay as one token.
-	case "$_TF_COUNT" in
-		4)
-			# 3-field: d=PORT:s=IP
-			pflow="$_TF1"; port="$_TF2"; ipflow="$_TF3"
-			trust_restore_ipv6 "$_TF4"; pip="$_TRV6_RESULT"
-			;;
-		5)
-			# 4-field: in:d=PORT:s=IP
-			dir="$_TF1"; pflow="$_TF2"; port="$_TF3"; ipflow="$_TF4"
-			trust_restore_ipv6 "$_TF5"; pip="$_TRV6_RESULT"
-			;;
-		6)
-			# 5-field: tcp:in:d=PORT:s=IP
-			proto="$_TF1"; dir="$_TF2"; pflow="$_TF3"; port="$_TF4"
-			ipflow="$_TF5"
-			trust_restore_ipv6 "$_TF6"; pip="$_TRV6_RESULT"
-			;;
-		*)
-			return 1
-			;;
-	esac
+	_trust_unpack_fields || return 1
+	local proto="$_TUF_PROTO" dir="$_TUF_DIR" pflow="$_TUF_PFLOW"
+	local port="$_TUF_PORT" ipflow="$_TUF_IPFLOW" pip="$_TUF_PIP"
 	# Validate protocol if present
 	if [ -n "$proto" ]; then
 		[ "$proto" == "tcp" ] || [ "$proto" == "udp" ] || return 1
@@ -904,25 +923,9 @@ trust_entry_rule() {
 
 	trust_protect_ipv6 "$entry"; local safe="$_TPV6_RESULT"
 	trust_parse_fields "$safe"
-	local proto="" dir="" pflow="" port="" ipflow="" pip=""
-	case "$_TF_COUNT" in
-		4)
-			pflow="$_TF1"; port="$_TF2"; ipflow="$_TF3"
-			trust_restore_ipv6 "$_TF4"; pip="$_TRV6_RESULT"
-			;;
-		5)
-			dir="$_TF1"; pflow="$_TF2"; port="$_TF3"; ipflow="$_TF4"
-			trust_restore_ipv6 "$_TF5"; pip="$_TRV6_RESULT"
-			;;
-		6)
-			proto="$_TF1"; dir="$_TF2"; pflow="$_TF3"; port="$_TF4"
-			ipflow="$_TF5"
-			trust_restore_ipv6 "$_TF6"; pip="$_TRV6_RESULT"
-			;;
-		*)
-			return 1
-			;;
-	esac
+	_trust_unpack_fields || return 1
+	local proto="$_TUF_PROTO" dir="$_TUF_DIR" pflow="$_TUF_PFLOW"
+	local port="$_TUF_PORT" ipflow="$_TUF_IPFLOW" pip="$_TUF_PIP"
 
 	expand_port "$port"; port="$_PORT"
 	if ! ipt_for_host "$pip"; then
@@ -1171,9 +1174,22 @@ _trust_action_target() {
 	fi
 }
 
+## Check if a trust entry already exists in any trust file.
+# Sets caller's $tlist to space-separated list of files containing the entry.
+# Args: host_entry
+_trust_check_duplicate() {
+	local _tcd_host="$1" _tcd_f
+	tlist=""
+	for _tcd_f in $DENY_HOSTS $ALLOW_HOSTS $GALLOW_HOSTS $GDENY_HOSTS; do
+		if [ -f "$_tcd_f" ] && grep -v '^#' "$_tcd_f" | grep -Fxq "$_tcd_host"; then
+			tlist="$tlist$_tcd_f "
+		fi
+	done
+}
+
 cli_trust() {
  local CHAIN="$1" ACTION="$2" FILE="$3" HOST="$4" CMT="$5"
- local tlist f valtrust TIME JACTION
+ local tlist f valtrust TIME JACTION ADDED_EPOCH
  if [ -z "$HOST" ]; then
         echo "an FQDN or IP address is required for this option" >&2
         return 1
@@ -1197,12 +1213,7 @@ cli_trust() {
 		fi
 		return 1
 	fi
-	tlist=""
-	for f in $DENY_HOSTS $ALLOW_HOSTS $GALLOW_HOSTS $GDENY_HOSTS; do
-		if [ -f "$f" ] && grep -v '^#' "$f" | grep -Fxq "$HOST"; then
-			tlist="$tlist$f "
-		fi
-	done
+	_trust_check_duplicate "$HOST"
 	load_local_addrs
 	if [ -n "$tlist" ]; then
 		echo "$HOST already exists in $tlist"
@@ -1283,12 +1294,7 @@ cli_trust() {
 	fi
 	return 1
  fi
- tlist=""
- for f in $DENY_HOSTS $ALLOW_HOSTS $GALLOW_HOSTS $GDENY_HOSTS; do
-     if [ -f "$f" ] && grep -v '^#' "$f" | grep -Fxq "$HOST"; then
-         tlist="$tlist$f "
-     fi
- done
+ _trust_check_duplicate "$HOST"
  valtrust="$tlist"
  load_local_addrs
  if [ "$valtrust" ]; then
@@ -1406,12 +1412,7 @@ cli_trust_temp() {
 	echo "Invalid TTL '$TTL_STR': must be a positive number with optional suffix (s/m/h/d)" >&2
 	return 1
  fi
- tlist=""
- for f in $DENY_HOSTS $ALLOW_HOSTS $GALLOW_HOSTS $GDENY_HOSTS; do
-	if [ -f "$f" ] && grep -v '^#' "$f" | grep -Fxq "$HOST"; then
-		tlist="$tlist$f "
-	fi
- done
+ _trust_check_duplicate "$HOST"
  valtrust="$tlist"
  load_local_addrs
  if [ "$valtrust" ]; then
@@ -1543,7 +1544,7 @@ record_block() {
 		echo "${ip}|1|${now}|${now}" >> "$tmpfile"
 	fi
 
-	mv -f "$tmpfile" "$history_file"
+	command mv -f "$tmpfile" "$history_file"
 	chmod 640 "$history_file"
 }
 
@@ -2214,22 +2215,9 @@ _trust_hosts_advanced() {
 	# Pre-parse: extract fields needed for FQDN and local-addr checks
 	trust_protect_ipv6 "$entry"; local safe="$_TPV6_RESULT"
 	trust_parse_fields "$safe"
-	local dir="" pflow="" port="" ipflow="" pip=""
-	case "$_TF_COUNT" in
-		4)  # 3-field: pflow=port:ipflow=ip
-			pflow="$_TF1"; port="$_TF2"; ipflow="$_TF3"
-			trust_restore_ipv6 "$_TF4"; pip="$_TRV6_RESULT"
-			;;
-		5)  # 4-field: dir:pflow=port:ipflow=ip
-			dir="$_TF1"; pflow="$_TF2"; port="$_TF3"; ipflow="$_TF4"
-			trust_restore_ipv6 "$_TF5"; pip="$_TRV6_RESULT"
-			;;
-		6)  # 5-field: proto:dir:pflow=port:ipflow=ip
-			dir="$_TF2"; pflow="$_TF3"; port="$_TF4"; ipflow="$_TF5"
-			trust_restore_ipv6 "$_TF6"; pip="$_TRV6_RESULT"
-			;;
-		*)  return 1 ;;
-	esac
+	_trust_unpack_fields || return 1
+	local dir="$_TUF_DIR" pflow="$_TUF_PFLOW"
+	local port="$_TUF_PORT" ipflow="$_TUF_IPFLOW" pip="$_TUF_PIP"
 
 	# Build description fragments for local-addr blocked log messages
 	expand_port "$port"; port="$_PORT"
@@ -2373,7 +2361,7 @@ download_url() {
 
 dlist_resnet() {
  if [ -f "$RESNET" ]; then
-        cp "$RESNET" "$RESNET.bk"
+        command cp "$RESNET" "$RESNET.bk"
         chmod 600 "$RESNET" "$RESNET.bk"
  fi
 if ( [ -n "$CURL" ] || [ -n "$WGET" ] ) && [ -f "$RESNET" ]; then
@@ -2387,14 +2375,14 @@ if ( [ -n "$CURL" ] || [ -n "$WGET" ] ) && [ -f "$RESNET" ]; then
    else
         eout "{resnet} download of $DLIST_RESERVED_URL failed"
 	 if [ -f "$RESNET.bk" ]; then
-	     cp "$RESNET.bk" "$RESNET"
+	     command cp "$RESNET.bk" "$RESNET"
 	     chmod 600 "$RESNET" "$RESNET.bk"
 	 fi
    fi
    rm -f "$url_tmp"
 else
  if [ -f "$RESNET.bk" ]; then
-	cp "$RESNET.bk" "$RESNET"
+	command cp "$RESNET.bk" "$RESNET"
 	chmod 600 "$RESNET" "$RESNET.bk"
  fi
 fi
@@ -2404,7 +2392,7 @@ dlist_download() {
 local tag="$1" url="$2" hosts_file="$3" parse_mode="${4:-standard}"
 # Backup existing file
 if [ -f "$hosts_file" ]; then
-   cp "$hosts_file" "$hosts_file.bk"
+   command cp "$hosts_file" "$hosts_file.bk"
    chmod 600 "$hosts_file" "$hosts_file.bk"
 fi
 local url_tmp
@@ -2431,7 +2419,7 @@ else
         # Error policy: dlist restores from backup to preserve data
         eout "{$tag} download of $url failed"
         if [ -f "$hosts_file.bk" ]; then
-            cp "$hosts_file.bk" "$hosts_file"
+            command cp "$hosts_file.bk" "$hosts_file"
             chmod 600 "$hosts_file" "$hosts_file.bk"
         fi
 fi
@@ -2560,7 +2548,7 @@ while IFS= read -r line; do
 	fi
 done < "$ipset_rules"
 if [ "$migrated" -gt 0 ]; then
-	cp "$tmp" "$ipset_rules"
+	command cp "$tmp" "$ipset_rules"
 	eout "{ipset} migrated $migrated entries in ipset.rules to 7-field format"
 fi
 rm -f "$tmp"
@@ -2726,7 +2714,7 @@ if [ -f "$ts_file" ]; then
 	grep -v "^${ts_name}:" "$ts_file" > "$ts_tmp" 2>/dev/null || true
 fi
 printf '%s\n' "${ts_name}:${ts_epoch}" >> "$ts_tmp"
-cp "$ts_tmp" "$ts_file"
+command cp "$ts_tmp" "$ts_file"
 chmod 600 "$ts_file"
 rm -f "$ts_tmp"
 }
@@ -3010,24 +2998,45 @@ fi
 expire_temp_entries() {
 	local current_time file line count=0
 	local -a _et_expired=()
+	local -a _et_cc_expired=()
+	local -a _et_cc_files=()
 	current_time=$(date +%s)
 	for file in "$ALLOW_HOSTS" "$DENY_HOSTS" "$CC_DENY_HOSTS" "$CC_ALLOW_HOSTS"; do
 		[ -f "$file" ] || continue
+		local _is_cc_file=0
+		if [ "$file" = "$CC_DENY_HOSTS" ] || [ "$file" = "$CC_ALLOW_HOSTS" ]; then
+			_is_cc_file=1
+		fi
 		while IFS= read -r line; do
 			_parse_temp_comment "$line"
 			if [ "$current_time" -ge "$_PTC_EPOCH" ] 2>/dev/null; then
 				eout "{trust} removed expired temp entry for $_PTC_IP"
-				_et_expired+=("$_PTC_IP")
+				if [ "$_is_cc_file" = "1" ]; then
+					_et_cc_expired+=("$_PTC_IP")
+					_et_cc_files+=("$file")
+				else
+					_et_expired+=("$_PTC_IP")
+				fi
 				count=$(($count + 1))
 			fi
 		done < <(grep '# added .* ttl=.*expire=' "$file")
 	done
-	# Deferred removal: avoids modifying trust files while iterating;
-	# cli_trust_remove handles both iptables rules and file cleanup
+	# Deferred removal: avoids modifying trust files while iterating
+	# Regular trust entries: cli_trust_remove handles iptables + file cleanup
 	local _et_ip
 	for _et_ip in "${_et_expired[@]}"; do
 		cli_trust_remove "$_et_ip" >> /dev/null 2>&1
 	done
+	# CC entries: _expire_cc_temp_entry removes only the temp metadata;
+	# preserves permanent entries, ipsets, and iptables rules for that CC
+	if [ "${#_et_cc_expired[@]}" -gt 0 ]; then
+		# shellcheck disable=SC1090,SC1091
+		. "$INSTALL_PATH/internals/geoip.apf"
+		local _et_i
+		for _et_i in "${!_et_cc_expired[@]}"; do
+			_expire_cc_temp_entry "${_et_cc_expired[$_et_i]}" "${_et_cc_files[$_et_i]}" 2>/dev/null
+		done
+	fi
 	if [ "$count" -gt 0 ]; then
 		eout "{trust} expired $count temporary trust entries"
 	fi
@@ -3076,25 +3085,48 @@ list_temp_entries() {
 flush_temp_entries() {
 	local file line count=0
 	local -a _ft_expired=()
+	local -a _ft_cc_expired=()
+	local -a _ft_cc_files=()
 	for file in "$ALLOW_HOSTS" "$DENY_HOSTS" "$CC_DENY_HOSTS" "$CC_ALLOW_HOSTS"; do
 		[ -f "$file" ] || continue
+		local _is_cc_file=0
+		if [ "$file" = "$CC_DENY_HOSTS" ] || [ "$file" = "$CC_ALLOW_HOSTS" ]; then
+			_is_cc_file=1
+		fi
 		while IFS= read -r line; do
 			_parse_temp_comment "$line"
-			_ft_expired+=("$_PTC_IP")
+			if [ "$_is_cc_file" = "1" ]; then
+				_ft_cc_expired+=("$_PTC_IP")
+				_ft_cc_files+=("$file")
+			else
+				_ft_expired+=("$_PTC_IP")
+			fi
 			count=$(($count + 1))
 		done < <(grep '# added .* ttl=.*expire=' "$file")
-		# Safety net: remove any orphaned ttl= comment lines not cleaned
-		# by per-IP cli_trust_remove (e.g., partial flush after restart);
-		# matches only "# added" metadata lines, not documentation headers
-		sed -i '/# added .* ttl=.*expire=/d' "$file"
+		if [ "$_is_cc_file" = "0" ]; then
+			# Safety net: remove any orphaned ttl= comment lines not cleaned
+			# by per-IP cli_trust_remove (e.g., partial flush after restart);
+			# matches only "# added" metadata lines, not documentation headers
+			sed -i '/# added .* ttl=.*expire=/d' "$file"
+		fi
 	done
-	# Deferred removal: avoids modifying trust files while iterating;
-	# cli_trust_remove handles both iptables rules and file cleanup
+	# Deferred removal: avoids modifying trust files while iterating
+	# Regular trust entries: cli_trust_remove handles iptables + file cleanup
 	local _ft_ip
 	for _ft_ip in "${_ft_expired[@]}"; do
 		# Suppress errors: iptables rules may not exist after firewall restart
 		cli_trust_remove "$_ft_ip" >> /dev/null 2>&1
 	done
+	# CC entries: _expire_cc_temp_entry removes only the temp metadata;
+	# preserves permanent entries, ipsets, and iptables rules for that CC
+	if [ "${#_ft_cc_expired[@]}" -gt 0 ]; then
+		# shellcheck disable=SC1090,SC1091
+		. "$INSTALL_PATH/internals/geoip.apf"
+		local _ft_i
+		for _ft_i in "${!_ft_cc_expired[@]}"; do
+			_expire_cc_temp_entry "${_ft_cc_expired[$_ft_i]}" "${_ft_cc_files[$_ft_i]}" 2>/dev/null
+		done
+	fi
 	eout "{trust} flushed $count temporary trust entries"
 	if [ "$SET_VERBOSE" != "1" ]; then
 		echo "Flushed $count temporary trust entries."

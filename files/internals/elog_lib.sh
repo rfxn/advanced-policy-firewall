@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# elog_lib.sh — Structured Event Logging Library 1.0.2
+# elog_lib.sh — Structured Event Logging Library 1.0.4
 ###
 # Copyright (C) 2002-2026 R-fx Networks <proj@rfxn.com>
 #                         Ryan MacDonald <ryan@rfxn.com>
@@ -26,10 +26,10 @@
 
 # Source guard — safe for repeated sourcing
 # shellcheck disable=SC2154
-[[ -n "${_ELOG_LIB_LOADED:-}" ]] && return 0 2>/dev/null
+[[ -n "${_ELOG_LIB_LOADED:-}" ]] && return 0 2>/dev/null  # suppress error when executed (not sourced)
 _ELOG_LIB_LOADED=1
 # shellcheck disable=SC2034 # version checked by consumers
-ELOG_LIB_VERSION="1.0.3"
+ELOG_LIB_VERSION="1.0.4"
 
 # --- Configuration variables (set by consumer before sourcing) ---
 # All use ${VAR:-default} — safe when sourced from inside functions (BATS).
@@ -43,7 +43,7 @@ ELOG_LIB_VERSION="1.0.3"
 # ELOG_LEVEL        — minimum severity: 0=debug 1=info 2=warn 3=error 4=critical (default: 1)
 # ELOG_VERBOSE      — when "1", debug-level messages emit to stdout (default: 0)
 # ELOG_FORMAT       — "classic" or "json" (default: classic)
-# ELOG_TS_FORMAT    — date strftime format (default: "%b %e %H:%M:%S")
+# ELOG_TS_FORMAT    — date strftime format (default: "%b %e %H:%M:%S"); must not contain "|"
 # ELOG_STDOUT       — "always"|"never"|"flag" (default: always)
 # ELOG_STDOUT_PREFIX — "full"|"short"|"none" (default: full)
 # ELOG_LOG_MAX_LINES — max lines in app log before truncation (0 = disabled)
@@ -78,6 +78,7 @@ ELOG_LIB_VERSION="1.0.3"
 # --- Internal state ---
 _ELOG_INIT_DONE=0
 _ELOG_WRITE_COUNT=0
+_ELOG_RET=""
 _ELOG_TRUNCATE_CHECK_INTERVAL=50
 
 # Event context staging — set by elog_event() before dispatch, read by SIEM handlers
@@ -94,6 +95,9 @@ _ELOG_STAGE_CEF=""
 _ELOG_STAGE_GELF=""
 _ELOG_STAGE_ELK=""
 
+# Cached hostname — resolved once, reused for all log calls
+_ELOG_HOSTNAME=""
+
 # UDP delivery method — detected at init or first use
 _ELOG_UDP_METHOD=""
 
@@ -106,37 +110,55 @@ _ELOG_HTTP_METHOD=""
 # Returns: 0=debug, 1=info, 2=warn, 3=error, 4=critical; unknown defaults to 1
 _elog_level_num() {
 	case "${1:-info}" in
-		debug)    echo 0 ;;
-		info)     echo 1 ;;
-		warn)     echo 2 ;;
-		error)    echo 3 ;;
-		critical) echo 4 ;;
-		*)        echo 1 ;;
+		debug)    _ELOG_RET=0 ;;
+		info)     _ELOG_RET=1 ;;
+		warn)     _ELOG_RET=2 ;;
+		error)    _ELOG_RET=3 ;;
+		critical) _ELOG_RET=4 ;;
+		*)        _ELOG_RET=1 ;;
 	esac
 }
 
 # _elog_level_name(num) — maps numeric value to level name
 _elog_level_name() {
 	case "${1:-1}" in
-		0) echo "debug" ;;
-		1) echo "info" ;;
-		2) echo "warn" ;;
-		3) echo "error" ;;
-		4) echo "critical" ;;
-		*) echo "info" ;;
+		0) _ELOG_RET="debug" ;;
+		1) _ELOG_RET="info" ;;
+		2) _ELOG_RET="warn" ;;
+		3) _ELOG_RET="error" ;;
+		4) _ELOG_RET="critical" ;;
+		*) _ELOG_RET="info" ;;
 	esac
 }
 
 # _elog_json_escape(str) — escape string for safe JSON embedding
-# Handles: backslash, double-quote, newline, tab, carriage return
+# Handles: backslash, double-quote, newline, tab, carriage return, backspace, form feed
 _elog_json_escape() {
-	local s="$1"
-	s="${s//\\/\\\\}"
-	s="${s//\"/\\\"}"
-	s="${s//$'\n'/\\n}"
-	s="${s//$'\t'/\\t}"
-	s="${s//$'\r'/\\r}"
-	echo "$s"
+	_ELOG_RET="$1"
+	_ELOG_RET="${_ELOG_RET//\\/\\\\}"
+	_ELOG_RET="${_ELOG_RET//\"/\\\"}"
+	_ELOG_RET="${_ELOG_RET//$'\n'/\\n}"
+	_ELOG_RET="${_ELOG_RET//$'\t'/\\t}"
+	_ELOG_RET="${_ELOG_RET//$'\r'/\\r}"
+	_ELOG_RET="${_ELOG_RET//$'\x08'/\\b}"
+	_ELOG_RET="${_ELOG_RET//$'\x0c'/\\f}"
+}
+
+# _elog_parse_extras(extras, callback_fn) — parse space-delimited key=value pairs
+# Calls callback_fn with (key, val) for each valid pair.
+# Strips trailing newlines from here-string, skips pairs without = or empty keys.
+_elog_parse_extras() {
+	local _extras="$1" _callback="$2"
+	[ -z "$_extras" ] && return 0
+	local _pair _key _val
+	while IFS= read -r -d ' ' _pair || [ -n "$_pair" ]; do
+		_key="${_pair%%=*}"
+		_val="${_pair#*=}"
+		_val="${_val%$'\n'}"  # strip trailing newline from here-string
+		[ "$_key" = "$_pair" ] && continue  # no = found
+		[ -z "$_key" ] && continue
+		"$_callback" "$_key" "$_val"
+	done <<< "$_extras"
 }
 
 # _elog_extract_tag(msg) — extract {tag} prefix from message
@@ -145,7 +167,9 @@ _elog_extract_tag() {
 	local msg="$1"
 	local tag_pat='^\{([^}]+)\}'
 	if [[ "$msg" =~ $tag_pat ]]; then
-		echo "${BASH_REMATCH[1]}"
+		_ELOG_RET="${BASH_REMATCH[1]}"
+	else
+		_ELOG_RET=""
 	fi
 }
 
@@ -154,10 +178,17 @@ _elog_strip_tag() {
 	local msg="$1"
 	local tag_pat='^\{[^}]+\} '
 	if [[ "$msg" =~ $tag_pat ]]; then
-		echo "${msg#"${BASH_REMATCH[0]}"}"
+		_ELOG_RET="${msg#"${BASH_REMATCH[0]}"}"
 	else
-		echo "$msg"
+		_ELOG_RET="$msg"
 	fi
+}
+
+# _elog_resolve_hostname — resolve and cache hostname (FQDN with fallback)
+# Sets _ELOG_HOSTNAME on first call; subsequent calls are no-ops
+_elog_resolve_hostname() {
+	[ -n "$_ELOG_HOSTNAME" ] && return 0
+	_ELOG_HOSTNAME=$(hostname -f 2>/dev/null || hostname -s 2>/dev/null || hostname)  # fallback chain for all target OSes
 }
 
 # ---------------------------------------------------------------------------
@@ -182,10 +213,16 @@ elog_init() {
 	ELOG_LOG_FILE="$_log_file"
 	ELOG_AUDIT_FILE="$_audit_file"
 
+	# Restrictive umask during file creation (restore after)
+	local _old_umask
+	_old_umask=$(umask)
+	umask 027
+
 	# Create log directory
 	if [ ! -d "$_log_dir" ]; then
-		if ! mkdir -p "$_log_dir" 2>/dev/null; then
+		if ! mkdir -p "$_log_dir" 2>/dev/null; then  # suppress permission errors; failure handled below
 			echo "elog_lib: failed to create log directory: $_log_dir" >&2
+			umask "$_old_umask"
 			return 1
 		fi
 		chmod 750 "$_log_dir"
@@ -196,30 +233,34 @@ elog_init() {
 	for _f in "$_log_file" "$_audit_file"; do
 		[ -z "$_f" ] && continue  # skip empty paths (audit disabled)
 		if [ ! -f "$_f" ]; then
-			touch "$_f" 2>/dev/null || {
+			touch "$_f" 2>/dev/null || {  # suppress permission errors; failure handled in || block
 				echo "elog_lib: failed to create log file: $_f" >&2
+				umask "$_old_umask"
 				return 1
 			}
 			chmod 640 "$_f"
 		fi
 	done
 
-	# Legacy symlink
+	umask "$_old_umask"
+
+	# Create legacy symlink; skip if regular file exists to avoid
+	# replacing a file the consumer may be actively writing to
 	if [ -n "${ELOG_LEGACY_LOG:-}" ]; then
-		if [ ! -e "$ELOG_LEGACY_LOG" ] && [ ! -L "$ELOG_LEGACY_LOG" ]; then
-			ln -sf "$_log_file" "$ELOG_LEGACY_LOG" 2>/dev/null || true
+		if [ ! -f "$ELOG_LEGACY_LOG" ]; then
+			ln -sf "$_log_file" "$ELOG_LEGACY_LOG" 2>/dev/null || true  # safe: legacy symlink is optional
 		fi
 	fi
 
 	# Auto-enable output modules
 	if [ -n "$_log_file" ]; then
-		elog_output_enable "file" 2>/dev/null || true
+		elog_output_enable "file" 2>/dev/null || true  # safe: module may not be registered yet
 	fi
 	if [ -n "$_audit_file" ]; then
-		elog_output_enable "audit_file" 2>/dev/null || true
+		elog_output_enable "audit_file" 2>/dev/null || true  # safe: module may not be registered yet
 	fi
 	if [ -n "${ELOG_SYSLOG_FILE:-}" ]; then
-		elog_output_enable "syslog_file" 2>/dev/null || true
+		elog_output_enable "syslog_file" 2>/dev/null || true  # safe: module may not be registered yet
 	fi
 
 	# Probe UDP transport only if syslog_udp module is actually enabled
@@ -266,7 +307,7 @@ elog_logrotate_snippet() {
 	    sharedscripts
 	    postrotate
 	        # Signal consumer to reopen log handles (if applicable)
-	        [ -f /var/run/${_app}.pid ] && kill -HUP \$(cat /var/run/${_app}.pid) 2>/dev/null || true
+	        [ -f /var/run/${_app}.pid ] && kill -HUP \$(cat /var/run/${_app}.pid) 2>/dev/null || true  # safe: PID may not exist
 	    endscript
 	}
 	LOGROTATE
@@ -277,7 +318,7 @@ elog_logrotate_snippet() {
 # Called periodically from elog(), not on every write.
 _elog_truncate_check() {
 	local _max="${ELOG_LOG_MAX_LINES:-0}"
-	[ "$_max" -le 0 ] 2>/dev/null && return 0
+	[ "$_max" -le 0 ] 2>/dev/null && return 0  # suppress non-integer warning when unset/empty
 	local _file="${ELOG_LOG_FILE:-}"
 	[ -z "$_file" ] && return 0
 	[ ! -f "$_file" ] && return 0
@@ -288,9 +329,12 @@ _elog_truncate_check() {
 	if [ "$_count" -gt "$_max" ]; then
 		local _tmpf
 		_tmpf=$(mktemp "${_file}.XXXXXX") || return 0
+		# shellcheck disable=SC2064
+		trap "command rm -f '$_tmpf'" HUP TERM INT
 		tail -n "$_max" "$_file" > "$_tmpf"
 		cat "$_tmpf" > "$_file"
-		rm -f "$_tmpf"
+		command rm -f "$_tmpf"
+		trap - HUP TERM INT
 	fi
 }
 
@@ -302,6 +346,8 @@ _elog_auto_enable() {
 	if [ -n "${ELOG_LOG_FILE:-}" ] && ! elog_output_enabled "file"; then
 		elog_output_enable "file" 2>/dev/null || true  # safe: module may not be registered yet
 	fi
+	# Note: ${:-} here is correct — treats both unset and empty as "disabled"
+	# (matches the enable-gate intent, complementing ${-} default at init)
 	if [ -n "${ELOG_AUDIT_FILE:-}" ] && ! elog_output_enabled "audit_file"; then
 		elog_output_enable "audit_file" 2>/dev/null || true  # safe: module may not be registered yet
 	fi
@@ -402,6 +448,11 @@ elog_output_enabled() {
 	[ "${_ELOG_OUTPUT_ENABLED[_ELOG_OUTPUT_IDX]}" = "1" ]
 }
 
+# _elog_module_active(cached_idx) — fast O(1) enabled check using cached index
+_elog_module_active() {
+	[ "${_ELOG_OUTPUT_ENABLED[$1]}" = "1" ]
+}
+
 # ---------------------------------------------------------------------------
 # Built-in Output Handlers
 # ---------------------------------------------------------------------------
@@ -463,31 +514,29 @@ _elog_out_stdout() {
 # _elog_severity_cef(level) — map elog level name to CEF severity (0-10)
 _elog_severity_cef() {
 	case "${1:-info}" in
-		debug)    echo 1 ;;
-		info)     echo 3 ;;
-		warn)     echo 5 ;;
-		error)    echo 7 ;;
-		critical) echo 10 ;;
-		*)        echo 3 ;;
+		debug)    _ELOG_RET=1 ;;
+		info)     _ELOG_RET=3 ;;
+		warn)     _ELOG_RET=5 ;;
+		error)    _ELOG_RET=7 ;;
+		critical) _ELOG_RET=10 ;;
+		*)        _ELOG_RET=3 ;;
 	esac
 }
 
 # _elog_cef_escape_header(str) — escape pipe, backslash, and newline for CEF header fields
 _elog_cef_escape_header() {
-	local s="$1"
-	s="${s//\\/\\\\}"
-	s="${s//|/\\|}"
-	s="${s//$'\n'/\\n}"
-	echo "$s"
+	_ELOG_RET="$1"
+	_ELOG_RET="${_ELOG_RET//\\/\\\\}"
+	_ELOG_RET="${_ELOG_RET//|/\\|}"
+	_ELOG_RET="${_ELOG_RET//$'\n'/\\n}"
 }
 
 # _elog_cef_escape_ext(str) — escape equals, newline, backslash for CEF extension
 _elog_cef_escape_ext() {
-	local s="$1"
-	s="${s//\\/\\\\}"
-	s="${s//=/\\=}"
-	s="${s//$'\n'/\\n}"
-	echo "$s"
+	_ELOG_RET="$1"
+	_ELOG_RET="${_ELOG_RET//\\/\\\\}"
+	_ELOG_RET="${_ELOG_RET//=/\\=}"
+	_ELOG_RET="${_ELOG_RET//$'\n'/\\n}"
 }
 
 # _elog_fmt_cef(type, level, msg, tag, extras) — build CEF formatted string
@@ -496,46 +545,49 @@ _elog_fmt_cef() {
 	local _type="$1" _level="$2" _msg="$3" _tag="${4:-}" _extras="${5:-}"
 	local _vendor _product _version _sev _name _ext
 
-	_vendor=$(_elog_cef_escape_header "${ELOG_CEF_VENDOR:-R-fx Networks}")
-	_product=$(_elog_cef_escape_header "${ELOG_CEF_PRODUCT:-${ELOG_APP:-${0##*/}}}")
-	_version=$(_elog_cef_escape_header "${ELOG_CEF_VERSION:-${ELOG_LIB_VERSION}}")
-	_sev=$(_elog_severity_cef "$_level")
+	_elog_cef_escape_header "${ELOG_CEF_VENDOR:-R-fx Networks}"
+	_vendor="$_ELOG_RET"
+	_elog_cef_escape_header "${ELOG_CEF_PRODUCT:-${ELOG_APP:-${0##*/}}}"
+	_product="$_ELOG_RET"
+	_elog_cef_escape_header "${ELOG_CEF_VERSION:-${ELOG_LIB_VERSION}}"
+	_version="$_ELOG_RET"
+	_elog_severity_cef "$_level"
+	_sev="$_ELOG_RET"
 
 	# SignatureId: header-escaped type for defensive correctness
 	local _sig_id
-	_sig_id=$(_elog_cef_escape_header "$_type")
+	_elog_cef_escape_header "$_type"
+	_sig_id="$_ELOG_RET"
 
 	# Name field: first 128 chars of message, header-escaped
 	local _trunc_msg="${_msg:0:128}"
-	_name=$(_elog_cef_escape_header "$_trunc_msg")
+	_elog_cef_escape_header "$_trunc_msg"
+	_name="$_ELOG_RET"
 
 	# Build extension from tag + extras
 	_ext=""
 	if [ -n "$_tag" ]; then
 		local _esc_tag
-		_esc_tag=$(_elog_cef_escape_ext "$_tag")
+		_elog_cef_escape_ext "$_tag"
+		_esc_tag="$_ELOG_RET"
 		_ext="tag=${_esc_tag}"
 	fi
 
-	# Parse extras (space-separated key=value pairs from _ELOG_EVT_EXTRAS)
-	# Note: values containing spaces are not supported (space-delimited format)
-	if [ -n "$_extras" ]; then
-		local _pair _key _val _esc_val
-		# Use read loop over space-separated pairs
-		while IFS= read -r -d ' ' _pair || [ -n "$_pair" ]; do
-			_key="${_pair%%=*}"
-			_val="${_pair#*=}"
-			_val="${_val%$'\n'}"  # strip trailing newline from here-string
-			[ "$_key" = "$_pair" ] && continue  # no = found
-			[ -z "$_key" ] && continue
-			_esc_val=$(_elog_cef_escape_ext "$_val")
-			if [ -n "$_ext" ]; then
-				_ext="${_ext} ${_key}=${_esc_val}"
-			else
-				_ext="${_key}=${_esc_val}"
-			fi
-		done <<< "$_extras"
-	fi
+	# Parse extras via shared helper — callback accesses _ext from parent scope
+	# shellcheck disable=SC2317  # invoked indirectly via _elog_parse_extras
+	_cef_extra_cb() {
+		local _key="$1" _val="$2"
+		_elog_cef_escape_ext "$_val"
+		local _esc_val="$_ELOG_RET"
+		_key="${_key//[= $'\n']/}"  # strip characters illegal in CEF extension keys
+		[ -z "$_key" ] && return 0
+		if [ -n "$_ext" ]; then
+			_ext="${_ext} ${_key}=${_esc_val}"
+		else
+			_ext="${_key}=${_esc_val}"
+		fi
+	}
+	_elog_parse_extras "$_extras" "_cef_extra_cb"
 
 	echo "CEF:0|${_vendor}|${_product}|${_version}|${_sig_id}|${_name}|${_sev}|${_ext}"
 }
@@ -555,19 +607,19 @@ _elog_out_cef() {
 # _elog_severity_syslog(level) — map elog level name to syslog severity (0-7)
 _elog_severity_syslog() {
 	case "${1:-info}" in
-		critical) echo 2 ;;
-		error)    echo 3 ;;
-		warn)     echo 4 ;;
-		info)     echo 6 ;;
-		debug)    echo 7 ;;
-		*)        echo 6 ;;
+		critical) _ELOG_RET=2 ;;
+		error)    _ELOG_RET=3 ;;
+		warn)     _ELOG_RET=4 ;;
+		info)     _ELOG_RET=6 ;;
+		debug)    _ELOG_RET=7 ;;
+		*)        _ELOG_RET=6 ;;
 	esac
 }
 
 # _elog_syslog_pri(facility, severity) — compute PRI value (facility * 8 + severity)
 _elog_syslog_pri() {
 	local _facility="${1:-1}" _severity="${2:-6}"
-	echo $(( _facility * 8 + _severity ))
+	_ELOG_RET=$(( _facility * 8 + _severity ))
 }
 
 # _elog_fmt_syslog_5424(pri, ts, host, app, pid, msg) — build RFC 5424 syslog line
@@ -625,11 +677,14 @@ _elog_out_syslog_udp() {
 	local _facility="${ELOG_SYSLOG_UDP_FACILITY:-1}"
 	local _level="${_ELOG_EVT_LEVEL:-info}"
 	local _sev _pri
-	_sev=$(_elog_severity_syslog "$_level")
-	_pri=$(_elog_syslog_pri "$_facility" "$_sev")
+	_elog_severity_syslog "$_level"
+	_sev="$_ELOG_RET"
+	_elog_syslog_pri "$_facility" "$_sev"
+	_pri="$_ELOG_RET"
 
-	local _host _app _pid _ts
-	_host=$(hostname -f 2>/dev/null || hostname -s 2>/dev/null || hostname)
+	local _app _pid _ts
+	_elog_resolve_hostname
+	local _host="$_ELOG_HOSTNAME"
 	_app="${ELOG_APP:-${0##*/}}"
 	_pid="$$"
 
@@ -701,7 +756,7 @@ _elog_http_send() {
 # Uses GNU date -d for ISO-to-epoch conversion (works on all 9 target OSes)
 _elog_ts_epoch() {
 	local _ts="$1"
-	date -d "$_ts" +%s 2>/dev/null || echo "0"  # fallback: epoch 0 if parse fails
+	_ELOG_RET=$(date -d "$_ts" +%s 2>/dev/null || echo "0")  # fallback: epoch 0 if parse fails
 }
 
 # _elog_fmt_gelf(type, level, msg, tag, extras, ts, host) — build GELF 1.1 JSON
@@ -710,25 +765,32 @@ _elog_fmt_gelf() {
 	local _ts="${6:-}" _host="${7:-}"
 	local _sev _epoch _app _pid
 
-	_sev=$(_elog_severity_syslog "$_level")
-	_epoch=$(_elog_ts_epoch "$_ts")
+	_elog_severity_syslog "$_level"
+	_sev="$_ELOG_RET"
+	_elog_ts_epoch "$_ts"
+	_epoch="$_ELOG_RET"
 	_app="${ELOG_APP:-${0##*/}}"
 	_pid="$$"
 
 	# short_message: first 256 chars; full_message only if truncated
 	local _short_msg="${_msg:0:256}"
 	local _esc_short _esc_host _esc_app _esc_type
-	_esc_short=$(_elog_json_escape "$_short_msg")
-	_esc_host=$(_elog_json_escape "$_host")
-	_esc_app=$(_elog_json_escape "$_app")
-	_esc_type=$(_elog_json_escape "$_type")
+	_elog_json_escape "$_short_msg"
+	_esc_short="$_ELOG_RET"
+	_elog_json_escape "$_host"
+	_esc_host="$_ELOG_RET"
+	_elog_json_escape "$_app"
+	_esc_app="$_ELOG_RET"
+	_elog_json_escape "$_type"
+	_esc_type="$_ELOG_RET"
 
 	local _gelf="{\"version\":\"1.1\",\"host\":\"${_esc_host}\",\"short_message\":\"${_esc_short}\""
 
 	# full_message only when message exceeds 256 chars
 	if [ ${#_msg} -gt 256 ]; then
 		local _esc_full
-		_esc_full=$(_elog_json_escape "$_msg")
+		_elog_json_escape "$_msg"
+		_esc_full="$_ELOG_RET"
 		_gelf="${_gelf},\"full_message\":\"${_esc_full}\""
 	fi
 
@@ -738,25 +800,22 @@ _elog_fmt_gelf() {
 	# Tag as custom field (only if non-empty)
 	if [ -n "$_tag" ]; then
 		local _esc_tag
-		_esc_tag=$(_elog_json_escape "$_tag")
+		_elog_json_escape "$_tag"
+		_esc_tag="$_ELOG_RET"
 		_gelf="${_gelf},\"_tag\":\"${_esc_tag}\""
 	fi
 
-	# Parse extras — each key=value becomes _key custom field
-	# Note: values containing spaces are not supported (space-delimited format)
-	if [ -n "$_extras" ]; then
-		local _pair _key _val _esc_key _esc_val
-		while IFS= read -r -d ' ' _pair || [ -n "$_pair" ]; do
-			_key="${_pair%%=*}"
-			_val="${_pair#*=}"
-			_val="${_val%$'\n'}"  # strip trailing newline from here-string
-			[ "$_key" = "$_pair" ] && continue  # no = found
-			[ -z "$_key" ] && continue
-			_esc_key=$(_elog_json_escape "$_key")
-			_esc_val=$(_elog_json_escape "$_val")
-			_gelf="${_gelf},\"_${_esc_key}\":\"${_esc_val}\""
-		done <<< "$_extras"
-	fi
+	# Parse extras via shared helper — callback accesses _gelf from parent scope
+	# shellcheck disable=SC2317  # invoked indirectly via _elog_parse_extras
+	_gelf_extra_cb() {
+		local _key="$1" _val="$2"
+		_elog_json_escape "$_key"
+		local _esc_key="$_ELOG_RET"
+		_elog_json_escape "$_val"
+		local _esc_val="$_ELOG_RET"
+		_gelf="${_gelf},\"_${_esc_key}\":\"${_esc_val}\""
+	}
+	_elog_parse_extras "$_extras" "_gelf_extra_cb"
 
 	_gelf="${_gelf}}"
 	echo "$_gelf"
@@ -801,27 +860,27 @@ _elog_ecs_category() {
 	case "${1:-}" in
 		# Detection category
 		threat_detected|threshold_exceeded|pattern_matched|scan_started|scan_completed)
-			echo "intrusion_detection" ;;
+			_ELOG_RET="intrusion_detection" ;;
 		# Enforcement category
 		block_added|block_removed|block_escalated|quarantine_added|quarantine_removed)
-			echo "intrusion_detection" ;;
+			_ELOG_RET="intrusion_detection" ;;
 		# Trust category
 		trust_added|trust_removed)
-			echo "configuration" ;;
+			_ELOG_RET="configuration" ;;
 		# Network category
 		rule_loaded|rule_removed|service_state)
-			echo "network" ;;
+			_ELOG_RET="network" ;;
 		# Alert category
 		alert_sent|alert_failed)
-			echo "notification" ;;
+			_ELOG_RET="notification" ;;
 		# Monitor category
 		monitor_started|monitor_stopped)
-			echo "process" ;;
+			_ELOG_RET="process" ;;
 		# System category
 		config_loaded|config_error|file_cleaned|error_occurred)
-			echo "configuration" ;;
+			_ELOG_RET="configuration" ;;
 		*)
-			echo "event" ;;
+			_ELOG_RET="event" ;;
 	esac
 }
 
@@ -830,31 +889,31 @@ _elog_ecs_type() {
 	case "${1:-}" in
 		# Enforcement: block/quarantine actions
 		block_added|quarantine_added)
-			echo "denied" ;;
+			_ELOG_RET="denied" ;;
 		block_removed|quarantine_removed)
-			echo "allowed" ;;
+			_ELOG_RET="allowed" ;;
 		block_escalated)
-			echo "denied" ;;
+			_ELOG_RET="denied" ;;
 		# Trust: configuration changes
 		trust_added|trust_removed)
-			echo "change" ;;
+			_ELOG_RET="change" ;;
 		# Network: rule and service lifecycle
 		rule_loaded)
-			echo "connection" ;;
+			_ELOG_RET="connection" ;;
 		rule_removed)
-			echo "connection" ;;
+			_ELOG_RET="connection" ;;
 		service_state|monitor_started)
-			echo "start" ;;
+			_ELOG_RET="start" ;;
 		monitor_stopped)
-			echo "end" ;;
+			_ELOG_RET="end" ;;
 		# System: config and errors
 		config_loaded|file_cleaned)
-			echo "change" ;;
+			_ELOG_RET="change" ;;
 		config_error|error_occurred|alert_failed)
-			echo "error" ;;
+			_ELOG_RET="error" ;;
 		# Detection and alerts: informational
 		*)
-			echo "info" ;;
+			_ELOG_RET="info" ;;
 	esac
 }
 
@@ -866,20 +925,30 @@ _elog_fmt_elk() {
 
 	_app="${ELOG_APP:-${0##*/}}"
 	_pid="$$"
-	_category=$(_elog_ecs_category "$_type")
-	_ecs_type=$(_elog_ecs_type "$_type")
+	_elog_ecs_category "$_type"
+	_category="$_ELOG_RET"
+	_elog_ecs_type "$_type"
+	_ecs_type="$_ELOG_RET"
 
 	# JSON-escape all variable fields
 	local _esc_ts _esc_level _esc_msg _esc_host _esc_app _esc_type
 	local _esc_category _esc_ecs_type
-	_esc_ts=$(_elog_json_escape "$_ts")
-	_esc_level=$(_elog_json_escape "$_level")
-	_esc_msg=$(_elog_json_escape "$_msg")
-	_esc_host=$(_elog_json_escape "$_host")
-	_esc_app=$(_elog_json_escape "$_app")
-	_esc_type=$(_elog_json_escape "$_type")
-	_esc_category=$(_elog_json_escape "$_category")
-	_esc_ecs_type=$(_elog_json_escape "$_ecs_type")
+	_elog_json_escape "$_ts"
+	_esc_ts="$_ELOG_RET"
+	_elog_json_escape "$_level"
+	_esc_level="$_ELOG_RET"
+	_elog_json_escape "$_msg"
+	_esc_msg="$_ELOG_RET"
+	_elog_json_escape "$_host"
+	_esc_host="$_ELOG_RET"
+	_elog_json_escape "$_app"
+	_esc_app="$_ELOG_RET"
+	_elog_json_escape "$_type"
+	_esc_type="$_ELOG_RET"
+	_elog_json_escape "$_category"
+	_esc_category="$_ELOG_RET"
+	_elog_json_escape "$_ecs_type"
+	_esc_ecs_type="$_ELOG_RET"
 
 	local _elk="{\"@timestamp\":\"${_esc_ts}\",\"log.level\":\"${_esc_level}\",\"message\":\"${_esc_msg}\""
 	_elk="${_elk},\"event.kind\":\"event\",\"event.category\":\"${_esc_category}\""
@@ -889,31 +958,29 @@ _elog_fmt_elk() {
 	# Tags array from tag (only if non-empty)
 	if [ -n "$_tag" ]; then
 		local _esc_tag
-		_esc_tag=$(_elog_json_escape "$_tag")
+		_elog_json_escape "$_tag"
+		_esc_tag="$_ELOG_RET"
 		_elk="${_elk},\"tags\":[\"${_esc_tag}\"]"
 	fi
 
-	# Labels object from extras (flat key=value map)
-	# Note: values containing spaces are not supported (space-delimited format)
-	if [ -n "$_extras" ]; then
-		local _labels="" _pair _key _val _esc_key _esc_val
-		while IFS= read -r -d ' ' _pair || [ -n "$_pair" ]; do
-			_key="${_pair%%=*}"
-			_val="${_pair#*=}"
-			_val="${_val%$'\n'}"  # strip trailing newline from here-string
-			[ "$_key" = "$_pair" ] && continue  # no = found
-			[ -z "$_key" ] && continue
-			_esc_key=$(_elog_json_escape "$_key")
-			_esc_val=$(_elog_json_escape "$_val")
-			if [ -n "$_labels" ]; then
-				_labels="${_labels},\"${_esc_key}\":\"${_esc_val}\""
-			else
-				_labels="\"${_esc_key}\":\"${_esc_val}\""
-			fi
-		done <<< "$_extras"
+	# Parse extras via shared helper — callback accesses _labels, _elk from parent scope
+	local _labels=""
+	# shellcheck disable=SC2317  # invoked indirectly via _elog_parse_extras
+	_elk_extra_cb() {
+		local _key="$1" _val="$2"
+		_elog_json_escape "$_key"
+		local _esc_key="$_ELOG_RET"
+		_elog_json_escape "$_val"
+		local _esc_val="$_ELOG_RET"
 		if [ -n "$_labels" ]; then
-			_elk="${_elk},\"labels\":{${_labels}}"
+			_labels="${_labels},\"${_esc_key}\":\"${_esc_val}\""
+		else
+			_labels="\"${_esc_key}\":\"${_esc_val}\""
 		fi
+	}
+	_elog_parse_extras "$_extras" "_elk_extra_cb"
+	if [ -n "$_labels" ]; then
+		_elk="${_elk},\"labels\":{${_labels}}"
 	fi
 
 	_elk="${_elk}}"
@@ -1050,8 +1117,8 @@ elog() {
 	# empty message — no output
 	[ -z "$_msg" ] && return 0
 
-	local _level_num
-	_level_num=$(_elog_level_num "$_level")
+	_elog_level_num "$_level"
+	local _level_num="$_ELOG_RET"
 
 	# debug level: stdout only (bare text), gated solely by ELOG_VERBOSE
 	# (not subject to ELOG_LEVEL filtering — ELOG_VERBOSE is its own gate)
@@ -1071,9 +1138,13 @@ elog() {
 	_elog_auto_enable
 
 	# info+ levels: format and route
-	local _ts _host _app _pid
-	_ts=$(date +"${ELOG_TS_FORMAT:-%b %e %H:%M:%S}")
-	_host=$(hostname -f 2>/dev/null || hostname -s 2>/dev/null || hostname)
+	local _ts _host _app _pid _iso_ts
+	local _both_ts
+	_both_ts=$(date +"${ELOG_TS_FORMAT:-%b %e %H:%M:%S}|%Y-%m-%dT%H:%M:%S%z")
+	_ts="${_both_ts%%|*}"
+	_iso_ts="${_both_ts#*|}"
+	_elog_resolve_hostname
+	_host="$_ELOG_HOSTNAME"
 	_app="${ELOG_APP:-${0##*/}}"
 	_pid="$$"
 
@@ -1082,79 +1153,45 @@ elog() {
 	_classic_line="$_ts $_host ${_app}(${_pid}): $_msg"
 
 	# Build JSON formatted line
-	local _json_line _esc_msg _tag _esc_tag _json_msg _iso_ts
-	_tag=$(_elog_extract_tag "$_msg")
+	local _json_line _esc_msg _tag _esc_tag _json_msg
+	_elog_extract_tag "$_msg"
+	_tag="$_ELOG_RET"
 	if [ -n "$_tag" ]; then
-		_json_msg=$(_elog_strip_tag "$_msg")
+		_elog_strip_tag "$_msg"
+		_json_msg="$_ELOG_RET"
 	else
 		_json_msg="$_msg"
 	fi
-	_esc_msg=$(_elog_json_escape "$_json_msg")
-	_iso_ts=$(date +"%Y-%m-%dT%H:%M:%S%z")
+	_elog_json_escape "$_json_msg"
+	_esc_msg="$_ELOG_RET"
+	local _esc_host _esc_app _esc_level
+	_elog_json_escape "$_host"
+	_esc_host="$_ELOG_RET"
+	_elog_json_escape "$_app"
+	_esc_app="$_ELOG_RET"
+	_elog_json_escape "$_level"
+	_esc_level="$_ELOG_RET"
 	if [ -n "$_tag" ]; then
-		_esc_tag=$(_elog_json_escape "$_tag")
-		_json_line="{\"ts\":\"${_iso_ts}\",\"host\":\"${_host}\",\"app\":\"${_app}\",\"pid\":${_pid},\"level\":\"${_level}\",\"tag\":\"${_esc_tag}\",\"msg\":\"${_esc_msg}\"}"
+		_elog_json_escape "$_tag"
+		_esc_tag="$_ELOG_RET"
+		_json_line="{\"ts\":\"${_iso_ts}\",\"host\":\"${_esc_host}\",\"app\":\"${_esc_app}\",\"pid\":${_pid},\"level\":\"${_esc_level}\",\"tag\":\"${_esc_tag}\",\"msg\":\"${_esc_msg}\"}"
 	else
-		_json_line="{\"ts\":\"${_iso_ts}\",\"host\":\"${_host}\",\"app\":\"${_app}\",\"pid\":${_pid},\"level\":\"${_level}\",\"msg\":\"${_esc_msg}\"}"
+		_json_line="{\"ts\":\"${_iso_ts}\",\"host\":\"${_esc_host}\",\"app\":\"${_esc_app}\",\"pid\":${_pid},\"level\":\"${_esc_level}\",\"msg\":\"${_esc_msg}\"}"
 	fi
 
-	# Use dispatch if any modules are registered, else direct write (backward compat)
-	if [ ${#_ELOG_OUTPUT_NAMES[@]} -gt 0 ]; then
-		local _fmt="${ELOG_FORMAT:-classic}"
-		local _out_classic _out_json
-		if [ "$_fmt" = "json" ]; then
-			_out_classic="$_json_line"
-		else
-			_out_classic="$_classic_line"
-		fi
-		_out_json="$_json_line"
-		# Stage level for SIEM handlers (syslog_udp uses _ELOG_EVT_LEVEL)
-		_ELOG_EVT_LEVEL="$_level"
-		_elog_dispatch "elog" "$_out_classic" "$_out_json" "$_level" "$_msg" "$_stdout_flag"
-		_ELOG_EVT_LEVEL=""
+	# Dispatch via output module registry (8 modules always registered at source time)
+	local _fmt="${ELOG_FORMAT:-classic}"
+	local _out_classic _out_json
+	if [ "$_fmt" = "json" ]; then
+		_out_classic="$_json_line"
 	else
-		# No modules registered — direct write (pre-init / backward compat)
-		local _fmt="${ELOG_FORMAT:-classic}"
-		if [ -n "${ELOG_LOG_FILE:-}" ]; then
-			if [ "$_fmt" = "json" ]; then
-				echo "$_json_line" >> "$ELOG_LOG_FILE"
-			else
-				echo "$_classic_line" >> "$ELOG_LOG_FILE"
-			fi
-		fi
-		if [ -n "${ELOG_SYSLOG_FILE:-}" ]; then
-			if [ "$_fmt" = "json" ]; then
-				echo "$_json_line" >> "$ELOG_SYSLOG_FILE"
-			else
-				echo "$_classic_line" >> "$ELOG_SYSLOG_FILE"
-			fi
-		fi
-		# Stdout
-		local _stdout="${ELOG_STDOUT:-always}"
-		case "$_stdout" in
-			always) ;;
-			never) return 0 ;;
-			flag)
-				[ -z "$_stdout_flag" ] && return 0
-				;;
-		esac
-		local _prefix="${ELOG_STDOUT_PREFIX:-full}"
-		case "$_prefix" in
-			full)
-				if [ "$_fmt" = "json" ]; then
-					echo "$_json_line"
-				else
-					echo "$_classic_line"
-				fi
-				;;
-			short)
-				echo "${_app}(${_pid}): $_msg"
-				;;
-			none)
-				echo "$_msg"
-				;;
-		esac
+		_out_classic="$_classic_line"
 	fi
+	_out_json="$_json_line"
+	# Stage level for SIEM handlers (syslog_udp uses _ELOG_EVT_LEVEL)
+	_ELOG_EVT_LEVEL="$_level"
+	_elog_dispatch "elog" "$_out_classic" "$_out_json" "$_level" "$_msg" "$_stdout_flag"
+	_ELOG_EVT_LEVEL=""
 
 	# Periodic log truncation check
 	_ELOG_WRITE_COUNT=$((_ELOG_WRITE_COUNT + 1))
@@ -1203,35 +1240,49 @@ elog_event() {
 	[ -z "$_msg" ] && return 0
 
 	# Severity filtering
-	local _level_num _min_level
-	_level_num=$(_elog_level_num "$_level")
-	_min_level="${ELOG_LEVEL:-1}"
+	_elog_level_num "$_level"
+	local _level_num="$_ELOG_RET"
+	local _min_level="${ELOG_LEVEL:-1}"
 	[ "$_level_num" -lt "$_min_level" ] && return 0
 
 	# Pre-init fallback
 	_elog_auto_enable
 
 	# Timestamp and identity
-	local _ts _host _app _pid
-	_ts=$(date +"${ELOG_TS_FORMAT:-%b %e %H:%M:%S}")
-	_host=$(hostname -f 2>/dev/null || hostname -s 2>/dev/null || hostname)
+	local _ts _host _app _pid _iso_ts
+	local _both_ts
+	_both_ts=$(date +"${ELOG_TS_FORMAT:-%b %e %H:%M:%S}|%Y-%m-%dT%H:%M:%S%z")
+	_ts="${_both_ts%%|*}"
+	_iso_ts="${_both_ts#*|}"
+	_elog_resolve_hostname
+	_host="$_ELOG_HOSTNAME"
 	_app="${ELOG_APP:-${0##*/}}"
 	_pid="$$"
 
 	# Extract {tag} from message
 	local _tag _json_msg
-	_tag=$(_elog_extract_tag "$_msg")
+	_elog_extract_tag "$_msg"
+	_tag="$_ELOG_RET"
 	if [ -n "$_tag" ]; then
-		_json_msg=$(_elog_strip_tag "$_msg")
+		_elog_strip_tag "$_msg"
+		_json_msg="$_ELOG_RET"
 	else
 		_json_msg="$_msg"
 	fi
 
 	# JSON-escape mandatory fields
-	local _esc_msg _esc_type _iso_ts
-	_esc_msg=$(_elog_json_escape "$_json_msg")
-	_esc_type=$(_elog_json_escape "$_type")
-	_iso_ts=$(date +"%Y-%m-%dT%H:%M:%S%z")
+	local _esc_msg _esc_type
+	_elog_json_escape "$_json_msg"
+	_esc_msg="$_ELOG_RET"
+	_elog_json_escape "$_type"
+	_esc_type="$_ELOG_RET"
+	local _esc_host _esc_app _esc_level
+	_elog_json_escape "$_host"
+	_esc_host="$_ELOG_RET"
+	_elog_json_escape "$_app"
+	_esc_app="$_ELOG_RET"
+	_elog_json_escape "$_level"
+	_esc_level="$_ELOG_RET"
 
 	# Parse key=value extra fields from remaining args
 	# Build both JSON extras and raw extras (for SIEM handlers) in single pass
@@ -1242,8 +1293,10 @@ elog_event() {
 		_val="${_pair#*=}"
 		[ "$_key" = "$_pair" ] && continue  # no = found
 		[ -z "$_key" ] && continue           # empty key
-		_esc_key=$(_elog_json_escape "$_key")
-		_esc_val=$(_elog_json_escape "$_val")
+		_elog_json_escape "$_key"
+		_esc_key="$_ELOG_RET"
+		_elog_json_escape "$_val"
+		_esc_val="$_ELOG_RET"
 		_extra="${_extra},\"${_esc_key}\":\"${_esc_val}\""
 		# Raw extras for SIEM handlers (space-separated key=value)
 		if [ -n "$_raw_extras" ]; then
@@ -1255,10 +1308,11 @@ elog_event() {
 
 	# Build JSON envelope
 	local _json_line
-	_json_line="{\"ts\":\"${_iso_ts}\",\"host\":\"${_host}\",\"app\":\"${_app}\",\"pid\":${_pid},\"type\":\"${_esc_type}\",\"level\":\"${_level}\",\"msg\":\"${_esc_msg}\""
+	_json_line="{\"ts\":\"${_iso_ts}\",\"host\":\"${_esc_host}\",\"app\":\"${_esc_app}\",\"pid\":${_pid},\"type\":\"${_esc_type}\",\"level\":\"${_esc_level}\",\"msg\":\"${_esc_msg}\""
 	if [ -n "$_tag" ]; then
 		local _esc_tag
-		_esc_tag=$(_elog_json_escape "$_tag")
+		_elog_json_escape "$_tag"
+		_esc_tag="$_ELOG_RET"
 		_json_line="${_json_line},\"tag\":\"${_esc_tag}\""
 	fi
 	_json_line="${_json_line}${_extra}}"
@@ -1282,15 +1336,15 @@ elog_event() {
 
 	# Pre-format SIEM lines if modules are enabled (avoid overhead otherwise)
 	_ELOG_STAGE_CEF=""
-	if elog_output_enabled "cef"; then
+	if _elog_module_active "$_ELOG_IDX_CEF"; then
 		_ELOG_STAGE_CEF=$(_elog_fmt_cef "$_type" "$_level" "$_json_msg" "$_tag" "$_ELOG_EVT_EXTRAS")
 	fi
 	_ELOG_STAGE_GELF=""
-	if elog_output_enabled "gelf"; then
+	if _elog_module_active "$_ELOG_IDX_GELF"; then
 		_ELOG_STAGE_GELF=$(_elog_fmt_gelf "$_type" "$_level" "$_json_msg" "$_tag" "$_ELOG_EVT_EXTRAS" "$_iso_ts" "$_host")
 	fi
 	_ELOG_STAGE_ELK=""
-	if elog_output_enabled "elk_json"; then
+	if _elog_module_active "$_ELOG_IDX_ELK"; then
 		_ELOG_STAGE_ELK=$(_elog_fmt_elk "$_type" "$_level" "$_json_msg" "$_tag" "$_ELOG_EVT_EXTRAS" "$_iso_ts" "$_host")
 	fi
 
@@ -1330,3 +1384,8 @@ elog_output_register "cef" "_elog_out_cef" "cef" "event"
 elog_output_register "syslog_udp" "_elog_out_syslog_udp" "classic" "all"
 elog_output_register "gelf" "_elog_out_gelf" "gelf" "event"
 elog_output_register "elk_json" "_elog_out_elk_json" "elk" "event"
+
+# Cache indices for frequently-checked modules (avoids linear scan per check)
+_elog_output_find "cef"; _ELOG_IDX_CEF=$_ELOG_OUTPUT_IDX
+_elog_output_find "gelf"; _ELOG_IDX_GELF=$_ELOG_OUTPUT_IDX
+_elog_output_find "elk_json"; _ELOG_IDX_ELK=$_ELOG_OUTPUT_IDX

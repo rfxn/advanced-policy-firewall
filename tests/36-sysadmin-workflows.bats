@@ -478,7 +478,7 @@ teardown() {
         sed -i '/^[^#]/d' "$APF_DIR/cc_deny.rules" 2>/dev/null || true
         sed -i '/^# added /d' "$APF_DIR/cc_deny.rules" 2>/dev/null || true
         ipset destroy apf_cc4_ZZ 2>/dev/null || true
-        /usr/bin/rm -f "$APF_DIR/geoip/ZZ.4"
+        rm -f "$APF_DIR/geoip/ZZ.4"
         sed -i 's/^USE_IPSET=.*/USE_IPSET="0"/' "$APF_DIR/conf.apf"
         unset GEOIP_CURL_BIN GEOIP_WGET_BIN
     fi

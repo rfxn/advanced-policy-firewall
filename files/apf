@@ -107,7 +107,7 @@ if [ "$DEVEL_MODE" == "1" ]; then
 	SKIP_FASTLOAD_VARS=1
 fi
 if [ ! -f "$INSTALL_PATH/internals/.md5.cores.new" ] && [ -f "$INSTALL_PATH/internals/.md5.cores" ]; then
-	cp "$INSTALL_PATH/internals/.md5.cores" "$INSTALL_PATH/internals/.md5.cores.new"
+	command cp "$INSTALL_PATH/internals/.md5.cores" "$INSTALL_PATH/internals/.md5.cores.new"
 fi
 
 if [ ! -f "$INSTALL_PATH/internals/.last.vars" ]; then

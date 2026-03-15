@@ -39,7 +39,7 @@ trust-based host management, reactive address blocking, and per-IP virtual netwo
   - [3.14 Remote Block Lists](#314-remote-block-lists)
   - [3.15 Logging & Control](#315-logging--control)
   - [3.16 Implicit Blocking](#316-implicit-blocking)
-  - [3.17 Firewall Order of Operations](#316-firewall-order-of-operations)
+  - [3.17 Firewall Order of Operations](#317-firewall-order-of-operations)
 - [4. General Usage](#4-general-usage)
   - [4.1 Trust System](#41-trust-system)
   - [4.2 Global Trust System](#42-global-trust-system)
@@ -486,7 +486,7 @@ Enable this option if you see Docker containers losing network connectivity afte
 
 The ipset subsystem uses kernel-level hash tables for high-performance IP matching. Instead of creating one iptables rule per blocked IP address (which scales linearly), ipset creates a single iptables rule per block list that references a kernel hash set, providing O(1) lookup performance regardless of list size.
 
-**`USE_IPSET`** - Set to `"1"` to enable ipset block list support. Requires the `ipset` utility to be installed (`apt-get install ipset` / `yum install ipset`). When disabled or ipset is not installed, the `ipset.rules` file is ignored.
+**`USE_IPSET`** - Controls ipset block list support. `"auto"` (default) detects the `ipset` binary and `ip_set` kernel module at startup and enables ipset if both are present. `"1"` forces enable regardless of detection. `"0"` forces disable. Requires the `ipset` utility (`apt-get install ipset` / `yum install ipset`). When disabled or ipset is not available, the `ipset.rules` file is ignored.
 
 **`IPSET_LOG_RATE`** - Default log rate limit (per minute) for ipset blocklist matches. Individual lists can control their own logging via the log field in `ipset.rules`.
 

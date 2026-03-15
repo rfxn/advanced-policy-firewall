@@ -245,6 +245,7 @@ ct_scan() {
 			local _count="${_line%% *}"
 			local _addr="${_line##* }"
 			[ -z "$_addr" ] && continue
+			valid_ip_cidr "$_addr" || continue
 
 			# Skip if already in deny list (any reason — prevents duplicate blocks)
 			if grep -Fxq "$_addr" "$DENY_HOSTS" 2>/dev/null; then

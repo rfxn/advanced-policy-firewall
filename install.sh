@@ -54,7 +54,7 @@ install() {
 
 	# Clean up legacy cron entries (ancient + pre-2.0.2 variants)
 	pkg_cron_remove /etc/cron.hourly/fw /etc/cron.daily/fw /etc/cron.d/fwdev
-	rm -f "$INSTALL_PATH/cron.fwdev"
+	command rm -f "$INSTALL_PATH/cron.fwdev"
 	pkg_cron_remove /etc/cron.daily/apf /etc/cron.d/apf_ipset /etc/cron.d/apf_temp
 
 	# Install consolidated cron: daily restart, hourly ipset refresh, per-minute temp expiry
@@ -95,9 +95,9 @@ install() {
 
 	# Rotate old log file
 	if [ -f "/var/log/apf_log" ]; then
-		mv -f /var/log/apf_log /var/log/apf_log.prev
+		command mv -f /var/log/apf_log /var/log/apf_log.prev
 	fi
-	rm -f /var/log/apfados_log
+	command rm -f /var/log/apfados_log
 
 	# Install logrotate config
 	if [ -f "logrotate.d.apf" ]; then

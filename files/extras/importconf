@@ -35,6 +35,41 @@ if [ -n "$_eg_val" ] && [[ "$_eg_val" == *" "* ]] && [[ "$_eg_val" != *","* ]]; 
 	pkg_config_set "$INSTALL_PATH/conf.apf" "EG_DROP_CMD" "$_eg_val"
 fi
 
+# Read old version early — needed for version-gated migrations below
+OV=$(awk '{print$2}' "$BK_LAST/VERSION")
+
+# Migrate auto-detect variables from hardcoded "0" (pre-2.0.2 default) to "auto"
+# which detects at runtime — "auto" won't enable a feature if unavailable.
+# Only run when upgrading from pre-2.0.2 where "0" was the default; on 2.0.2+
+# a user setting "0" means explicitly disabled and must not be overwritten.
+case "$OV" in
+	""|1.*|2.0.0|2.0.1)
+		for _auto_var in DOCKER_COMPAT USE_IPSET IPT_LOCK_SUPPORT; do
+			_auto_val=$(pkg_config_get "$INSTALL_PATH/conf.apf" "$_auto_var") || _auto_val=""
+			if [ "$_auto_val" = "0" ]; then
+				pkg_config_set "$INSTALL_PATH/conf.apf" "$_auto_var" "auto"
+			fi
+		done
+
+		# Fix TCR_PASS/TCR_PORTS combined-line format from pre-2.0.2.
+		# In 2.0.1 and earlier, both variables shared a single line:
+		#   TCR_PASS="1"		TCR_PORTS="33434:33534"
+		# pkg_config_merge treats the entire line as TCR_PASS's value,
+		# losing the user's TCR_PORTS customization. Extract and fix.
+		_tcr_line=$(grep '^TCR_PASS=' "$INSTALL_PATH/conf.apf" 2>/dev/null) || _tcr_line=""
+		if [[ "$_tcr_line" == *TCR_PORTS=* ]]; then
+			_tcr_ports_val="${_tcr_line##*TCR_PORTS=}"
+			_tcr_ports_val="${_tcr_ports_val//\"/}"
+			_tcr_ports_val="${_tcr_ports_val%%[[:space:]]*}"
+			_tcr_pass_val="${_tcr_line#TCR_PASS=}"
+			_tcr_pass_val="${_tcr_pass_val%%[[:space:]]*}"
+			_tcr_pass_val="${_tcr_pass_val//\"/}"
+			pkg_config_set "$INSTALL_PATH/conf.apf" "TCR_PASS" "$_tcr_pass_val"
+			pkg_config_set "$INSTALL_PATH/conf.apf" "TCR_PORTS" "$_tcr_ports_val"
+		fi
+		;;
+esac
+
 # Restore user's trust, rule, and hook files from backup
 command cp -f "$BK_LAST"/*_hosts.rules "$INSTALL_PATH/"
 command cp -f "$BK_LAST"/glob_allow.rules "$INSTALL_PATH/" 2>/dev/null || true  # may not exist in old installs
@@ -50,7 +85,6 @@ command cp -f "$BK_LAST"/silent_ips.rules "$INSTALL_PATH/" 2>/dev/null || true  
 command cp -f "$BK_LAST"/preroute.rules "$INSTALL_PATH/" 2>/dev/null || true    # may not exist in old installs
 command cp -f "$BK_LAST"/postroute.rules "$INSTALL_PATH/" 2>/dev/null || true   # may not exist in old installs
 
-OV=$(awk '{print$2}' "$BK_LAST/VERSION")
 NV=$(awk '{print$2}' "$INSTALL_PATH/VERSION")
 if [ "$OV" = "$NV" ]; then
         echo "  Restored configuration from backup ($NV reinstall)."
