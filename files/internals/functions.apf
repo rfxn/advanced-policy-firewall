@@ -1174,6 +1174,19 @@ _trust_action_target() {
 	fi
 }
 
+## Check if a trust entry already exists in any trust file.
+# Sets caller's $tlist to space-separated list of files containing the entry.
+# Args: host_entry
+_trust_check_duplicate() {
+	local _tcd_host="$1" _tcd_f
+	tlist=""
+	for _tcd_f in $DENY_HOSTS $ALLOW_HOSTS $GALLOW_HOSTS $GDENY_HOSTS; do
+		if [ -f "$_tcd_f" ] && grep -v '^#' "$_tcd_f" | grep -Fxq "$_tcd_host"; then
+			tlist="$tlist$_tcd_f "
+		fi
+	done
+}
+
 cli_trust() {
  local CHAIN="$1" ACTION="$2" FILE="$3" HOST="$4" CMT="$5"
  local tlist f valtrust TIME JACTION
@@ -1200,12 +1213,7 @@ cli_trust() {
 		fi
 		return 1
 	fi
-	tlist=""
-	for f in $DENY_HOSTS $ALLOW_HOSTS $GALLOW_HOSTS $GDENY_HOSTS; do
-		if [ -f "$f" ] && grep -v '^#' "$f" | grep -Fxq "$HOST"; then
-			tlist="$tlist$f "
-		fi
-	done
+	_trust_check_duplicate "$HOST"
 	load_local_addrs
 	if [ -n "$tlist" ]; then
 		echo "$HOST already exists in $tlist"
@@ -1286,12 +1294,7 @@ cli_trust() {
 	fi
 	return 1
  fi
- tlist=""
- for f in $DENY_HOSTS $ALLOW_HOSTS $GALLOW_HOSTS $GDENY_HOSTS; do
-     if [ -f "$f" ] && grep -v '^#' "$f" | grep -Fxq "$HOST"; then
-         tlist="$tlist$f "
-     fi
- done
+ _trust_check_duplicate "$HOST"
  valtrust="$tlist"
  load_local_addrs
  if [ "$valtrust" ]; then

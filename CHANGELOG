@@ -164,6 +164,8 @@
 
 [Change] Conntrack module migration: use -m conntrack --ctstate when available,
          falling back to -m state --state on legacy systems
+[Change] cli_trust(): extract _trust_check_duplicate() helper from two
+         identical inline duplicate-entry check blocks
 [Change] trust_hosts(): single-pass loop replacing four-pass grep cascade;
       advanced syntax delegated to trust_entry_rule(); batch all rules via
       iptables-restore --noflush reducing lock acquisitions from O(n) to O(1)
