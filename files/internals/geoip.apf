@@ -1427,3 +1427,54 @@ cli_cc_remove() {
 	fi
 	return 1
 }
+
+## Expire a single temporary CC entry without destroying permanent entries.
+# Removes the temp metadata comment line and the bare CC entry line that
+# immediately follows it. If no permanent (non-temp) entry for that CC
+# remains in any CC rules file, performs full removal (iptables rules,
+# ipsets, cached data) via cli_cc_remove().
+# Args: cc file
+# Returns: 0 on success, 1 if entry not found
+_expire_cc_temp_entry() {
+	local cc="$1" file="$2"
+	local tmpfile
+
+	[ -n "$cc" ] || return 1
+	[ -f "$file" ] || return 1
+
+	# Use awk to remove the temp comment + the bare CC line that follows it.
+	# Temp comments match: "# added CC on ... ttl=... expire=..."
+	# The next line is the bare CC entry belonging to that temp comment.
+	tmpfile=$(mktemp "${file}.XXXXXX") || return 1
+	awk -v cc="$cc" '
+	/^# added / && index($0, "ttl=") && index($0, "expire=") {
+		split($0, a, " ")
+		if (a[3] == cc) { skip_next = 1; next }
+	}
+	skip_next && $0 == cc { skip_next = 0; next }
+	{ skip_next = 0; print }
+	' "$file" > "$tmpfile"
+	command mv -f "$tmpfile" "$file"
+
+	# Check if any permanent (non-temp) entry for this CC still exists
+	# in EITHER CC rules file. A permanent entry is a bare CC line whose
+	# preceding comment lacks ttl=/expire= markers, or an advanced entry.
+	local _has_permanent=0 _f
+	for _f in "$CC_DENY_HOSTS" "$CC_ALLOW_HOSTS"; do
+		[ -f "$_f" ] || continue
+		if grep -v '^#' "$_f" 2>/dev/null | grep -Fxq "$cc"; then
+			_has_permanent=1
+			break
+		fi
+		if grep -v '^#' "$_f" 2>/dev/null | grep -q "=${cc}$"; then
+			_has_permanent=1
+			break
+		fi
+	done
+
+	if [ "$_has_permanent" = "0" ]; then
+		# No permanent entry remains — full cleanup (iptables, ipsets, cache)
+		cli_cc_remove "$cc" > /dev/null 2>&1
+	fi
+	return 0
+}

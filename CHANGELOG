@@ -150,6 +150,10 @@
 [Fix] GeoIP --cc CC detail: fix advanced entry regex in _geoip_rules_status()
       to match = separator; advanced entries (tcp:in:d=22:s=CN) use = not :
       before the CC code; detail view showed "not in rules" for advanced entries
+[Fix] GeoIP temp CC expiry: expire_temp_entries() and flush_temp_entries() no
+      longer destroy permanent CC entries when expiring temporary ones; new
+      _expire_cc_temp_entry() removes only temp metadata and conditionally
+      cleans up iptables/ipsets only when no permanent entry remains
 
   -- Changes --
 
