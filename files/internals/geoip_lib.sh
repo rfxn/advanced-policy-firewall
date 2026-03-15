@@ -333,7 +333,7 @@ _geoip_download_ipverse() {
 		return 1
 	fi
 
-	mv -f "$tmpfile" "$output" || { rm -f "$tmpfile"; return 1; }
+	command mv -f "$tmpfile" "$output" || { rm -f "$tmpfile"; return 1; }
 	return 0
 }
 
@@ -367,7 +367,7 @@ _geoip_download_ipdeny() {
 		return 1
 	fi
 
-	mv -f "$tmpfile" "$output" || { rm -f "$tmpfile"; return 1; }
+	command mv -f "$tmpfile" "$output" || { rm -f "$tmpfile"; return 1; }
 	return 0
 }
 
@@ -614,7 +614,7 @@ _geoip_download_ipdeny_bulk() {
 			continue
 		fi
 		cc_upper=$(echo "$cc_lower" | tr '[:lower:]' '[:upper:]')
-		cp "$f" "$output_dir/${cc_upper}.zone"
+		command cp "$f" "$output_dir/${cc_upper}.zone"
 		count=$((count + 1))
 	done
 
@@ -693,7 +693,7 @@ geoip_build_ipdb() {
 		return 1
 	fi
 
-	if ! mv -f "$tmpdir/sorted.dat" "$output"; then
+	if ! command mv -f "$tmpdir/sorted.dat" "$output"; then
 		rm -rf "$tmpdir"
 		return 1
 	fi

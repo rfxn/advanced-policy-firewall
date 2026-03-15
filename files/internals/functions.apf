@@ -93,7 +93,7 @@ snapshot_save() {
 		rm -f "$snap_tmp"
 		return 1
 	fi
-	mv -f "$snap_tmp" "$snap_dir/.apf.restore"
+	command mv -f "$snap_tmp" "$snap_dir/.apf.restore"
 
 	# IPv6 snapshot (non-fatal — IPv4 snapshot survives if this fails)
 	if [ "$USE_IPV6" == "1" ] && [ -n "$IP6TS" ]; then
@@ -108,7 +108,7 @@ snapshot_save() {
 			eout "{glob} IPv6 snapshot save failed (empty or invalid output)"
 			rm -f "$snap_tmp"
 		else
-			mv -f "$snap_tmp" "$snap_dir/.apf6.restore"
+			command mv -f "$snap_tmp" "$snap_dir/.apf6.restore"
 		fi
 	fi
 
@@ -1546,7 +1546,7 @@ record_block() {
 		echo "${ip}|1|${now}|${now}" >> "$tmpfile"
 	fi
 
-	mv -f "$tmpfile" "$history_file"
+	command mv -f "$tmpfile" "$history_file"
 	chmod 640 "$history_file"
 }
 
@@ -2376,7 +2376,7 @@ download_url() {
 
 dlist_resnet() {
  if [ -f "$RESNET" ]; then
-        cp "$RESNET" "$RESNET.bk"
+        command cp "$RESNET" "$RESNET.bk"
         chmod 600 "$RESNET" "$RESNET.bk"
  fi
 if ( [ -n "$CURL" ] || [ -n "$WGET" ] ) && [ -f "$RESNET" ]; then
@@ -2390,14 +2390,14 @@ if ( [ -n "$CURL" ] || [ -n "$WGET" ] ) && [ -f "$RESNET" ]; then
    else
         eout "{resnet} download of $DLIST_RESERVED_URL failed"
 	 if [ -f "$RESNET.bk" ]; then
-	     cp "$RESNET.bk" "$RESNET"
+	     command cp "$RESNET.bk" "$RESNET"
 	     chmod 600 "$RESNET" "$RESNET.bk"
 	 fi
    fi
    rm -f "$url_tmp"
 else
  if [ -f "$RESNET.bk" ]; then
-	cp "$RESNET.bk" "$RESNET"
+	command cp "$RESNET.bk" "$RESNET"
 	chmod 600 "$RESNET" "$RESNET.bk"
  fi
 fi
@@ -2407,7 +2407,7 @@ dlist_download() {
 local tag="$1" url="$2" hosts_file="$3" parse_mode="${4:-standard}"
 # Backup existing file
 if [ -f "$hosts_file" ]; then
-   cp "$hosts_file" "$hosts_file.bk"
+   command cp "$hosts_file" "$hosts_file.bk"
    chmod 600 "$hosts_file" "$hosts_file.bk"
 fi
 local url_tmp
@@ -2434,7 +2434,7 @@ else
         # Error policy: dlist restores from backup to preserve data
         eout "{$tag} download of $url failed"
         if [ -f "$hosts_file.bk" ]; then
-            cp "$hosts_file.bk" "$hosts_file"
+            command cp "$hosts_file.bk" "$hosts_file"
             chmod 600 "$hosts_file" "$hosts_file.bk"
         fi
 fi
@@ -2563,7 +2563,7 @@ while IFS= read -r line; do
 	fi
 done < "$ipset_rules"
 if [ "$migrated" -gt 0 ]; then
-	cp "$tmp" "$ipset_rules"
+	command cp "$tmp" "$ipset_rules"
 	eout "{ipset} migrated $migrated entries in ipset.rules to 7-field format"
 fi
 rm -f "$tmp"
@@ -2729,7 +2729,7 @@ if [ -f "$ts_file" ]; then
 	grep -v "^${ts_name}:" "$ts_file" > "$ts_tmp" 2>/dev/null || true
 fi
 printf '%s\n' "${ts_name}:${ts_epoch}" >> "$ts_tmp"
-cp "$ts_tmp" "$ts_file"
+command cp "$ts_tmp" "$ts_file"
 chmod 600 "$ts_file"
 rm -f "$ts_tmp"
 }

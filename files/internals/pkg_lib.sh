@@ -578,7 +578,7 @@ pkg_backup() {
 			command cp -pR "$install_path" "$backup_path" || rc=$?
 			;;
 		move)
-			mv "$install_path" "$backup_path" || rc=$?
+			command mv "$install_path" "$backup_path" || rc=$?
 			;;
 	esac
 
@@ -1870,7 +1870,7 @@ pkg_rclocal_remove() {
 			continue
 		}
 		grep -v "$pattern" "$path" > "$tmpfile" 2>/dev/null || true  # safe: grep -v returns 1 when all lines match
-		mv -f "$tmpfile" "$path" || {
+		command mv -f "$tmpfile" "$path" || {
 			pkg_warn "pkg_rclocal_remove: failed to update ${path}"
 			rm -f "$tmpfile"
 		}
