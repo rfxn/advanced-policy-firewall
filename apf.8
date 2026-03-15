@@ -33,6 +33,9 @@ apf \- Advanced Policy Firewall
 .RB [ \-\-cc " [\fICC\fR | \fIIP\fR]] | " \-\-cc\-update ]
 .br
 .B apf
+.RB [ \-\-ct\-scan | \-\-ct\-status ]
+.br
+.B apf
 .RB [ \-\-ipset\-update | \-\-gre\-up | \-\-gre\-down | \-\-gre\-status ]
 .SH DESCRIPTION
 Advanced Policy Firewall (APF) is an iptables/netfilter\-based firewall
@@ -263,7 +266,17 @@ metadata for efficient removal. Resolution timeout is controlled by
 (default 10 seconds). On refresh
 .RB ( \-e ),
 FQDNs are re\-resolved to pick up DNS changes.
-An optional comment may follow the address, separated by a space.
+Comments are supported as full lines beginning with
+.BR # .
+Inline comments on the same line as an address are not supported and will
+cause that entry to be silently skipped.
+The
+.B apf \-a
+and
+.B apf \-d
+commands automatically prepend a structured
+.B # added ...
+comment on the line before each entry.
 .PP
 Advanced trust syntax allows protocol, direction, and port filtering:
 .PP
@@ -271,9 +284,21 @@ Advanced trust syntax allows protocol, direction, and port filtering:
 .B proto:flow:[s/d]=port:[s/d]=ip(/mask)
 .RE
 .PP
-For example:
+Both
+.B proto
+and
+.B flow
+are independently optional.
+When proto is omitted, rules apply to both TCP and UDP.
+When flow is omitted, rules apply to both inbound and outbound.
+.PP
+Examples:
 .B tcp:in:d=22:s=10.0.0.0/8
-allows inbound TCP port 22 from 10.0.0.0/8.
+(5\-field, inbound TCP 22 from 10.0.0.0/8),
+.B in:d=443:s=192.168.1.0/24
+(4\-field, inbound TCP+UDP 443),
+.B d=3306:s=192.168.1.5
+(3\-field, both directions, both protocols).
 .PP
 Temporary entries (added via
 .B \-ta
@@ -377,7 +402,9 @@ organized into sections:
 .B Main Config
 Development mode, install path, interfaces, IPv6 toggle, fast load, VNET,
 FQDN resolution timeout, block escalation
-.RB ( PERMBLOCK_COUNT / PERMBLOCK_INTERVAL ).
+.RB ( PERMBLOCK_COUNT / PERMBLOCK_INTERVAL ),
+Docker/container compatibility mode
+.RB ( DOCKER_COMPAT ).
 .TP
 .B Reactive Address Blocking
 RAB enable/disable, sanity and port\-scan triggers, thresholds, timers.

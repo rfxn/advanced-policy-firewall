@@ -606,9 +606,11 @@ scales linearly), ipset creates a single iptables rule per block list that
 references a kernel hash set, providing O(1) lookup performance regardless of
 list size.
 
-USE_IPSET - Set to "1" to enable ipset block list support. Requires the
-'ipset' utility to be installed (apt-get install ipset / yum install ipset).
-When disabled or ipset is not installed, the ipset.rules file is ignored.
+USE_IPSET - Controls ipset block list support. "auto" (default) detects the
+ipset binary and ip_set kernel module at startup and enables ipset if both are
+present. "1" forces enable regardless of detection. "0" forces disable.
+Requires the 'ipset' utility (apt-get install ipset / yum install ipset).
+When disabled or ipset is not available, the ipset.rules file is ignored.
 
 IPSET_LOG_RATE - Default log rate limit (per minute) for ipset blocklist
 matches. Individual lists can control their own logging via the log field in
