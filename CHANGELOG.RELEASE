@@ -151,8 +151,26 @@
       -> '0.0.0.0/0') in cli_trust(), cli_trust_remove(), cli_trust_temp()
 [Fix] trust validation: extend abbreviated CIDR hint to bare-host validation
       path in cli_trust(), cli_trust_remove(), cli_trust_temp()
+[Fix] GeoIP: IFS=',' leak from callers broke LOG rule LEXT word splitting in
+      _geoip_add_simple_rules() and _geoip_add_advanced_rule(); defensive
+      IFS reset at function entry prevents silent LOG rule corruption
 
   -- Changes --
+
+[Change] GeoIP: extract _geoip_validate_int() helper replacing 3 inline
+         integer validation blocks for CC_CACHE_TTL/CC_INTERVAL
+[Change] GeoIP: extract _geoip_default_deny_tail() helper replacing 22-line
+         duplicated CC_ALLOW implicit deny pattern in cc_rules_load()
+[Change] GeoIP: replace pipeline subshell pattern (cmd | while) with process
+         substitution (while ... done < <(cmd)) in geoip_update() and
+         geoip_info() to prevent subshell variable loss
+[Change] GeoIP: combine 4 separate sed -i passes into single invocation in
+         cli_cc_remove() for reduced I/O
+[Change] GeoIP: replace date +%s content write with touch for .world_cached
+         marker (only mtime is checked, content was never read)
+[Change] GeoIP: add empty-var guards for CC_DENY_HOSTS/CC_ALLOW_HOSTS at
+         entry of cli_cc_trust(), cli_cc_trust_advanced(),
+         cli_cc_trust_temp(), cli_cc_remove()
 
 [Change] Conntrack module migration: replace -m state --state with $STATE_MATCH
          variable throughout firewall rules; auto-detects xt_conntrack module

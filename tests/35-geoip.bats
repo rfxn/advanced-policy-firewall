@@ -843,3 +843,208 @@ _source_funcs='source '"$APF_DIR"'/internals/functions.apf; CC_DENY_HOSTS='"$APF
     "$APF" -s
     [ "$has_summary" -eq 1 ]
 }
+
+# ============================================================
+# P3: High-risk gap coverage — IFS/LEXT, implicit deny, fast
+# load, temp allow, remove roundtrip, IPv6 exclusion, not-found
+# ============================================================
+
+@test "CC_ALLOW implicit deny-all: tail rule blocks unlisted countries" {
+    clean_cc_state
+    create_cc_fixture_v4 "ZZ"
+    echo "ZZ" >> "$APF_DIR/cc_allow.rules"
+
+    "$APF" -f 2>/dev/null || true
+    "$APF" -s
+
+    assert_chain_exists CC_ALLOW
+    # CC_ALLOW must end with a DROP or REJECT tail rule (implicit deny-all)
+    # Default ALL_STOP is DROP in conf.apf
+    assert_rule_exists_ips CC_ALLOW "DROP"
+
+    "$APF" -f 2>/dev/null || true
+    clean_cc_state
+    "$APF" -s
+}
+
+@test "fast load restores CC ipsets from cache" {
+    clean_cc_state
+    create_cc_fixture_v4 "ZZ"
+    echo "ZZ" >> "$APF_DIR/cc_deny.rules"
+
+    # Full load to create snapshot + ipsets
+    "$APF" -f 2>/dev/null || true
+    "$APF" -s
+
+    # Verify ipset exists after full load
+    run ipset list apf_cc4_ZZ
+    assert_success
+
+    # Enable fast load
+    source /opt/tests/helpers/apf-config.sh
+    apf_set_config "SET_FASTLOAD" "1"
+
+    # Flush then restart — should use fast load path
+    "$APF" -f 2>/dev/null || true
+    "$APF" -s
+
+    # ipset must exist after fast load (snapshot references it)
+    run ipset list apf_cc4_ZZ
+    assert_success
+    assert_output --partial "192.0.2.0/24"
+
+    # Restore
+    apf_set_config "SET_FASTLOAD" "0"
+    "$APF" -f 2>/dev/null || true
+    clean_cc_state
+    "$APF" -s
+}
+
+@test "LEXT regression: LOG rule contains --log-tcp-options (S-004 fix)" {
+    clean_cc_state
+    create_cc_fixture_v4 "ZZ"
+    source /opt/tests/helpers/apf-config.sh
+    apf_set_config "CC_LOG" "1"
+    apf_set_config "LOG_DROP" "1"
+    apf_set_config "CC_LOG_ONLY" "0"
+    # LOG_EXT=1 enables LEXT="--log-tcp-options --log-ip-options";
+    # if IFS=',' leaks into _geoip_add_simple_rules, these two tokens
+    # become one mangled argument and iptables silently drops them
+    apf_set_config "LOG_EXT" "1"
+    "$APF" -f 2>/dev/null || true
+    "$APF" -s
+    "$APF" -d ZZ "lext test"
+
+    # LOG rule must contain individual LEXT tokens (not mangled by IFS=',')
+    run iptables -S CC_DENY 2>/dev/null
+    assert_success
+    assert_output --partial "log-tcp-options"
+
+    # Clean up
+    apf_set_config "LOG_EXT" "0"
+    "$APF" -u ZZ 2>/dev/null || true
+    clean_cc_state
+}
+
+@test "apf -ta ZZ 1h creates CC_ALLOW chain + ipset + TTL markers" {
+    clean_cc_state
+    create_cc_fixture_v4 "ZZ"
+    "$APF" -f 2>/dev/null || true
+    "$APF" -s
+    "$APF" -ta ZZ 1h "temp allow test"
+
+    # CC_ALLOW chain should exist with match-set rule
+    assert_chain_exists CC_ALLOW
+    assert_rule_exists_ips CC_ALLOW "match-set apf_cc4_ZZ src"
+
+    # ipset should be populated
+    run ipset list apf_cc4_ZZ
+    assert_success
+    assert_output --partial "192.0.2.0/24"
+
+    # TTL markers in cc_allow.rules
+    run grep "ttl=" "$APF_DIR/cc_allow.rules"
+    assert_success
+    run grep "expire=" "$APF_DIR/cc_allow.rules"
+    assert_success
+
+    # Clean up
+    "$APF" -u ZZ 2>/dev/null || true
+    clean_cc_state
+}
+
+@test "apf -u ZZ removes both simple and advanced entries" {
+    clean_cc_state
+    create_cc_fixture_v4 "ZZ"
+    "$APF" -f 2>/dev/null || true
+    "$APF" -s
+
+    # Add simple deny
+    "$APF" -d ZZ "simple"
+    # Add advanced deny
+    "$APF" -d "tcp:in:d=22:s=ZZ" "advanced"
+
+    # Verify both persisted
+    run grep -Fx "ZZ" "$APF_DIR/cc_deny.rules"
+    assert_success
+    run grep -Fx "tcp:in:d=22:s=ZZ" "$APF_DIR/cc_deny.rules"
+    assert_success
+
+    # Remove via -u ZZ — should remove both
+    "$APF" -u ZZ
+
+    # Both should be gone from rules file
+    run grep -Fx "ZZ" "$APF_DIR/cc_deny.rules"
+    assert_failure
+    run grep -Fx "tcp:in:d=22:s=ZZ" "$APF_DIR/cc_deny.rules"
+    assert_failure
+
+    # ipset should be destroyed
+    run ipset list apf_cc4_ZZ 2>/dev/null
+    assert_failure
+
+    clean_cc_state
+}
+
+@test "CC_IPV6=0 excludes IPv6 ipset creation" {
+    if ! ip6tables_available; then skip "ip6tables not available"; fi
+    clean_cc_state
+    create_cc_fixture_v4 "ZZ"
+    create_cc_fixture_v6 "ZZ"
+    source /opt/tests/helpers/apf-config.sh
+    apf_set_config "USE_IPV6" "1"
+    apf_set_config "CC_IPV6" "0"
+    "$APF" -f 2>/dev/null || true
+    "$APF" -s
+    "$APF" -d ZZ "ipv6 off test"
+
+    # IPv4 ipset should exist
+    run ipset list apf_cc4_ZZ
+    assert_success
+
+    # IPv6 ipset should NOT exist
+    run ipset list apf_cc6_ZZ 2>/dev/null
+    assert_failure
+
+    # Clean up
+    apf_set_config "CC_IPV6" "1"
+    "$APF" -u ZZ 2>/dev/null || true
+    clean_cc_state
+}
+
+@test "cli_cc_remove reports not-found for never-added CC" {
+    clean_cc_state
+    "$APF" -f 2>/dev/null || true
+    "$APF" -s
+
+    run "$APF" -u XX
+    # apf -u does not exit non-zero on not-found, but prints message
+    assert_output --partial "not found"
+
+    clean_cc_state
+}
+
+@test "mixed deny+allow: both CC_DENY and CC_ALLOW chains populated" {
+    clean_cc_state
+    create_cc_fixture_v4 "ZZ"
+    create_cc_fixture_v4_yy
+    echo "ZZ" >> "$APF_DIR/cc_deny.rules"
+    echo "YY" >> "$APF_DIR/cc_allow.rules"
+    # YY needs v4 fixture too
+    mkdir -p "$APF_DIR/geoip"
+    cp "$APF_DIR/geoip/YY.4" "$APF_DIR/geoip/YY.4" 2>/dev/null || true
+
+    "$APF" -f 2>/dev/null || true
+    "$APF" -s
+
+    # Both chains should exist
+    assert_chain_exists CC_DENY
+    assert_chain_exists CC_ALLOW
+    # Each chain should have its respective match-set rule
+    assert_rule_exists_ips CC_DENY "match-set apf_cc4_ZZ src"
+    assert_rule_exists_ips CC_ALLOW "match-set apf_cc4_YY src"
+
+    "$APF" -f 2>/dev/null || true
+    clean_cc_state
+    "$APF" -s
+}

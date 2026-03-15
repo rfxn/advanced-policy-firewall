@@ -32,6 +32,18 @@ _GEOIP_DL_COUNT=0
 
 # --- Private helpers (prefix: _geoip_) ---
 
+## Validate that a config variable is a non-negative integer, resetting
+# to a default value if not. Uses indirect expansion (bash 4.0+).
+# Args: var_name default_value
+_geoip_validate_int() {
+	local _vname="$1" _vdefault="$2"
+	local _vval="${!_vname:-$_vdefault}"
+	local _vi_re='^[0-9]+$'
+	if ! [[ "$_vval" =~ $_vi_re ]]; then
+		eval "$_vname=\$_vdefault"
+	fi
+}
+
 ## Validate prerequisites for GeoIP operations.
 # Returns 1 with error message if requirements not met.
 geoip_validate_config() {
@@ -64,11 +76,7 @@ geoip_download() {
 	local _cc_lower
 
 	# Cache freshness check: skip download if cached data is fresh
-	# Guard against non-numeric CC_CACHE_TTL (default: 24 hours)
-	local _ct_re='^[0-9]+$'
-	if ! [[ "${CC_CACHE_TTL:-24}" =~ $_ct_re ]]; then
-		CC_CACHE_TTL=24
-	fi
+	_geoip_validate_int CC_CACHE_TTL 24
 	_GEOIP_CACHE_HIT=0
 	local _cache_mtime _max_age_secs
 	_cache_mtime=$(stat --printf='%Y' "$cache_file" 2>/dev/null) || _cache_mtime=0  # safe: file may not exist on first run
@@ -168,11 +176,7 @@ geoip_download_all() {
 	# only IPv6 downloads (IPv4 files are fresh from bulk)
 	if [ "$_total" -gt 1 ]; then
 		local _world_fresh=0
-		# Guard against non-numeric CC_CACHE_TTL (default: 24 hours)
-		local _ct_re='^[0-9]+$'
-		if ! [[ "${CC_CACHE_TTL:-24}" =~ $_ct_re ]]; then
-			CC_CACHE_TTL=24
-		fi
+		_geoip_validate_int CC_CACHE_TTL 24
 		if [ -f "$CC_DATA_DIR/.world_cached" ] && [ "${CC_CACHE_TTL:-24}" -gt 0 ]; then
 			local _wc_mtime
 			_wc_mtime=$(stat --printf='%Y' "$CC_DATA_DIR/.world_cached" 2>/dev/null) || _wc_mtime=0  # safe: marker may not exist yet
@@ -388,27 +392,36 @@ cc_rules_load() {
 
 	# If CC_ALLOW has simple entries, add default deny after allow rules
 	if [ -n "$simple_allow" ]; then
+		_geoip_default_deny_tail "CC_ALLOW"
+	fi
+}
+
+## Append the CC_ALLOW implicit deny-all tail rules (log + drop/reject).
+# Called at the end of cc_rules_load() when CC_ALLOW has entries.
+# Handles both IPv4 and IPv6 stacks, audit mode, and log toggle.
+# Args: chain
+_geoip_default_deny_tail() {
+	local chain="$1"
+	if [ "$CC_LOG_ONLY" = "1" ]; then
+		ipt4 -A "$chain" -m limit --limit="$LOG_RATE/minute" \
+			-j "$LOG_TARGET" --log-level="$LOG_LEVEL" $LEXT --log-prefix="** CC_AUDIT:DEFAULT ** "
+	else
+		if [ "$CC_LOG" = "1" ] && [ "$LOG_DROP" = "1" ]; then
+			ipt4 -A "$chain" -m limit --limit="$LOG_RATE/minute" \
+				-j "$LOG_TARGET" --log-level="$LOG_LEVEL" $LEXT --log-prefix="** CC_DENY:DEFAULT ** "
+		fi
+		ipt4 -A "$chain" -j "$ALL_STOP"
+	fi
+	if [ "$CC_IPV6" = "1" ] && [ "$USE_IPV6" = "1" ]; then
 		if [ "$CC_LOG_ONLY" = "1" ]; then
-			ipt4 -A CC_ALLOW -m limit --limit="$LOG_RATE/minute" \
+			ipt6 -A "$chain" -m limit --limit="$LOG_RATE/minute" \
 				-j "$LOG_TARGET" --log-level="$LOG_LEVEL" $LEXT --log-prefix="** CC_AUDIT:DEFAULT ** "
 		else
 			if [ "$CC_LOG" = "1" ] && [ "$LOG_DROP" = "1" ]; then
-				ipt4 -A CC_ALLOW -m limit --limit="$LOG_RATE/minute" \
+				ipt6 -A "$chain" -m limit --limit="$LOG_RATE/minute" \
 					-j "$LOG_TARGET" --log-level="$LOG_LEVEL" $LEXT --log-prefix="** CC_DENY:DEFAULT ** "
 			fi
-			ipt4 -A CC_ALLOW -j "$ALL_STOP"
-		fi
-		if [ "$CC_IPV6" = "1" ] && [ "$USE_IPV6" = "1" ]; then
-			if [ "$CC_LOG_ONLY" = "1" ]; then
-				ipt6 -A CC_ALLOW -m limit --limit="$LOG_RATE/minute" \
-					-j "$LOG_TARGET" --log-level="$LOG_LEVEL" $LEXT --log-prefix="** CC_AUDIT:DEFAULT ** "
-			else
-				if [ "$CC_LOG" = "1" ] && [ "$LOG_DROP" = "1" ]; then
-					ipt6 -A CC_ALLOW -m limit --limit="$LOG_RATE/minute" \
-						-j "$LOG_TARGET" --log-level="$LOG_LEVEL" $LEXT --log-prefix="** CC_DENY:DEFAULT ** "
-				fi
-				ipt6 -A CC_ALLOW -j "$ALL_STOP"
-			fi
+			ipt6 -A "$chain" -j "$ALL_STOP"
 		fi
 	fi
 }
@@ -440,6 +453,10 @@ _geoip_ensure_cc_chain() {
 # Creates ipset match rules in the specified chain.
 # Args: cc chain action
 _geoip_add_simple_rules() {
+	# Reset IFS defensively — callers (cc_rules_load, cli_cc_trust,
+	# cli_cc_trust_temp) may have IFS=',' active, which breaks unquoted
+	# $LEXT word splitting in LOG rules (S-004 fix)
+	local IFS=$' \t\n'
 	local cc="$1" chain="$2" action="$3"
 	local set4="apf_cc4_${cc}"
 	local cc_name
@@ -489,6 +506,9 @@ _geoip_add_simple_rules() {
 # Uses trust_parse_fields() from functions.apf for parsing.
 # Args: entry cc chain action
 _geoip_add_advanced_rule() {
+	# Reset IFS defensively — prevents future regressions if callers
+	# set IFS=',' before calling (same rationale as _geoip_add_simple_rules)
+	local IFS=$' \t\n'
 	local entry="$1" cc="$2" chain="$3" action="$4"
 	local set4="apf_cc4_${cc}"
 
@@ -664,11 +684,7 @@ geoip_update() {
 	fi
 
 	# Check interval: skip if last update was recent enough
-	# Guard against non-numeric CC_INTERVAL (default: 7 days)
-	local _ci_re='^[0-9]+$'
-	if ! [[ "${CC_INTERVAL:-7}" =~ $_ci_re ]]; then
-		CC_INTERVAL=7
-	fi
+	_geoip_validate_int CC_INTERVAL 7
 	if ! geoip_is_stale "$CC_DATA_DIR" "${CC_INTERVAL:-7}"; then
 		eout "{geoip} data is fresh (interval: ${CC_INTERVAL:-7}d), skipping update"
 		return 0
@@ -678,14 +694,15 @@ geoip_update() {
 	geoip_download_all
 
 	# Re-populate all active ipsets with atomic swap
+	# Process substitution avoids subshell variable loss from pipeline
 	local cc family set_name
-	$IPSET list -n 2>/dev/null | grep '^apf_cc' | while IFS= read -r set_name; do
+	while IFS= read -r set_name; do
 		# Parse set name: apf_cc{4,6}_{CC}
 		family="${set_name#apf_cc}"
 		family="${family%%_*}"
 		cc="${set_name#apf_cc${family}_}"
 		geoip_populate_set "$cc" "$family"
-	done
+	done < <($IPSET list -n 2>/dev/null | grep '^apf_cc')
 
 	# Only mark updated if actual downloads occurred (prevents false
 	# .last_update reset when all CCs are cache hits)
@@ -747,7 +764,7 @@ _geoip_world_fetch() {
 	rm -f "$tmp_tar"
 	rm -rf "$tmp_dir"
 
-	date +%s > "$CC_DATA_DIR/.world_cached"
+	touch "$CC_DATA_DIR/.world_cached"
 	eout "{geoip} world GeoIP data cached: $count new countries"
 	return 0
 }
@@ -985,9 +1002,10 @@ geoip_info() {
 	echo ""
 
 	# Overview: list all active CC ipsets
+	# Process substitution avoids subshell variable loss from pipeline
 	echo "Active country blocks:"
 	local set_name cc family count
-	$IPSET list -n 2>/dev/null | grep '^apf_cc' | sort | while IFS= read -r set_name; do
+	while IFS= read -r set_name; do
 		family="${set_name#apf_cc}"
 		family="${family%%_*}"
 		cc="${set_name#apf_cc${family}_}"
@@ -999,7 +1017,7 @@ geoip_info() {
 		local cc_name
 		cc_name=$(geoip_cc_name "$cc")
 		printf "  %-4s %-20s IPv%s  %6d CIDRs\n" "$cc" "$cc_name" "$family" "$count"
-	done
+	done < <($IPSET list -n 2>/dev/null | grep '^apf_cc' | sort)
 }
 
 ## CLI handler for bare country code trust (apf -d CN, apf -a US).
@@ -1010,6 +1028,7 @@ cli_cc_trust() {
 	local host="$1" chain="$2" action="$3" file="$4" comment="$5"
 	local cc_list="" cc TIME ADDED_EPOCH CMT="$comment"
 
+	[ -n "$CC_DENY_HOSTS" ] && [ -n "$CC_ALLOW_HOSTS" ] || return 1
 	if ! geoip_validate_config; then
 		return 1
 	fi
@@ -1104,6 +1123,7 @@ cli_cc_trust_advanced() {
 	local entry="$1" chain="$2" action="$3" file="$4" comment="$5"
 	local cc TIME ADDED_EPOCH CMT="$comment"
 
+	[ -n "$CC_DENY_HOSTS" ] && [ -n "$CC_ALLOW_HOSTS" ] || return 1
 	if ! geoip_validate_config; then
 		return 1
 	fi
@@ -1181,6 +1201,7 @@ cli_cc_trust_temp() {
 	local host="$1" chain="$2" action="$3" file="$4" ttl_str="$5" comment="$6"
 	local cc_list="" cc TIME ADDED_EPOCH EXPIRE_EPOCH CMT="$comment"
 
+	[ -n "$CC_DENY_HOSTS" ] && [ -n "$CC_ALLOW_HOSTS" ] || return 1
 	if ! geoip_validate_config; then
 		return 1
 	fi
@@ -1279,6 +1300,8 @@ cli_cc_remove() {
 	local cc="$1"
 	local found=0
 
+	[ -n "$CC_DENY_HOSTS" ] && [ -n "$CC_ALLOW_HOSTS" ] || return 1
+
 	# Expand continent
 	if [[ "$cc" == @* ]]; then
 		if geoip_expand_codes "$cc"; then
@@ -1304,12 +1327,12 @@ cli_cc_remove() {
 		if grep -v '^#' "$f" | grep -q "=${cc}$" 2>/dev/null; then
 			found=1
 		fi
-		sed -i "\%# added ${escaped_cc} %d" "$f"
-		sed -i "\%^${escaped_cc}$%d" "$f"
-		# Remove advanced entries ending with =CC
-		sed -i "\%=${cc}$%d" "$f"
-		# Remove comment lines for advanced entries
-		sed -i "\%# added.*=${cc} %d" "$f"
+		# Remove simple entries, their comments, advanced entries, and
+		# advanced entry comments in a single sed pass
+		sed -i -e "\%# added ${escaped_cc} %d" \
+		       -e "\%^${escaped_cc}$%d" \
+		       -e "\%=${cc}$%d" \
+		       -e "\%# added.*=${cc} %d" "$f"
 	done
 
 	# Remove iptables rules BEFORE destroying ipsets (ipset refuses
