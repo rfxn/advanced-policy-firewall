@@ -960,13 +960,15 @@ geoip_info() {
 			# Show live ipset stats if loaded
 			set_name="apf_cc4_${cc}"
 			if $IPSET list "$set_name" > /dev/null 2>&1; then
-				count4=$($IPSET list "$set_name" 2>/dev/null | grep -c '^[0-9]') || count4=0
+				count4=$($IPSET list -t "$set_name" 2>/dev/null | awk '/^Number of entries:/ {print $NF}')
+				count4="${count4:-0}"
 				echo "    Live IPv4 ipset:   $count4 entries"
 			fi
 			if [ "$CC_IPV6" = "1" ] && [ "$USE_IPV6" = "1" ]; then
 				set_name="apf_cc6_${cc}"
 				if $IPSET list "$set_name" > /dev/null 2>&1; then
-					count6=$($IPSET list "$set_name" 2>/dev/null | grep -c '^[0-9a-fA-F]') || count6=0
+					count6=$($IPSET list -t "$set_name" 2>/dev/null | awk '/^Number of entries:/ {print $NF}')
+					count6="${count6:-0}"
 					echo "    Live IPv6 ipset:   $count6 entries"
 				fi
 			fi
@@ -1013,11 +1015,8 @@ geoip_info() {
 		family="${set_name#apf_cc}"
 		family="${family%%_*}"
 		cc="${set_name#apf_cc${family}_}"
-		if [ "$family" = "6" ]; then
-			count=$($IPSET list "$set_name" 2>/dev/null | grep -c '^[0-9a-fA-F]') || count=0
-		else
-			count=$($IPSET list "$set_name" 2>/dev/null | grep -c '^[0-9]') || count=0
-		fi
+		count=$($IPSET list -t "$set_name" 2>/dev/null | awk '/^Number of entries:/ {print $NF}')
+		count="${count:-0}"
 		cc_name=$(geoip_cc_name "$cc")
 		_entry=$(printf "  %-4s %-20s IPv%s  %6d CIDRs\n" "$cc" "$cc_name" "$family" "$count")
 

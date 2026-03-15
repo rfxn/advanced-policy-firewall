@@ -200,6 +200,8 @@
 [Change] --cc CC: show country detail (continent, rules status, cached data,
       live ipset stats) even when country code filtering is inactive;
       previously returned "inactive" with no information
+[Change] geoip_info(): use ipset list -t (headers only) instead of full
+      member listing for entry counts; eliminates O(n) grep on large ipsets
 [Change] Integrate geoip_lib.sh v1.0.1: shared GeoIP metadata library
       replaces embedded country name table, continent lists, CC validation,
       download functions, and CIDR search; ~300 lines removed
