@@ -154,6 +154,9 @@
       longer destroy permanent CC entries when expiring temporary ones; new
       _expire_cc_temp_entry() removes only temp metadata and conditionally
       cleans up iptables/ipsets only when no permanent entry remains
+[Change] GeoIP download: log WARNING when TLS verification fails and insecure
+      fallback succeeds; GEOIP_LOG_FUNC callback in geoip_lib.sh routes
+      warnings through consumer's logging system (eout in APF)
 
   -- Changes --
 

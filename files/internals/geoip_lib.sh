@@ -214,6 +214,20 @@ geoip_all_cc() {
 # ---------------------------------------------------------------------------
 # Binary discovery at source time — allows env override for testing.
 # ---------------------------------------------------------------------------
+# Optional log callback — set by consumer to route warnings through their
+# logging system (e.g., eout in APF). When unset, warnings go to stderr only.
+# Signature: GEOIP_LOG_FUNC "message"
+GEOIP_LOG_FUNC="${GEOIP_LOG_FUNC:-}"
+
+## Internal warning helper — logs via consumer callback if set, always stderr.
+_geoip_log_warning() {
+	local msg="$1"
+	echo "geoip_lib: WARNING: $msg" >&2
+	if [[ -n "$GEOIP_LOG_FUNC" ]] && command -v "$GEOIP_LOG_FUNC" > /dev/null 2>&1; then
+		"$GEOIP_LOG_FUNC" "$msg"
+	fi
+}
+
 GEOIP_CURL_BIN="${GEOIP_CURL_BIN:-$(command -v curl 2>/dev/null || true)}"  # may be absent
 GEOIP_WGET_BIN="${GEOIP_WGET_BIN:-$(command -v wget 2>/dev/null || true)}"  # may be absent
 GEOIP_AWK_BIN="${GEOIP_AWK_BIN:-$(command -v awk 2>/dev/null || true)}"     # may be absent
@@ -239,6 +253,9 @@ _geoip_download_cmd() {
 			"$GEOIP_CURL_BIN" -sfL --insecure --connect-timeout "$GEOIP_DL_TIMEOUT" \
 				--max-time "$GEOIP_DL_TIMEOUT" -o "$output" "$url" 2>/dev/null  # curl stderr noise suppressed
 			rc=$?
+			if [[ "$rc" -eq 0 ]]; then
+				_geoip_log_warning "TLS verification failed, used insecure fallback for $url"
+			fi
 		fi
 	elif [[ -n "$GEOIP_WGET_BIN" ]]; then
 		# Strict TLS first
@@ -249,6 +266,9 @@ _geoip_download_cmd() {
 			"$GEOIP_WGET_BIN" -q --no-check-certificate \
 				--timeout="$GEOIP_DL_TIMEOUT" -O "$output" "$url" 2>/dev/null  # wget stderr noise suppressed
 			rc=$?
+			if [[ "$rc" -eq 0 ]]; then
+				_geoip_log_warning "TLS verification failed, used insecure fallback for $url"
+			fi
 		fi
 	else
 		echo "geoip_lib: neither curl nor wget available" >&2
