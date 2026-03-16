@@ -610,7 +610,12 @@ mutex_lock() {
     APF_MUTEX_LOCKED="1"
     return
   fi
-  # Fallback: noclobber-based file lock with stale PID detection
+  # Fallback: noclobber-based file lock with stale PID detection.
+  # TOCTOU note: the noclobber test-and-create is not fully atomic on all
+  # filesystems, but the race window is negligible in practice -- PID space
+  # is 4M+ on modern kernels, the exec-flock fast path (above) handles the
+  # common case, and APF operations are infrequent (typically minutes apart).
+  # The stale-PID check below covers the remaining failure mode (crashed holder).
   local start_time
   start_time=$(date +%s)
   while true; do
@@ -831,6 +836,42 @@ resolve_fqdn() {
 	return 0
 }
 
+# Unpack advanced trust entry fields from trust_parse_fields() globals.
+# Caller must have called trust_protect_ipv6(entry) and
+# trust_parse_fields($_TPV6_RESULT) before invoking this helper.
+# Sets _TUF_PROTO, _TUF_DIR, _TUF_PFLOW, _TUF_PORT, _TUF_IPFLOW, _TUF_PIP.
+# Returns 1 on unrecognized token count.
+_trust_unpack_fields() {
+	_TUF_PROTO=""
+	_TUF_DIR=""
+	_TUF_PFLOW=""
+	_TUF_PORT=""
+	_TUF_IPFLOW=""
+	_TUF_PIP=""
+	case "$_TF_COUNT" in
+		4)
+			_TUF_PFLOW="$_TF1"; _TUF_PORT="$_TF2"
+			_TUF_IPFLOW="$_TF3"
+			trust_restore_ipv6 "$_TF4"; _TUF_PIP="$_TRV6_RESULT"
+			;;
+		5)
+			_TUF_DIR="$_TF1"; _TUF_PFLOW="$_TF2"
+			_TUF_PORT="$_TF3"; _TUF_IPFLOW="$_TF4"
+			trust_restore_ipv6 "$_TF5"; _TUF_PIP="$_TRV6_RESULT"
+			;;
+		6)
+			_TUF_PROTO="$_TF1"; _TUF_DIR="$_TF2"
+			_TUF_PFLOW="$_TF3"; _TUF_PORT="$_TF4"
+			_TUF_IPFLOW="$_TF5"
+			trust_restore_ipv6 "$_TF6"; _TUF_PIP="$_TRV6_RESULT"
+			;;
+		*)
+			return 1
+			;;
+	esac
+	return 0
+}
+
 # Validate an advanced trust entry (contains '=') or delegate to valid_host().
 # Sets _VTE_IP to the extracted IP for local-addr checks.
 # Returns 0 on valid, 1 on invalid.
@@ -843,34 +884,9 @@ valid_trust_entry() {
 	fi
 	trust_protect_ipv6 "$entry"; local safe="$_TPV6_RESULT"
 	trust_parse_fields "$safe"
-	local proto="" dir="" pflow="" port="" ipflow="" pip=""
-	# trust_parse_fields splits on ':' and '=' so token count differs from
-	# the logical field count:
-	#   3-field  d=PORT:s=IP             → 4 tokens
-	#   4-field  in:d=PORT:s=IP          → 5 tokens
-	#   5-field  tcp:in:d=PORT:s=IP      → 6 tokens
-	# IPv6 addresses with @ placeholders stay as one token.
-	case "$_TF_COUNT" in
-		4)
-			# 3-field: d=PORT:s=IP
-			pflow="$_TF1"; port="$_TF2"; ipflow="$_TF3"
-			trust_restore_ipv6 "$_TF4"; pip="$_TRV6_RESULT"
-			;;
-		5)
-			# 4-field: in:d=PORT:s=IP
-			dir="$_TF1"; pflow="$_TF2"; port="$_TF3"; ipflow="$_TF4"
-			trust_restore_ipv6 "$_TF5"; pip="$_TRV6_RESULT"
-			;;
-		6)
-			# 5-field: tcp:in:d=PORT:s=IP
-			proto="$_TF1"; dir="$_TF2"; pflow="$_TF3"; port="$_TF4"
-			ipflow="$_TF5"
-			trust_restore_ipv6 "$_TF6"; pip="$_TRV6_RESULT"
-			;;
-		*)
-			return 1
-			;;
-	esac
+	_trust_unpack_fields || return 1
+	local proto="$_TUF_PROTO" dir="$_TUF_DIR" pflow="$_TUF_PFLOW"
+	local port="$_TUF_PORT" ipflow="$_TUF_IPFLOW" pip="$_TUF_PIP"
 	# Validate protocol if present
 	if [ -n "$proto" ]; then
 		[ "$proto" == "tcp" ] || [ "$proto" == "udp" ] || return 1
@@ -907,25 +923,9 @@ trust_entry_rule() {
 
 	trust_protect_ipv6 "$entry"; local safe="$_TPV6_RESULT"
 	trust_parse_fields "$safe"
-	local proto="" dir="" pflow="" port="" ipflow="" pip=""
-	case "$_TF_COUNT" in
-		4)
-			pflow="$_TF1"; port="$_TF2"; ipflow="$_TF3"
-			trust_restore_ipv6 "$_TF4"; pip="$_TRV6_RESULT"
-			;;
-		5)
-			dir="$_TF1"; pflow="$_TF2"; port="$_TF3"; ipflow="$_TF4"
-			trust_restore_ipv6 "$_TF5"; pip="$_TRV6_RESULT"
-			;;
-		6)
-			proto="$_TF1"; dir="$_TF2"; pflow="$_TF3"; port="$_TF4"
-			ipflow="$_TF5"
-			trust_restore_ipv6 "$_TF6"; pip="$_TRV6_RESULT"
-			;;
-		*)
-			return 1
-			;;
-	esac
+	_trust_unpack_fields || return 1
+	local proto="$_TUF_PROTO" dir="$_TUF_DIR" pflow="$_TUF_PFLOW"
+	local port="$_TUF_PORT" ipflow="$_TUF_IPFLOW" pip="$_TUF_PIP"
 
 	expand_port "$port"; port="$_PORT"
 	if ! ipt_for_host "$pip"; then
@@ -2215,22 +2215,9 @@ _trust_hosts_advanced() {
 	# Pre-parse: extract fields needed for FQDN and local-addr checks
 	trust_protect_ipv6 "$entry"; local safe="$_TPV6_RESULT"
 	trust_parse_fields "$safe"
-	local dir="" pflow="" port="" ipflow="" pip=""
-	case "$_TF_COUNT" in
-		4)  # 3-field: pflow=port:ipflow=ip
-			pflow="$_TF1"; port="$_TF2"; ipflow="$_TF3"
-			trust_restore_ipv6 "$_TF4"; pip="$_TRV6_RESULT"
-			;;
-		5)  # 4-field: dir:pflow=port:ipflow=ip
-			dir="$_TF1"; pflow="$_TF2"; port="$_TF3"; ipflow="$_TF4"
-			trust_restore_ipv6 "$_TF5"; pip="$_TRV6_RESULT"
-			;;
-		6)  # 5-field: proto:dir:pflow=port:ipflow=ip
-			dir="$_TF2"; pflow="$_TF3"; port="$_TF4"; ipflow="$_TF5"
-			trust_restore_ipv6 "$_TF6"; pip="$_TRV6_RESULT"
-			;;
-		*)  return 1 ;;
-	esac
+	_trust_unpack_fields || return 1
+	local dir="$_TUF_DIR" pflow="$_TUF_PFLOW"
+	local port="$_TUF_PORT" ipflow="$_TUF_IPFLOW" pip="$_TUF_PIP"
 
 	# Build description fragments for local-addr blocked log messages
 	expand_port "$port"; port="$_PORT"

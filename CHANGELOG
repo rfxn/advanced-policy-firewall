@@ -243,6 +243,9 @@
       resolution on pre-usr-merge distros
 [Fix] elog_lib.sh: correct header version comment (1.0.2 to 1.0.3) to match
       ELOG_LIB_VERSION variable
+[Change] Extract _trust_unpack_fields() helper from three duplicated case
+      blocks in valid_trust_entry(), trust_entry_rule(), _trust_hosts_advanced()
+[Change] Document mutex_lock() TOCTOU race acceptability in noclobber fallback
 
   -- Documentation --
 
