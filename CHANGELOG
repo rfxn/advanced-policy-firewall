@@ -254,6 +254,17 @@
       grep/path operations (defense-in-depth)
 [Fix] importconf: fix TCR_PORTS loss on upgrade from pre-2.0.2; extract
       TCR_PORTS value from combined TCR_PASS line after pkg_config_merge
+[Change] Update vendored pkg_lib.sh to v1.0.4: sed escaping fixes for
+      pkg_config_set variable name validation and pkg_man_install sed pairs
+[Change] Update vendored pkg_lib.sh to v1.0.5: bare rm to command rm
+      class-wide (33 sites), config merge temp-file safety, varname validation
+[Change] Pin batsman submodule to v1.2.2
+[Change] Update vendored geoip_lib.sh to v1.0.4: convention compliance,
+      input validation hardening, TLS fallback gating, IPv6 database functions
+[Change] Update vendored elog_lib.sh to v1.0.4: JSON-escape fixes for RFC
+      8259 compliance, ~70% fork reduction, hostname caching, shared helper
+      extraction
+[Fix] geoip.apf: remove dead local variable from cc_rules_load()
 
   -- Documentation --
 
