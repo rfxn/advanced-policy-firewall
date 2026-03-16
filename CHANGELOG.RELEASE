@@ -246,6 +246,10 @@
 [Change] Extract _trust_unpack_fields() helper from three duplicated case
       blocks in valid_trust_entry(), trust_entry_rule(), _trust_hosts_advanced()
 [Change] Document mutex_lock() TOCTOU race acceptability in noclobber fallback
+[Change] Extract _geoip_collect_ccs_from_file() helper from three duplicated
+      CC rules file parsing loops in geoip_download_all(), cc_rules_load(),
+      and _geoip_fast_load_ipsets(); parameterized include_advanced flag
+[Change] Document eval security boundary in cli_cc_remove() LOG rule removal
 
   -- Documentation --
 

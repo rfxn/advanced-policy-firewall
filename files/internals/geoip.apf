@@ -137,6 +137,43 @@ geoip_download() {
 	return 0
 }
 
+## Collect country codes from a single CC rules file.
+# Args: $1=file $2=include_advanced (1=include entries with '=', 0=skip)
+# Sets _GAC_CODES to comma-separated CC list (may have leading comma).
+_geoip_collect_ccs_from_file() {
+	local file="$1" _gac_include_adv="${2:-1}"
+	local line cc
+	_GAC_CODES=""
+	[ -f "$file" ] || return 0
+	while IFS= read -r line; do
+		case "$line" in '#'*|'') continue ;; esac
+		if [[ "$line" == *=* ]]; then
+			[ "$_gac_include_adv" = "0" ] && continue
+			cc="${line##*=}"
+		else
+			cc="$line"
+		fi
+		if [[ "$cc" == @* ]]; then
+			if geoip_expand_codes "$cc"; then
+				_GAC_CODES="$_GAC_CODES,$_VCC_CODES"
+			fi
+		elif valid_cc "$cc"; then
+			_GAC_CODES="$_GAC_CODES,$cc"
+		fi
+	done < "$file"
+}
+
+## Collect country codes from both CC deny and allow rules files.
+# Args: $1=include_advanced (1=include entries with '=', 0=skip)
+# Sets _GAC_CODES to combined comma-separated CC list.
+_geoip_collect_active_ccs() {
+	local _gac_all="" _gac_adv="${1:-1}"
+	_geoip_collect_ccs_from_file "$CC_DENY_HOSTS" "$_gac_adv"
+	_gac_all="$_GAC_CODES"
+	_geoip_collect_ccs_from_file "$CC_ALLOW_HOSTS" "$_gac_adv"
+	_GAC_CODES="${_gac_all}${_GAC_CODES}"
+}
+
 ## Download data for all active country codes from both rules files.
 # Parses rules, expands continents, downloads each unique CC.
 # Called on every full load — downloads when cache is stale or CC_CACHE_TTL=0.
@@ -144,28 +181,9 @@ geoip_download() {
 # (hours) gates per-file freshness within this function.
 # Sets _GEOIP_DL_COUNT to the number of CCs that required fresh downloads.
 geoip_download_all() {
-	local file line cc cc_list="" seen=""
-	for file in "$CC_DENY_HOSTS" "$CC_ALLOW_HOSTS"; do
-		[ -f "$file" ] || continue
-		while IFS= read -r line; do
-			case "$line" in '#'*|'') continue ;; esac
-			# Extract CC from advanced or simple entries
-			if [[ "$line" == *=* ]]; then
-				# Advanced: last field after last '='
-				cc="${line##*=}"
-			else
-				cc="$line"
-			fi
-			# Expand continent or validate CC
-			if [[ "$cc" == @* ]]; then
-				if geoip_expand_codes "$cc"; then
-					cc_list="$cc_list,$_VCC_CODES"
-				fi
-			elif valid_cc "$cc"; then
-				cc_list="$cc_list,$cc"
-			fi
-		done < "$file"
-	done
+	local cc seen=""
+	_geoip_collect_active_ccs 1
+	local cc_list="$_GAC_CODES"
 
 	# Deduplicate and download
 	local _total _cur=0 _dl_count=0 _cached_count=0 _bulk_downloaded=0
@@ -302,30 +320,10 @@ cc_rules_load() {
 	fi
 
 	# --- Pass 1: Simple entries (bare country codes) ---
-	local simple_deny="" simple_allow=""
-	for file in "$CC_DENY_HOSTS" "$CC_ALLOW_HOSTS"; do
-		[ -f "$file" ] || continue
-		while IFS= read -r line; do
-			case "$line" in '#'*|''|*=*) continue ;; esac
-			# Bare CC entries (including temp — ttl/expire markers are on comment lines)
-			cc="$line"
-			if [[ "$cc" == @* ]]; then
-				if geoip_expand_codes "$cc"; then
-					if [ "$file" = "$CC_DENY_HOSTS" ]; then
-						simple_deny="$simple_deny,$_VCC_CODES"
-					else
-						simple_allow="$simple_allow,$_VCC_CODES"
-					fi
-				fi
-			elif valid_cc "$cc"; then
-				if [ "$file" = "$CC_DENY_HOSTS" ]; then
-					simple_deny="$simple_deny,$cc"
-				else
-					simple_allow="$simple_allow,$cc"
-				fi
-			fi
-		done < "$file"
-	done
+	_geoip_collect_ccs_from_file "$CC_DENY_HOSTS" 0
+	local simple_deny="$_GAC_CODES"
+	_geoip_collect_ccs_from_file "$CC_ALLOW_HOSTS" 0
+	local simple_allow="$_GAC_CODES"
 
 	# Populate ipsets and add chain rules for simple deny entries
 	local seen=""
@@ -610,25 +608,9 @@ _geoip_fast_load_ipsets() {
 	if [ "$USE_IPSET" != "1" ] || [ -z "$IPSET" ]; then
 		return 0
 	fi
-	local file line cc cc_list="" seen=""
-	for file in "$CC_DENY_HOSTS" "$CC_ALLOW_HOSTS"; do
-		[ -f "$file" ] || continue
-		while IFS= read -r line; do
-			case "$line" in '#'*|'') continue ;; esac
-			if [[ "$line" == *=* ]]; then
-				cc="${line##*=}"
-			else
-				cc="$line"
-			fi
-			if [[ "$cc" == @* ]]; then
-				if geoip_expand_codes "$cc"; then
-					cc_list="$cc_list,$_VCC_CODES"
-				fi
-			elif valid_cc "$cc"; then
-				cc_list="$cc_list,$cc"
-			fi
-		done < "$file"
-	done
+	local cc seen=""
+	_geoip_collect_active_ccs 1
+	local cc_list="$_GAC_CODES"
 
 	local _fl_count=0
 	local _save_ifs="$IFS"
@@ -1393,9 +1375,13 @@ cli_cc_remove() {
 			while $IPT $IPT_FLAGS -D "$chain" -m set --match-set "apf_cc4_${cc}" src -j ACCEPT 2>/dev/null; do :; done
 			while $IPT $IPT_FLAGS -D "$chain" -m set --match-set "apf_cc4_${cc}" dst -j "$ALL_STOP" 2>/dev/null; do :; done
 			while $IPT $IPT_FLAGS -D "$chain" -m set --match-set "apf_cc4_${cc}" dst -j ACCEPT 2>/dev/null; do :; done
-			# LOG rules — eval required because iptables -S output contains
+			# LOG rules -- eval required because iptables -S output contains
 			# shell-quoted --log-prefix values (e.g., "** CC_DENY:ZZ ** ")
-			# that must be parsed as shell words, not split on whitespace.
+			# that must be parsed as shell words for -D to match.
+			# Security boundary: three independent gates prevent arbitrary eval:
+			#   1. valid_cc() constrains $cc to ^[A-Z]{2}$ at all entry points
+			#   2. grep filters -S output to lines containing "apf_cc[46]_${cc}"
+			#   3. _cc_eval_re regex restricts to ^-A (CC_DENY|CC_ALLOW|...) lines
 			# Format validation: only process rules matching APF's CC chain
 			# naming convention to prevent eval from processing unexpected input.
 			$IPT $IPT_FLAGS -S "$chain" 2>/dev/null | grep "apf_cc4_${cc}" | while IFS= read -r _rule; do
