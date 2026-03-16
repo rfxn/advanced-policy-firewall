@@ -229,6 +229,20 @@
 [Fix] Portability: replace bare cp/mv with command cp/command mv across all
       shipping files; bypasses shell aliases and resolves via PATH portably
       on both pre-usr-merge (CentOS 6) and modern distros
+[Change] refresh(): exit 0 (not 1) when trust rules are unchanged since
+      last refresh; semantically correct (unchanged is not an error) but
+      may affect automation that checks for non-zero exit on no-op refresh
+[Change] GeoIP ipset existence checks in hot-path rule builders use
+      ipset list -t (headers only) instead of full member listing; avoids
+      dumping large ipsets to /dev/null during firewall load
+[Fix] _icmp_filter(): declare loop variable i as local; aligns with sibling
+      helpers _port_filter_loop() and _uid_filter_loop()
+[Fix] cli_trust(): declare ADDED_EPOCH as local to prevent global namespace
+      pollution
+[Fix] uninstall.sh: replace bare rm with command rm for portable coreutils
+      resolution on pre-usr-merge distros
+[Fix] elog_lib.sh: correct header version comment (1.0.2 to 1.0.3) to match
+      ELOG_LIB_VERSION variable
 
   -- Documentation --
 

@@ -63,7 +63,7 @@ printf "Remove install directory %s? [y/N] " "$INSTALL_PATH"
 read -r _answer
 case "$_answer" in
 	y|Y|yes|YES)
-		rm -rf "$INSTALL_PATH"
+		command rm -rf "$INSTALL_PATH"
 		echo "  Removed $INSTALL_PATH"
 		;;
 	*)
@@ -76,7 +76,7 @@ printf "Remove APF log files? [y/N] "
 read -r _answer
 case "$_answer" in
 	y|Y|yes|YES)
-		rm -f /var/log/apf_log /var/log/apf_log.prev
+		command rm -f /var/log/apf_log /var/log/apf_log.prev
 		echo "  Removed log files"
 		;;
 	*)

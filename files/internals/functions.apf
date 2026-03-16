@@ -1189,7 +1189,7 @@ _trust_check_duplicate() {
 
 cli_trust() {
  local CHAIN="$1" ACTION="$2" FILE="$3" HOST="$4" CMT="$5"
- local tlist f valtrust TIME JACTION
+ local tlist f valtrust TIME JACTION ADDED_EPOCH
  if [ -z "$HOST" ]; then
         echo "an FQDN or IP address is required for this option" >&2
         return 1

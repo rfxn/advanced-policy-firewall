@@ -464,7 +464,7 @@ _geoip_add_simple_rules() {
 
 	# Populate IPv4 ipset
 	geoip_populate_set "$cc" "4"
-	if $IPSET list "$set4" > /dev/null 2>&1; then
+	if $IPSET list -t "$set4" > /dev/null 2>&1; then
 		if [ "$CC_LOG_ONLY" = "1" ]; then
 			ipt4 -A "$chain" -m set --match-set "$set4" src -m limit \
 				--limit="$LOG_RATE/minute" -j "$LOG_TARGET" --log-level="$LOG_LEVEL" \
@@ -484,7 +484,7 @@ _geoip_add_simple_rules() {
 	if [ "$CC_IPV6" = "1" ] && [ "$USE_IPV6" = "1" ]; then
 		local set6="apf_cc6_${cc}"
 		geoip_populate_set "$cc" "6"
-		if $IPSET list "$set6" > /dev/null 2>&1; then
+		if $IPSET list -t "$set6" > /dev/null 2>&1; then
 			if [ "$CC_LOG_ONLY" = "1" ]; then
 				ipt6 -A "$chain" -m set --match-set "$set6" src -m limit \
 					--limit="$LOG_RATE/minute" -j "$LOG_TARGET" --log-level="$LOG_LEVEL" \
@@ -567,7 +567,7 @@ _geoip_add_advanced_rule() {
 		fi
 	done
 
-	if $IPSET list "$set4" > /dev/null 2>&1; then
+	if $IPSET list -t "$set4" > /dev/null 2>&1; then
 		if [ "$CC_LOG_ONLY" = "1" ]; then
 			ipt4 -A "$chain" $match -m set --match-set "$set4" "$ipset_dir" \
 				-m limit --limit="$LOG_RATE/minute" -j "$LOG_TARGET" \
@@ -586,7 +586,7 @@ _geoip_add_advanced_rule() {
 	if [ "$CC_IPV6" = "1" ] && [ "$USE_IPV6" = "1" ]; then
 		local set6="apf_cc6_${cc}"
 		geoip_populate_set "$cc" "6"
-		if $IPSET list "$set6" > /dev/null 2>&1; then
+		if $IPSET list -t "$set6" > /dev/null 2>&1; then
 			if [ "$CC_LOG_ONLY" = "1" ]; then
 				ipt6 -A "$chain" $match -m set --match-set "$set6" "$ipset_dir" \
 					-m limit --limit="$LOG_RATE/minute" -j "$LOG_TARGET" \
