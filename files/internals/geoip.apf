@@ -295,7 +295,7 @@ geoip_populate_set() {
 # Creates CC_DENY, CC_ALLOW, CC_DENYP, CC_ALLOWP chains.
 # Two passes: simple entries (bare CCs) then advanced entries.
 cc_rules_load() {
-	local file line cc entry chain action
+	local file line cc chain action
 	local _has_deny=0 _has_allow=0 _has_denyp=0 _has_allowp=0
 	local _file_simple_ccs _wc_cc _wc_base _exp_cc
 
