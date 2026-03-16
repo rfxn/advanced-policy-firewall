@@ -250,6 +250,10 @@
       CC rules file parsing loops in geoip_download_all(), cc_rules_load(),
       and _geoip_fast_load_ipsets(); parameterized include_advanced flag
 [Change] Document eval security boundary in cli_cc_remove() LOG rule removal
+[Fix] ctlimit.apf: add valid_ip_cidr() guard on conntrack-sourced IPs before
+      grep/path operations (defense-in-depth)
+[Fix] importconf: fix TCR_PORTS loss on upgrade from pre-2.0.2; extract
+      TCR_PORTS value from combined TCR_PASS line after pkg_config_merge
 
   -- Documentation --
 

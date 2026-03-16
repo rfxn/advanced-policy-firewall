@@ -50,6 +50,23 @@ case "$OV" in
 				pkg_config_set "$INSTALL_PATH/conf.apf" "$_auto_var" "auto"
 			fi
 		done
+
+		# Fix TCR_PASS/TCR_PORTS combined-line format from pre-2.0.2.
+		# In 2.0.1 and earlier, both variables shared a single line:
+		#   TCR_PASS="1"		TCR_PORTS="33434:33534"
+		# pkg_config_merge treats the entire line as TCR_PASS's value,
+		# losing the user's TCR_PORTS customization. Extract and fix.
+		_tcr_line=$(grep '^TCR_PASS=' "$INSTALL_PATH/conf.apf" 2>/dev/null) || _tcr_line=""
+		if [[ "$_tcr_line" == *TCR_PORTS=* ]]; then
+			_tcr_ports_val="${_tcr_line##*TCR_PORTS=}"
+			_tcr_ports_val="${_tcr_ports_val//\"/}"
+			_tcr_ports_val="${_tcr_ports_val%%[[:space:]]*}"
+			_tcr_pass_val="${_tcr_line#TCR_PASS=}"
+			_tcr_pass_val="${_tcr_pass_val%%[[:space:]]*}"
+			_tcr_pass_val="${_tcr_pass_val//\"/}"
+			pkg_config_set "$INSTALL_PATH/conf.apf" "TCR_PASS" "$_tcr_pass_val"
+			pkg_config_set "$INSTALL_PATH/conf.apf" "TCR_PORTS" "$_tcr_ports_val"
+		fi
 		;;
 esac
 
