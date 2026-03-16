@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# pkg_lib.sh — Shared Packaging & Installer Library 1.0.3
+# pkg_lib.sh — Shared Packaging & Installer Library 1.0.4
 ###
 # Copyright (C) 2002-2026 R-fx Networks <proj@rfxn.com>
 #                         Ryan MacDonald <ryan@rfxn.com>
@@ -29,7 +29,7 @@
 [[ -n "${_PKG_LIB_LOADED:-}" ]] && return 0 2>/dev/null
 _PKG_LIB_LOADED=1
 # shellcheck disable=SC2034 # version checked by consumers
-PKG_LIB_VERSION="1.0.3"
+PKG_LIB_VERSION="1.0.4"
 
 # Configurable defaults — consuming projects override via environment
 PKG_NO_COLOR="${PKG_NO_COLOR:-0}"
@@ -578,7 +578,7 @@ pkg_backup() {
 			command cp -pR "$install_path" "$backup_path" || rc=$?
 			;;
 		move)
-			command mv "$install_path" "$backup_path" || rc=$?
+			mv "$install_path" "$backup_path" || rc=$?
 			;;
 	esac
 
@@ -1870,7 +1870,7 @@ pkg_rclocal_remove() {
 			continue
 		}
 		grep -v "$pattern" "$path" > "$tmpfile" 2>/dev/null || true  # safe: grep -v returns 1 when all lines match
-		command mv -f "$tmpfile" "$path" || {
+		mv -f "$tmpfile" "$path" || {
 			pkg_warn "pkg_rclocal_remove: failed to update ${path}"
 			rm -f "$tmpfile"
 		}
@@ -2172,12 +2172,15 @@ pkg_man_install() {
 	}
 
 	# Apply optional sed replacement pairs (format: "old|new")
-	local pair old_str new_str
+	local pair old_str new_str esc_old esc_new
 	for pair in "$@"; do
 		old_str="${pair%%|*}"
 		new_str="${pair#*|}"
 		if [[ -n "$old_str" ]]; then
-			sed -i "s|${old_str}|${new_str}|g" "$tmpfile" || {
+			# Escape both strings for sed with | delimiter (handle &, |, /, \)
+			esc_old=$(printf '%s' "$old_str" | sed 's/[&|/\]/\\&/g')
+			esc_new=$(printf '%s' "$new_str" | sed 's/[&|/\]/\\&/g')
+			sed -i "s|${esc_old}|${esc_new}|g" "$tmpfile" || {
 				pkg_warn "pkg_man_install: sed replacement failed for pair: ${pair}"
 			}
 		fi
@@ -2380,6 +2383,14 @@ pkg_config_set() {
 
 	if [[ ! -f "$conf_file" ]]; then
 		pkg_error "pkg_config_set: file not found: ${conf_file}"
+		return 1
+	fi
+
+	# Validate var name: must be a safe shell variable name to prevent
+	# regex/sed injection — config variable names never contain metacharacters
+	local _varname_re='^[a-zA-Z_][a-zA-Z0-9_]*$'
+	if [[ ! "$var" =~ $_varname_re ]]; then
+		pkg_error "pkg_config_set: invalid variable name: ${var}"
 		return 1
 	fi
 
