@@ -229,7 +229,7 @@ ct_scan() {
 
 	if ! _ct_read_conntrack > "$ct_data_tmp" 2>/dev/null; then
 		eout "{ct_limit} conntrack data unavailable (no conntrack binary or /proc/net/nf_conntrack)"
-		rm -f "$exempt_tmp" "$ct_data_tmp"
+		command rm -f "$exempt_tmp" "$ct_data_tmp"
 		return 1
 	fi
 
@@ -258,7 +258,8 @@ ct_scan() {
 			if [ "$SET_VNET" = "1" ] && [ -f "$INSTALL_PATH/vnet/${_addr}.rules" ]; then
 				local _vnet_ct
 				_vnet_ct=$(grep -m1 '^CT_LIMIT=' "$INSTALL_PATH/vnet/${_addr}.rules" 2>/dev/null | cut -d= -f2 | tr -d '"' | tr -d "'")
-				if [ -n "$_vnet_ct" ] && [ "$_vnet_ct" != "0" ]; then
+				local _ct_int_re='^[0-9]+$'
+				if [ -n "$_vnet_ct" ] && [[ "$_vnet_ct" =~ $_ct_int_re ]] && [ "$_vnet_ct" != "0" ]; then
 					_effective_limit="$_vnet_ct"
 				fi
 			fi
@@ -276,10 +277,8 @@ ct_scan() {
 			# the PERMBLOCK_COUNT threshold.
 			if [ "$CT_PERMANENT" != "1" ] && [ -f "$INSTALL_PATH/internals/.block_history" ]; then
 				# Remove block history entry to prevent PERMBLOCK escalation
-				# Use grep -Fv (fixed-string invert) for safe IP matching
-				local _hist_tmp
-				_hist_tmp=$(grep -Fv "${_addr}|" "$INSTALL_PATH/internals/.block_history")
-				printf '%s\n' "$_hist_tmp" > "$INSTALL_PATH/internals/.block_history"
+				local _escaped_addr="${_addr//./\\.}"
+				sed -i "\%^${_escaped_addr}|%d" "$INSTALL_PATH/internals/.block_history"
 			fi
 			blocked=$((blocked + 1))
 		done <<< "$results"
@@ -290,7 +289,7 @@ ct_scan() {
 
 	eout "{ct_limit} scan complete: $total_conns connections, $blocked blocked"
 
-	rm -f "$exempt_tmp" "$ct_data_tmp"
+	command rm -f "$exempt_tmp" "$ct_data_tmp"
 }
 
 ## Display CT_LIMIT status.

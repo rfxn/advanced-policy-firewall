@@ -1,0 +1,84 @@
+# bash completion for apf (Advanced Policy Firewall)
+# Installed to /etc/bash_completion.d/apf by install.sh
+#
+# Copyright (C) 2002-2026, R-fx Networks <proj@rfxn.com>
+# Licensed under the GNU General Public License v2
+
+_apf_completions() {
+	local cur prev
+	cur="${COMP_WORDS[COMP_CWORD]}"
+	prev="${COMP_WORDS[COMP_CWORD-1]}"
+
+	# Flag lists
+	local short_flags="-s -r -f -l -t -e -a -d -u -g -o -v -h"
+	local long_flags="--start --restart --stop --flush --list --status --refresh --allow --deny --remove --unban --la --list-allow --ld --list-deny --lookup --temp-allow --temp-deny --templ --temp-list --tempf --temp-flush --search --validate --check --dump-config --ovars --rules --info --cc --cc-update --ct-scan --ct-status --ipset-update --gre-up --gre-down --gre-status --version --help"
+
+	# Find the subcommand flag (first non-option word after 'apf')
+	local cmd="" cmd_pos=0 i
+	for (( i=1; i < COMP_CWORD; i++ )); do
+		case "${COMP_WORDS[$i]}" in
+			-*) cmd="${COMP_WORDS[$i]}"; cmd_pos=$i; break ;;
+		esac
+	done
+
+	# Context-sensitive completions based on subcommand
+	case "$cmd" in
+		-a|--allow|-d|--deny|-u|--remove|--unban|--lookup)
+			# complete first arg with IPs from trust files
+			if [ "$COMP_CWORD" -eq $((cmd_pos + 1)) ]; then
+				local allow_file="/etc/apf/allow_hosts.rules"
+				local deny_file="/etc/apf/deny_hosts.rules"
+				local ips=""
+				if [ -f "$allow_file" ]; then
+					ips="$ips $(grep -v '^#' "$allow_file" 2>/dev/null | grep -v '^$')"
+				fi
+				if [ -f "$deny_file" ]; then
+					ips="$ips $(grep -v '^#' "$deny_file" 2>/dev/null | grep -v '^$')"
+				fi
+				if [ -n "$ips" ]; then
+					COMPREPLY=( $(compgen -W "$ips" -- "$cur") )
+				fi
+			fi
+			return 0
+			;;
+		-ta|--temp-allow|-td|--temp-deny)
+			# first arg: host; second arg: TTL
+			local pos=$((COMP_CWORD - cmd_pos))
+			if [ "$pos" -eq 2 ]; then
+				COMPREPLY=( $(compgen -W "5m 15m 30m 1h 2h 6h 12h 1d 7d 30d" -- "$cur") )
+			fi
+			return 0
+			;;
+		-g|--search)
+			# no specific completions for search pattern
+			return 0
+			;;
+		--cc)
+			# complete with country codes from active rules
+			if [ "$COMP_CWORD" -eq $((cmd_pos + 1)) ]; then
+				local cc_deny="/etc/apf/cc_deny.rules"
+				local cc_allow="/etc/apf/cc_allow.rules"
+				local ccs=""
+				if [ -f "$cc_deny" ]; then
+					ccs="$ccs $(grep -v '^#' "$cc_deny" 2>/dev/null | grep -v '^$')"
+				fi
+				if [ -f "$cc_allow" ]; then
+					ccs="$ccs $(grep -v '^#' "$cc_allow" 2>/dev/null | grep -v '^$')"
+				fi
+				if [ -n "$ccs" ]; then
+					COMPREPLY=( $(compgen -W "$ccs" -- "$cur") )
+				fi
+			fi
+			return 0
+			;;
+	esac
+
+	# Default: complete flags
+	if [[ "$cur" == --* ]]; then
+		COMPREPLY=( $(compgen -W "$long_flags" -- "$cur") )
+	elif [[ "$cur" == -* ]]; then
+		COMPREPLY=( $(compgen -W "$short_flags $long_flags" -- "$cur") )
+	fi
+}
+
+complete -F _apf_completions apf

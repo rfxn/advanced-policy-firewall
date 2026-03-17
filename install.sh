@@ -12,6 +12,12 @@ BINPATH=${BINPATH:-"/usr/local/sbin/apf"}
 COMPAT_BINPATH=${COMPAT_BINPATH:-"/usr/local/sbin/fwmgr"}
 
 cd "$(dirname "$0")" || { echo "Error: cannot cd to script directory"; exit 1; }
+
+if [ "$(id -u)" != "0" ]; then
+	echo "Error: install.sh must be run as root"
+	exit 1
+fi
+
 [ -f "files/VERSION" ] || { echo "Error: source files not found — run install.sh from the APF source directory"; exit 1; }
 
 # Source shared packaging library
@@ -46,7 +52,7 @@ install() {
 	command cp -pf importconf "$INSTALL_PATH/extras/"
 
 	# Install documentation to doc/ subdirectory
-	pkg_doc_install "$INSTALL_PATH/doc" README CHANGELOG COPYING.GPL apf.8 FLOW
+	pkg_doc_install "$INSTALL_PATH/doc" README.md CHANGELOG COPYING.GPL apf.8 FLOW
 
 	# Create binary symlinks
 	pkg_symlink "$INSTALL_PATH/apf" "$BINPATH"
@@ -62,6 +68,14 @@ install() {
 		pkg_cron_install "cron.d.apf" "/etc/cron.d/apf"
 		if [ "$INSTALL_PATH" != "/etc/apf" ]; then
 			pkg_sed_replace "/etc/apf" "$INSTALL_PATH" "/etc/cron.d/apf"
+		fi
+	fi
+
+	# Bash tab completion
+	if [ -f "apf.bash-completion" ]; then
+		pkg_bash_completion "apf.bash-completion" "apf"
+		if [ "$INSTALL_PATH" != "/etc/apf" ]; then
+			pkg_sed_replace "/etc/apf" "$INSTALL_PATH" /etc/bash_completion.d/apf
 		fi
 	fi
 
@@ -115,11 +129,6 @@ install() {
 
 	# Generate VNET rules
 	"$INSTALL_PATH/vnet/vnetgen" 2>/dev/null  # safe: may fail in containers without interfaces
-
-	# Install apf-m menu system if dialog is available
-	if [ -f "/usr/bin/dialog" ] && [ -d "$INSTALL_PATH/extras/apf-m" ]; then
-		(cd "$INSTALL_PATH/extras/apf-m/" && sh install -i)
-	fi
 
 	chmod 750 "$INSTALL_PATH"
 }

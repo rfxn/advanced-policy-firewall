@@ -112,7 +112,7 @@ geoip_download() {
 
 	if [ "$rc" -ne 0 ] || [ ! -s "$dl_tmp" ]; then
 		eout "{geoip} download failed for $cc (IPv$family)"
-		rm -f "$dl_tmp"
+		command rm -f "$dl_tmp"
 		# Keep existing cache if available
 		return 1
 	fi
@@ -125,14 +125,14 @@ geoip_download() {
 	fi
 	if [ "$valid_count" -eq 0 ]; then
 		eout "{geoip} no valid CIDR entries in download for $cc (IPv$family)"
-		rm -f "$dl_tmp"
+		command rm -f "$dl_tmp"
 		return 1
 	fi
 
 	# Cache validated data
 	cat "$dl_tmp" > "$cache_file"
 	chmod 640 "$cache_file"
-	rm -f "$dl_tmp"
+	command rm -f "$dl_tmp"
 	eout "{geoip} cached $valid_count CIDRs for $cc (IPv$family)"
 	return 0
 }
@@ -287,7 +287,7 @@ geoip_populate_set() {
 	fi
 	$IPSET flush "${set_name}-tmp" 2>/dev/null || true    # cleanup tmp set
 	$IPSET destroy "${set_name}-tmp" 2>/dev/null || true  # may already be destroyed after swap
-	rm -f "$restore_tmp"
+	command rm -f "$restore_tmp"
 	return 0
 }
 
@@ -717,15 +717,15 @@ _geoip_world_fetch() {
 	eout "{geoip} fetching world IPv4 data from ipdeny.com (~1MB)"
 	if ! download_url "$url" "$tmp_tar"; then
 		eout "{geoip} world data download failed"
-		rm -f "$tmp_tar"
-		rm -rf "$tmp_dir"
+		command rm -f "$tmp_tar"
+		command rm -rf "$tmp_dir"
 		return 1
 	fi
 
 	if ! tar -xzf "$tmp_tar" -C "$tmp_dir" 2>/dev/null; then
 		eout "{geoip} world data extract failed"
-		rm -f "$tmp_tar"
-		rm -rf "$tmp_dir"
+		command rm -f "$tmp_tar"
+		command rm -rf "$tmp_dir"
 		return 1
 	fi
 
@@ -745,8 +745,8 @@ _geoip_world_fetch() {
 		fi
 	done
 
-	rm -f "$tmp_tar"
-	rm -rf "$tmp_dir"
+	command rm -f "$tmp_tar"
+	command rm -rf "$tmp_dir"
 
 	touch "$CC_DATA_DIR/.world_cached"
 	eout "{geoip} world GeoIP data cached: $count new countries"
@@ -1409,7 +1409,7 @@ cli_cc_remove() {
 	fi
 
 	# Remove cached data
-	rm -f "$CC_DATA_DIR/${cc}.4" "$CC_DATA_DIR/${cc}.6"
+	command rm -f "$CC_DATA_DIR/${cc}.4" "$CC_DATA_DIR/${cc}.6"
 
 	if [ "$found" = "1" ]; then
 		return 0

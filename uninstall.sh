@@ -50,6 +50,9 @@ pkg_uninstall_cron \
 # Remove logrotate config
 pkg_uninstall_logrotate "apf"
 
+# Remove bash completion
+pkg_uninstall_completion "apf"
+
 # Remove symlinks
 echo "Removing symlinks..."
 pkg_symlink_cleanup "$BINPATH" "$COMPAT_BINPATH"
@@ -77,6 +80,7 @@ read -r _answer
 case "$_answer" in
 	y|Y|yes|YES)
 		command rm -f /var/log/apf_log /var/log/apf_log.prev
+		command rm -rf /var/log/apf
 		echo "  Removed log files"
 		;;
 	*)
