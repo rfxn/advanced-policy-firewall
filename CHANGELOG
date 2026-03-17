@@ -74,6 +74,9 @@
       following, timeouts, retries; all download sites migrated
 [New] uninstall.sh: removes all system-wide artifacts including cron, man
       page, and symlinks; prompts before removing install directory and logs
+[New] Bash tab completion: apf.bash-completion installed to
+      /etc/bash_completion.d/apf; context-sensitive completions for trust
+      hosts, temp TTL values, and country codes
 
   -- Bug Fixes --
 
@@ -177,6 +180,7 @@
 
   -- Changes --
 
+[Change] Remove plain text README; consolidate on README.md only
 [Change] Conntrack module migration: use -m conntrack --ctstate when available,
          falling back to -m state --state on legacy systems
 [Change] cli_trust(): extract _trust_check_duplicate() helper from two

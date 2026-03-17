@@ -50,6 +50,9 @@ pkg_uninstall_cron \
 # Remove logrotate config
 pkg_uninstall_logrotate "apf"
 
+# Remove bash completion
+pkg_uninstall_completion "apf"
+
 # Remove symlinks
 echo "Removing symlinks..."
 pkg_symlink_cleanup "$BINPATH" "$COMPAT_BINPATH"

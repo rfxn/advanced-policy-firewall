@@ -46,7 +46,7 @@ install() {
 	command cp -pf importconf "$INSTALL_PATH/extras/"
 
 	# Install documentation to doc/ subdirectory
-	pkg_doc_install "$INSTALL_PATH/doc" README CHANGELOG COPYING.GPL apf.8 FLOW
+	pkg_doc_install "$INSTALL_PATH/doc" README.md CHANGELOG COPYING.GPL apf.8 FLOW
 
 	# Create binary symlinks
 	pkg_symlink "$INSTALL_PATH/apf" "$BINPATH"
@@ -62,6 +62,14 @@ install() {
 		pkg_cron_install "cron.d.apf" "/etc/cron.d/apf"
 		if [ "$INSTALL_PATH" != "/etc/apf" ]; then
 			pkg_sed_replace "/etc/apf" "$INSTALL_PATH" "/etc/cron.d/apf"
+		fi
+	fi
+
+	# Bash tab completion
+	if [ -f "apf.bash-completion" ]; then
+		pkg_bash_completion "apf.bash-completion" "apf"
+		if [ "$INSTALL_PATH" != "/etc/apf" ]; then
+			pkg_sed_replace "/etc/apf" "$INSTALL_PATH" /etc/bash_completion.d/apf
 		fi
 	fi
 
