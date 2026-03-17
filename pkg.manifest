@@ -24,7 +24,8 @@ PKG_HAS_SYSV_INIT="1"
 PKG_HAS_CRON_D="1"
 PKG_HAS_LOGROTATE="1"
 PKG_HAS_MAN_PAGE="1"
-PKG_HAS_BASH_COMPLETION="0"
+PKG_HAS_BASH_COMPLETION="1"
+PKG_COMPLETION_FILE="apf.bash-completion"
 
 # Dependencies
 PKG_DEP_RPM="iptables iproute kmod bash coreutils"
@@ -43,7 +44,7 @@ PKG_MAN_FILE="apf.8"
 
 # Supplementary source files
 PKG_EXTRAS="importconf"
-PKG_DOCS="README CHANGELOG COPYING.GPL FLOW"
+PKG_DOCS="README.md CHANGELOG COPYING.GPL FLOW"
 
 # Docker build flags (APF requires --privileged for iptables)
 PKG_DOCKER_FLAGS="--privileged"

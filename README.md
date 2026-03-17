@@ -267,6 +267,7 @@ The following files are located under your install path (`/etc/apf` by default):
 | `postroute.rules` | Post-routing custom rules |
 | `vnet/` | Per-IP virtual network policy files |
 | `/etc/cron.d/apf` | Consolidated cron: daily restart, hourly ipset refresh, per-minute temp trust expiry |
+| `/etc/bash_completion.d/apf` | Bash tab completion for apf command-line options |
 | `/var/log/apf_log` | Default status log location |
 | `/var/log/apf/audit.log` | Structured JSONL audit log (config, service state, rule events) |
 
@@ -283,7 +284,7 @@ The uninstaller will:
 - Stop the firewall and flush all iptables rules
 - Remove systemd service, SysV init scripts, and rc.local entries
 - Remove cron entries (current and legacy)
-- Remove logrotate config, symlinks, and man page
+- Remove bash completion, logrotate config, symlinks, and man page
 - Prompt before removing the install directory and log files
 
 To override the install path (if APF was installed to a non-default location):

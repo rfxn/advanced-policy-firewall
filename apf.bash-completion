@@ -11,7 +11,7 @@ _apf_completions() {
 
 	# Flag lists
 	local short_flags="-s -r -f -l -t -e -a -d -u -g -o -v -h"
-	local long_flags="--start --restart --stop --flush --list --status --refresh --allow --deny --remove --unban --list-allow --list-deny --lookup --temp-allow --temp-deny --temp-list --temp-flush --search --validate --check --dump-config --ovars --rules --info --cc --cc-update --ct-scan --ct-status --ipset-update --gre-up --gre-down --gre-status --version --help"
+	local long_flags="--start --restart --stop --flush --list --status --refresh --allow --deny --remove --unban --la --list-allow --ld --list-deny --lookup --temp-allow --temp-deny --temp-list --temp-flush --search --validate --check --dump-config --ovars --rules --info --cc --cc-update --ct-scan --ct-status --ipset-update --gre-up --gre-down --gre-status --version --help"
 
 	# Context-sensitive completions
 	case "$prev" in
