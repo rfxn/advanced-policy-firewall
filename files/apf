@@ -273,9 +273,9 @@ case "$1" in
 	;;
 
 -r|--restart)
-	$0 --flush
+	$0 --flush || exit $?
 	sleep 2
-	$0 --start
+	$0 --start || exit $?
 	;;
 -a|--allow)
 	# Propagate exit code: invalid host, duplicate, or rule failure → exit 1
