@@ -1913,8 +1913,8 @@ firewall_info() {
 	fi
 	if [ "$USE_IPSET" == "1" ]; then
 		local ipset_count=0
-		if command -v ipset > /dev/null 2>&1; then
-			ipset_count=$(ipset list -n 2>/dev/null | grep -c .)
+		if [ -n "$IPSET" ]; then
+			ipset_count=$($IPSET list -n 2>/dev/null | grep -c .)  # grep -c exits 1 when count is 0; handled below
 			[ "$ipset_count" -gt 0 ] 2>/dev/null || ipset_count=0
 		fi
 		echo "  ipset:            enabled ($ipset_count active lists)"
@@ -2154,9 +2154,9 @@ search() {
  fi
 
  # ipset sets
- if [ "$USE_IPSET" == "1" ] && command -v ipset > /dev/null 2>&1; then
+ if [ "$USE_IPSET" == "1" ] && [ -n "$IPSET" ]; then
   local ipset_matches
-  ipset_matches=$(ipset list 2>/dev/null | grep -in -- "$pattern")
+  ipset_matches=$($IPSET list 2>/dev/null | grep -in -- "$pattern")
   if [ -n "$ipset_matches" ]; then
    echo "=== ipset ==="
    echo "$ipset_matches"
@@ -2949,7 +2949,7 @@ if [ "$eff_expire" -ge "60" ]; then
  if [ "$eff_expire" -lt "$REFRESH_TIME" ]; then
         eff_expire="$REFRESH_TIME"
  fi
- if [ -f "$INSTALL_PATH/deny_hosts.rules" ]; then
+ if [ -f "$DENY_HOSTS" ]; then
          expire_time="$eff_expire"
          check_time=$(date +%s)
          while IFS= read -r line; do
@@ -2982,7 +2982,7 @@ if [ "$eff_expire" -ge "60" ]; then
                         eout "{trust} removed expired ban for $ip (${time_diff}s/${expire_time}s)"
                         _eb_expired+=("$ip")
                 fi
-         done < <(grep -vE "static|noexpire|ttl=" "$INSTALL_PATH/deny_hosts.rules" | grep -E "# added .* on ")
+         done < <(grep -vE "static|noexpire|ttl=" "$DENY_HOSTS" | grep -E "# added .* on ")
          # Deferred removal: avoids modifying deny_hosts.rules while iterating;
          # cli_trust_remove handles both iptables rules and file cleanup
          for ip in "${_eb_expired[@]}"; do
