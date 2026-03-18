@@ -269,6 +269,26 @@
       8259 compliance, ~70% fork reduction, hostname caching, shared helper
       extraction
 [Fix] geoip.apf: remove dead local variable from cc_rules_load()
+[Fix] ctlimit.apf: fix grep -Fv substring match in ct_scan block_history
+      removal that could silently remove unrelated IP entries sharing a prefix
+[Fix] apf: restart (-r) now propagates exit codes from flush/start
+      sub-invocations; prevents silent firewall-down with success exit code
+[Fix] ctlimit.apf: add numeric validation for VNET-overridden CT_LIMIT values;
+      non-numeric values silently fall back to global CT_LIMIT
+[Fix] install.sh: add root privilege check matching uninstall.sh
+[Fix] uninstall.sh: clean up /var/log/apf/ audit log directory on uninstall
+[Change] Remove dead variables from internals.conf: HOST (replaced by GETENT),
+      IP6_NET (never consumed), UTIME (never consumed), LOCK_TIMEOUT (superseded
+      by ENTER_LOCK_TIMEOUT)
+[Change] Remove dead code: GEOIP_LOG_FUNC callback (never consumed by
+      geoip_lib.sh), _vc_burst unused declaration, unreachable DEVEL_ON checks
+      in fast load path, tautological CNF non-empty test, apf-m install block
+[Change] Replace bare ipset calls with $IPSET variable in firewall_info/search;
+      use $DENY_HOSTS variable in expirebans() instead of hardcoded path
+[Change] Replace 44 bare rm calls with command rm across internal libraries
+      (functions.apf, geoip.apf, ctlimit.apf) for portable alias bypass
+[Change] Add inline comments to 12 uncommented || true suppressions per
+      shell standards convention
 
   -- Documentation --
 
