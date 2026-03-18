@@ -1612,14 +1612,14 @@ restore_external_baseline() {
 	for f in "$bdir/.apf.input.baseline" "$bdir/.apf.output.baseline"; do
 		[ -f "$f" ] || continue
 		while IFS= read -r rule; do
-			case "$rule" in -A*) $IPT $IPT_FLAGS $rule 2>/dev/null || true ;; esac
+			case "$rule" in -A*) $IPT $IPT_FLAGS $rule 2>/dev/null || true ;; esac  # safe: baseline rule may already exist
 		done < "$f"
 	done
 	if [ "$USE_IPV6" == "1" ]; then
 		for f in "$bdir/.apf6.input.baseline" "$bdir/.apf6.output.baseline"; do
 			[ -f "$f" ] || continue
 			while IFS= read -r rule; do
-				case "$rule" in -A*) $IP6T $IPT_FLAGS $rule 2>/dev/null || true ;; esac
+				case "$rule" in -A*) $IP6T $IPT_FLAGS $rule 2>/dev/null || true ;; esac  # safe: baseline rule may already exist
 			done < "$f"
 		done
 	fi
@@ -1693,11 +1693,11 @@ flush_apf_chains() {
 	fi
 
 	# Flush mangle PREROUTING/POSTROUTING (tosroute/ECN)
-	ipt4 -t mangle -F PREROUTING 2>/dev/null || true
-	ipt4 -t mangle -F POSTROUTING 2>/dev/null || true
+	ipt4 -t mangle -F PREROUTING 2>/dev/null || true   # safe: mangle table may not exist
+	ipt4 -t mangle -F POSTROUTING 2>/dev/null || true  # safe: mangle table may not exist
 	if [ "$USE_IPV6" == "1" ]; then
-		ipt6 -t mangle -F PREROUTING 2>/dev/null || true
-		ipt6 -t mangle -F POSTROUTING 2>/dev/null || true
+		ipt6 -t mangle -F PREROUTING 2>/dev/null || true   # safe: mangle table may not exist
+		ipt6 -t mangle -F POSTROUTING 2>/dev/null || true  # safe: mangle table may not exist
 	fi
 
 	# Set INPUT/OUTPUT to ACCEPT; leave FORWARD as-is
@@ -2667,8 +2667,8 @@ while IFS= read -r line; do
 	_ipset_resolve_data || continue
 
 	# Create sets and populate with atomic swap
-	$IPSET create "$_IPE_NAME" "$_IPE_HASH_TYPE" maxelem "$_IPE_IPSET_MAXELEM" 2>/dev/null || true
-	$IPSET create "${_IPE_NAME}-tmp" "$_IPE_HASH_TYPE" maxelem "$_IPE_IPSET_MAXELEM" 2>/dev/null || true
+	$IPSET create "$_IPE_NAME" "$_IPE_HASH_TYPE" maxelem "$_IPE_IPSET_MAXELEM" 2>/dev/null || true  # safe: set may already exist
+	$IPSET create "${_IPE_NAME}-tmp" "$_IPE_HASH_TYPE" maxelem "$_IPE_IPSET_MAXELEM" 2>/dev/null || true  # safe: set may already exist
 	$IPSET flush "${_IPE_NAME}-tmp"
 
 	ipset_populate_set "$_IPE_NAME" "$_IPE_IPSET_MAXELEM" "$_IPE_DATA_FILE"
@@ -2708,7 +2708,7 @@ local ts_tmp
 ts_tmp=$(mktemp "$INSTALL_PATH/.apf-XXXXXX")
 _apf_reg_tmp "$ts_tmp"
 if [ -f "$ts_file" ]; then
-	grep -v "^${ts_name}:" "$ts_file" > "$ts_tmp" 2>/dev/null || true
+	grep -v "^${ts_name}:" "$ts_file" > "$ts_tmp" 2>/dev/null || true  # safe: empty result is valid (new timestamp entry)
 fi
 printf '%s\n' "${ts_name}:${ts_epoch}" >> "$ts_tmp"
 command cp "$ts_tmp" "$ts_file"
@@ -2759,7 +2759,7 @@ while IFS= read -r line; do
 	eout "{ipset} updating set $_IPE_NAME from $_IPE_FILE_OR_URL"
 	_ipset_resolve_data || continue
 
-	$IPSET create "${_IPE_NAME}-tmp" "$_IPE_HASH_TYPE" maxelem "$_IPE_IPSET_MAXELEM" 2>/dev/null || true
+	$IPSET create "${_IPE_NAME}-tmp" "$_IPE_HASH_TYPE" maxelem "$_IPE_IPSET_MAXELEM" 2>/dev/null || true  # safe: set may already exist
 	$IPSET flush "${_IPE_NAME}-tmp"
 
 	ipset_populate_set "$_IPE_NAME" "$_IPE_IPSET_MAXELEM" "$_IPE_DATA_FILE"
@@ -2792,8 +2792,8 @@ while IFS= read -r line; do
 	local name
 	name="${line%%:*}"
 	[ -z "$name" ] && continue
-	$IPSET destroy "$name" 2>/dev/null || true
-	$IPSET destroy "${name}-tmp" 2>/dev/null || true
+	$IPSET destroy "$name" 2>/dev/null || true       # safe: set may not exist
+	$IPSET destroy "${name}-tmp" 2>/dev/null || true  # safe: set may not exist
 done < "$ipset_rules"
 command rm -f "$INSTALL_PATH/internals/.ipset.timestamps"
 }
