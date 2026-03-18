@@ -465,7 +465,10 @@ _create_offender_fixture() {
     "$APF" -s
 
     # Pre-populate block_history with bystander IP (shares prefix with offender)
-    echo "${bystander_ip}|2|1000|2000" > "$history_file"
+    # Use current timestamp so record_block() doesn't prune it as expired
+    local _now
+    _now=$(date +%s)
+    echo "${bystander_ip}|2|${_now}|${_now}" > "$history_file"
 
     # Create fixture with offender exceeding threshold
     _create_offender_fixture "$CT_FIXTURE_DIR/ct_prefix_test" "$offender_ip" 20
