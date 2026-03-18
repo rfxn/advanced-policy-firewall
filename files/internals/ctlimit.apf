@@ -276,10 +276,8 @@ ct_scan() {
 			# the PERMBLOCK_COUNT threshold.
 			if [ "$CT_PERMANENT" != "1" ] && [ -f "$INSTALL_PATH/internals/.block_history" ]; then
 				# Remove block history entry to prevent PERMBLOCK escalation
-				# Use grep -Fv (fixed-string invert) for safe IP matching
-				local _hist_tmp
-				_hist_tmp=$(grep -Fv "${_addr}|" "$INSTALL_PATH/internals/.block_history")
-				printf '%s\n' "$_hist_tmp" > "$INSTALL_PATH/internals/.block_history"
+				local _escaped_addr="${_addr//./\\.}"
+				sed -i "\%^${_escaped_addr}|%d" "$INSTALL_PATH/internals/.block_history"
 			fi
 			blocked=$((blocked + 1))
 		done <<< "$results"
