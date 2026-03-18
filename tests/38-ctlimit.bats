@@ -448,3 +448,75 @@ _create_offender_fixture() {
     # Clean up
     "$APF" -u "$offender_ip" 2>/dev/null || true
 }
+
+@test "CT_PERMANENT=0: block_history removal does not affect IPs sharing prefix" {
+    source /opt/tests/helpers/apf-config.sh
+    local offender_ip="1.2.3.4"
+    local bystander_ip="11.2.3.4"
+    local history_file="$APF_DIR/internals/.block_history"
+
+    apf_set_config "CT_LIMIT" "5"
+    apf_set_config "CT_INTERVAL" "60"
+    apf_set_config "CT_BLOCK_TIME" "300"
+    apf_set_config "CT_PERMANENT" "0"
+    apf_set_config "PERMBLOCK_COUNT" "5"
+
+    "$APF" -f 2>/dev/null || true
+    "$APF" -s
+
+    # Pre-populate block_history with bystander IP (shares prefix with offender)
+    echo "${bystander_ip}|2|1000|2000" > "$history_file"
+
+    # Create fixture with offender exceeding threshold
+    _create_offender_fixture "$CT_FIXTURE_DIR/ct_prefix_test" "$offender_ip" 20
+
+    _create_mock_conntrack "$CT_FIXTURE_DIR/ct_prefix_test" "$CT_FIXTURE_DIR/mock-conntrack-prefix"
+    echo "CONNTRACK=\"$CT_FIXTURE_DIR/mock-conntrack-prefix\"" >> "$APF_DIR/conf.apf"
+
+    "$APF" --ct-scan
+
+    # Offender should be temp-denied
+    grep -Fq "$offender_ip" "$APF_DIR/deny_hosts.rules"
+
+    # Bystander IP must NOT be removed from block_history (regression for B-001)
+    [ -f "$history_file" ]
+    grep -Fq "${bystander_ip}|" "$history_file"
+
+    "$APF" -u "$offender_ip" 2>/dev/null || true
+}
+
+@test "VNET CT_LIMIT: non-numeric value in vnet rules falls back to global" {
+    source /opt/tests/helpers/apf-config.sh
+    local offender_ip="198.51.100.50"
+    local vnet_ip="10.0.0.100"
+
+    apf_set_config "CT_LIMIT" "5"
+    apf_set_config "CT_INTERVAL" "60"
+    apf_set_config "CT_BLOCK_TIME" "300"
+    apf_set_config "CT_PERMANENT" "1"
+    apf_set_config "SET_VNET" "1"
+
+    "$APF" -f 2>/dev/null || true
+    "$APF" -s
+
+    # Create a VNET rules file with non-numeric CT_LIMIT
+    mkdir -p "$APF_DIR/vnet"
+    echo 'CT_LIMIT="abc"' > "$APF_DIR/vnet/${offender_ip}.rules"
+
+    # Create fixture: offender_ip with 20 connections (exceeds global CT_LIMIT=5)
+    _create_offender_fixture "$CT_FIXTURE_DIR/ct_vnet_nonnumeric" "$offender_ip" 20
+
+    _create_mock_conntrack "$CT_FIXTURE_DIR/ct_vnet_nonnumeric" "$CT_FIXTURE_DIR/mock-conntrack-vnet"
+    echo "CONNTRACK=\"$CT_FIXTURE_DIR/mock-conntrack-vnet\"" >> "$APF_DIR/conf.apf"
+
+    # Should not produce bash arithmetic errors on stderr
+    run "$APF" --ct-scan
+    [ "$status" -eq 0 ]
+
+    # Non-numeric VNET CT_LIMIT is silently ignored; global CT_LIMIT=5 applies;
+    # 20 connections exceeds 5, so the offender should be blocked
+    grep -Fq "$offender_ip" "$APF_DIR/deny_hosts.rules"
+
+    "$APF" -u "$offender_ip" 2>/dev/null || true
+    rm -f "$APF_DIR/vnet/${offender_ip}.rules"
+}
