@@ -12,12 +12,13 @@ BINPATH=${BINPATH:-"/usr/local/sbin/apf"}
 COMPAT_BINPATH=${COMPAT_BINPATH:-"/usr/local/sbin/fwmgr"}
 
 cd "$(dirname "$0")" || { echo "Error: cannot cd to script directory"; exit 1; }
-[ -f "files/VERSION" ] || { echo "Error: source files not found — run install.sh from the APF source directory"; exit 1; }
 
 if [ "$(id -u)" != "0" ]; then
 	echo "Error: install.sh must be run as root"
 	exit 1
 fi
+
+[ -f "files/VERSION" ] || { echo "Error: source files not found — run install.sh from the APF source directory"; exit 1; }
 
 # Source shared packaging library
 # shellcheck disable=SC1091
