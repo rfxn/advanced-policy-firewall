@@ -80,6 +80,7 @@ read -r _answer
 case "$_answer" in
 	y|Y|yes|YES)
 		command rm -f /var/log/apf_log /var/log/apf_log.prev
+		command rm -rf /var/log/apf
 		echo "  Removed log files"
 		;;
 	*)
