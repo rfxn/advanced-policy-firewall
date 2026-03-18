@@ -258,7 +258,8 @@ ct_scan() {
 			if [ "$SET_VNET" = "1" ] && [ -f "$INSTALL_PATH/vnet/${_addr}.rules" ]; then
 				local _vnet_ct
 				_vnet_ct=$(grep -m1 '^CT_LIMIT=' "$INSTALL_PATH/vnet/${_addr}.rules" 2>/dev/null | cut -d= -f2 | tr -d '"' | tr -d "'")
-				if [ -n "$_vnet_ct" ] && [ "$_vnet_ct" != "0" ]; then
+				local _ct_int_re='^[0-9]+$'
+				if [ -n "$_vnet_ct" ] && [[ "$_vnet_ct" =~ $_ct_int_re ]] && [ "$_vnet_ct" != "0" ]; then
 					_effective_limit="$_vnet_ct"
 				fi
 			fi
