@@ -30,7 +30,7 @@ devm() {
         echo "*/5 * * * * root $INSTALL_PATH/apf -f >> /dev/null 2>&1" > "$cron_file"
         chmod 644 "$cron_file"
  elif [ "$DEVEL_MODE" == "0" ]; then
-        rm -f "$cron_file"
+        command rm -f "$cron_file"
  fi
 }
 
@@ -51,11 +51,11 @@ _apf_cleanup_tmp() {
 # Also cleans stale .apf-* temp files left by interrupted operations.
 # Safe to call repeatedly (rm -f on non-existent files is a no-op).
 _apf_cleanup_stale_tmp() {
-	rm -f "$INSTALL_PATH"/internals/refresh.allow.* 2>/dev/null
-	rm -f "$INSTALL_PATH"/internals/refresh.drop.* 2>/dev/null
-	rm -f "$INSTALL_PATH"/.apf-* 2>/dev/null
+	command rm -f "$INSTALL_PATH"/internals/refresh.allow.* 2>/dev/null
+	command rm -f "$INSTALL_PATH"/internals/refresh.drop.* 2>/dev/null
+	command rm -f "$INSTALL_PATH"/.apf-* 2>/dev/null
 	# rm -rf for geoip: _geoip_world_fetch() creates temp directories via mktemp -d
-	rm -rf "$INSTALL_PATH"/.apf-geoip-* 2>/dev/null
+	command rm -rf "$INSTALL_PATH"/.apf-geoip-* 2>/dev/null
 }
 
 ## Detect iptables backend (nft vs legacy)
@@ -85,12 +85,12 @@ snapshot_save() {
 	snap_rc=$?
 	if [ "$snap_rc" -ne 0 ]; then
 		eout "{glob} snapshot save failed (iptables-save exit $snap_rc)"
-		rm -f "$snap_tmp"
+		command rm -f "$snap_tmp"
 		return 1
 	fi
 	if [ ! -s "$snap_tmp" ] || ! grep -q '^\*' "$snap_tmp"; then
 		eout "{glob} snapshot save failed (empty or invalid output)"
-		rm -f "$snap_tmp"
+		command rm -f "$snap_tmp"
 		return 1
 	fi
 	command mv -f "$snap_tmp" "$snap_dir/.apf.restore"
@@ -103,10 +103,10 @@ snapshot_save() {
 		snap_rc=$?
 		if [ "$snap_rc" -ne 0 ]; then
 			eout "{glob} IPv6 snapshot save failed (ip6tables-save exit $snap_rc)"
-			rm -f "$snap_tmp"
+			command rm -f "$snap_tmp"
 		elif [ ! -s "$snap_tmp" ] || ! grep -q '^\*' "$snap_tmp"; then
 			eout "{glob} IPv6 snapshot save failed (empty or invalid output)"
-			rm -f "$snap_tmp"
+			command rm -f "$snap_tmp"
 		else
 			command mv -f "$snap_tmp" "$snap_dir/.apf6.restore"
 		fi
@@ -627,7 +627,7 @@ mutex_lock() {
     local lock_pid
     read -r lock_pid < "$LOCK_FILE" 2>/dev/null || lock_pid=""
     if [ -n "$lock_pid" ] && ! kill -0 "$lock_pid" 2>/dev/null; then
-      rm -f "$LOCK_FILE"
+      command rm -f "$LOCK_FILE"
       continue
     fi
     local now
@@ -644,7 +644,7 @@ mutex_unlock() {
   if [ "$APF_MUTEX_LOCKED" == "1" ]; then
     # Under exec-flock, the file-based flock manages the lock — don't remove
     if [ "$_APF_LOCKED" != "1" ]; then
-      rm -f "$LOCK_FILE"
+      command rm -f "$LOCK_FILE"
     fi
     APF_MUTEX_LOCKED="0"
   fi
@@ -673,7 +673,7 @@ trim() {
                 _apf_reg_tmp "$_trim_tmp"
                 tail -n "$MAXLINES" "$FILE" > "$_trim_tmp"
                 cat "$_trim_tmp" > "$FILE"
-                rm -f "$_trim_tmp"
+                command rm -f "$_trim_tmp"
         fi
  fi
 }
@@ -1759,9 +1759,9 @@ if [ -n "$IPSET" ]; then
 fi
 
 gre_flush
-rm -f /etc/cron.d/refresh.apf
-rm -f /etc/cron.d/ctlimit.apf "$INSTALL_PATH/internals/cron.ctlimit"
-rm -f "$INSTALL_PATH/internals/.block_history"
+command rm -f /etc/cron.d/refresh.apf
+command rm -f /etc/cron.d/ctlimit.apf "$INSTALL_PATH/internals/cron.ctlimit"
+command rm -f "$INSTALL_PATH/internals/.block_history"
 
 if [ ! "$1" = "1" ]; then
 	eout "{glob} firewall offline"
@@ -1800,7 +1800,7 @@ elif [ -t 1 ]; then
 else
 	cat "$iptc"
 fi
-rm -f "$iptc"
+command rm -f "$iptc"
 }
 
 rules() {
@@ -2376,7 +2376,7 @@ if ( [ -n "$CURL" ] || [ -n "$WGET" ] ) && [ -f "$RESNET" ]; then
 	     chmod 600 "$RESNET" "$RESNET.bk"
 	 fi
    fi
-   rm -f "$url_tmp"
+   command rm -f "$url_tmp"
 else
  if [ -f "$RESNET.bk" ]; then
 	command cp "$RESNET.bk" "$RESNET"
@@ -2420,14 +2420,14 @@ else
             chmod 600 "$hosts_file" "$hosts_file.bk"
         fi
 fi
-rm -f "$url_tmp"
+command rm -f "$url_tmp"
 }
 
 dlist_php() {
 if [ -n "$DLIST_PHP_URL" ] && [ "$DLIST_PHP" == "1" ] && ( [ -n "$CURL" ] || [ -n "$WGET" ] ); then
    dlist_download "php" "$DLIST_PHP_URL" "$PHP_HOSTS"
 else
-   rm -f "$PHP_HOSTS"; touch "$PHP_HOSTS"; chmod 600 "$PHP_HOSTS"
+   command rm -f "$PHP_HOSTS"; touch "$PHP_HOSTS"; chmod 600 "$PHP_HOSTS"
 fi
 }
 
@@ -2466,7 +2466,7 @@ dlist_dshield() {
 if [ -n "$DLIST_DSHIELD_URL" ] && [ "$DLIST_DSHIELD" == "1" ] && ( [ -n "$CURL" ] || [ -n "$WGET" ] ); then
    dlist_download "dshield" "$DLIST_DSHIELD_URL" "$DS_HOSTS"
 else
-   rm -f "$DS_HOSTS"; touch "$DS_HOSTS"; chmod 600 "$DS_HOSTS"
+   command rm -f "$DS_HOSTS"; touch "$DS_HOSTS"; chmod 600 "$DS_HOSTS"
 fi
 }
 
@@ -2476,7 +2476,7 @@ dlist_spamhaus() {
 if [ -n "$DLIST_SPAMHAUS_URL" ] && [ "$DLIST_SPAMHAUS" == "1" ] && ( [ -n "$CURL" ] || [ -n "$WGET" ] ); then
    dlist_download "sdrop" "$DLIST_SPAMHAUS_URL" "$DROP_HOSTS" "spamhaus"
 else
-   rm -f "$DROP_HOSTS"; touch "$DROP_HOSTS"; chmod 600 "$DROP_HOSTS"
+   command rm -f "$DROP_HOSTS"; touch "$DROP_HOSTS"; chmod 600 "$DROP_HOSTS"
 fi
 }
 
@@ -2486,7 +2486,7 @@ dlist_ecnshame() {
 if [ -n "$DLIST_ECNSHAME_URL" ] && [ "$DLIST_ECNSHAME" == "1" ] && ( [ -n "$CURL" ] || [ -n "$WGET" ] ); then
    dlist_download "ecnshame" "$DLIST_ECNSHAME_URL" "$ECNSHAME_HOSTS"
 else
-   rm -f "$ECNSHAME_HOSTS"; touch "$ECNSHAME_HOSTS"; chmod 600 "$ECNSHAME_HOSTS"
+   command rm -f "$ECNSHAME_HOSTS"; touch "$ECNSHAME_HOSTS"; chmod 600 "$ECNSHAME_HOSTS"
 fi
 }
 
@@ -2548,7 +2548,7 @@ if [ "$migrated" -gt 0 ]; then
 	command cp "$tmp" "$ipset_rules"
 	eout "{ipset} migrated $migrated entries in ipset.rules to 7-field format"
 fi
-rm -f "$tmp"
+command rm -f "$tmp"
 }
 
 ## Shared ipset populate helper: filter data file into restore format and load.
@@ -2576,7 +2576,7 @@ ipset_populate_set() {
 	if [ "$_IPSET_COUNT" -gt 0 ]; then
 		$IPSET restore -exist < "$_ips_restore" 2>/dev/null
 	fi
-	rm -f "$_ips_restore"
+	command rm -f "$_ips_restore"
 }
 
 # Parse and validate an ipset.rules entry line.
@@ -2625,7 +2625,7 @@ _ipset_resolve_data() {
 		# Error policy: ipset continues with next entry (non-blocking)
 		if ! download_url "$_IPE_FILE_OR_URL" "$_IPE_URL_TMP"; then
 			eout "{ipset} download failed for $_IPE_NAME: $_IPE_FILE_OR_URL"
-			rm -f "$_IPE_URL_TMP"
+			command rm -f "$_IPE_URL_TMP"
 			_IPE_URL_TMP=""
 			return 1
 		fi
@@ -2713,7 +2713,7 @@ fi
 printf '%s\n' "${ts_name}:${ts_epoch}" >> "$ts_tmp"
 command cp "$ts_tmp" "$ts_file"
 chmod 600 "$ts_file"
-rm -f "$ts_tmp"
+command rm -f "$ts_tmp"
 }
 
 ipset_update() {
@@ -2795,7 +2795,7 @@ while IFS= read -r line; do
 	$IPSET destroy "$name" 2>/dev/null || true
 	$IPSET destroy "${name}-tmp" 2>/dev/null || true
 done < "$ipset_rules"
-rm -f "$INSTALL_PATH/internals/.ipset.timestamps"
+command rm -f "$INSTALL_PATH/internals/.ipset.timestamps"
 }
 
 ## Shared helper for glob trust file downloads.
@@ -2823,9 +2823,9 @@ if [ -n "$_gtd_url" ] && [ "$USE_RGT" == "1" ] && ( [ -n "$CURL" ] || [ -n "$WGE
    else
         eout "{trust} download of $_gtd_url failed"
    fi
-   rm -f "$url_tmp"
+   command rm -f "$url_tmp"
 else
-   rm -f "$_gtd_hosts"
+   command rm -f "$_gtd_hosts"
    touch "$_gtd_hosts"
    chmod 600 "$_gtd_hosts"
 fi
@@ -3269,7 +3269,7 @@ EOF
 	ln -fs "$INSTALL_PATH/internals/cron.refresh" /etc/cron.d/refresh.apf
 	eout "{glob} SET_REFRESH is set to $SET_REFRESH minutes"
 else
-	rm -f /etc/cron.d/refresh.apf
+	command rm -f /etc/cron.d/refresh.apf
 	eout "{glob} SET_REFRESH is set disabled"
 
 fi
@@ -3286,6 +3286,6 @@ EOF
 	ln -fs "$INSTALL_PATH/internals/cron.ctlimit" /etc/cron.d/ctlimit.apf
 	eout "{ct_limit} CT_LIMIT is set to $CT_LIMIT (scan every ${ct_min}m)"
 else
-	rm -f /etc/cron.d/ctlimit.apf "$INSTALL_PATH/internals/cron.ctlimit"
+	command rm -f /etc/cron.d/ctlimit.apf "$INSTALL_PATH/internals/cron.ctlimit"
 fi
 }
