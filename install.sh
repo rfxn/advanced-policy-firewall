@@ -129,11 +129,6 @@ install() {
 	# Generate VNET rules
 	"$INSTALL_PATH/vnet/vnetgen" 2>/dev/null  # safe: may fail in containers without interfaces
 
-	# Install apf-m menu system if dialog is available
-	if [ -f "/usr/bin/dialog" ] && [ -d "$INSTALL_PATH/extras/apf-m" ]; then
-		(cd "$INSTALL_PATH/extras/apf-m/" && sh install -i)
-	fi
-
 	chmod 750 "$INSTALL_PATH"
 }
 

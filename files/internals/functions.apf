@@ -450,7 +450,7 @@ validate_config() {
  local err=""
  local _vc_rate='^[0-9]+/[smh]$'
  local _vc_int='^[0-9]+$'
- local _vc_name _vc_val _vc_burst _vc_entry
+ local _vc_name _vc_val _vc_entry
  # Validate IFACE_UNTRUSTED is set
  if [ -z "$IFACE_UNTRUSTED" ]; then
     err="${err}IFACE_UNTRUSTED is not set (conf.apf must define the untrusted network interface); "
@@ -725,9 +725,6 @@ is_fqdn() {
 # Source shared GeoIP metadata library (country names, continents, validation,
 # download). Uses BASH_SOURCE-relative path for portability (works both when
 # sourced via internals.conf with $INSTALL_PATH and in test context without it).
-# Route geoip_lib warnings through eout when available (APF consumer integration).
-_geoip_lib_log_warning() { eout "{geoip} WARNING: $1"; }
-GEOIP_LOG_FUNC="_geoip_lib_log_warning"
 _geoip_lib_path="${BASH_SOURCE[0]%/*}/geoip_lib.sh"
 if [ -f "$_geoip_lib_path" ]; then
 	# shellcheck disable=SC1090,SC1091

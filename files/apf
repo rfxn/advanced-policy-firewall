@@ -18,7 +18,7 @@ apf_banner() {
 	echo ""
 }
 
-if [ -f "$CNF" ] && [ -n "$CNF" ]; then
+if [ -f "$CNF" ]; then
    source "$CNF"
 else
    apf_banner
@@ -174,18 +174,12 @@ if [ -z "$SKIP_FASTLOAD_FIRSTRUN" ] && [ -z "$SKIP_FASTLOAD_EXPIRED" ] && [ -z "
 			else
 				eout "{glob} firewall initialized"
 				elog_event "service_state" "info" "APF firewall started (fast load)"
-				if [ "$SET_VERBOSE" == "1" ] && [ "$DEVEL_ON" == "1" ]; then
-					eout "{glob} !!DEVELOPMENT MODE ENABLED!! - firewall will flush every 5 minutes."
-				fi
 				mutex_unlock
 				exit 0
 			fi
 		else
 			eout "{glob} firewall initialized"
 			elog_event "service_state" "info" "APF firewall started (fast load)"
-			if [ "$SET_VERBOSE" == "1" ] && [ "$DEVEL_ON" == "1" ]; then
-				eout "{glob} !!DEVELOPMENT MODE ENABLED!! - firewall will flush every 5 minutes."
-			fi
 			mutex_unlock
 			exit 0
 		fi

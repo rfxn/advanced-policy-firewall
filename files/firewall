@@ -9,7 +9,7 @@
 #
 CNF="/etc/apf/conf.apf"
 
-if [ -f "$CNF" ] && [ -n "$CNF" ]; then
+if [ -f "$CNF" ]; then
    source "$CNF"
 else
    echo "$CNF not found; aborting" >&2
