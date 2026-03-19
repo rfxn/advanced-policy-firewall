@@ -348,7 +348,7 @@ fi
 
 ipset_flush
 
-# Flush GeoIP country ipsets (inline — no geoip.apf dependency)
+# Flush GeoIP country ipsets (inline — no apf_geoip.sh dependency)
 if [ -n "$IPSET" ]; then
 	$IPSET list -n 2>/dev/null | grep '^apf_cc' | while IFS= read -r _set; do
 		$IPSET destroy "$_set" 2>/dev/null || true  # may not exist
@@ -837,7 +837,7 @@ ipt -A OUTPUT -j TGDENY
 # Country Code Filtering (GeoIP)
 if cc_enabled; then
 	# shellcheck disable=SC1090,SC1091
-	. "$INSTALL_PATH/internals/geoip.apf"
+	. "$INSTALL_PATH/internals/apf_geoip.sh"
 	geoip_load
 fi
 
@@ -1148,7 +1148,7 @@ if [ -z "$SKIP_FASTLOAD_FIRSTRUN" ] && [ -z "$SKIP_FASTLOAD_EXPIRED" ] && [ -z "
 		# Recreate GeoIP ipsets from cached data (no downloads)
 		if cc_enabled; then
 			# shellcheck disable=SC1090,SC1091
-			. "$INSTALL_PATH/internals/geoip.apf"
+			. "$INSTALL_PATH/internals/apf_geoip.sh"
 			_geoip_fast_load_ipsets
 		fi
 		eout "{glob} activating firewall, fast load ($IPT_BACKEND)"

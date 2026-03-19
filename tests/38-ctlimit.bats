@@ -82,9 +82,9 @@ teardown() {
     apf_set_interface "veth-pub" ""
 }
 
-# Helper: source ctlimit.apf with minimal variable setup (no conf.apf sourcing)
+# Helper: source apf_ctlimit.sh with minimal variable setup (no conf.apf sourcing)
 _source_ctlimit() {
-    # Set only the variables that ctlimit.apf needs
+    # Set only the variables that apf_ctlimit.sh needs
     INSTALL_PATH="$APF_DIR"
     ALLOW_HOSTS="$APF_DIR/allow_hosts.rules"
     DENY_HOSTS="$APF_DIR/deny_hosts.rules"
@@ -96,7 +96,7 @@ _source_ctlimit() {
     eval "$(sed -n '/^_apf_reg_tmp()/,/^}/p' "$APF_DIR/internals/apf.lib.sh")"
     _APF_TMPFILES=""
     _APF_CTLIMIT_LOADED=""
-    source "$APF_DIR/internals/ctlimit.apf"
+    source "$APF_DIR/internals/apf_ctlimit.sh"
 }
 
 # ---- Unit tests: awk counting ----

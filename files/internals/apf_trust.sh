@@ -340,11 +340,11 @@ cli_trust_remove() {
 
 	# Advanced syntax removal
 	if [[ "$DIP" == *=* ]]; then
-		# Check if last field is a country code → delegate to geoip.apf
+		# Check if last field is a country code → delegate to apf_geoip.sh
 		local _ctr_last_field="${DIP##*=}"
 		if valid_cc "$_ctr_last_field" || [[ "$_ctr_last_field" == @* ]]; then
 			# shellcheck disable=SC1090,SC1091
-			. "$INSTALL_PATH/internals/geoip.apf"
+			. "$INSTALL_PATH/internals/apf_geoip.sh"
 			cli_cc_remove "$_ctr_last_field"
 			return $?
 		fi
@@ -390,7 +390,7 @@ cli_trust_remove() {
 		# Not a valid host — check if it's a country code
 		if valid_cc "$DIP" || [[ "$DIP" == @* ]]; then
 			# shellcheck disable=SC1090,SC1091
-			. "$INSTALL_PATH/internals/geoip.apf"
+			. "$INSTALL_PATH/internals/apf_geoip.sh"
 			cli_cc_remove "$DIP"
 			return $?
 		fi
@@ -476,11 +476,11 @@ cli_trust() {
 
  # Advanced trust syntax (contains '=')
  if [[ "$HOST" == *=* ]]; then
-	# Check if last field is a country code → delegate to geoip.apf
+	# Check if last field is a country code → delegate to apf_geoip.sh
 	local _ct_last_field="${HOST##*=}"
 	if valid_cc "$_ct_last_field" || [[ "$_ct_last_field" == @* ]]; then
 		# shellcheck disable=SC1090,SC1091
-		. "$INSTALL_PATH/internals/geoip.apf"
+		. "$INSTALL_PATH/internals/apf_geoip.sh"
 		cli_cc_trust_advanced "$HOST" "$CHAIN" "$ACTION" "$FILE" "$CMT"
 		return $?
 	fi
@@ -562,7 +562,7 @@ cli_trust() {
 	# Not a valid host — check if it's a country code
 	if valid_cc "$HOST" || [[ "$HOST" == @* ]]; then
 		# shellcheck disable=SC1090,SC1091
-		. "$INSTALL_PATH/internals/geoip.apf"
+		. "$INSTALL_PATH/internals/apf_geoip.sh"
 		cli_cc_trust "$HOST" "$CHAIN" "$ACTION" "$FILE" "$CMT"
 		return $?
 	fi
@@ -648,11 +648,11 @@ cli_trust_temp() {
 
  # Validate entry (advanced or bare)
  if [[ "$HOST" == *=* ]]; then
-	# Check if last field is a country code → delegate to geoip.apf
+	# Check if last field is a country code → delegate to apf_geoip.sh
 	local _ctt_last="${HOST##*=}"
 	if valid_cc "$_ctt_last" || [[ "$_ctt_last" == @* ]]; then
 		# shellcheck disable=SC1090,SC1091
-		. "$INSTALL_PATH/internals/geoip.apf"
+		. "$INSTALL_PATH/internals/apf_geoip.sh"
 		cli_cc_trust_temp "$HOST" "$CHAIN" "$ACTION" "$FILE" "$TTL_STR" "$CMT"
 		return $?
 	fi
@@ -669,7 +669,7 @@ cli_trust_temp() {
 		# Not a valid host — check if it's a country code
 		if valid_cc "$HOST" || [[ "$HOST" == @* ]]; then
 			# shellcheck disable=SC1090,SC1091
-			. "$INSTALL_PATH/internals/geoip.apf"
+			. "$INSTALL_PATH/internals/apf_geoip.sh"
 			cli_cc_trust_temp "$HOST" "$CHAIN" "$ACTION" "$FILE" "$TTL_STR" "$CMT"
 			return $?
 		fi
@@ -1139,7 +1139,7 @@ expire_temp_entries() {
 	# preserves permanent entries, ipsets, and iptables rules for that CC
 	if [ "${#_et_cc_expired[@]}" -gt 0 ]; then
 		# shellcheck disable=SC1090,SC1091
-		. "$INSTALL_PATH/internals/geoip.apf"
+		. "$INSTALL_PATH/internals/apf_geoip.sh"
 		local _et_i
 		for _et_i in "${!_et_cc_expired[@]}"; do
 			_expire_cc_temp_entry "${_et_cc_expired[$_et_i]}" "${_et_cc_files[$_et_i]}" 2>/dev/null
@@ -1229,7 +1229,7 @@ flush_temp_entries() {
 	# preserves permanent entries, ipsets, and iptables rules for that CC
 	if [ "${#_ft_cc_expired[@]}" -gt 0 ]; then
 		# shellcheck disable=SC1090,SC1091
-		. "$INSTALL_PATH/internals/geoip.apf"
+		. "$INSTALL_PATH/internals/apf_geoip.sh"
 		local _ft_i
 		for _ft_i in "${!_ft_cc_expired[@]}"; do
 			_expire_cc_temp_entry "${_ft_cc_expired[$_ft_i]}" "${_ft_cc_files[$_ft_i]}" 2>/dev/null

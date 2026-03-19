@@ -1,5 +1,5 @@
 #!/bin/bash
-#
+# shellcheck shell=bash
 ##
 # Advanced Policy Firewall (APF) v2.0.2
 #             (C) 2002-2026, R-fx Networks <proj@rfxn.com>
@@ -8,11 +8,13 @@
 ##
 #
 # Connection tracking limit — sourced on-demand by apf CLI
-# Global per-IP connection limit via periodic conntrack table scanning
+# APF internal library (files/internals/apf_ctlimit.sh)
 
 # Source guard: prevent double-sourcing
 [[ -n "${_APF_CTLIMIT_LOADED:-}" ]] && return 0
 _APF_CTLIMIT_LOADED=1
+# shellcheck disable=SC2034
+APF_CTLIMIT_VERSION="1.0.0"
 
 # --- Public API ---
 # ct_scan()           — run conntrack scan and block offenders

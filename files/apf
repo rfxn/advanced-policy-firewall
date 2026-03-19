@@ -191,7 +191,7 @@ case "$1" in
 	if ct_enabled; then
 		mutex_lock
 		# shellcheck disable=SC1090,SC1091
-		. "$INSTALL_PATH/internals/ctlimit.apf"
+		. "$INSTALL_PATH/internals/apf_ctlimit.sh"
 		cli_ct_scan
 	else
 		echo "CT_LIMIT not enabled (CT_LIMIT=0 in conf.apf)"
@@ -199,18 +199,18 @@ case "$1" in
 	;;
 --ct-status)
 	# shellcheck disable=SC1090,SC1091
-	. "$INSTALL_PATH/internals/ctlimit.apf"
+	. "$INSTALL_PATH/internals/apf_ctlimit.sh"
 	cli_ct_status
 	;;
 --cc)
 	# shellcheck disable=SC1090,SC1091
-	. "$INSTALL_PATH/internals/geoip.apf"
+	. "$INSTALL_PATH/internals/apf_geoip.sh"
 	geoip_info "$2"
 	;;
 --cc-update)
 	mutex_lock
 	# shellcheck disable=SC1090,SC1091
-	. "$INSTALL_PATH/internals/geoip.apf"
+	. "$INSTALL_PATH/internals/apf_geoip.sh"
 	geoip_update
 	;;
 *)

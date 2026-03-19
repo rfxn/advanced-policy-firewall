@@ -625,7 +625,7 @@ _source_funcs='source '"$APF_DIR"'/internals/apf.lib.sh; CC_DENY_HOSTS='"$APF_DI
 # ============================================================
 
 @test "geoip_validate_config fails when USE_IPSET=0" {
-    run bash -c 'source '"$APF_DIR"'/internals/internals.conf; USE_IPSET=0; IPSET=""; source '"$APF_DIR"'/internals/geoip.apf; geoip_validate_config'
+    run bash -c 'source '"$APF_DIR"'/internals/internals.conf; USE_IPSET=0; IPSET=""; source '"$APF_DIR"'/internals/apf_geoip.sh; geoip_validate_config'
     assert_failure
     assert_output --partial "requires ipset"
 }
