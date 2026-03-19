@@ -34,6 +34,12 @@ install() {
 	# Copy source files to install path
 	pkg_copy_tree "files" "$INSTALL_PATH" || { pkg_error "file copy failed"; exit 1; }
 
+	# Clean up files from pre-decomposition layout (2.0.2 upgrade)
+	command rm -f "$INSTALL_PATH/firewall"
+	command rm -f "$INSTALL_PATH/internals/functions.apf"
+	command rm -f "$INSTALL_PATH/internals/geoip.apf"
+	command rm -f "$INSTALL_PATH/internals/ctlimit.apf"
+
 	# Create GeoIP data cache directory
 	mkdir -p "$INSTALL_PATH/geoip"
 
@@ -46,7 +52,7 @@ install() {
 
 	# Set file permissions: dirs=750, files=640, executables=750
 	pkg_set_perms "$INSTALL_PATH" "750" "640" \
-		"apf" "firewall" "vnet/vnetgen" "extras/get_ports"
+		"apf" "vnet/vnetgen" "extras/get_ports"
 
 	# Copy extras (importconf)
 	command cp -pf importconf "$INSTALL_PATH/extras/"

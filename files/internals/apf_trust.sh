@@ -163,7 +163,6 @@ trust_entry_rule() {
 	local flow_desc
 	if [ "$pflow" == "d" ]; then flow_desc="to"; else flow_desc="from"; fi
 	_TER_DESC="${dir_desc}${proto_desc}${pip} ${flow_desc} port ${port}"
-	_TER_DIR="$dir"
 
 	# Build rule string(s)
 	local _ter_r1 _ter_r2=""
@@ -946,7 +945,7 @@ _trust_hosts_advanced() {
 trust_hosts() {
 local file="$1"
 local chain="$2"
-local action_all="$3" action_tcp="$4" action_udp="$5" verb="$6"
+local action_all="$3" verb="$4"
 local i
 local _TER_BUFFER_MODE=1
 load_local_addrs
@@ -1028,9 +1027,9 @@ if [ -n "$_th_raw" ]; then
 fi
 }
 
-allow_hosts() { trust_hosts "$1" "$2" ACCEPT ACCEPT ACCEPT "allow"; }
+allow_hosts() { trust_hosts "$1" "$2" ACCEPT "allow"; }
 
-deny_hosts() { trust_hosts "$1" "$2" "$ALL_STOP" "$TCP_STOP" "$UDP_STOP" "deny"; }
+deny_hosts() { trust_hosts "$1" "$2" "$ALL_STOP" "deny"; }
 
 ## Temp entry management
 
