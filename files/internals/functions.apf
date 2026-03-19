@@ -7,56 +7,8 @@
 # This program may be freely redistributed under the terms of the GNU GPL v2
 ##
 #
-
-eout() {
-	local _msg="$1"
-	local _force_stdout="${2:-0}"
-	if [ -n "$_msg" ]; then
-		if [ "$_force_stdout" = "1" ]; then
-			elog info "$_msg" 1
-		else
-			elog info "$_msg"
-		fi
-	fi
-}
-
-devm() {
- local cron_file="/etc/cron.d/apf_develmode"
- if [ "$DEVEL_MODE" == "1" ]; then
-        DEVEL_ON=1
-        if [ "$SET_VERBOSE" != "1" ]; then
-                eout "{glob} !!DEVELOPMENT MODE ENABLED!! - firewall will flush every 5 minutes." 1
-        fi
-        echo "*/5 * * * * root $INSTALL_PATH/apf -f >> /dev/null 2>&1" > "$cron_file"
-        chmod 644 "$cron_file"
- elif [ "$DEVEL_MODE" == "0" ]; then
-        command rm -f "$cron_file"
- fi
-}
-
-## Temp file tracking for signal-safe cleanup
-_APF_TMPFILES=""
-_apf_reg_tmp() { _APF_TMPFILES="$_APF_TMPFILES $1"; }
-_apf_cleanup_tmp() {
-	local f
-	for f in $_APF_TMPFILES; do
-		[ -e "$f" ] && rm -rf "$f"
-	done
-	_APF_TMPFILES=""
-}
-
-## Remove orphaned temp files from previous APF versions.
-# Pre-2.0.2 refresh() created refresh.allow.*/refresh.drop.* temp files via
-# mktemp without cleanup registration; these accumulate across restarts.
-# Also cleans stale .apf-* temp files left by interrupted operations.
-# Safe to call repeatedly (rm -f on non-existent files is a no-op).
-_apf_cleanup_stale_tmp() {
-	command rm -f "$INSTALL_PATH"/internals/refresh.allow.* 2>/dev/null
-	command rm -f "$INSTALL_PATH"/internals/refresh.drop.* 2>/dev/null
-	command rm -f "$INSTALL_PATH"/.apf-* 2>/dev/null
-	# rm -rf for geoip: _geoip_world_fetch() creates temp directories via mktemp -d
-	command rm -rf "$INSTALL_PATH"/.apf-geoip-* 2>/dev/null
-}
+# NOTE: This file is being progressively decomposed into apf_*.sh sub-libraries.
+# Functions below will be extracted in subsequent commits.
 
 ## Detect iptables backend (nft vs legacy)
 # Sets global IPT_BACKEND to "nft" or "legacy" based on iptables --version output.
@@ -650,34 +602,6 @@ mutex_unlock() {
   fi
 }
 
-trim() {
- local FILE="$1"
- local MAXLINES="$2"
- local LINES CHK_CMT CHK_SCMT
-
- if [ -z "$MAXLINES" ]; then
-	MAXLINES=0
- fi
- if [ "$MAXLINES" != "0" ] && [ -f "$FILE" ]; then
-	LINES=$(grep -cvE '^(#|$)' "$FILE")
-        if [ "$LINES" -gt "$MAXLINES" ]; then
-                eout "{glob} trimming $FILE to $MAXLINES lines"
-                CHK_CMT=$(tail -n "$MAXLINES" "$FILE" | grep -c "#")
-                MAXLINES=$(($CHK_CMT+$MAXLINES))
-                CHK_SCMT=$(tail -n "$MAXLINES" "$FILE" | tac | tail -n 1 | grep "#")
-                if [ -z "$CHK_SCMT" ]; then
-                        MAXLINES=$((1+$MAXLINES))
-                fi
-                local _trim_tmp
-                _trim_tmp=$(mktemp "$(dirname "$FILE")/.trim.XXXXXX")
-                _apf_reg_tmp "$_trim_tmp"
-                tail -n "$MAXLINES" "$FILE" > "$_trim_tmp"
-                cat "$_trim_tmp" > "$FILE"
-                command rm -f "$_trim_tmp"
-        fi
- fi
-}
-
 valid_ip_cidr() {
 	local _vic_ipv4='^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}(/[0-9]{1,2})?$'
 	[[ "$1" =~ $_vic_ipv4 ]] || return 1
@@ -721,16 +645,6 @@ is_fqdn() {
 	local _if_fqdn='^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?)+$'
 	[[ "$1" =~ $_if_fqdn ]]
 }
-
-# Source shared GeoIP metadata library (country names, continents, validation,
-# download). Uses BASH_SOURCE-relative path for portability (works both when
-# sourced via internals.conf with $INSTALL_PATH and in test context without it).
-_geoip_lib_path="${BASH_SOURCE[0]%/*}/geoip_lib.sh"
-if [ -f "$_geoip_lib_path" ]; then
-	# shellcheck disable=SC1090,SC1091
-	. "$_geoip_lib_path"
-fi
-unset _geoip_lib_path
 
 # Validate ISO 3166-1 country code or continent shorthand.
 # Thin wrapper: delegates to geoip_validate_cc() then bridges output variables.
