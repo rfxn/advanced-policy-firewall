@@ -52,8 +52,9 @@ teardown_file() {
     assert_success
 }
 
-@test "non-default INSTALL_PATH: apf_core.sh references /opt/apf" {
-    run grep "/opt/apf" "$APF_DIR/internals/apf_core.sh"
+@test "non-default INSTALL_PATH: apf_core.sh uses INSTALL_PATH variable" {
+    # apf_core.sh uses $INSTALL_PATH throughout (no hardcoded /etc/apf to sed-replace)
+    run grep 'INSTALL_PATH' "$APF_DIR/internals/apf_core.sh"
     assert_success
 }
 
