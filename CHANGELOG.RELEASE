@@ -289,6 +289,18 @@
       (functions.apf, geoip.apf, ctlimit.apf) for portable alias bypass
 [Change] Add inline comments to 12 uncommented || true suppressions per
       shell standards convention
+[Change] Decompose functions.apf (3,291 lines) into 8 sub-libraries:
+      apf.lib.sh (sourcing hub), apf_ipt.sh, apf_validate.sh, apf_trust.sh,
+      apf_ipset.sh, apf_dlist.sh, apf_cli.sh, apf_core.sh; no API or
+      behavioral changes
+[Change] Absorb files/firewall (386 lines) as firewall_full_load() in
+      apf_core.sh; apf CLI wrapper thinned to ~200 lines
+[Change] Rename geoip.apf to apf_geoip.sh, ctlimit.apf to apf_ctlimit.sh;
+      aligns with BFD apf_*.sh sub-library naming convention
+[Fix] Remove dead _TER_DIR assignment in trust_entry_rule() (V-001)
+[Fix] Remove dead action_tcp/action_udp params from trust_hosts() (V-002)
+[Change] install.sh cleans orphaned pre-decomposition files on upgrade
+      (functions.apf, geoip.apf, ctlimit.apf, firewall)
 
   -- Documentation --
 

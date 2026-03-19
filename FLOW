@@ -59,7 +59,7 @@ Step 1: Kernel Modules -- modinit()
 Loads required iptables/netfilter kernel modules via modprobe. IPv6 modules
 are loaded when USE_IPV6=1. Skipped when SET_MONOKERN=1.
 
-  Source: functions.apf (modinit)
+  Source: apf_ipt.sh (modinit)
   Config: SET_MONOKERN
   Scope:  System-wide (kernel)
 
@@ -70,7 +70,7 @@ Resets all iptables chains (filter, mangle, raw tables). Sets default
 policies to ACCEPT temporarily, deletes all user chains, zeros counters.
 When DOCKER_COMPAT=1, uses surgical flush preserving external chains.
 
-  Source: functions.apf (flush)
+  Source: apf_core.sh (flush)
   Config: DOCKER_COMPAT
   Chains: All tables, all chains
   Scope:  Dual-stack (IPv4 + IPv6)
@@ -85,7 +85,7 @@ it is sourced immediately after flush. All APF variables and helpers
 Use for: custom chains, NAT rules, early ACCEPT/DROP overrides, rules
 that must be applied before any APF filtering.
 
-  Source: firewall:25-30
+  Source: apf_core.sh (firewall_full_load):25-30
   Config: File permission (750 = active, 640 = inactive)
   Scope:  Dual-stack (all APF helpers available)
 
@@ -95,7 +95,7 @@ Step 4: Interface & Route Verification
 When VF_ROUTE=1, verifies that IFACE_UNTRUSTED and IFACE_TRUSTED interfaces
 have valid route entries. Aborts if verification fails.
 
-  Source: firewall:32-62
+  Source: apf_core.sh (firewall_full_load):32-62
   Config: VF_ROUTE, IFACE_UNTRUSTED, IFACE_TRUSTED
 
 
@@ -105,7 +105,7 @@ Detects all IPv4 addresses on IFACE_UNTRUSTED and writes them to
 .localaddrs. When USE_IPV6=1, also writes .localaddrs6. Used by the trust
 system to determine if a host is local.
 
-  Source: firewall:64-67
+  Source: apf_core.sh (firewall_full_load):64-67
 
 
 Step 6: Preroute Rules
@@ -113,7 +113,7 @@ Step 6: Preroute Rules
 Loads ToS (Type of Service) PREROUTING classifications and custom
 preroute.rules.
 
-  Source: firewall:75-77
+  Source: apf_core.sh (firewall_full_load):75-77
   Config: TOS_* variables
   Chains: mangle PREROUTING
 
@@ -122,7 +122,7 @@ Step 7: Loopback ACCEPT
 
 Permits all traffic on the loopback interface (lo).
 
-  Source: firewall:79-81
+  Source: apf_core.sh (firewall_full_load):79-81
   Chains: INPUT, OUTPUT
   Scope:  Dual-stack
 
@@ -164,7 +164,7 @@ Step 10: GRE Tunnels -- gre_init()
 When USE_GRE=1, creates GRE tunnel interfaces and dedicated GRE_IN/GRE_OUT
 chains. Adds protocol 47 (GRE) ACCEPT rules for each tunnel endpoint.
 
-  Source: firewall:118, gretunnel.sh
+  Source: apf_core.sh (firewall_full_load):118, gretunnel.sh
   Config: USE_GRE, gre.rules
   Chains: INPUT (GRE_IN), OUTPUT (GRE_OUT)
 
@@ -176,7 +176,7 @@ Creates utility chains used as jump targets throughout the firewall:
   RESET    -- sends TCP RST then DROP (for non-TCP)
   PROHIBIT -- sends ICMP host-prohibited (IPv4) or icmp6-adm-prohibited (IPv6)
 
-  Source: firewall:120-126
+  Source: apf_core.sh (firewall_full_load):120-126
   Scope:  Dual-stack
 
 
@@ -194,7 +194,7 @@ Step 13: MSS Clamping
 
 Clamps outbound TCP MSS to path MTU to prevent fragmentation issues.
 
-  Source: firewall:132
+  Source: apf_core.sh (firewall_full_load):132
   Chains: OUTPUT
   Scope:  Dual-stack
 
@@ -207,7 +207,7 @@ Blocks traffic from/to nonroutable address space using network list files:
   BLK_PRVNET  -- private networks (10/8, 172.16/12, 192.168/16, etc.)
   BLK_RESNET  -- reserved/unassigned networks (optionally downloaded)
 
-  Source: firewall:134-146, functions.apf (dnet)
+  Source: apf_core.sh (firewall_full_load):134-146, apf_core.sh (dnet)
   Config: BLK_MCATNET, BLK_PRVNET, BLK_RESNET, DLIST_RESERVED
   Chains: INPUT, OUTPUT
   Scope:  Address-family aware via ipt_for_host()
@@ -376,7 +376,7 @@ Populates the trust chains with allow entries:
 
 Entries can be plain IPs/CIDRs/FQDNs or advanced trust syntax.
 
-  Source: firewall:172-174
+  Source: apf_core.sh (firewall_full_load):172-174
   Chains: TALLOW, TGALLOW (INPUT + OUTPUT)
   Scope:  Dual-stack via ipt_for_host()
 
@@ -389,7 +389,7 @@ flagged by sanity checks or port scans are blocked for RAB_TIMER seconds.
 When RAB_PSCAN_LEVEL > 0, creates the RABPSCAN chain monitoring specific
 ports. DNS nameservers are exempted from portscan detection.
 
-  Source: firewall:178-233
+  Source: apf_core.sh (firewall_full_load):178-233
   Config: RAB, RAB_* variables
   Chains: INPUT, RABPSCAN
 
@@ -515,7 +515,7 @@ Guards against invalid state transitions after port filtering. The
 ESTABLISHED,RELATED fast-path is at Step 19; this rule catches only
 malformed NEW packets that slip past port rules.
 
-  Source: firewall:267
+  Source: apf_core.sh (firewall_full_load):267
   Chains: INPUT
   Scope:  Dual-stack
 
@@ -529,7 +529,7 @@ For each nameserver in /etc/resolv.conf:
   When RESV_DNS=0:  generic DNS rules for all nameservers
   When RESV_DNS_DROP=1: explicit DROP for non-whitelisted DNS sport 53
 
-  Source: firewall:270-305
+  Source: apf_core.sh (firewall_full_load):270-305
   Config: RESV_DNS, RESV_DNS_DROP
   Chains: INPUT, OUTPUT
   Scope:  IPv4 + IPv6
@@ -543,7 +543,7 @@ Optional protocol-specific rules:
   SSH (HELPER_SSH=1):  ESTABLISHED/RELATED return traffic from SSH port
   Traceroute (TCR_PASS=1): UDP NEW on TCR_PORTS range
 
-  Source: firewall:307-326
+  Source: apf_core.sh (firewall_full_load):307-326
   Config: HELPER_FTP, HELPER_SSH, TCR_PASS
   Chains: INPUT, OUTPUT
   Scope:  Dual-stack
@@ -554,7 +554,7 @@ Step 26: Drop Logging
 When LOG_DROP=1, adds rate-limited log rules for packets reaching the end
 of INPUT and OUTPUT chains (about to be dropped by default policy).
 
-  Source: firewall:329-339
+  Source: apf_core.sh (firewall_full_load):329-339
   Config: LOG_DROP, LOG_RATE, LOG_LEVEL
   Chains: INPUT, OUTPUT
   Scope:  Dual-stack
@@ -565,7 +565,7 @@ Step 27: ECN Shame List
 When SYSCTL_ECN=1, loads the ECN shame list of hosts that break with
 Explicit Congestion Notification enabled.
 
-  Source: firewall:342-346
+  Source: apf_core.sh (firewall_full_load):342-346
   Config: SYSCTL_ECN, DLIST_ECNSHAME
 
 
@@ -573,7 +573,7 @@ Step 28: Postroute Rules
 
 Loads ToS POSTROUTING classifications and custom postroute.rules.
 
-  Source: firewall:348-350
+  Source: apf_core.sh (firewall_full_load):348-350
   Config: TOS_* variables
   Chains: mangle POSTROUTING
 
@@ -584,7 +584,7 @@ Step 29: Default OUTPUT Policy
   EGF enabled:            OUTPUT -j DROP for tcp, udp, and all -- only
                           explicitly opened ports are allowed out
 
-  Source: firewall:352-361
+  Source: apf_core.sh (firewall_full_load):352-361
   Config: EGF
   Chains: OUTPUT
   Scope:  Dual-stack
@@ -595,7 +595,7 @@ Step 30: Default INPUT Policy
 Appends final DROP rules for tcp, udp, and all protocols. Any packet that
 has not matched a previous ACCEPT rule is dropped here.
 
-  Source: firewall:363-367
+  Source: apf_core.sh (firewall_full_load):363-367
   Chains: INPUT
   Scope:  Dual-stack
 
@@ -609,7 +609,7 @@ variables and helpers are available. Ships as 640 (inactive).
 Use for: Docker chain restoration, custom logging, external integrations,
 rules that must survive APF restarts and be applied after all APF rules.
 
-  Source: firewall:369-374
+  Source: apf_core.sh (firewall_full_load):369-374
   Config: File permission (750 = active, 640 = inactive)
   Scope:  Dual-stack (all APF helpers available)
 
