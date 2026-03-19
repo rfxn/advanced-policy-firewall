@@ -3,7 +3,7 @@
 # 10: Input validation functions — valid_host(), valid_ip_cidr(), is_fqdn()
 #
 # These are security-gate functions. They require no firewall startup;
-# we source functions.apf directly and test return codes.
+# we source apf_validate.sh directly and test return codes.
 
 load '/usr/local/lib/bats/bats-support/load'
 load '/usr/local/lib/bats/bats-assert/load'
@@ -11,10 +11,10 @@ load '/usr/local/lib/bats/bats-assert/load'
 setup_file() {
     # Source the validation functions directly — they have no dependencies
     # We only need the functions, extracted inline to avoid sourcing
-    # the full functions.apf which requires conf.apf variables.
-    eval "$(sed -n '/^valid_ip_cidr()/,/^}/p' /opt/apf/internals/functions.apf)"
-    eval "$(sed -n '/^valid_host()/,/^}/p' /opt/apf/internals/functions.apf)"
-    eval "$(sed -n '/^is_fqdn()/,/^}/p' /opt/apf/internals/functions.apf)"
+    # the full apf_validate.sh which requires conf.apf variables.
+    eval "$(sed -n '/^valid_ip_cidr()/,/^}/p' /opt/apf/internals/apf_validate.sh)"
+    eval "$(sed -n '/^valid_host()/,/^}/p' /opt/apf/internals/apf_validate.sh)"
+    eval "$(sed -n '/^is_fqdn()/,/^}/p' /opt/apf/internals/apf_validate.sh)"
     export -f valid_ip_cidr valid_host is_fqdn
 }
 

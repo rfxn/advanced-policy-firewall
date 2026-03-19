@@ -88,8 +88,8 @@ teardown() {
         export ELOG_STDOUT='never'
         . '$APF_DIR/internals/elog_lib.sh'
         elog_init
-        # Source eout from functions.apf via sed extraction
-        eval \"\$(sed -n '/^eout()/,/^}/p' '$APF_DIR/internals/functions.apf')\"
+        # Source eout from apf.lib.sh via sed extraction
+        eval \"\$(sed -n '/^eout()/,/^}/p' '$APF_DIR/internals/apf.lib.sh')\"
         eout '{glob} test log line'
         grep -q 'test log line' '${ELOG_LOG_DIR}/apf.log'
     "
@@ -106,7 +106,7 @@ teardown() {
         . '$APF_DIR/internals/elog_lib.sh'
         elog_init
         elog_output_enable 'stdout' 2>/dev/null || true
-        eval \"\$(sed -n '/^eout()/,/^}/p' '$APF_DIR/internals/functions.apf')\"
+        eval \"\$(sed -n '/^eout()/,/^}/p' '$APF_DIR/internals/apf.lib.sh')\"
         output=\$(eout '{glob} forced stdout' 1)
         echo \"\$output\" | grep -q 'forced stdout'
     "

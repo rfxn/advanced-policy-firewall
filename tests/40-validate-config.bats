@@ -3,7 +3,7 @@
 # 40: validate_config(), trim(), and download_url() unit tests
 #
 # Extracted from 21-refactor-regression.bats for performance: these tests
-# only call $APF --validate or source functions.apf directly — they never
+# only call $APF --validate or source apf.lib.sh directly — they never
 # start the firewall, so they don't need the expensive per-test iptables
 # flush that 21-refactor-regression's teardown() performs.
 
@@ -324,7 +324,7 @@ teardown() {
     # Source and call trim in subshell to avoid set -e issues with internals.conf
     run bash -c "
         source '$APF_DIR/conf.apf'
-        source '$APF_DIR/internals/functions.apf'
+        source '$APF_DIR/internals/apf.lib.sh'
         trim '$tmpfile'
     "
     assert_success
@@ -357,12 +357,12 @@ _dl_serve() {
     _dl_serve "$port" "test-content-wget"
     sleep 0.5
 
-    # Source only conf.apf + functions.apf; set CURL/WGET directly to avoid
+    # Source only conf.apf + apf.lib.sh; set CURL/WGET directly to avoid
     # internals.conf side effects (network probing, file sourcing) that fail
     # on deep legacy OSes
     run bash -c "
         source '$APF_DIR/conf.apf'
-        source '$APF_DIR/internals/functions.apf'
+        source '$APF_DIR/internals/apf.lib.sh'
         CURL=\$(command -v curl 2>/dev/null)
         WGET=\$(command -v wget 2>/dev/null)
         download_url 'http://127.0.0.1:$port/test' '$dst'
@@ -378,7 +378,7 @@ _dl_serve() {
 @test "download_url fails when both curl and wget missing" {
     run bash -c "
         source '$APF_DIR/conf.apf'
-        source '$APF_DIR/internals/functions.apf'
+        source '$APF_DIR/internals/apf.lib.sh'
         CURL=''
         WGET=''
         download_url 'http://127.0.0.1:1/nonexistent' '/tmp/dl-none'
@@ -392,7 +392,7 @@ _dl_serve() {
 
     run bash -c "
         source '$APF_DIR/conf.apf'
-        source '$APF_DIR/internals/functions.apf'
+        source '$APF_DIR/internals/apf.lib.sh'
         CURL=\$(command -v curl 2>/dev/null)
         WGET=\$(command -v wget 2>/dev/null)
         download_url 'http://127.0.0.1:1/nonexistent' '$dst'
@@ -411,7 +411,7 @@ _dl_serve() {
 
     run bash -c "
         source '$APF_DIR/conf.apf'
-        source '$APF_DIR/internals/functions.apf'
+        source '$APF_DIR/internals/apf.lib.sh'
         CURL=''
         WGET=\$(command -v wget 2>/dev/null)
         download_url 'http://127.0.0.1:$port/test' '$dst'

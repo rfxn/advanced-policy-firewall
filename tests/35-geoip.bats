@@ -109,12 +109,12 @@ teardown_file() {
 }
 
 # ============================================================
-# Validation tests — functions.apf detection helpers
+# Validation tests — apf.lib.sh detection helpers
 # ============================================================
 
-# Source just functions.apf for lightweight unit tests (internals.conf does
+# Source apf.lib.sh for lightweight unit tests (internals.conf does
 # network detection that fails without full interface setup)
-_source_funcs='source '"$APF_DIR"'/internals/functions.apf; CC_DENY_HOSTS='"$APF_DIR"'/cc_deny.rules; CC_ALLOW_HOSTS='"$APF_DIR"'/cc_allow.rules'
+_source_funcs='source '"$APF_DIR"'/internals/apf.lib.sh; CC_DENY_HOSTS='"$APF_DIR"'/cc_deny.rules; CC_ALLOW_HOSTS='"$APF_DIR"'/cc_allow.rules'
 
 @test "valid_cc accepts 2-letter uppercase country code" {
     run bash -c "$_source_funcs; valid_cc CN && echo \$_VCC_TYPE"
@@ -195,7 +195,7 @@ _source_funcs='source '"$APF_DIR"'/internals/functions.apf; CC_DENY_HOSTS='"$APF
 # geoip_lib integration regression — verify library-backed functions
 # ============================================================
 
-@test "geoip_lib is sourced by functions.apf" {
+@test "geoip_lib is sourced by apf.lib.sh" {
     run bash -c "$_source_funcs; [[ -n \$_GEOIP_LIB_LOADED ]]"
     assert_success
 }

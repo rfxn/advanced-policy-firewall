@@ -92,8 +92,8 @@ _source_ctlimit() {
     SET_VNET="0"
     CT_SKIP=""
     ip=$(command -v ip 2>/dev/null)
-    # Source just functions.apf temp file helpers
-    eval "$(sed -n '/^_apf_reg_tmp()/,/^}/p' "$APF_DIR/internals/functions.apf")"
+    # Source apf.lib.sh temp file helpers
+    eval "$(sed -n '/^_apf_reg_tmp()/,/^}/p' "$APF_DIR/internals/apf.lib.sh")"
     _APF_TMPFILES=""
     _APF_CTLIMIT_LOADED=""
     source "$APF_DIR/internals/ctlimit.apf"
@@ -322,13 +322,13 @@ _source_ctlimit() {
 
 @test "ct_enabled returns true when CT_LIMIT > 0" {
     # Source just the function definition
-    eval "$(sed -n '/^ct_enabled()/,/^}/p' "$APF_DIR/internals/functions.apf")"
+    eval "$(sed -n '/^ct_enabled()/,/^}/p' "$APF_DIR/internals/apf_validate.sh")"
     CT_LIMIT="100"
     ct_enabled
 }
 
 @test "ct_enabled returns false when CT_LIMIT=0" {
-    eval "$(sed -n '/^ct_enabled()/,/^}/p' "$APF_DIR/internals/functions.apf")"
+    eval "$(sed -n '/^ct_enabled()/,/^}/p' "$APF_DIR/internals/apf_validate.sh")"
     CT_LIMIT="0"
     ! ct_enabled
 }
