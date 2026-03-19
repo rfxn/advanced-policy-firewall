@@ -31,8 +31,8 @@ teardown_file() {
     [ -x "$APF_DIR/apf" ]
 }
 
-@test "install.sh creates executable firewall" {
-    [ -x "$APF_DIR/firewall" ]
+@test "install.sh creates apf_core.sh library" {
+    [ -f "$APF_DIR/internals/apf_core.sh" ]
 }
 
 @test "install.sh creates executable vnetgen" {

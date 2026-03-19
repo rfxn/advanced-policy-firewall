@@ -1,5 +1,5 @@
 #!/bin/bash
-#
+# shellcheck shell=bash
 ##
 # Advanced Policy Firewall (APF) v2.0.2
 #             (C) 2002-2026, R-fx Networks <proj@rfxn.com>
@@ -8,11 +8,13 @@
 ##
 #
 # GeoIP country code filtering — sourced on-demand by firewall/apf
-# First APF internal library (files/internals/<domain>.apf convention)
+# APF internal library (files/internals/apf_geoip.sh)
 
 # Source guard: prevent double-sourcing from multiple paths
 [[ -n "${_APF_GEOIP_LOADED:-}" ]] && return 0
 _APF_GEOIP_LOADED=1
+# shellcheck disable=SC2034
+APF_GEOIP_VERSION="1.0.0"
 
 # --- Public API ---
 # geoip_load()         — main entry point (validate, download, build chains)
