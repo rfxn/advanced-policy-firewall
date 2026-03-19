@@ -111,7 +111,9 @@ trim() {
 # AFTER this hub returns. Do not call elog/eout at source-time in sub-libraries.
 
 ## Source APF sub-libraries in dependency order
-# (initially just functions.apf — sub-libraries added as they are extracted)
+
+# shellcheck disable=SC1090,SC1091
+. "$_internals_dir/apf_ipt.sh"
 
 # shellcheck disable=SC1090,SC1091
 . "$_internals_dir/functions.apf"
