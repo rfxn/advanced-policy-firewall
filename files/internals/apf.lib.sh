@@ -122,4 +122,10 @@ trim() {
 . "$_internals_dir/apf_trust.sh"
 
 # shellcheck disable=SC1090,SC1091
+. "$_internals_dir/apf_ipset.sh"
+
+# shellcheck disable=SC1090,SC1091
+. "$_internals_dir/apf_dlist.sh"
+
+# shellcheck disable=SC1090,SC1091
 . "$_internals_dir/functions.apf"
