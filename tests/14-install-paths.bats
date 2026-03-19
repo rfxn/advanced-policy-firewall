@@ -52,8 +52,8 @@ teardown_file() {
     assert_success
 }
 
-@test "non-default INSTALL_PATH: firewall script references /opt/apf" {
-    run grep "/opt/apf" "$APF_DIR/firewall"
+@test "non-default INSTALL_PATH: apf_core.sh references /opt/apf" {
+    run grep "/opt/apf" "$APF_DIR/internals/apf_core.sh"
     assert_success
 }
 
@@ -266,10 +266,10 @@ teardown_file() {
     [ "$perms" = "750" ]
 }
 
-@test "firewall script has correct permissions (750)" {
+@test "apf_core.sh library has correct permissions (640)" {
     local perms
-    perms=$(stat -c "%a" "$APF_DIR/firewall")
-    [ "$perms" = "750" ]
+    perms=$(stat -c "%a" "$APF_DIR/internals/apf_core.sh")
+    [ "$perms" = "640" ]
 }
 
 @test "vnetgen has correct permissions (750)" {

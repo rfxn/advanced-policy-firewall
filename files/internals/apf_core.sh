@@ -1,4 +1,5 @@
 #!/bin/bash
+# shellcheck shell=bash
 #
 ##
 # Advanced Policy Firewall (APF) v2.0.2
@@ -7,8 +8,15 @@
 # This program may be freely redistributed under the terms of the GNU GPL v2
 ##
 #
-# NOTE: This file is being progressively decomposed into apf_*.sh sub-libraries.
-# Functions below will be extracted in subsequent commits.
+# APF lifecycle: start, full-load, flush, dependency checks, mutex,
+# cron handlers, rule-generation helpers, firewall info display
+
+# Source guard
+[[ -n "${_APF_CORE_LOADED:-}" ]] && return 0 2>/dev/null
+_APF_CORE_LOADED=1
+
+# shellcheck disable=SC2034
+APF_CORE_VERSION="1.0.0"
 
 check_rab() {
  ml xt_recent
@@ -178,10 +186,6 @@ mutex_unlock() {
     APF_MUTEX_LOCKED="0"
   fi
 }
-
-# geoip_cc_name() — provided by geoip_lib.sh (identical signature).
-# APF's copy removed; the library definition is authoritative.
-# geoip_expand_codes() — moved to apf_validate.sh.
 
 save_external_baseline() {
 	local bdir="$INSTALL_PATH/internals"
@@ -676,5 +680,562 @@ EOF
 	eout "{ct_limit} CT_LIMIT is set to $CT_LIMIT (scan every ${ct_min}m)"
 else
 	command rm -f /etc/cron.d/ctlimit.apf "$INSTALL_PATH/internals/cron.ctlimit"
+fi
+}
+
+# Verify that an interface has a route to a network; abort if not.
+_verify_iface_route() {
+	local iface="$1"
+	local val=""
+	if [ -n "$ip" ]; then
+		val=$($ip route show dev "$iface" 2>/dev/null)
+	elif command -v route > /dev/null 2>&1; then
+		val=$(route -n | grep -w "$iface")
+	else
+		eout "{glob} neither ip nor route found; cannot verify interface $iface"
+		exit 1
+	fi
+	if [ -z "$val" ]; then
+		eout "{glob} could not verify that interface $iface is routed to a network, aborting."
+		if [ "$SET_VERBOSE" != "1" ]; then
+			echo "could not verify that interface $iface is routed to a network, aborting."
+		fi
+		exit 1
+	fi
+}
+
+## firewall_full_load — builds the complete iptables ruleset.
+# Formerly the procedural body of files/firewall; absorbed into a function
+# so start() can call it in-process instead of spawning a subprocess.
+# shellcheck disable=SC2086
+firewall_full_load() {
+# load our iptables modules
+modinit
+
+# Delete user made chains. Flush and zero the chains.
+flush 1
+
+# Pre-configuration hook — runs before any iptables rules
+if [ -x "$INSTALL_PATH/hook_pre.sh" ]; then
+	eout "{glob} executing pre-configuration hook"
+	# shellcheck disable=SC1090,SC1091
+	. "$INSTALL_PATH/hook_pre.sh" || true  # safe: sourced hook exit code is advisory, never block firewall load
+fi
+
+if [ -n "$IF" ] && [ "$VF_ROUTE" == "1" ]; then
+	for i in $IF; do
+		_verify_iface_route "$i"
+	done
+fi
+if [ -n "$IFACE_TRUSTED" ] && [ "$VF_ROUTE" == "1" ]; then
+	for i in ${IFACE_TRUSTED//,/ }; do
+		_verify_iface_route "$i"
+	done
+fi
+
+$ip addr list "$IFACE_UNTRUSTED" | grep -w inet | grep -v inet6 | tr '/' ' ' | awk '{print$2}' > "$INSTALL_PATH/internals/.localaddrs"
+if [ "$USE_IPV6" == "1" ]; then
+	$ip addr list "$IFACE_UNTRUSTED" | grep -w inet6 | tr '/' ' ' | awk '{print$2}' > "$INSTALL_PATH/internals/.localaddrs6"
+fi
+
+if [ "$RAB" == "0" ]; then
+	RAB_LOG_HIT=0
+fi
+
+eout "{glob} determined (IFACE_UNTRUSTED) $IFACE_UNTRUSTED has address $NET"
+
+# Load our PREROUTE rules
+tosroute PREROUTING
+. "$PRERT"
+
+# Allow all traffic on the loopback interface
+ipt -A INPUT -i lo -j ACCEPT
+ipt -A OUTPUT -o lo -j ACCEPT
+
+
+# Allow all traffic on trusted interfaces
+if [ -n "$IFACE_TRUSTED" ]; then
+ for i in ${IFACE_TRUSTED//,/ }; do
+ VAL_IF=$($ip addr list | grep -w "$i")
+ if [ -z "$VAL_IF" ]; then
+        eout "{glob} unable to verify status of interface $i; assuming untrusted"
+ else
+        eout "{glob} allow all to/from trusted interface $i"
+        ipt -A INPUT -i "$i" -j ACCEPT
+        ipt -A OUTPUT -o "$i" -j ACCEPT
+ fi
+ done
+fi
+
+# Silent IPs — server addresses that should receive no traffic
+if [ -f "$INSTALL_PATH/silent_ips.rules" ]; then
+ while IFS= read -r line || [ -n "$line" ]; do
+  line="${line%%#*}"
+  line="${line// /}"
+  if [ -n "$line" ]; then
+   if ! valid_host "$line"; then
+    eout "{glob} WARNING: skipping invalid silent IP entry: $line"
+    continue
+   fi
+   if ipt_for_host "$line"; then
+    $IPT_H $IPT_FLAGS -A INPUT -d "$line" -j DROP
+    $IPT_H $IPT_FLAGS -A OUTPUT -s "$line" -j DROP
+    eout "{glob} silent drop for $line"
+   fi
+  fi
+ done < "$INSTALL_PATH/silent_ips.rules"
+fi
+
+# Create GRE tunnels and firewall rules
+gre_init
+
+# Create TCP RESET & UDP PROHIBIT chains
+ipt -N RESET
+ipt -A RESET -p tcp -j REJECT --reject-with tcp-reset
+ipt -A RESET -j DROP
+ipt -N PROHIBIT
+ipt4 -A PROHIBIT -j REJECT --reject-with icmp-host-prohibited
+ipt6 -A PROHIBIT -j REJECT --reject-with icmp6-adm-prohibited
+
+# Load our SYSCTL rules
+. "$INSTALL_PATH/sysctl.rules" >> /dev/null 2>&1
+
+# Fix MTU/MSS Problems
+ipt -A OUTPUT -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu
+
+# Block common nonroutable IP networks
+if [ "$BLK_MCATNET" = "1" ]; then
+	dnet $MCATNET
+fi
+if [ "$BLK_PRVNET" = "1" ]; then
+	dnet $PRVNET
+fi
+if [ "$BLK_RESNET" = "1" ]; then
+	if [ "$DLIST_RESERVED" == "1" ]; then
+		dlist_resnet
+	fi
+	dnet $RESNET
+fi
+
+# Create (glob)trust system chains
+ipt -N TALLOW
+ipt -N TDENY
+ipt -N TGALLOW
+ipt -N TGDENY
+ipt -N REFRESH_TEMP
+ipt -A INPUT -j REFRESH_TEMP
+ipt -A OUTPUT -j REFRESH_TEMP
+ipt -A INPUT -j TALLOW
+ipt -A OUTPUT -j TALLOW
+ipt -A INPUT -j TGALLOW
+ipt -A OUTPUT -j TGALLOW
+ipt -A INPUT -j TDENY
+ipt -A OUTPUT -j TDENY
+ipt -A INPUT -j TGDENY
+ipt -A OUTPUT -j TGDENY
+
+# Country Code Filtering (GeoIP)
+if cc_enabled; then
+	# shellcheck disable=SC1090,SC1091
+	. "$INSTALL_PATH/internals/geoip.apf"
+	geoip_load
+fi
+
+# Load our Blocked Traffic rules
+. "$INSTALL_PATH/bt.rules"
+
+# Set refresh cron
+cron_refresh
+
+# Set CT_LIMIT scan cron
+cron_ctlimit
+
+# Load our Allow Hosts rules
+glob_allow_download
+allow_hosts $ALLOW_HOSTS TALLOW
+elog_event "rule_loaded" "info" "{trust} trust chains loaded" \
+	"allow=$ALLOW_HOSTS" "deny=$DENY_HOSTS"
+
+# RAB default drop for events
+check_rab
+if [ "$RAB" == "1" ]; then
+ eout "{rab} set active RAB"
+ if [ "$RAB_HITCOUNT" == "0" ]; then
+	RAB_HITCOUNT="1"
+ fi
+
+ if [ "$RAB_TRIP" == "0" ]; then
+	RAB_TRIP_FLAGS="--rcheck"
+ else
+	RAB_TRIP_FLAGS="--update"
+ fi
+
+ if [ "$LOG_DROP" == "1" ] || [ "$RAB_LOG_TRIP" == "1" ]; then
+	ipt -A INPUT -p all -m recent --rcheck --hitcount $RAB_HITCOUNT --seconds $RAB_TIMER -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** RABTRIP ** "
+ fi
+ ipt -A INPUT -p all -m recent $RAB_TRIP_FLAGS --hitcount $RAB_HITCOUNT --seconds $RAB_TIMER -j $ALL_STOP
+
+ # RAB portscan rules
+ if [ "$RAB_PSCAN_LEVEL" != "0" ] && [ -n "$RAB_PSCAN_LEVEL" ]; then
+  eout "{rab} set active RAB_PSCAN"
+  case "$RAB_PSCAN_LEVEL" in
+  1)
+  RAB_PSCAN_PORTS="$RAB_PSCAN_LEVEL_1"
+  ;;
+  2)
+  RAB_PSCAN_PORTS="$RAB_PSCAN_LEVEL_2"
+  ;;
+  3)
+  RAB_PSCAN_PORTS="$RAB_PSCAN_LEVEL_3"
+  ;;
+  *)
+  eout "{rab} warning: RAB_PSCAN_LEVEL='$RAB_PSCAN_LEVEL' invalid, defaulting to level 1"
+  RAB_PSCAN_PORTS="$RAB_PSCAN_LEVEL_1"
+  ;;
+  esac
+  eout "{rab} RAB_PSCAN monitored ports $RAB_PSCAN_PORTS"
+  ipt -N RABPSCAN
+  LDNS=$(grep -v "#" /etc/resolv.conf | grep -w nameserver | awk '{print$2}' | grep -v 127.0.0.1)
+  if [ "$LDNS" ]; then
+	for i in $LDNS; do
+		if ipt_for_host "$i"; then
+			$IPT_H $IPT_FLAGS -I RABPSCAN -s "$i" -j RETURN
+		fi
+	done
+  fi
+  for i in ${RAB_PSCAN_PORTS//,/ }; do
+   if [ "$LOG_DROP" == "1" ] || [ "$RAB_LOG_HIT" == "1" ]; then
+	   ipt -A RABPSCAN -p tcp --dport $i -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** RABHIT ** "
+	   ipt -A RABPSCAN -p udp --dport $i -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** RABHIT ** "
+   fi
+   ipt -A RABPSCAN -p tcp --dport $i -m recent --set -j $TCP_STOP
+   ipt -A RABPSCAN -p udp --dport $i -m recent --set -j $UDP_STOP
+  done
+  ipt -A INPUT -j RABPSCAN
+ fi
+fi
+
+trim $DENY_HOSTS $SET_TRIM
+trim $GDENY_HOSTS $SET_TRIM
+
+# State tracking — fast-path for established/related connections.
+# Trust chains, blocklists, sanity checks, and RAB above ensure that denied,
+# malformed, and attack traffic is blocked regardless of connection state.
+# Conntrack validates TCP flags for ESTABLISHED packets (invalid flags →
+# INVALID state, not ESTABLISHED), so these skip safely.
+ipt -A INPUT  -p tcp $STATE_MATCH ESTABLISHED,RELATED -j ACCEPT
+ipt -A INPUT  -p udp $STATE_MATCH ESTABLISHED,RELATED -j ACCEPT
+ipt -A OUTPUT -p tcp --dport 1024:65535 $STATE_MATCH ESTABLISHED,RELATED -j ACCEPT
+ipt -A OUTPUT -p udp --dport 1024:65535 $STATE_MATCH ESTABLISHED,RELATED -j ACCEPT
+
+# Load our LOG rules
+. "$INSTALL_PATH/log.rules"
+
+# Virtual Adapters
+. "$INSTALL_PATH/vnet/main.vnet"
+
+# Clear any cport values
+cl_cports
+# CRITICAL: Re-source conf.apf to reload port variables after cl_cports() clears them.
+# Removing this causes a silent security regression (no port filters).
+. "$CNF"
+
+# Load our main TCP/UDP rules
+if [ "$SET_VNET" == "1" ]; then
+	VNET="$NET"
+else
+	VNET="0/0"
+fi
+. "$INSTALL_PATH/main.rules"
+
+# Drop NEW tcp connections after this point
+ipt -A INPUT  -p tcp ! --syn $STATE_MATCH NEW -j $ALL_STOP
+
+# DNS
+if [ -f "/etc/resolv.conf" ] && [ "$RESV_DNS" == "1" ]; then
+LDNS=$(grep -v "#" /etc/resolv.conf | grep -w nameserver | awk '{print$2}' | grep -v 127.0.0.1)
+  if [ -n "$LDNS" ]; then
+        for i in $LDNS; do
+        eout "{glob} resolv dns discovery for $i"
+        if [[ "$i" == *:* ]]; then
+                # IPv6 nameserver
+                if [ "$USE_IPV6" == "1" ]; then
+                ipt6 -A INPUT -p udp -s "$i" --sport 53 --dport 1024:65535 $STATE_MATCH ESTABLISHED,RELATED -j ACCEPT
+                ipt6 -A INPUT -p tcp -s "$i" --sport 53 --dport 1024:65535 $STATE_MATCH ESTABLISHED,RELATED -j ACCEPT
+                ipt6 -A OUTPUT -p udp -d "$i" --dport 53 --sport 1024:65535 -j ACCEPT
+                ipt6 -A OUTPUT -p tcp -d "$i" --dport 53 --sport 1024:65535 -j ACCEPT
+                fi
+        else
+                # IPv4 nameserver
+                ipt4 -A INPUT -p udp -s "$i" --sport 53 --dport 1024:65535 $STATE_MATCH ESTABLISHED,RELATED -j ACCEPT
+                ipt4 -A INPUT -p tcp -s "$i" --sport 53 --dport 1024:65535 $STATE_MATCH ESTABLISHED,RELATED -j ACCEPT
+                ipt4 -A OUTPUT -p udp -d "$i" --dport 53 --sport 1024:65535 -j ACCEPT
+                ipt4 -A OUTPUT -p tcp -d "$i" --dport 53 --sport 1024:65535 -j ACCEPT
+        fi
+        done
+        if [ "$RESV_DNS_DROP" == "1" ]; then
+                ipt4 -A INPUT  -p tcp --sport 53 --dport 1024:65535 -j $ALL_STOP
+                ipt4 -A INPUT  -p udp --sport 53 --dport 1024:65535 -j $ALL_STOP
+                if [ "$USE_IPV6" == "1" ]; then
+                ipt6 -A INPUT  -p tcp --sport 53 --dport 1024:65535 -j $ALL_STOP
+                ipt6 -A INPUT  -p udp --sport 53 --dport 1024:65535 -j $ALL_STOP
+                fi
+        fi
+  fi
+else
+        ipt -A INPUT  -p udp --sport 53 --dport 1024:65535 $STATE_MATCH ESTABLISHED,RELATED -j ACCEPT
+        ipt -A INPUT  -p tcp --sport 53 --dport 1024:65535 $STATE_MATCH ESTABLISHED,RELATED -j ACCEPT
+        ipt -A OUTPUT -p udp --dport 53 --sport 1024:65535 -j ACCEPT
+        ipt -A OUTPUT -p tcp --dport 53 --sport 1024:65535 -j ACCEPT
+fi
+
+# FTP
+if [ "$HELPER_FTP" == "1" ]; then
+ipt -A INPUT  -p tcp --sport 1024:65535 --dport $HELPER_FTP_PORT $STATE_MATCH RELATED,ESTABLISHED -j ACCEPT
+ipt -A INPUT  -p tcp -m multiport --dport $HELPER_FTP_PORT,$HELPER_FTP_DATA $STATE_MATCH ESTABLISHED,RELATED -j ACCEPT
+ipt -A INPUT  -p udp -m multiport --dport $HELPER_FTP_PORT,$HELPER_FTP_DATA $STATE_MATCH ESTABLISHED,RELATED -j ACCEPT
+ipt -A OUTPUT  -p tcp --dport 1024:65535 --sport $HELPER_FTP_PORT $STATE_MATCH RELATED,ESTABLISHED -j ACCEPT
+ipt -A OUTPUT  -p tcp -m multiport --dport $HELPER_FTP_PORT,$HELPER_FTP_DATA $STATE_MATCH ESTABLISHED,RELATED -j ACCEPT
+ipt -A OUTPUT  -p udp -m multiport --dport $HELPER_FTP_PORT,$HELPER_FTP_DATA $STATE_MATCH ESTABLISHED,RELATED -j ACCEPT
+fi
+
+# SSH
+if [ "$HELPER_SSH" == "1" ]; then
+	ipt -A INPUT  -p tcp --sport $HELPER_SSH_PORT --dport 1024:65535 $STATE_MATCH ESTABLISHED,RELATED -j ACCEPT
+fi
+
+# Traceroute
+if [ "$TCR_PASS" == "1" ]; then
+	ipt -A INPUT  -p udp $STATE_MATCH NEW --dport $TCR_PORTS -j ACCEPT
+        ipt -A OUTPUT  -p udp $STATE_MATCH NEW --dport $TCR_PORTS -j ACCEPT
+fi
+
+
+if [ "$LOG_DROP" == "1" ]; then
+# Default TCP/UDP INPUT log chain
+         ipt -A INPUT -p tcp -m limit --limit $LOG_RATE/minute  -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** IN_TCP DROP ** "
+         ipt -A INPUT -p udp -m limit --limit $LOG_RATE/minute  -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** IN_UDP DROP ** "
+fi
+
+if [ "$LOG_DROP" == "1" ] && [ "$EGF" == "1" ]; then
+# Default TCP/UDP OUTPUT log chain
+         ipt -A OUTPUT -p tcp -m limit --limit $LOG_RATE/minute  -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** OUT_TCP DROP ** "
+         ipt -A OUTPUT -p udp -m limit --limit $LOG_RATE/minute  -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** OUT_UDP DROP ** "
+fi
+
+
+# ECNSHAME
+if [ "$SYSCTL_ECN" == "1" ]; then
+	dlist_ecnshame
+	dlist_ecnshame_hosts
+fi
+
+# Load our POSTROUTE rules
+tosroute POSTROUTING
+. "$POSTRT"
+
+# Default Output Policies
+if [ "$EGF" == "1" ]; then
+	ipt -A OUTPUT -p tcp -j $TCP_STOP
+	ipt -A OUTPUT -p udp -j $UDP_STOP
+	ipt -A OUTPUT -p all -j $ALL_STOP
+	eout "{glob} default (egress) output drop"
+else
+	ipt -A OUTPUT -j ACCEPT
+	eout "{glob} default (egress) output accept"
+fi
+
+# Default Input Policies
+eout "{glob} default (ingress) input drop"
+ipt -A INPUT -p tcp -j $TCP_STOP
+ipt -A INPUT -p udp -j $UDP_STOP
+ipt -A INPUT -p all -j $ALL_STOP
+
+# Post-configuration hook — runs after all rules including default policies
+if [ -x "$INSTALL_PATH/hook_post.sh" ]; then
+	eout "{glob} executing post-configuration hook"
+	# shellcheck disable=SC1090,SC1091
+	. "$INSTALL_PATH/hook_post.sh" || true  # safe: sourced hook exit code is advisory, never block firewall load
+fi
+}
+
+start() {
+check_deps
+validate_config
+elog_event "config_loaded" "info" "APF configuration loaded"
+##
+# Fast Load
+##
+if [ "$SET_FASTLOAD" == "1" ] && [ "$DOCKER_COMPAT" != "1" ]; then
+# is this our first startup?
+# if so we certainly do not want fast load
+if [ ! -f "$INSTALL_PATH/internals/.last.full" ]; then
+	SKIP_FASTLOAD_FIRSTRUN=1
+fi
+# Is our last full load more than 12h ago?
+# if so we are going to full load
+if [ -f "$INSTALL_PATH/internals/.last.full" ]; then
+ read -r LAST_FULL < "$INSTALL_PATH/internals/.last.full"
+ CURRENT_LOAD=$(date +"%s")
+ LOAD_DIFF=$(($CURRENT_LOAD-$LAST_FULL))
+ if [ ! "$LOAD_DIFF" -lt "43200" ]; then
+	SKIP_FASTLOAD_EXPIRED=1
+ fi
+fi
+
+# has our configuration changed since full load?
+# if so full we go
+if [ ! -f "$INSTALL_PATH/internals/.md5.cores" ]; then
+        SKIP_FASTLOAD_VARS=1
+	MD5_FIRSTRUN=1
+else
+        EMPTY_MD5=$(< "$INSTALL_PATH/internals/.md5.cores")
+        if [ -z "$EMPTY_MD5" ]; then
+                $MD5 $MD5_FILES > "$INSTALL_PATH/internals/.md5.cores" 2> /dev/null
+        fi
+	$MD5 $MD5_FILES > "$INSTALL_PATH/internals/.md5.cores.new" 2> /dev/null
+        VARS_DIFF=$($DIFF "$INSTALL_PATH/internals/.md5.cores.new" "$INSTALL_PATH/internals/.md5.cores")
+        if [ -n "$VARS_DIFF" ]; then
+		$MD5 $MD5_FILES > "$INSTALL_PATH/internals/.md5.cores" 2> /dev/null
+                SKIP_FASTLOAD_VARS=1
+        fi
+fi
+if [ "$DEVEL_MODE" == "1" ]; then
+	SKIP_FASTLOAD_VARS=1
+fi
+if [ ! -f "$INSTALL_PATH/internals/.md5.cores.new" ] && [ -f "$INSTALL_PATH/internals/.md5.cores" ]; then
+	command cp "$INSTALL_PATH/internals/.md5.cores" "$INSTALL_PATH/internals/.md5.cores.new"
+fi
+
+if [ ! -f "$INSTALL_PATH/internals/.last.vars" ]; then
+	"$INSTALL_PATH/apf" -o > "$INSTALL_PATH/internals/.last.vars"
+	SKIP_FASTLOAD_VARS=1
+else
+	"$INSTALL_PATH/apf" -o > "$INSTALL_PATH/internals/.last.vars.new"
+	VARS_DIFF=$($DIFF "$INSTALL_PATH/internals/.last.vars.new" "$INSTALL_PATH/internals/.last.vars")
+	if [ -n "$VARS_DIFF" ]; then
+	        "$INSTALL_PATH/apf" -o > "$INSTALL_PATH/internals/.last.vars"
+		SKIP_FASTLOAD_VARS=1
+	fi
+fi
+
+# check uptime is greater than 10 minutes (600s)
+ read -r UPSEC _ < /proc/uptime; UPSEC="${UPSEC%%.*}"
+ if [ "$UPSEC" -lt "601" ]; then
+	SET_FASTLOAD_UPSEC=1
+ fi
+
+# check if we are flagged to skip fast load, otherwise off we go
+if [ -z "$SKIP_FASTLOAD_FIRSTRUN" ] && [ -z "$SKIP_FASTLOAD_EXPIRED" ] && [ -z "$SKIP_FASTLOAD_VARS" ] && [ -z "$SET_FASTLOAD_UPSEC" ]; then
+	# Verify snapshot backend matches current iptables backend
+	detect_ipt_backend
+	if [ -f "$INSTALL_PATH/internals/.apf.restore.backend" ]; then
+		read -r IPT_BACKEND_SAVED < "$INSTALL_PATH/internals/.apf.restore.backend"
+		if [ "$IPT_BACKEND_SAVED" != "$IPT_BACKEND" ]; then
+			SKIP_FASTLOAD_BACKEND=1
+		fi
+	fi
+	if [ "$SKIP_FASTLOAD_BACKEND" != "1" ]; then
+		# Pre-validate IPv4 snapshot before attempting restore
+		if [ ! -s "$INSTALL_PATH/internals/.apf.restore" ] || ! grep -q '^\*' "$INSTALL_PATH/internals/.apf.restore"; then
+			eout "{glob} fast load snapshot empty or invalid, going full load"
+		else
+		devm
+		# Recreate ipsets before restore (snapshot references --match-set)
+		if [ "$USE_IPSET" == "1" ] && [ -n "$IPSET" ] && [ -f "$INSTALL_PATH/ipset.rules" ]; then
+			ipset_load
+		fi
+		# Recreate GeoIP ipsets from cached data (no downloads)
+		if cc_enabled; then
+			# shellcheck disable=SC1090,SC1091
+			. "$INSTALL_PATH/internals/geoip.apf"
+			_geoip_fast_load_ipsets
+		fi
+		eout "{glob} activating firewall, fast load ($IPT_BACKEND)"
+		if ! $IPTR $IPT_FLAGS "$INSTALL_PATH/internals/.apf.restore" 2>/dev/null; then
+			eout "{glob} fast load failed (iptables-restore error), going full load"
+			flush 1
+		elif [ "$USE_IPV6" == "1" ] && [ -z "$IP6TR" ]; then
+			eout "{glob} fast load incomplete (ip6tables-restore not found), going full load"
+			flush 1
+		elif [ "$USE_IPV6" == "1" ] && [ -n "$IP6TR" ] && [ ! -f "$INSTALL_PATH/internals/.apf6.restore" ]; then
+			eout "{glob} fast load incomplete (IPv6 enabled but no IPv6 snapshot), going full load"
+			flush 1
+		elif [ "$USE_IPV6" == "1" ] && [ -n "$IP6TR" ] && [ -f "$INSTALL_PATH/internals/.apf6.restore" ]; then
+			if [ ! -s "$INSTALL_PATH/internals/.apf6.restore" ] || ! grep -q '^\*' "$INSTALL_PATH/internals/.apf6.restore"; then
+				eout "{glob} IPv6 snapshot empty or invalid, going full load"
+				flush 1
+			elif ! $IP6TR $IPT_FLAGS "$INSTALL_PATH/internals/.apf6.restore" 2>/dev/null; then
+				eout "{glob} fast load failed (ip6tables-restore error), going full load"
+				flush 1
+			else
+				eout "{glob} firewall initialized"
+				elog_event "service_state" "info" "APF firewall started (fast load)"
+				mutex_unlock
+				exit 0
+			fi
+		else
+			eout "{glob} firewall initialized"
+			elog_event "service_state" "info" "APF firewall started (fast load)"
+			mutex_unlock
+			exit 0
+		fi
+		fi # snapshot validation
+	else
+		eout "{glob} fast load snapshot backend mismatch ($IPT_BACKEND_SAVED vs $IPT_BACKEND), going full load"
+	fi
+ elif [ "$SKIP_FASTLOAD_FIRSTRUN" == "1" ]; then
+	eout "{glob} first run? fast load skipped [internals/.last.full not present]"
+ elif [ "$SKIP_FASTLOAD_EXPIRED" == "1" ]; then
+	eout "{glob} fast load snapshot more than 12h old, going full load"
+ elif [ "$SKIP_FASTLOAD_VARS" == "1" ]; then
+	eout "{glob} config. or .rule file has changed since last full load, going full load"
+ elif [ "$SET_FASTLOAD_UPSEC" == "1" ]; then
+	eout "{glob} uptime less than 10 minutes, going full load"
+fi
+
+fi
+##
+# Full Load
+##
+# Remove orphaned temp files from previous versions (no-op if none exist)
+_apf_cleanup_stale_tmp
+eout "{glob} activating firewall"
+# record our last full load
+date +"%s" > "$INSTALL_PATH/internals/.last.full"
+if [ ! -f "$DS_HOSTS" ]; then
+	touch "$DS_HOSTS"
+	chmod 640 "$DS_HOSTS"
+fi
+if [ ! -f "$DENY_HOSTS" ]; then
+        touch "$DENY_HOSTS"
+        chmod 640 "$DENY_HOSTS"
+fi
+if [ ! -f "$ALLOW_HOSTS" ]; then
+        touch "$ALLOW_HOSTS"
+        chmod 640 "$ALLOW_HOSTS"
+fi
+# check dev mode
+devm
+# generate vnet rules
+"$INSTALL_PATH/vnet/vnetgen"
+# start main firewall load
+firewall_full_load
+eout "{glob} firewall initialized"
+elog_event "service_state" "info" "APF firewall started"
+if [ "$MD5_FIRSTRUN" == "1" ]; then
+        $MD5 $MD5_FILES > "$INSTALL_PATH/internals/.md5.cores" 2> /dev/null
+fi
+
+firewall_on=$($IPT $IPT_FLAGS -L --numeric | grep -vE "Chain|destination")
+if [ "$DEVEL_ON" != "1" ] && [ "$DOCKER_COMPAT" != "1" ] && [ -n "$firewall_on" ]; then
+	snapshot_save
+fi
+if [ "$SET_VERBOSE" == "1" ] && [ "$DEVEL_ON" == "1" ]; then
+	eout "{glob} !!DEVELOPMENT MODE ENABLED!! - firewall will flush every 5 minutes."
+fi
+
+if [ "$SET_REFRESH_MD5" == "1" ] && [ "$MD5" ]; then
+	$MD5 $DENY_HOSTS $GDENY_HOSTS $ALLOW_HOSTS $GALLOW_HOSTS | $MD5 | awk '{print$1}' > "$INSTALL_PATH/internals/.trusts.md5"
 fi
 }

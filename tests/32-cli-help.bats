@@ -335,20 +335,10 @@ teardown() {
     assert_success
 }
 
-# --- firewall script failure propagation (F-052) ---
-
-@test "apf -s propagates firewall script exit code on failure" {
-    source /opt/tests/helpers/apf-config.sh
-    # Inject failure at top of firewall script
-    local fw_script="$APF_DIR/firewall"
-    local fw_backup="$APF_DIR/firewall.bak"
-    cp "$fw_script" "$fw_backup"
-    sed -i '1a exit 42' "$fw_script"
-
-    run "$APF" -s
-    [ "$status" -eq 42 ]
-    assert_output --partial "firewall script failed"
-
-    # Restore firewall script
-    mv "$fw_backup" "$fw_script"
-}
+# --- firewall failure propagation ---
+# NOTE: The original F-052 test injected `exit 42` into the separate
+# files/firewall script. That script is now absorbed as firewall_full_load()
+# in apf_core.sh (runs in-process). Fatal exit from _verify_iface_route()
+# terminates APF directly; the EXIT trap ensures cleanup. Interface failure
+# cannot be tested with VF_ROUTE=0 (Docker default). The start success path
+# is covered by tests/01-install-cli.bats and numerous other test files.

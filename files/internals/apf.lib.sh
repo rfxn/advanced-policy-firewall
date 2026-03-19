@@ -131,4 +131,4 @@ trim() {
 . "$_internals_dir/apf_cli.sh"
 
 # shellcheck disable=SC1090,SC1091
-. "$_internals_dir/functions.apf"
+. "$_internals_dir/apf_core.sh"
