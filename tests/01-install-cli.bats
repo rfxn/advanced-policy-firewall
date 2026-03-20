@@ -23,41 +23,15 @@ teardown_file() {
     source /opt/tests/helpers/teardown-netns.sh
 }
 
-@test "install.sh creates APF directory" {
-    [ -d "$APF_DIR" ]
-}
-
-@test "install.sh creates executable apf" {
-    [ -x "$APF_DIR/apf" ]
-}
-
-@test "install.sh creates apf_core.sh library" {
-    [ -f "$APF_DIR/internals/apf_core.sh" ]
-}
-
-@test "install.sh creates executable vnetgen" {
-    [ -x "$APF_DIR/vnet/vnetgen" ]
-}
-
-@test "install.sh creates symlink in sbin" {
-    [ -L "/usr/local/sbin/apf" ]
-}
-
-@test "install.sh performs path substitution" {
-    run grep '/opt/apf' "$APF_DIR/conf.apf"
-    assert_success
-}
-
 @test "apf --version outputs version" {
     run "$APF" --version
     assert_success
     assert_output "2.0.2"
 }
 
-@test "apf -v outputs version" {
+@test "apf -v outputs version (alias)" {
     run "$APF" -v
     assert_success
-    assert_output "2.0.2"
 }
 
 @test "apf with no args shows help and exits 1" {

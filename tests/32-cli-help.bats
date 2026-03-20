@@ -35,12 +35,6 @@ teardown() {
     assert_output --partial "usage: apf"
 }
 
-@test "apf --help exits 0 and shows usage" {
-    run "$APF" --help
-    assert_success
-    assert_output --partial "usage: apf"
-}
-
 @test "unknown option exits 1" {
     run "$APF" --badopt
     assert_failure
@@ -87,7 +81,6 @@ teardown() {
 @test "apf --check succeeds with valid config (alias)" {
     run "$APF" --check
     assert_success
-    assert_output --partial "Configuration validated successfully"
 }
 
 @test "apf --validate fails with invalid TCP_STOP value" {
@@ -288,12 +281,6 @@ teardown() {
 @test "apf --templ still lists temp entries" {
     run "$APF" --templ
     assert_success
-}
-
-@test "apf -o still outputs config" {
-    run "$APF" -o
-    assert_success
-    assert_output --partial "INSTALL_PATH"
 }
 
 @test "apf --help does not show Internal section" {

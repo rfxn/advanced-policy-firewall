@@ -656,7 +656,7 @@ pkt_sanity_flags() {
 cron_refresh() {
 if [ "$SET_REFRESH" != "0" ] && [ -n "$SET_REFRESH" ]; then
 cat<<EOF > "$INSTALL_PATH/internals/cron.refresh"
-*/$SET_REFRESH * * * * root $INSTALL_PATH/apf --refresh >> /dev/null 2>&1 &
+*/$SET_REFRESH * * * * root $INSTALL_PATH/apf --refresh >> /dev/null 2>&1
 EOF
 	chmod 644 "$INSTALL_PATH/internals/cron.refresh"
 	ln -fs "$INSTALL_PATH/internals/cron.refresh" /etc/cron.d/refresh.apf

@@ -85,14 +85,17 @@ case "$1" in
 	$0 --start || exit $?
 	;;
 -a|--allow)
+	mutex_lock
 	# Propagate exit code: invalid host, duplicate, or rule failure → exit 1
 	cli_trust "TALLOW" "ALLOW" "$ALLOW_HOSTS" "$2" "$3" || exit 1
 	;;
 -d|--deny)
+	mutex_lock
 	# Propagate exit code: invalid host, duplicate, or rule failure → exit 1
 	cli_trust "TDENY" "DENY" "$DENY_HOSTS" "$2" "$3" || exit 1
 	;;
 -u|--remove|--unban)
+	mutex_lock
 	if cli_trust_remove "$2"; then
 		eout "{trust} removed $2 from trust system"
 		if [ "$SET_VERBOSE" != "1" ]; then
@@ -147,9 +150,11 @@ case "$1" in
 	search "$2"
 	;;
 -ta|--temp-allow)
+	mutex_lock
 	cli_trust_temp "TALLOW" "ALLOW" "$ALLOW_HOSTS" "$2" "$3" "$4" || exit 1
 	;;
 -td|--temp-deny)
+	mutex_lock
 	cli_trust_temp "TDENY" "DENY" "$DENY_HOSTS" "$2" "$3" "$4" || exit 1
 	;;
 --templ|--temp-list)

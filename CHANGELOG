@@ -174,6 +174,19 @@
       version-gated auto-detect migration (DOCKER_COMPAT, USE_IPSET,
       IPT_LOCK_SUPPORT "0" to "auto") was only in the extras copy and never
       ran during install — upgraders from pre-2.0.2 were not migrated
+[Fix] trust_parse_fields(): add set -f/set +f to prevent glob expansion
+      on unquoted field split; valid_trust_entry() rejects *, ?, [ chars
+[Fix] Add mutex_lock to -a, -d, -u, -ta, -td CLI handlers; closes race
+      window with cron --temp-expire on flock-absent systems
+[Fix] Replace 5 bare rm calls with command rm in apf_ipset.sh (3),
+      apf_geoip.sh (1), apf.lib.sh (1) — completes 1874eec convention
+[Fix] Advanced trust removal: also delete iptables rules from TGALLOW/TGDENY
+      chains; entries from global trust files were left in live iptables until
+      next refresh or restart
+[Fix] flush_temp_entries(): move orphan comment cleanup after cli_trust_remove
+      so FQDN resolved= metadata is available for IP resolution during removal
+[Fix] cron_refresh(): remove trailing & from cron entry; backgrounding inside
+      cron prevents exit code tracking and allows overlapping executions
 [Change] GeoIP download: log WARNING when TLS verification fails and insecure
       fallback succeeds; GEOIP_LOG_FUNC callback in geoip_lib.sh routes
       warnings through consumer's logging system (eout in APF)

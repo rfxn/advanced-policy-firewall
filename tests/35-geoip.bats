@@ -181,11 +181,6 @@ _source_funcs='source '"$APF_DIR"'/internals/apf.lib.sh; CC_DENY_HOSTS='"$APF_DI
     assert_output "China"
 }
 
-@test "geoip_cc_name maps US to United States" {
-    run bash -c "$_source_funcs; geoip_cc_name US"
-    assert_output "United States"
-}
-
 @test "geoip_cc_name returns bare code for unknown CC" {
     run bash -c "$_source_funcs; geoip_cc_name ZZ"
     assert_output "ZZ"

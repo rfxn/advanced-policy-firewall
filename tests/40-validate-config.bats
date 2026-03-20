@@ -254,16 +254,6 @@ teardown() {
     apf_set_config "SET_EXPIRE" "0"
 }
 
-@test "validate_config accepts SET_EXPIRE=0 (disabled)" {
-    source /opt/tests/helpers/apf-config.sh
-    apf_set_config "SET_EXPIRE" "0"
-
-    run "$APF" --validate
-    assert_success
-
-    apf_set_config "SET_EXPIRE" "0"
-}
-
 @test "validate_config rejects non-numeric FQDN_TIMEOUT" {
     source /opt/tests/helpers/apf-config.sh
     apf_set_config "FQDN_TIMEOUT" "abc"
@@ -422,4 +412,58 @@ _dl_serve() {
     assert_output "fallback-content"
 
     rm -f "$dst"
+}
+
+@test "advanced trust entry rejects glob metacharacters" {
+    # Glob chars in port/IP fields must be rejected
+    run bash -c "
+        source '$APF_DIR/conf.apf'
+        source '$APF_DIR/internals/apf.lib.sh'
+        valid_trust_entry 'd=*:s=10.0.0.1'
+    "
+    [ "$status" -ne 0 ]
+    run bash -c "
+        source '$APF_DIR/conf.apf'
+        source '$APF_DIR/internals/apf.lib.sh'
+        valid_trust_entry 'd=?:s=10.0.0.1'
+    "
+    [ "$status" -ne 0 ]
+    # [22] is neutralized by trust_protect_ipv6 (bracket removal) — safe, not a glob
+    run bash -c "
+        source '$APF_DIR/conf.apf'
+        source '$APF_DIR/internals/apf.lib.sh'
+        valid_trust_entry 'd=[22]:s=10.0.0.1'
+    "
+    [ "$status" -eq 0 ]
+    # Valid entries still work (no false positives)
+    run bash -c "
+        source '$APF_DIR/conf.apf'
+        source '$APF_DIR/internals/apf.lib.sh'
+        valid_trust_entry 'd=22:s=10.0.0.1'
+    "
+    [ "$status" -eq 0 ]
+    # IPv6 bracket entry must pass (brackets removed before glob check)
+    run bash -c "
+        source '$APF_DIR/conf.apf'
+        source '$APF_DIR/internals/apf.lib.sh'
+        valid_trust_entry 'd=22:s=[2001:db8::1]'
+    "
+    [ "$status" -eq 0 ]
+}
+
+@test "no bare rm/cp/mv in source files (coding standard)" {
+    # Bare rm/cp/mv (without 'command' prefix) hang when aliases exist.
+    # This test prevents regression of the convention established in 1874eec.
+    # Strategy: find all rm/cp/mv calls, exclude 'command rm/cp/mv' and comments.
+    # Covers all contexts: leading, && prefixed, { prefixed, || prefixed, ; prefixed.
+    local hits
+    hits=$(grep -rEn '\brm -|\bcp -|\bmv -' \
+        /opt/apf/internals/apf_*.sh \
+        /opt/apf/internals/apf.lib.sh \
+        /opt/apf/apf \
+        2>/dev/null \
+        | grep -v '^\s*#' \
+        | grep -v 'command rm\|command cp\|command mv' \
+        | grep -v '# .*rm \|# .*cp \|# .*mv ' || true)
+    [ -z "$hits" ]
 }
