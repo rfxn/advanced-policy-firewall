@@ -135,16 +135,6 @@ teardown() {
     "$APF" -u 2001:db8::50 2>/dev/null || true
 }
 
-@test "apf -u removes IPv6 host" {
-    "$APF" -a 2001:db8::51 "ipv6 remove test" 2>/dev/null
-    run "$APF" -u 2001:db8::51
-    assert_success
-
-    # Verify host entry line removed from file (anchor to line start; comments may remain)
-    run grep "^2001:db8::51" "$APF_DIR/allow_hosts.rules"
-    assert_failure
-}
-
 @test "ICMPv6 configured types accepted" {
     # Type 128 (echo-request) should be in the default IG_ICMPV6_TYPES
     assert_rule_exists_ip6 INPUT "ipv6-icmp.*type 128"

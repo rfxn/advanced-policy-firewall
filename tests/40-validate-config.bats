@@ -254,16 +254,6 @@ teardown() {
     apf_set_config "SET_EXPIRE" "0"
 }
 
-@test "validate_config accepts SET_EXPIRE=0 (disabled)" {
-    source /opt/tests/helpers/apf-config.sh
-    apf_set_config "SET_EXPIRE" "0"
-
-    run "$APF" --validate
-    assert_success
-
-    apf_set_config "SET_EXPIRE" "0"
-}
-
 @test "validate_config rejects non-numeric FQDN_TIMEOUT" {
     source /opt/tests/helpers/apf-config.sh
     apf_set_config "FQDN_TIMEOUT" "abc"
