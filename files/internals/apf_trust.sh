@@ -48,7 +48,9 @@ trust_parse_fields() {
 	# Split advanced trust entry on ':' and '=' into positional fields
 	# Input: "d=22:s=10.0.0.1" → _TF1=d _TF2=22 _TF3=s _TF4=10.0.0.1
 	local IFS=':='
+	set -f  # disable glob expansion for unquoted $1 split
 	set -- $1
+	set +f
 	_TF_COUNT=$#
 	_TF1="${1:-}"; _TF2="${2:-}"; _TF3="${3:-}"
 	_TF4="${4:-}"; _TF5="${5:-}"; _TF6="${6:-}"
@@ -101,6 +103,10 @@ valid_trust_entry() {
 		return $?
 	fi
 	trust_protect_ipv6 "$entry"; local safe="$_TPV6_RESULT"
+	# Reject glob metacharacters after IPv6 bracket removal — never valid in trust syntax
+	case "$safe" in
+		*[\*\?\[]*) return 1 ;;
+	esac
 	trust_parse_fields "$safe"
 	_trust_unpack_fields || return 1
 	local proto="$_TUF_PROTO" dir="$_TUF_DIR" pflow="$_TUF_PFLOW"
