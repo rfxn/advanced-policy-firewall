@@ -328,3 +328,9 @@
       and centralized UAT cleanup to prevent cascading failures
 [Fix] CI: UAT job Docker build used wrong context directory; use -f
       tests/Dockerfile with project root as build context
+[Fix] trust_parse_fields(): add set -f/set +f to prevent glob expansion
+      on unquoted field split; valid_trust_entry() rejects *, ?, [ chars
+[Fix] Add mutex_lock to -a, -d, -u, -ta, -td CLI handlers; closes race
+      window with cron --temp-expire on flock-absent systems
+[Fix] Replace 5 bare rm calls with command rm in apf_ipset.sh (3),
+      apf_geoip.sh (1), apf.lib.sh (1) — completes 1874eec convention
