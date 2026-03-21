@@ -144,7 +144,7 @@ _ipset_resolve_data() {
 	fi
 	if [ ! -f "$_IPE_DATA_FILE" ] || [ ! -s "$_IPE_DATA_FILE" ]; then
 		eout "{ipset} empty or missing data for $_IPE_NAME"
-		[ -n "$_IPE_URL_TMP" ] && rm -f "$_IPE_URL_TMP"
+		[ -n "$_IPE_URL_TMP" ] && command rm -f "$_IPE_URL_TMP"
 		_IPE_URL_TMP=""
 		return 1
 	fi
@@ -183,7 +183,7 @@ while IFS= read -r line; do
 	ipset_populate_set "$_IPE_NAME" "$_IPE_IPSET_MAXELEM" "$_IPE_DATA_FILE"
 	local count="$_IPSET_COUNT"
 
-	[ -n "$_IPE_URL_TMP" ] && rm -f "$_IPE_URL_TMP"
+	[ -n "$_IPE_URL_TMP" ] && command rm -f "$_IPE_URL_TMP"
 
 	if [ "$count" -eq 0 ]; then
 		eout "{ipset} no valid entries for $_IPE_NAME, skipping"
@@ -274,7 +274,7 @@ while IFS= read -r line; do
 	ipset_populate_set "$_IPE_NAME" "$_IPE_IPSET_MAXELEM" "$_IPE_DATA_FILE"
 	local count="$_IPSET_COUNT"
 
-	[ -n "$_IPE_URL_TMP" ] && rm -f "$_IPE_URL_TMP"
+	[ -n "$_IPE_URL_TMP" ] && command rm -f "$_IPE_URL_TMP"
 
 	if [ "$count" -gt 0 ]; then
 		$IPSET swap "${_IPE_NAME}-tmp" "$_IPE_NAME"

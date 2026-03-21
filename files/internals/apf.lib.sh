@@ -55,7 +55,7 @@ _apf_reg_tmp() { _APF_TMPFILES="$_APF_TMPFILES $1"; }
 _apf_cleanup_tmp() {
 	local f
 	for f in $_APF_TMPFILES; do
-		[ -e "$f" ] && rm -rf "$f"
+		[ -e "$f" ] && command rm -rf "$f"
 	done
 	_APF_TMPFILES=""
 }

@@ -713,7 +713,7 @@ _geoip_world_fetch() {
 	mkdir -p "$CC_DATA_DIR" 2>/dev/null  # safe: parent dir always exists
 	tmp_tar=$(mktemp "$INSTALL_PATH/.apf-geoip-XXXXXX") || return 1
 	_apf_reg_tmp "$tmp_tar"
-	tmp_dir=$(mktemp -d "$INSTALL_PATH/.apf-geoip-world-XXXXXX") || { rm -f "$tmp_tar"; return 1; }
+	tmp_dir=$(mktemp -d "$INSTALL_PATH/.apf-geoip-world-XXXXXX") || { command rm -f "$tmp_tar"; return 1; }
 	_apf_reg_tmp "$tmp_dir"
 
 	eout "{geoip} fetching world IPv4 data from ipdeny.com (~1MB)"
