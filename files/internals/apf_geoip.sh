@@ -1419,6 +1419,30 @@ cli_cc_remove() {
 	return 1
 }
 
+## Check if any entry (bare or advanced) exists for CC in either CC rules file.
+# Returns 0 if any entry exists, 1 if none.
+# Used by _expire_cc_temp_entry() and cli_cc_remove_entry() to decide
+# whether full cleanup (ipsets, cache) is warranted after targeted removal.
+# Args: cc
+_geoip_cc_has_entries() {
+	local IFS=$' \t\n'
+	local cc="$1"
+	local _f
+
+	[ -n "$cc" ] || return 1
+
+	for _f in "$CC_DENY_HOSTS" "$CC_ALLOW_HOSTS"; do
+		[ -f "$_f" ] || continue
+		if grep -v '^#' "$_f" 2>/dev/null | grep -Fxq "$cc"; then
+			return 0
+		fi
+		if grep -v '^#' "$_f" 2>/dev/null | grep -q "=${cc}$"; then
+			return 0
+		fi
+	done
+	return 1
+}
+
 ## Expire a single temporary CC entry without destroying permanent entries.
 # Removes the temp metadata comment line and the bare CC entry line that
 # immediately follows it. If no permanent (non-temp) entry for that CC
@@ -1450,20 +1474,7 @@ _expire_cc_temp_entry() {
 	# Check if any permanent (non-temp) entry for this CC still exists
 	# in EITHER CC rules file. A permanent entry is a bare CC line whose
 	# preceding comment lacks ttl=/expire= markers, or an advanced entry.
-	local _has_permanent=0 _f
-	for _f in "$CC_DENY_HOSTS" "$CC_ALLOW_HOSTS"; do
-		[ -f "$_f" ] || continue
-		if grep -v '^#' "$_f" 2>/dev/null | grep -Fxq "$cc"; then
-			_has_permanent=1
-			break
-		fi
-		if grep -v '^#' "$_f" 2>/dev/null | grep -q "=${cc}$"; then
-			_has_permanent=1
-			break
-		fi
-	done
-
-	if [ "$_has_permanent" = "0" ]; then
+	if ! _geoip_cc_has_entries "$cc"; then
 		# No permanent entry remains — full cleanup (iptables, ipsets, cache)
 		cli_cc_remove "$cc" > /dev/null 2>&1
 	fi

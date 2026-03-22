@@ -1,3 +1,11 @@
+- 2.0.3 | Mar 22 2026:
+
+  -- Changes --
+
+[Change] Add _geoip_cc_has_entries() helper function to apf_geoip.sh; refactor
+         _expire_cc_temp_entry() to call the new helper instead of inline grep,
+         deduplicating the has-entries check in preparation for cli_cc_remove_entry()
+
 - 2.0.2 | Mar 08 2026:
 
   -- New Features --
