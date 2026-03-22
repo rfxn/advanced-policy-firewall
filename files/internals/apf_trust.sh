@@ -369,10 +369,14 @@ cli_trust_remove() {
 				_ctr_resolved_entry="${DIP//$_VTE_IP/$_ctr_rip}"
 				trust_entry_rule "$_ctr_resolved_entry" "TALLOW" "ALLOW" "-D" 2>/dev/null && found=1
 				trust_entry_rule "$_ctr_resolved_entry" "TDENY" "DENY" "-D" 2>/dev/null && found=1
+				trust_entry_rule "$_ctr_resolved_entry" "TGALLOW" "ALLOW" "-D" 2>/dev/null && found=1
+				trust_entry_rule "$_ctr_resolved_entry" "TGDENY" "DENY" "-D" 2>/dev/null && found=1
 			done
 		else
 			trust_entry_rule "$DIP" "TALLOW" "ALLOW" "-D" 2>/dev/null && found=1
 			trust_entry_rule "$DIP" "TDENY" "DENY" "-D" 2>/dev/null && found=1
+			trust_entry_rule "$DIP" "TGALLOW" "ALLOW" "-D" 2>/dev/null && found=1
+			trust_entry_rule "$DIP" "TGDENY" "DENY" "-D" 2>/dev/null && found=1
 		fi
 		# Remove exact entry + associated comment from trust files
 		local escaped_entry
@@ -1216,12 +1220,6 @@ flush_temp_entries() {
 			fi
 			count=$(($count + 1))
 		done < <(grep '# added .* ttl=.*expire=' "$file")
-		if [ "$_is_cc_file" = "0" ]; then
-			# Safety net: remove any orphaned ttl= comment lines not cleaned
-			# by per-IP cli_trust_remove (e.g., partial flush after restart);
-			# matches only "# added" metadata lines, not documentation headers
-			sed -i '/# added .* ttl=.*expire=/d' "$file"
-		fi
 	done
 	# Deferred removal: avoids modifying trust files while iterating
 	# Regular trust entries: cli_trust_remove handles iptables + file cleanup
@@ -1229,6 +1227,13 @@ flush_temp_entries() {
 	for _ft_ip in "${_ft_expired[@]}"; do
 		# Suppress errors: iptables rules may not exist after firewall restart
 		cli_trust_remove "$_ft_ip" >> /dev/null 2>&1
+	done
+	# Safety net: remove any orphaned ttl= comment lines not cleaned
+	# by per-IP cli_trust_remove (e.g., partial flush after restart);
+	# runs AFTER cli_trust_remove so FQDN resolved= metadata is available
+	for file in "$ALLOW_HOSTS" "$DENY_HOSTS"; do
+		[ -f "$file" ] || continue
+		sed -i '/# added .* ttl=.*expire=/d' "$file"
 	done
 	# CC entries: _expire_cc_temp_entry removes only the temp metadata;
 	# preserves permanent entries, ipsets, and iptables rules for that CC

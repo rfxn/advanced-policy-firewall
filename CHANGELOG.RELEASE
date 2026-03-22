@@ -334,5 +334,10 @@
       window with cron --temp-expire on flock-absent systems
 [Fix] Replace 5 bare rm calls with command rm in apf_ipset.sh (3),
       apf_geoip.sh (1), apf.lib.sh (1) — completes 1874eec convention
+[Fix] Advanced trust removal: also delete iptables rules from TGALLOW/TGDENY
+      chains; entries from global trust files were left in live iptables until
+      next refresh or restart
+[Fix] flush_temp_entries(): move orphan comment cleanup after cli_trust_remove
+      so FQDN resolved= metadata is available for IP resolution during removal
 [Fix] cron_refresh(): remove trailing & from cron entry; backgrounding inside
       cron prevents exit code tracking and allows overlapping executions
