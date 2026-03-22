@@ -1,29 +1,3 @@
-- 2.0.3 | Mar 22 2026:
-
-  -- Changes --
-
-[Change] Add _geoip_cc_has_entries() helper function to apf_geoip.sh; refactor
-         _expire_cc_temp_entry() to call the new helper instead of inline grep,
-         deduplicating the has-entries check in preparation for cli_cc_remove_entry()
-[New] Add cli_cc_remove_entry() to apf_geoip.sh: targeted removal of a single
-     advanced CC entry (e.g., tcp:in:d=22:s=ZZ) from rules files and iptables
-     chains (CC_DENYP/CC_ALLOWP) without affecting bare CC entries or other
-     advanced entries for the same country; delegates to cli_cc_remove() for
-     full ipset/cache cleanup when no entries remain
-[Change] Route advanced CC trust removal in cli_trust_remove() to
-         cli_cc_remove_entry() for per-entry targeted removal; continent
-         shorthand (@EU etc.) and bare CC codes continue to route to
-         cli_cc_remove() (nuke-all behaviour unchanged)
-[Fix] cli_cc_remove_entry(): match LOG rules by proto and port flags
-     separately rather than as a combined fixed string; iptables -S
-     output inserts -m tcp between -p tcp and --dport N, causing
-     grep -F to miss LOG rules and leave them as orphans after targeted
-     advanced CC entry removal
-[New] Add 5 regression tests to tests/35-geoip.bats for granular CC
-     advanced trust entry removal: bare CC entry preservation, targeted
-     iptables rule removal, ipset cleanup when last entry removed, cache
-     preservation when other entries remain, CC_LOG_ONLY targeted removal
-
 - 2.0.2 | Mar 08 2026:
 
   -- New Features --
@@ -203,9 +177,25 @@
 [Change] GeoIP download: log WARNING when TLS verification fails and insecure
       fallback succeeds; GEOIP_LOG_FUNC callback in geoip_lib.sh routes
       warnings through consumer's logging system (eout in APF)
+[Fix] cli_cc_remove_entry(): match LOG rules by proto and port flags
+      separately rather than as a combined fixed string; iptables -S
+      output inserts -m tcp between -p tcp and --dport N, causing
+      grep -F to miss LOG rules and leave them as orphans after targeted
+      advanced CC entry removal
 
   -- Changes --
 
+[New] Granular CC advanced trust entry removal: apf -u of a specific advanced
+      CC entry (e.g., tcp:in:d=22:s=ZZ) now removes only that entry and its
+      iptables rules; bare CC entries, other advanced entries, and ipsets for
+      the same country are preserved; ipset/cache cleanup occurs only when the
+      last entry for a CC is removed; nuke-all behaviour for bare CC codes and
+      continent shorthand (@EU) is unchanged
+[Change] Add _geoip_cc_has_entries() helper to apf_geoip.sh; refactor
+         _expire_cc_temp_entry() to use shared helper instead of inline grep
+[Change] Route advanced CC trust removal in cli_trust_remove() to
+         cli_cc_remove_entry() for per-entry targeted removal; continent
+         shorthand (@EU etc.) and bare CC codes continue nuke-all path
 [Change] Remove plain text README; consolidate on README.md only
 [Change] Conntrack module migration: use -m conntrack --ctstate when available,
          falling back to -m state --state on legacy systems
