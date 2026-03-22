@@ -25,6 +25,8 @@ APF_GEOIP_VERSION="1.0.0"
 # cli_cc_trust()       — handle apf -a/-d for country codes
 # cli_cc_trust_advanced() — advanced syntax CC trust
 # cli_cc_trust_temp()  — temporary CC trust entries
+# cli_cc_remove_entry() — targeted removal of single advanced CC entry
+# cli_cc_remove()      — nuke-all removal for a CC
 
 # --- Module state ---
 # Set by geoip_download() to indicate cache freshness result (0=downloaded, 1=cache hit)
@@ -1322,6 +1324,131 @@ cli_cc_trust_temp() {
 			echo "temp $action_lower $cc_name ($cc) for $expire_disp"
 		fi
 	done
+}
+
+## Remove a single advanced CC entry from rules files and iptables.
+# SYNC: parsing mirrors _geoip_add_advanced_rule:518-542
+# Handles both CC_DENY and CC_ALLOW paths. If no entries remain for
+# the CC after removal, delegates to cli_cc_remove() for full cleanup.
+# Args: entry cc
+# Returns 0 if found/removed, 1 if not found.
+cli_cc_remove_entry() {
+	local IFS=$' \t\n'
+	local entry="$1" cc="$2"
+	local found_in="" found=0
+
+	[ -n "$entry" ] || return 1
+	if ! valid_cc "$cc"; then
+		return 1
+	fi
+	[ -n "$CC_DENY_HOSTS" ] && [ -n "$CC_ALLOW_HOSTS" ] || return 1
+
+	# Determine which rules file(s) contain this entry
+	if [ -f "$CC_DENY_HOSTS" ] && grep -v '^#' "$CC_DENY_HOSTS" 2>/dev/null | grep -Fxq "$entry"; then
+		found_in="deny"
+	fi
+	if [ -f "$CC_ALLOW_HOSTS" ] && grep -v '^#' "$CC_ALLOW_HOSTS" 2>/dev/null | grep -Fxq "$entry"; then
+		found_in="${found_in:+${found_in},}allow"
+	fi
+
+	if [ -z "$found_in" ]; then
+		return 1
+	fi
+	found=1
+
+	# Remove entry + its preceding comment from rules file(s)
+	# Comment format: "# added ENTRY on DATE with ..."
+	local escaped_entry
+	escaped_entry=$(echo "$entry" | sed 's/[.\/\[\]*]/\\&/g')
+	if [[ "$found_in" == *deny* ]] && [ -f "$CC_DENY_HOSTS" ]; then
+		sed -i -e "\%# added ${escaped_entry} %d" \
+		       -e "\%^${escaped_entry}$%d" "$CC_DENY_HOSTS"
+	fi
+	if [[ "$found_in" == *allow* ]] && [ -f "$CC_ALLOW_HOSTS" ]; then
+		sed -i -e "\%# added ${escaped_entry} %d" \
+		       -e "\%^${escaped_entry}$%d" "$CC_ALLOW_HOSTS"
+	fi
+
+	# Parse entry to reconstruct iptables match args
+	# Replace CC with PLACEHOLDER for parsing (same as _geoip_add_advanced_rule:519)
+	local parse_entry="${entry%=*}=PLACEHOLDER"
+	trust_protect_ipv6 "$parse_entry"
+	trust_parse_fields "$_TPV6_RESULT"
+
+	local proto="" dir="" pflow="" port="" ipflow=""
+	case "$_TF_COUNT" in
+		4) proto="tcp"; pflow="$_TF1"; port="$_TF2"; ipflow="$_TF3" ;;
+		5) dir="$_TF1"; pflow="$_TF2"; port="$_TF3"; ipflow="$_TF4" ;;
+		6) proto="$_TF1"; dir="$_TF2"; pflow="$_TF3"; port="$_TF4"; ipflow="$_TF5" ;;
+		*) return 1 ;;
+	esac
+	[ -z "$proto" ] && proto="tcp"
+
+	expand_port "$port"; port="$_PORT"
+
+	# Build iptables match arguments
+	local match="-p $proto"
+	if [ "$pflow" = "d" ]; then
+		match="$match --dport $port"
+	else
+		match="$match --sport $port"
+	fi
+
+	# ipset direction: s=CC → src, d=CC → dst
+	local ipset_dir="src"
+	[ "$ipflow" = "d" ] && ipset_dir="dst"
+
+	# Security boundary for eval (same as cli_cc_remove):
+	#   1. valid_cc() constrains $cc to ^[A-Z]{2}$ at all entry points
+	#   2. grep filters -S output to lines containing "apf_cc[46]_${cc}"
+	#   3. _cc_eval_re regex restricts to ^-A (CC_DENY|CC_ALLOW|...) lines
+	local _cc_eval_re='^-A (CC_DENY|CC_ALLOW|CC_DENYP|CC_ALLOWP) '
+
+	# Process each chain determined by where the entry was found
+	local _chain _action
+	for _chain in CC_DENYP CC_ALLOWP; do
+		if [[ "$_chain" == "CC_DENYP" ]]; then
+			[[ "$found_in" == *deny* ]] || continue
+			_action="$ALL_STOP"
+		else
+			[[ "$found_in" == *allow* ]] || continue
+			_action="ACCEPT"
+		fi
+
+		if $IPT $IPT_FLAGS -L "$_chain" -n > /dev/null 2>&1; then
+			local set4="apf_cc4_${cc}"
+			# Action rule removal — fails silently under CC_LOG_ONLY=1 (no action rule exists)
+			$IPT $IPT_FLAGS -D "$_chain" $match -m set --match-set "$set4" "$ipset_dir" -j "$_action" 2>/dev/null || true
+			# LOG rule removal via eval (handles shell-quoted --log-prefix values)
+			$IPT $IPT_FLAGS -S "$_chain" 2>/dev/null | grep "apf_cc4_${cc}" | while IFS= read -r _rule; do
+				[[ "$_rule" =~ $_cc_eval_re ]] || continue
+				# Only remove LOG rules matching our specific proto/port match
+				if echo "$_rule" | grep -qF -- "$match"; then
+					eval "$IPT $IPT_FLAGS -D \"$_chain\" ${_rule#-A $_chain }" 2>/dev/null || true
+				fi
+			done
+		fi
+
+		# IPv6
+		if [ "$USE_IPV6" = "1" ] && [ "$CC_IPV6" = "1" ] && \
+		   $IP6T $IPT_FLAGS -L "$_chain" -n > /dev/null 2>&1; then
+			local set6="apf_cc6_${cc}"
+			$IP6T $IPT_FLAGS -D "$_chain" $match -m set --match-set "$set6" "$ipset_dir" -j "$_action" 2>/dev/null || true
+			$IP6T $IPT_FLAGS -S "$_chain" 2>/dev/null | grep "apf_cc6_${cc}" | while IFS= read -r _rule; do
+				[[ "$_rule" =~ $_cc_eval_re ]] || continue
+				if echo "$_rule" | grep -qF -- "$match"; then
+					eval "$IP6T $IPT_FLAGS -D \"$_chain\" ${_rule#-A $_chain }" 2>/dev/null || true
+				fi
+			done
+		fi
+	done
+
+	# If no entries remain for this CC in either rules file, perform full cleanup
+	if ! _geoip_cc_has_entries "$cc"; then
+		cli_cc_remove "$cc" > /dev/null 2>&1
+	fi
+
+	return 0
 }
 
 ## Remove a country code from trust system.

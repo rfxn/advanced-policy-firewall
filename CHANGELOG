@@ -5,6 +5,11 @@
 [Change] Add _geoip_cc_has_entries() helper function to apf_geoip.sh; refactor
          _expire_cc_temp_entry() to call the new helper instead of inline grep,
          deduplicating the has-entries check in preparation for cli_cc_remove_entry()
+[New] Add cli_cc_remove_entry() to apf_geoip.sh: targeted removal of a single
+     advanced CC entry (e.g., tcp:in:d=22:s=ZZ) from rules files and iptables
+     chains (CC_DENYP/CC_ALLOWP) without affecting bare CC entries or other
+     advanced entries for the same country; delegates to cli_cc_remove() for
+     full ipset/cache cleanup when no entries remain
 
 - 2.0.2 | Mar 08 2026:
 
