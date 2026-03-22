@@ -7,6 +7,10 @@
 # This program may be freely redistributed under the terms of the GNU GPL v2
 ##
 #
+# Fallback stubs when run standalone (outside install.sh context)
+command -v pkg_warn >/dev/null 2>&1 || pkg_warn() { echo "  Warning: $1"; }
+command -v pkg_item >/dev/null 2>&1 || pkg_item() { echo "  $1: $2"; }
+
 tcp_ports=""
 udp_ports=""
 
@@ -41,8 +45,8 @@ elif command -v netstat > /dev/null 2>&1; then
 		fi
 	done
 else
-	echo "  Warning: neither ss nor netstat found"
+	pkg_warn "neither ss nor netstat found"
 fi
 
-echo "  Listening TCP ports: $tcp_ports"
-echo "  Listening UDP ports: $udp_ports"
+pkg_item "Listening TCP ports" "$tcp_ports"
+pkg_item "Listening UDP ports" "$udp_ports"

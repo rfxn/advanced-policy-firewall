@@ -303,6 +303,7 @@ validate_config() {
  fi
  if [ -n "$err" ]; then
     eout "{glob} configuration error: $err"
+    elog_event "config_error" "error" "{glob} configuration error: $err"
     [ "$SET_VERBOSE" != "1" ] && echo "apf($$): configuration error: $err"
     mutex_unlock
     exit 1

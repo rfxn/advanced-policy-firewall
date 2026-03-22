@@ -92,6 +92,8 @@ if download_url "$url" "$url_tmp"; then
 else
         # Error policy: dlist restores from backup to preserve data
         eout "{$tag} download of $url failed"
+        elog_event "error_occurred" "error" "{$tag} download of $url failed" \
+            "url=$url"
         if [ -f "$hosts_file.bk" ]; then
             command cp "$hosts_file.bk" "$hosts_file"
             chmod 600 "$hosts_file" "$hosts_file.bk"
@@ -209,6 +211,8 @@ if [ -n "$_gtd_url" ] && [ "$USE_RGT" == "1" ] && ( [ -n "$CURL" ] || [ -n "$WGE
         done < "$url_tmp"
    else
         eout "{trust} download of $_gtd_url failed"
+        elog_event "error_occurred" "error" "{trust} download of $_gtd_url failed" \
+            "url=$_gtd_url"
    fi
    command rm -f "$url_tmp"
 else

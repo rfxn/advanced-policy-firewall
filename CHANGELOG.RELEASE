@@ -10,20 +10,16 @@
 [New] GeoIP country blocking: ipset-based high-performance country filtering
       using cc_deny.rules/cc_allow.rules with ISO 3166-1 alpha-2 codes and
       continent shorthand (@EU, @AS, @NA, @SA, @AF, @OC); tiered data sources
-      (ipverse.net, ipdeny.com) with local caching; atomic ipset swap for zero
-      downtime updates; audit mode (CC_LOG_ONLY) for impact measurement;
-      dual-stack IPv4/IPv6 support; advanced syntax for per-port/protocol rules
-[New] --cc IP: GeoIP reverse lookup — look up which country and continent
-      an IP address or CIDR belongs to using cached GeoIP data; portable
-      awk CIDR containment with on-demand world data download
-[New] CC_CACHE_TTL: per-file cache freshness for GeoIP data (default 24h);
-      skips re-downloading unchanged country data on firewall start, reducing
-      full load time from ~30s to ~0s when cache is fresh; set 0 for previous
-      always-download behavior; distinct from CC_INTERVAL (days, --cc-update)
+      (ipverse.net, ipdeny.com) with CC_CACHE_TTL freshness tracking; atomic
+      ipset swap for zero downtime updates; audit mode (CC_LOG_ONLY) for impact
+      measurement; dual-stack IPv4/IPv6; advanced per-port/protocol syntax;
+      granular entry removal (apf -u preserves unrelated entries for same CC);
+      --cc IP reverse lookup via awk CIDR containment; --cc CC detail display;
+      per-CC download progress feedback; geoip_lib.sh shared metadata library
 [New] Structured event logging via elog_lib.sh: dual log model (application log
-      + JSONL audit trail at /var/log/apf/audit.log), output module registry,
-      severity filtering; eout() backward-compatible as elog_lib wrapper;
-      audit events for config_loaded, service_state, and rule_loaded lifecycle
+      + JSONL audit trail at /var/log/apf/audit.log); severity filtering;
+      eout() backward-compatible wrapper; 23 audit events across 9 event types
+      covering trust, blocking, config, and error lifecycle
 [New] SYN flood protection: SYNFLOOD chain rate-limits inbound TCP SYN packets
       via iptables limit module; configurable rate/burst thresholds, LOG +
       DROP for excess, dual-stack support
@@ -63,131 +59,92 @@
 [New] Auto-detection for USE_IPSET, IPT_LOCK_SUPPORT, and DOCKER_COMPAT:
       each resolves at startup based on system capabilities; CentOS 6
       (iptables 1.4.7, no -w) safely degrades; replaces hardcoded defaults
-      with "auto" (upgrade-safe via .ca.def)
-[New] install.sh improvements: auto-detect default network interface on
-      fresh install; auto-detect and disable conflicting firewall services
-      (firewalld, ufw); post-install dependency warnings; CentOS 6 safe
-[New] pkg_lib.sh v1.0.2 integrated: shared packaging library for backup,
-      service lifecycle, cron, man page, and OS detection; RPM/DEB packaging
-      infrastructure via pkg.manifest and pkg_gen.sh
+      with "auto" (upgrade-safe)
+[New] install.sh: auto-detect default network interface on fresh install;
+      auto-detect and disable conflicting firewall services (firewalld, ufw);
+      structured output via pkg_lib; post-install dependency warnings
 [New] Unified download helper: curl primary with wget fallback, redirect
-      following, timeouts, retries; all download sites migrated
+      following, timeouts, retries; TLS diagnostic hints on failure
 [New] uninstall.sh: removes all system-wide artifacts including cron, man
-      page, and symlinks; prompts before removing install directory and logs
+      page, symlinks, and audit log directory; prompts before removing
+      install directory and logs
 [New] Bash tab completion: apf.bash-completion installed to
       /etc/bash_completion.d/apf; context-sensitive completions for trust
       hosts, temp TTL values, and country codes
 
   -- Bug Fixes --
 
-[Fix] install.sh: fix directory permissions (dirs=750, files=640); verify
-      source files before install; remove unsafe pre-install rm -rf; prevent
-      backup collision on rapid re-installs; replace hardcoded /sbin/chkconfig
-      with command -v discovery
-[Fix] importconf: guard vnet/*.rules glob; fix INSTALL_PATH default; preserve
-      custom files and hook permissions during upgrade; fix upgrade detection;
-      fix dead-code EG_DROP_CMD migration with pkg_config_get/pkg_config_set;
+[Fix] importconf: guard vnet/*.rules glob; preserve custom files, hook
+      permissions, and TCR_PORTS during upgrade; fix upgrade detection;
+      rewrite config merge with pkg_config_merge() from pkg_lib;
       migrate DOCKER_COMPAT, USE_IPSET, IPT_LOCK_SUPPORT from "0" to "auto"
       on upgrade so upgraders get runtime auto-detection defaults
-[Fix] Anchor grep/sed patterns across trust, expiry, and block escalation
-      functions to prevent IP substring collisions
-[Fix] cli_trust_remove(): spec-based iptables rule deletion with removal
-      tracking; anchored comment cleanup; reject empty argument
+[Fix] install.sh: fix directory permissions (dirs=750, files=640); verify
+      source files before install; prevent backup collision; add root check;
+      re-create periodic cron entries (refresh, CT scan) on upgrade
+[Fix] Trust system: anchor grep/sed patterns to prevent IP substring
+      collisions; spec-based iptables rule deletion in cli_trust_remove();
+      glob expansion protection in trust_parse_fields(); control character
+      and metacharacter rejection in valid_trust_entry()
+[Fix] Add mutex_lock to -a, -d, -u, -ta, -td CLI handlers; closes race
+      window with cron --temp-expire on flock-absent systems
+[Fix] Advanced trust removal: also delete iptables rules from TGALLOW/TGDENY
+      chains; entries from global trust files were left in live iptables until
+      next refresh or restart
+[Fix] flush_temp_entries(): move orphan comment cleanup after cli_trust_remove
+      so FQDN resolved= metadata is available for IP resolution during removal
+[Fix] trust validation: add hint for abbreviated CIDR notation (e.g., '0/0'
+      -> '0.0.0.0/0') across cli_trust(), cli_trust_remove(), cli_trust_temp()
 [Fix] lgate_mac(): use $VF_LGATE instead of undefined $LGATE_MAC; gateway
       MAC filtering was non-functional
 [Fix] expirebans(): fix $ip variable shadowing global iproute2 path; defer
       removals until after iteration to avoid modifying trust files while
       reading; add date parse error handling
-[Fix] ipset_migrate_rules(): add 5-field (v2.0.1) to 7-field migration;
-      5-field entries were silently dropped on upgrade
-[Fix] glob_allow/deny_download(): validate entries with valid_host() instead
-      of raw file copy
-[Fix] SMTP_BLK: add chain-exists guard for VNET re-sourcing; add to Docker
-      compat flush chain list; warn on empty SMTP_PORTS
 [Fix] Fast load: atomic snapshot writes via mktemp+mv; validate snapshots
       before iptables-restore; flush partial rules on restore failure; check
       firewall exit code to prevent saving broken state; backend marker
       tracking for nft/legacy compatibility
-[Fix] CLI feedback: unknown options exit 1; error messages to stderr;
-      trust_lookup() negative result to stdout; list() uses cat for pipes
-      and silent pager fallback for TTY; checks $EDITOR before hardcoded list
-[Fix] Strip control characters from trust comment field to prevent line
-      injection in allow/deny hosts files
-[Fix] refresh(): populate REFRESH_TEMP from trust files instead of
-      iptables-save parsing; protect bare IPv6 entries during refresh;
-      exit 0 when trust rules unchanged
-[Fix] Cron lifecycle: clean runtime-created refresh.apf and apf_develmode
-      entries during install, uninstall, and firewall stop; ensures cleanup
-      on rapid re-installs
 [Fix] cl_cports(): reset EG_DROP_CMD, SMTP, and connlimit variables between
       VNET iterations to prevent rule leaking
-[Fix] Preserve file inodes: logrotate copytruncate for tail -f consumers;
-      trim() uses cat+rm instead of mv; trim() excludes blank lines from
-      data line count
 [Fix] sysctl.rules: fix wrong proc paths for secure_redirects,
       send_redirects, and proxy_arp; per-interface sysctls were silently
       never applied
-[Fix] Code hygiene: variable quoting, CentOS 6 compatibility, mktemp for
-      all temp files with signal-safe cleanup
+[Fix] SMTP_BLK: add chain-exists guard for VNET re-sourcing; add to Docker
+      compat flush chain list; warn on empty SMTP_PORTS
+[Fix] refresh(): populate REFRESH_TEMP from trust files instead of
+      iptables-save parsing; protect bare IPv6 entries during refresh
+[Fix] Cron lifecycle: clean runtime-created refresh.apf and apf_develmode
+      entries during install, uninstall, and firewall stop; remove trailing &
+      from cron_refresh() preventing exit code tracking
+[Fix] apf: restart (-r) now propagates exit codes from flush/start
+      sub-invocations; prevents silent firewall-down with success exit code
+[Fix] GeoIP: fix IPv4-as-FQDN false positive in --cc IP lookup; fix IFS
+      leak corrupting LOG rules; fix --cc-update timestamp tracking; fix temp
+      CC expiry destroying permanent entries; harden eval in LOG rule removal;
+      reject unknown country codes in --cc detail display
+[Fix] ipset_migrate_rules(): add 5-field (v2.0.1) to 7-field migration;
+      5-field entries were silently dropped on upgrade
+[Fix] glob_allow/deny_download(): validate entries with valid_host() instead
+      of raw file copy
+[Fix] ctlimit.apf: add valid_ip_cidr() guard on conntrack-sourced IPs;
+      fix grep -Fv substring match that could remove unrelated IP entries;
+      add numeric validation for VNET-overridden CT_LIMIT values
+[Fix] CLI feedback: unknown options exit 1; error messages to stderr;
+      list() uses cat for pipes and silent pager fallback for TTY
+[Fix] Duplicate stdout output: restrict stdout output module to elog() source
+      only; elog_event() structured events route to audit/SIEM, not terminal
+[Fix] Preserve file inodes: logrotate copytruncate for tail -f consumers;
+      trim() uses cat+rm instead of mv
 [Fix] vnetgen: strip Docker @ifN suffix from ip link output to prevent
       duplicate VNET rules in containers
-[Fix] ovars(): filter shell conditionals from variable name extraction;
-      internals.conf if/elif lines produced invalid variable name errors on
-      stderr during apf -o and fast load startup
-[Fix] GeoIP --cc IP: fix IPv4-as-FQDN false positive; replace broken 3-octet
-      prefix fallback with portable awk CIDR containment; on-demand world data
-      download resolves any IPv4 to country; --cc CC auto-fetches missing cache
-[Fix] GeoIP staleness warning: restore age precision — message now shows
-      "GeoIP data is N days old" instead of generic "stale" phrasing
-[Fix] trust validation: add hint for abbreviated CIDR notation (e.g., '0/0'
-      -> '0.0.0.0/0') across cli_trust(), cli_trust_remove(), cli_trust_temp()
-[Fix] GeoIP: IFS=',' leak from callers broke LOG rule LEXT word splitting in
-      _geoip_add_simple_rules() and _geoip_add_advanced_rule(); defensive
-      IFS reset at function entry prevents silent LOG rule corruption
-[Fix] GeoIP --cc-update: always mark data timestamp on cached update; when
-      all CCs are cache hits within CC_CACHE_TTL, geoip_mark_updated() was
-      skipped causing permanently stale "Last update" and repeated staleness
-      gate triggers on every subsequent --cc-update run
-[Fix] GeoIP --cc overview: split "Active country blocks" into labeled
-      subsections — "Denied countries" for cc_deny.rules entries and
-      "Allowed countries (strict-allowlist)" for cc_allow.rules entries;
-      shows implicit deny-all note when cc_allow.rules is active
-[Fix] GeoIP --cc CC detail: fix advanced entry regex in _geoip_rules_status()
-      to match = separator; advanced entries (tcp:in:d=22:s=CN) use = not :
-      before the CC code; detail view showed "not in rules" for advanced entries
-[Fix] GeoIP temp CC expiry: expire_temp_entries() and flush_temp_entries() no
-      longer destroy permanent CC entries when expiring temporary ones; new
-      _expire_cc_temp_entry() removes only temp metadata and conditionally
-      cleans up iptables/ipsets only when no permanent entry remains
-[Fix] GeoIP cli_cc_remove(): move eval guard regex declaration before the
-      chain loop so it is always defined in the IPv6 path; previously the
-      regex was only set inside the IPv4 if-block, leaving an empty match
-      (matches everything) when IPv4 chain was absent
-[Fix] cli_trust_temp(): adopt _trust_check_duplicate() helper instead of
-      inline duplicate-check loop; aligns with cli_trust() call sites
-[Fix] install.sh: replace remaining bare mv/rm with command mv/rm for
-      portable coreutils resolution on pre-usr-merge distros
-[Fix] importconf: gate auto-detect migration (DOCKER_COMPAT, USE_IPSET,
-      IPT_LOCK_SUPPORT "0" to "auto") on source version < 2.0.2; prevents
-      overwriting explicit user "0" settings on future upgrades
-[Fix] importconf: sync top-level importconf from files/extras/importconf;
-      version-gated auto-detect migration (DOCKER_COMPAT, USE_IPSET,
-      IPT_LOCK_SUPPORT "0" to "auto") was only in the extras copy and never
-      ran during install — upgraders from pre-2.0.2 were not migrated
-[Change] GeoIP download: log WARNING when TLS verification fails and insecure
-      fallback succeeds; GEOIP_LOG_FUNC callback in geoip_lib.sh routes
-      warnings through consumer's logging system (eout in APF)
+[Fix] Portability: replace bare rm/mv/cp with command rm/mv/cp across all
+      shipping files for portable coreutils resolution on pre-usr-merge
+      (CentOS 6, Ubuntu 12.04) and modern distros
 
   -- Changes --
 
-[Change] Remove plain text README; consolidate on README.md only
 [Change] Conntrack module migration: use -m conntrack --ctstate when available,
-         falling back to -m state --state on legacy systems
-[Change] cli_trust(): extract _trust_check_duplicate() helper from two
-         identical inline duplicate-entry check blocks
-[Change] trust_hosts(): single-pass loop replacing four-pass grep cascade;
-      advanced syntax delegated to trust_entry_rule(); batch all rules via
-      iptables-restore --noflush reducing lock acquisitions from O(n) to O(1)
+      falling back to -m state --state on legacy systems
 [Change] File-based flock mutex: replace FD-based exec/flock with noclobber +
       PID fallback; EXIT trap releases lock on signal; trust CLI operations
       acquire lock for cron race prevention
@@ -198,146 +155,36 @@
       hourly ipset refresh, and per-minute temp expiry
 [Change] ipset batch loading via ipset restore; reduces load time from
       minutes to seconds for large block lists
-[Change] Performance: replace subprocess chains with bash builtins across
-      hot paths; VNET parsing with builtins and glob patterns
-[Change] help(): show readable option names; add new commands; hide aliases
-[Change] Runtime file permissions: align chmod 600 to 640 for trust files
-      and log files; matches install.sh convention
-[Change] install.sh/uninstall.sh refactored to use pkg_lib primitives;
-      sed path replacement optimized with grep -rl pre-filter
-[Change] Remove dead bandmin() integration (cPanel, discontinued ~2014);
-      eliminates bash SIGSEGV on GHA runners with newer kernels
-[Change] Delete .ca.def (803 lines): rewrite importconf to use
-      pkg_config_merge() from pkg_lib; AWK-based key=value merge replaces
-      shell-eval heredoc template; preserves trust files, hooks, rules,
-      permissions, and DLIST_*_URL customizations across upgrades
-[Change] Update vendored pkg_lib.sh to v1.0.3 (config merge API);
-      elog_lib.sh to v1.0.3: FQDN host field in JSON and syslog output
-[Change] download_url(): log TLS diagnostic hint on download failure for
-      legacy system troubleshooting
-[Change] Drop Ubuntu 22.04 from CI matrix; redundant with 20.04+24.04
-[Change] --cc CC: show country detail (continent, rules status, cached data,
-      live ipset stats) even when country code filtering is inactive;
-      previously returned "inactive" with no information
-[Change] geoip_info(): use ipset list -t (headers only) instead of full
-      member listing for entry counts; eliminates O(n) grep on large ipsets
-[Change] Integrate geoip_lib.sh v1.0.1: shared GeoIP metadata library
-      replaces embedded country name table, continent lists, CC validation,
-      download functions, and CIDR search; ~300 lines removed
-[Change] GeoIP progress output: continent expansion and multi-CC downloads
-      now show per-CC progress (e.g., "processing US (3/51)") via eout;
-      eliminates silent 3-minute waits during @EU and similar operations
-[Fix] GeoIP cli_cc_remove(): harden eval in LOG rule removal with format
-      validation; only process rules matching APF CC chain naming convention
-      (CC_DENY|CC_ALLOW|CC_DENYP|CC_ALLOWP) to prevent eval on unexpected input
-[Fix] Portability: replace bare cp/mv with command cp/command mv across all
-      shipping files; bypasses shell aliases and resolves via PATH portably
-      on both pre-usr-merge (CentOS 6) and modern distros
+[Change] Performance: single-pass trust loading with iptables-restore --noflush
+      reducing lock acquisitions from O(n) to O(1); subprocess replacement
+      with bash builtins across hot paths
 [Change] refresh(): exit 0 (not 1) when trust rules are unchanged since
-      last refresh; semantically correct (unchanged is not an error) but
-      may affect automation that checks for non-zero exit on no-op refresh
-[Change] GeoIP ipset existence checks in hot-path rule builders use
-      ipset list -t (headers only) instead of full member listing; avoids
-      dumping large ipsets to /dev/null during firewall load
-[Fix] _icmp_filter(): declare loop variable i as local; aligns with sibling
-      helpers _port_filter_loop() and _uid_filter_loop()
-[Fix] cli_trust(): declare ADDED_EPOCH as local to prevent global namespace
-      pollution
-[Fix] uninstall.sh: replace bare rm with command rm for portable coreutils
-      resolution on pre-usr-merge distros
-[Fix] elog_lib.sh: correct header version comment (1.0.2 to 1.0.3) to match
-      ELOG_LIB_VERSION variable
-[Change] Extract _trust_unpack_fields() helper from three duplicated case
-      blocks in valid_trust_entry(), trust_entry_rule(), _trust_hosts_advanced()
-[Change] Document mutex_lock() TOCTOU race acceptability in noclobber fallback
-[Change] Extract _geoip_collect_ccs_from_file() helper from three duplicated
-      CC rules file parsing loops in geoip_download_all(), cc_rules_load(),
-      and _geoip_fast_load_ipsets(); parameterized include_advanced flag
-[Change] Document eval security boundary in cli_cc_remove() LOG rule removal
-[Fix] ctlimit.apf: add valid_ip_cidr() guard on conntrack-sourced IPs before
-      grep/path operations (defense-in-depth)
-[Fix] importconf: fix TCR_PORTS loss on upgrade from pre-2.0.2; extract
-      TCR_PORTS value from combined TCR_PASS line after pkg_config_merge
-[Change] Update vendored pkg_lib.sh to v1.0.4: sed escaping fixes for
-      pkg_config_set variable name validation and pkg_man_install sed pairs
-[Change] Update vendored pkg_lib.sh to v1.0.5: bare rm to command rm
-      class-wide (33 sites), config merge temp-file safety, varname validation
-[Change] Pin batsman submodule to v1.2.2
-[Change] Update vendored geoip_lib.sh to v1.0.4: convention compliance,
-      input validation hardening, TLS fallback gating, IPv6 database functions
-[Change] Update vendored elog_lib.sh to v1.0.4: JSON-escape fixes for RFC
-      8259 compliance, ~70% fork reduction, hostname caching, shared helper
-      extraction
-[Fix] geoip.apf: remove dead local variable from cc_rules_load()
-[Fix] ctlimit.apf: fix grep -Fv substring match in ct_scan block_history
-      removal that could silently remove unrelated IP entries sharing a prefix
-[Fix] apf: restart (-r) now propagates exit codes from flush/start
-      sub-invocations; prevents silent firewall-down with success exit code
-[Fix] ctlimit.apf: add numeric validation for VNET-overridden CT_LIMIT values;
-      non-numeric values silently fall back to global CT_LIMIT
-[Fix] install.sh: add root privilege check matching uninstall.sh
-[Fix] uninstall.sh: clean up /var/log/apf/ audit log directory on uninstall
-[Change] Remove dead variables from internals.conf: HOST (replaced by GETENT),
-      IP6_NET (never consumed), UTIME (never consumed), LOCK_TIMEOUT (superseded
-      by ENTER_LOCK_TIMEOUT)
-[Change] Remove dead code: GEOIP_LOG_FUNC callback (never consumed by
-      geoip_lib.sh), _vc_burst unused declaration, unreachable DEVEL_ON checks
-      in fast load path, tautological CNF non-empty test, apf-m install block
-[Change] Replace bare ipset calls with $IPSET variable in firewall_info/search;
-      use $DENY_HOSTS variable in expirebans() instead of hardcoded path
-[Change] Replace 44 bare rm calls with command rm across internal libraries
-      (functions.apf, geoip.apf, ctlimit.apf) for portable alias bypass
-[Change] Add inline comments to 12 uncommented || true suppressions per
-      shell standards convention
-[Change] Decompose functions.apf (3,291 lines) into 8 sub-libraries:
-      apf.lib.sh (sourcing hub), apf_ipt.sh, apf_validate.sh, apf_trust.sh,
-      apf_ipset.sh, apf_dlist.sh, apf_cli.sh, apf_core.sh; no API or
-      behavioral changes
-[Change] Absorb files/firewall (386 lines) as firewall_full_load() in
-      apf_core.sh; apf CLI wrapper thinned to ~200 lines
-[Change] Rename geoip.apf to apf_geoip.sh, ctlimit.apf to apf_ctlimit.sh;
-      aligns with BFD apf_*.sh sub-library naming convention
-[Fix] Remove dead _TER_DIR assignment in trust_entry_rule() (V-001)
-[Fix] Remove dead action_tcp/action_udp params from trust_hosts() (V-002)
-[Change] install.sh cleans orphaned pre-decomposition files on upgrade
-      (functions.apf, geoip.apf, ctlimit.apf, firewall)
+      last refresh; may affect automation checking for non-zero on no-op
+[Change] Internal restructuring: decompose functions.apf (3,291 lines) into
+      8 sub-libraries via apf.lib.sh hub; remove dead code and unused
+      variables; clean up deprecated function parameters
+[Change] Update vendored libraries: pkg_lib.sh v1.0.5 (config merge API),
+      elog_lib.sh v1.0.4 (JSON-escape fixes), geoip_lib.sh v1.0.4 (input
+      validation, TLS fallback, IPv6 database functions)
 
   -- Documentation --
 
-[New] Man page: apf.8 covering all CLI operations, trust system, and
-      configuration reference
-[New] FLOW.md/FLOW: standalone order-of-operations document with INPUT chain
+[New] Man page: apf.8 covering all CLI operations, trust system, country
+      code filtering, and configuration reference
+[New] FLOW.md: standalone order-of-operations document with INPUT chain
       precedence table and fast/full load conditions
-[Change] README: modernize headers; add Quick Start; document 2.0.2 features;
-      correct troubleshooting from 'apf -l' to 'apf --rules'
-[Fix] Documentation sync: add GeoIP sections to README/man page; correct
-      SYNFLOOD in FLOW, NFLOG in conf.apf, DOCKER_COMPAT values in README;
-      align man page SYNOPSIS, help() options, and Key Files across all docs
+[New] README restructured to rfxn documentation convention: banner SVGs,
+      What's New section, Exit Codes table, Quick Start, SECURITY.md and
+      CONTRIBUTING.md companion files
+[Fix] Documentation alignment: sync CLI aliases, CC examples, --lookup scope,
+      and man page section references across help(), apf.8, and README
 
   -- Test Suite --
 
-[New] 12 new test files (22-33) and expanded coverage across existing files:
-      uid-egress, devel-fastload, vnet, connlimit, hooks, temp-trust,
-      synflood, block-escalation, advanced-trust, FQDN, CLI, and regression
-      (612 tests across 35 files)
-[New] UAT acceptance suite: 12 scenario files with 83 tests exercising
-      trust lifecycle, temporary trust, firewall lifecycle, port filtering,
-      advanced trust syntax, IPv6, and error paths; CI job on Debian 12
-[Change] Migrate test infrastructure to batsman v1.2.0; test parallelization;
-      validate_config tests use --validate saving ~55-60s; per-test teardown
-      and centralized UAT cleanup to prevent cascading failures
-[Fix] CI: UAT job Docker build used wrong context directory; use -f
-      tests/Dockerfile with project root as build context
-[Fix] trust_parse_fields(): add set -f/set +f to prevent glob expansion
-      on unquoted field split; valid_trust_entry() rejects *, ?, [ chars
-[Fix] Add mutex_lock to -a, -d, -u, -ta, -td CLI handlers; closes race
-      window with cron --temp-expire on flock-absent systems
-[Fix] Replace 5 bare rm calls with command rm in apf_ipset.sh (3),
-      apf_geoip.sh (1), apf.lib.sh (1) — completes 1874eec convention
-[Fix] Advanced trust removal: also delete iptables rules from TGALLOW/TGDENY
-      chains; entries from global trust files were left in live iptables until
-      next refresh or restart
-[Fix] flush_temp_entries(): move orphan comment cleanup after cli_trust_remove
-      so FQDN resolved= metadata is available for IP resolution during removal
-[Fix] cron_refresh(): remove trailing & from cron entry; backgrounding inside
-      cron prevents exit code tracking and allows overlapping executions
+[New] 39 BATS test files with 672 tests: trust system, advanced trust syntax,
+      temp trust, GeoIP, CT_LIMIT, SYN flood, hooks, VNET, fast load, CLI,
+      FQDN resolution, block escalation, and regression coverage
+[New] UAT acceptance suite: 14 scenario tests exercising trust lifecycle,
+      firewall lifecycle, port filtering, IPv6, and error paths
+[Change] Test infrastructure: batsman v1.2.0 with parallel execution;
+      per-test teardown; centralized cleanup to prevent cascading failures

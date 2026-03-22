@@ -272,6 +272,8 @@ ct_scan() {
 			fi
 
 			eout "{ct_limit} blocking $_addr ($_count connections, limit $_effective_limit)"
+			elog_event "block_added" "warn" "{ct_limit} blocking $_addr ($_count connections, limit $_effective_limit)" \
+				"host=$_addr" "conns=$_count" "limit=$_effective_limit"
 			"$INSTALL_PATH/apf" -td "$_addr" "$CT_BLOCK_TIME" "CT_LIMIT exceeded ($_count conns)" 2>/dev/null
 
 			# CT_PERMANENT=0: remove block history entry to prevent PERMBLOCK

@@ -44,11 +44,13 @@ snapshot_save() {
 	snap_rc=$?
 	if [ "$snap_rc" -ne 0 ]; then
 		eout "{glob} snapshot save failed (iptables-save exit $snap_rc)"
+		elog_event "error_occurred" "error" "{glob} snapshot save failed (iptables-save exit $snap_rc)"
 		command rm -f "$snap_tmp"
 		return 1
 	fi
 	if [ ! -s "$snap_tmp" ] || ! grep -q '^\*' "$snap_tmp"; then
 		eout "{glob} snapshot save failed (empty or invalid output)"
+		elog_event "error_occurred" "error" "{glob} snapshot save failed (empty or invalid output)"
 		command rm -f "$snap_tmp"
 		return 1
 	fi

@@ -33,6 +33,11 @@ if ! elog_init; then
 fi
 # elog_init enables file/audit_file but NOT stdout — enable it for eout() compat
 elog_output_enable "stdout" 2>/dev/null || true  # safe: stdout always registered in elog_lib.sh
+# Restrict stdout to elog() calls only — elog_event() output goes to audit/SIEM,
+# not the terminal. Without this, eout+elog_event pairs duplicate on screen.
+if _elog_output_find "stdout"; then
+	_ELOG_OUTPUT_SOURCES[$_ELOG_OUTPUT_IDX]="elog"
+fi
 
 if [ ! -f "$LOG_APF" ]; then
         touch "$LOG_APF"
@@ -98,6 +103,8 @@ case "$1" in
 	mutex_lock
 	if cli_trust_remove "$2"; then
 		eout "{trust} removed $2 from trust system"
+		elog_event "trust_removed" "info" "{trust} removed $2 from trust system" \
+			"host=$2"
 		if [ "$SET_VERBOSE" != "1" ]; then
 			echo "Removed $2 from trust system."
 		fi
@@ -210,7 +217,7 @@ case "$1" in
 --cc)
 	# shellcheck disable=SC1090,SC1091
 	. "$INSTALL_PATH/internals/apf_geoip.sh"
-	geoip_info "$2"
+	geoip_info "$2" || exit 1
 	;;
 --cc-update)
 	mutex_lock

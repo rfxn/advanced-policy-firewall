@@ -350,7 +350,11 @@ cli_trust_remove() {
 		if valid_cc "$_ctr_last_field" || [[ "$_ctr_last_field" == @* ]]; then
 			# shellcheck disable=SC1090,SC1091
 			. "$INSTALL_PATH/internals/apf_geoip.sh"
-			cli_cc_remove "$_ctr_last_field"
+			if [[ "$_ctr_last_field" == @* ]]; then
+				cli_cc_remove "$_ctr_last_field"
+			else
+				cli_cc_remove_entry "$DIP" "$_ctr_last_field"
+			fi
 			return $?
 		fi
 		if ! valid_trust_entry "$DIP"; then
@@ -540,6 +544,8 @@ cli_trust() {
 					fi
 				fi
 			done <<< "$_RESOLVED_IPS"
+			elog_event "trust_added" "info" "{trust} added $ACTION $_TER_DESC" \
+				"host=$HOST" "action=$ACTION"
 		fi
 	elif is_local_addr "$_VTE_IP"; then
 		echo "$_VTE_IP is a local address and can not be added to the trust system" >&2
@@ -555,6 +561,8 @@ cli_trust() {
 		echo "$HOST" >> "$FILE"
 		if trust_entry_rule "$HOST" "$CHAIN" "$ACTION" "-I"; then
 			eout "{trust} added $ACTION $_TER_DESC"
+			elog_event "trust_added" "info" "{trust} added $ACTION $_TER_DESC" \
+				"host=$HOST" "action=$ACTION"
 			if [ "$SET_VERBOSE" != "1" ]; then
 				echo "Inserted into firewall: $ACTION $_TER_DESC"
 			fi
@@ -619,6 +627,8 @@ cli_trust() {
 			fi
 		done <<< "$_RESOLVED_IPS"
 		eout "{trust} added $ACTION all to/from $HOST (resolved: $_ct_csv)"
+		elog_event "trust_added" "info" "{trust} added $ACTION all to/from $HOST" \
+			"host=$HOST" "action=$ACTION" "resolved=$_ct_csv"
 		if [ "$SET_VERBOSE" != "1" ]; then
 			echo "Inserted into firewall: $ACTION all to/from $HOST (resolved: $_ct_csv)"
 		fi
@@ -641,6 +651,8 @@ cli_trust() {
          $IPT_H $IPT_FLAGS -I $CHAIN -s "$HOST" -j $JACTION
         	$IPT_H $IPT_FLAGS -I $CHAIN -d "$HOST" -j $JACTION
          eout "{trust} added $ACTION all to/from $HOST"
+         elog_event "trust_added" "info" "{trust} added $ACTION all to/from $HOST" \
+             "host=$HOST" "action=$ACTION"
          if [ "$SET_VERBOSE" != "1" ]; then
 	        echo "Inserted into firewall: $ACTION all to/from $HOST"
 	fi
@@ -743,6 +755,8 @@ cli_trust_temp() {
 				fi
 				_maybe_block_escalate "$_ctt_rip" "$ACTION"
 			done <<< "$_RESOLVED_IPS"
+			elog_event "trust_added" "info" "{trust} added temporary $ACTION $_TER_DESC" \
+				"host=$HOST" "action=$ACTION" "ttl=$_TTL_SECONDS"
 		else
 			# Bare FQDN
 			_trust_action_target
@@ -754,6 +768,8 @@ cli_trust_temp() {
 				_maybe_block_escalate "$_ctt_rip" "$ACTION"
 			done <<< "$_RESOLVED_IPS"
 			eout "{trust} added temporary $ACTION all to/from $HOST (resolved: $_ctt_csv, ttl=${_TTL_SECONDS}s, expires $EXPIRE_DISP)"
+			elog_event "trust_added" "info" "{trust} added temporary $ACTION all to/from $HOST" \
+				"host=$HOST" "action=$ACTION" "ttl=$_TTL_SECONDS"
 			if [ "$SET_VERBOSE" != "1" ]; then
 				echo "Inserted into firewall: temporary $ACTION all to/from $HOST (resolved: $_ctt_csv, ttl=${_TTL_SECONDS}s, expires $EXPIRE_DISP)"
 			fi
@@ -780,6 +796,8 @@ cli_trust_temp() {
 		fi
 		EXPIRE_DISP=$(date -d "@$EXPIRE_EPOCH" +"%D %H:%M:%S")
 		eout "{trust} added temporary $ACTION $_TER_DESC (ttl=${_TTL_SECONDS}s, expires $EXPIRE_DISP)"
+		elog_event "trust_added" "info" "{trust} added temporary $ACTION $_TER_DESC" \
+			"host=$HOST" "action=$ACTION" "ttl=$_TTL_SECONDS"
 		if [ "$SET_VERBOSE" != "1" ]; then
 			echo "Inserted into firewall: temporary $ACTION $_TER_DESC (ttl=${_TTL_SECONDS}s, expires $EXPIRE_DISP)"
 		fi
@@ -795,6 +813,8 @@ cli_trust_temp() {
 		$IPT_H $IPT_FLAGS -I $CHAIN -d "$HOST" -j $JACTION
 		EXPIRE_DISP=$(date -d "@$EXPIRE_EPOCH" +"%D %H:%M:%S")
 		eout "{trust} added temporary $ACTION all to/from $HOST (ttl=${_TTL_SECONDS}s, expires $EXPIRE_DISP)"
+		elog_event "trust_added" "info" "{trust} added temporary $ACTION all to/from $HOST" \
+			"host=$HOST" "action=$ACTION" "ttl=$_TTL_SECONDS"
 		if [ "$SET_VERBOSE" != "1" ]; then
 			echo "Inserted into firewall: temporary $ACTION all to/from $HOST (ttl=${_TTL_SECONDS}s, expires $EXPIRE_DISP)"
 		fi
@@ -867,6 +887,8 @@ escalate_to_permanent() {
 	echo "$ip" >> "$DENY_HOSTS"
 
 	eout "{trust} $ip auto-escalated to permanent deny (PERMBLOCK_COUNT=$PERMBLOCK_COUNT reached)"
+	elog_event "block_escalated" "error" "{trust} $ip auto-escalated to permanent deny" \
+		"host=$ip" "threshold=$PERMBLOCK_COUNT"
 
 	# Remove from block history (escalation complete)
 	local history_file="$INSTALL_PATH/internals/.block_history"
@@ -1156,6 +1178,8 @@ expire_temp_entries() {
 	fi
 	if [ "$count" -gt 0 ]; then
 		eout "{trust} expired $count temporary trust entries"
+		elog_event "trust_removed" "info" "{trust} expired $count temporary trust entries" \
+			"count=$count"
 	fi
 }
 
@@ -1246,6 +1270,8 @@ flush_temp_entries() {
 		done
 	fi
 	eout "{trust} flushed $count temporary trust entries"
+	elog_event "trust_removed" "info" "{trust} flushed $count temporary trust entries" \
+		"count=$count"
 	if [ "$SET_VERBOSE" != "1" ]; then
 		echo "Flushed $count temporary trust entries."
 	fi

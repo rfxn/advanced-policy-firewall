@@ -147,8 +147,8 @@ _disable_conflicting_service() {
 		if systemctl is-active "$_svc" > /dev/null 2>&1; then
 			pkg_service_stop "$_svc" 2>/dev/null  # safe: best-effort
 			pkg_service_disable "$_svc" 2>/dev/null  # safe: best-effort
-			echo "  Note: $_svc was active and has been stopped and disabled."
-			echo "        APF manages iptables directly; $_svc cannot coexist."
+			pkg_info "$_svc was active — stopped and disabled"
+			pkg_info "APF manages iptables directly; $_svc cannot coexist"
 		fi
 	fi
 }
@@ -171,16 +171,42 @@ show_iface_info() {
 	default_iface=$(detect_iface)
 	ip_bin=$(command -v ip 2>/dev/null)
 	if [ -n "$default_iface" ]; then
-		echo "  Default interface:    $default_iface"
+		pkg_item "Default interface" "$default_iface"
 	else
-		echo "  Default interface:    (not detected — no default route found)"
-		echo "  Note: Set IFACE_UNTRUSTED manually in $INSTALL_PATH/conf.apf"
+		pkg_item "Default interface" "(not detected)"
+		pkg_info "Set IFACE_UNTRUSTED manually in $INSTALL_PATH/conf.apf"
 	fi
 	if [ -n "$ip_bin" ]; then
 		other_ifaces=$($ip_bin -o link show up 2>/dev/null | awk -F': ' '{print $2}' | sed 's/@.*//' | grep -v '^lo$' | grep -v "^${default_iface}$" | sort -u | paste -sd ',' -)
 		if [ -n "$other_ifaces" ]; then
-			echo "  Other interfaces:     $other_ifaces"
+			pkg_item "Other interfaces" "$other_ifaces"
 		fi
+	fi
+}
+
+postinfo() {
+	echo ""
+	pkg_item "Install path" "$INSTALL_PATH"
+	pkg_item "Config" "$INSTALL_PATH/conf.apf"
+	pkg_item "Executable" "$BINPATH"
+	if [ -f "/usr/share/man/man8/apf.8.gz" ]; then
+		pkg_item "Man page" "/usr/share/man/man8/apf.8.gz"
+	fi
+	show_iface_info
+	. "$INSTALL_PATH/extras/get_ports"
+}
+
+# _check_deps — non-fatal dependency warnings for chroot/container builds
+_check_deps() {
+	local _dep_warn=0
+	pkg_check_dep "iptables" "iptables" "iptables" "recommended" || _dep_warn=1
+	pkg_check_dep "ip" "iproute" "iproute2" "recommended" || _dep_warn=1
+	pkg_check_dep "modprobe" "kmod" "kmod" "recommended" || _dep_warn=1
+	if [ "$_dep_warn" = "1" ]; then
+		echo ""
+		pkg_info "Missing dependencies must be installed before running APF."
+		pkg_info "This is expected in chroot/container builds where binaries"
+		pkg_info "will be available at runtime."
 	fi
 }
 
@@ -191,52 +217,62 @@ VER=$(awk '/version/ {print$2}' files/VERSION)
 pkg_cron_remove /etc/cron.d/refresh.apf /etc/cron.d/apf_develmode /etc/cron.d/ctlimit.apf
 
 if [ -d "$INSTALL_PATH" ]; then
-	pkg_backup "$INSTALL_PATH" "copy" || { echo "Backup failed, aborting."; exit 1; }
-	echo -n "Installing APF $VER: "
+	# --- Upgrade path ---
+	pkg_header "APF" "$VER" "upgrade"
+	pkg_section "Backing up existing installation"
+	pkg_backup "$INSTALL_PATH" "copy" || { pkg_error "backup failed, aborting."; exit 1; }
+	pkg_section "Installing files"
 	install
-else
-	echo -n "Installing APF $VER: "
-	install
-fi
-
-echo "Completed."
-echo ""
-echo "Installation Details:"
-echo "  Install path:         $INSTALL_PATH/"
-echo "  Config path:          $INSTALL_PATH/conf.apf"
-echo "  Executable path:      $BINPATH"
-if [ -f "/usr/share/man/man8/apf.8.gz" ]; then
-	echo "  Man page:             /usr/share/man/man8/apf.8.gz"
-fi
-echo ""
-echo "Other Details:"
-if pkg_backup_exists "$INSTALL_PATH"; then
+	pkg_section "Importing configuration"
 	BK_LAST=$(pkg_backup_path "$INSTALL_PATH") ./importconf
-	show_iface_info
-	. "$INSTALL_PATH/extras/get_ports"
-	echo "  Note: Please review $INSTALL_PATH/conf.apf for consistency, install default backed up to $INSTALL_PATH/conf.apf.orig"
+	postinfo
+	pkg_info "Review $INSTALL_PATH/conf.apf for consistency"
+	pkg_info "Install default backed up to $INSTALL_PATH/conf.apf.orig"
+	_check_deps
+
+	# Re-create runtime cron entries from imported config (pre-install cleanup
+	# removed them; they are normally created by apf -s but the upgrade does
+	# not restart the firewall)
+	if [ -d "/etc/cron.d" ]; then
+		_int_re='^[0-9]+$'
+		_sr=$(pkg_config_get "$INSTALL_PATH/conf.apf" "SET_REFRESH") || _sr=""
+		if [[ "$_sr" =~ $_int_re ]] && [ "$_sr" != "0" ]; then
+cat<<EOF > "$INSTALL_PATH/internals/cron.refresh"
+*/$_sr * * * * root $INSTALL_PATH/apf --refresh >> /dev/null 2>&1
+EOF
+			command chmod 644 "$INSTALL_PATH/internals/cron.refresh"
+			command ln -fs "$INSTALL_PATH/internals/cron.refresh" /etc/cron.d/refresh.apf
+		fi
+		_ct=$(pkg_config_get "$INSTALL_PATH/conf.apf" "CT_LIMIT") || _ct=""
+		if [[ "$_ct" =~ $_int_re ]] && [ "$_ct" != "0" ]; then
+			_ci=$(pkg_config_get "$INSTALL_PATH/conf.apf" "CT_INTERVAL") || _ci=""
+			[[ "$_ci" =~ $_int_re ]] || _ci=30
+			_ci=$(( _ci / 60 ))
+			[ "$_ci" -lt 1 ] && _ci=1
+cat<<EOF > "$INSTALL_PATH/internals/cron.ctlimit"
+*/$_ci * * * * root $INSTALL_PATH/apf --ct-scan >> /dev/null 2>&1
+EOF
+			command chmod 644 "$INSTALL_PATH/internals/cron.ctlimit"
+			command ln -fs "$INSTALL_PATH/internals/cron.ctlimit" /etc/cron.d/ctlimit.apf
+		fi
+	fi
+
+	pkg_success "APF ${VER} upgrade complete"
 else
-	# Auto-detect default network interface on fresh install
+	# --- Fresh install path ---
+	pkg_header "APF" "$VER" "install"
+	pkg_section "Installing files"
+	install
+	# Auto-detect default network interface
 	_detected_iface=$(detect_iface)
 	if [ -n "$_detected_iface" ] && [ "$_detected_iface" != "eth0" ]; then
 		sed -i "s/^IFACE_UNTRUSTED=\"eth0\"/IFACE_UNTRUSTED=\"$_detected_iface\"/" "$INSTALL_PATH/conf.apf"
 	fi
-	show_iface_info
-	if [ -n "$_detected_iface" ] && [ "$_detected_iface" != "eth0" ]; then
-		echo "                        (set as IFACE_UNTRUSTED)"
+	postinfo
+	if [ -n "${_detected_iface:-}" ] && [ "$_detected_iface" != "eth0" ]; then
+		pkg_info "Auto-configured IFACE_UNTRUSTED=$_detected_iface"
 	fi
-	. "$INSTALL_PATH/extras/get_ports"
-	echo "  Note: These ports are not auto-configured; they are simply presented for information purposes. You must manually configure all port options."
-fi
-
-# Post-install dependency warnings (non-fatal for chroot/container builds)
-_dep_warn=0
-pkg_check_dep "iptables" "iptables" "iptables" "recommended" || _dep_warn=1
-pkg_check_dep "ip" "iproute" "iproute2" "recommended" || _dep_warn=1
-pkg_check_dep "modprobe" "kmod" "kmod" "recommended" || _dep_warn=1
-if [ "$_dep_warn" = "1" ]; then
-	echo ""
-	echo "  Note: Missing dependencies must be installed before running APF."
-	echo "        This is expected in chroot/container builds where binaries"
-	echo "        will be available at runtime."
+	pkg_info "Ports shown for reference only — configure manually in conf.apf"
+	_check_deps
+	pkg_success "APF ${VER} installation complete"
 fi

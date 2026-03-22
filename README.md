@@ -1,8 +1,19 @@
 # Advanced Policy Firewall (APF)
 
-[![Version](https://img.shields.io/badge/version-2.0.2-blue.svg)](CHANGELOG)
-[![License: GPL v2](https://img.shields.io/badge/license-GPL_v2-green.svg)](COPYING.GPL)
-[![CI](https://github.com/rfxn/advanced-policy-firewall/actions/workflows/smoke-test.yml/badge.svg?branch=master)](https://github.com/rfxn/advanced-policy-firewall/actions/workflows/smoke-test.yml)
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/banner-dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="assets/banner-light.svg">
+    <img alt="Advanced Policy Firewall (APF)" src="assets/banner-dark.svg" width="830">
+  </picture>
+</p>
+
+<p align="center">
+  <a href="https://github.com/rfxn/advanced-policy-firewall/actions/workflows/smoke-test.yml"><img src="https://img.shields.io/github/actions/workflow/status/rfxn/advanced-policy-firewall/smoke-test.yml?branch=master&style=flat-square&label=CI" alt="CI"></a>
+  <a href="CHANGELOG"><img src="https://img.shields.io/badge/version-2.0.2-blue.svg?style=flat-square" alt="Version"></a>
+  <a href="COPYING.GPL"><img src="https://img.shields.io/badge/license-GPL_v2-green.svg?style=flat-square" alt="License: GPL v2"></a>
+  <a href="#11-supported-systems--requirements"><img src="https://img.shields.io/badge/platform-Linux-orange.svg?style=flat-square" alt="Platform: Linux"></a>
+</p>
 
 **iptables/netfilter-based firewall management for Linux servers** — stateful packet filtering,
 trust-based host management, reactive address blocking, and per-IP virtual network policies.
@@ -13,10 +24,23 @@ trust-based host management, reactive address blocking, and per-IP virtual netwo
 
 ---
 
+## What's New in 2.0.2
+
+- **GeoIP country blocking** — ipset-based country filtering with ISO 3166-1 codes, continent shorthand (`@EU`, `@AS`), dual-stack IPv4/IPv6, advanced per-port/protocol syntax, audit mode, and tiered data sources with local caching
+- **Connection tracking limit** — global per-IP connection limit via periodic conntrack scanning with configurable thresholds, port/state filters, CIDR exemptions, and PERMBLOCK escalation
+- **Temporary trust with TTL** — `apf -ta`/`-td` with per-entry time-to-live (5m, 1h, 7d), automatic cron expiry, and block escalation for repeat offenders
+- **Structured event logging** — dual log model via elog_lib.sh with JSONL audit trail at `/var/log/apf/audit.log` covering trust mutations, config events, and service state
+- **SYN flood protection** — iptables-level rate limiting with configurable rate/burst, complementing kernel sysctl protection
+
+See [CHANGELOG](CHANGELOG) for the complete release notes.
+
+---
+
 ## Contents
 
+- [Quick Start](#quick-start)
 - [1. Introduction](#1-introduction)
-  - [1.1 Supported Systems & Requirements](#11-supported-systems--requirements)
+  - [1.1 Supported Systems](#11-supported-systems--requirements)
 - [2. Installation](#2-installation)
   - [2.1 Boot Loading](#21-boot-loading)
   - [2.2 Upgrading](#22-upgrading)
@@ -24,34 +48,38 @@ trust-based host management, reactive address blocking, and per-IP virtual netwo
   - [2.4 Uninstallation](#24-uninstallation)
 - [3. Configuration](#3-configuration)
   - [3.1 Basic Options](#31-basic-options)
-  - [3.2 Outbound Filtering & Rate Limiting](#32-outbound-filtering--rate-limiting)
+  - [3.2 Outbound Filtering](#32-outbound-filtering--rate-limiting)
   - [3.3 Advanced Options](#33-advanced-options)
   - [3.4 Reactive Address Blocking](#34-reactive-address-blocking)
   - [3.5 Virtual Network Files](#35-virtual-network-files)
-  - [3.6 Global Variables & Custom Rules](#36-global-variables--custom-rules)
+  - [3.6 Global Variables](#36-global-variables--custom-rules)
   - [3.7 Hook Scripts](#37-hook-scripts)
   - [3.8 Silent IP Blocking](#38-silent-ip-blocking)
-  - [3.9 Docker/Container Compatibility](#39-dockercontainer-compatibility)
+  - [3.9 Docker Compatibility](#39-dockercontainer-compatibility)
   - [3.10 ipset Block Lists](#310-ipset-block-lists)
-  - [3.11 Country Code Filtering (GeoIP)](#311-country-code-filtering-geoip)
+  - [3.11 Country Code Filtering](#311-country-code-filtering-geoip)
   - [3.12 Connection Tracking Limit](#312-connection-tracking-limit)
   - [3.13 GRE Tunnels](#313-gre-tunnels)
   - [3.14 Remote Block Lists](#314-remote-block-lists)
-  - [3.15 Logging & Control](#315-logging--control)
+  - [3.15 Logging and Control](#315-logging--control)
   - [3.16 Implicit Blocking](#316-implicit-blocking)
-  - [3.17 Firewall Order of Operations](#317-firewall-order-of-operations)
-- [4. General Usage](#4-general-usage)
+  - [3.17 Firewall Order](#317-firewall-order-of-operations)
+- [4. Usage](#4-usage)
   - [4.1 Trust System](#41-trust-system)
-  - [4.2 Global Trust System](#42-global-trust-system)
+  - [4.2 Global Trust](#42-global-trust-system)
   - [4.3 Advanced Trust Syntax](#43-advanced-trust-syntax)
-  - [4.4 Temporary Trust Entries](#44-temporary-trust-entries)
-  - [4.5 Troubleshooting](#45-troubleshooting)
-- [5. License](#5-license)
-- [6. Support Information](#6-support-information)
+  - [4.4 Temporary Trust](#44-temporary-trust-entries)
+  - [4.5 Exit Codes](#45-exit-codes)
+- [Integration](#integration)
+- [Troubleshooting](#troubleshooting)
+- [License](#license)
+- [Support](#support)
 
 ---
 
 ## Quick Start
+
+Get APF running in under five minutes.
 
 ```bash
 # Install
@@ -179,7 +207,7 @@ APF includes automatic dependency checking at startup. Critical dependencies (ip
 
 ## 2. Installation
 
-The installation setup of APF is very straight forward, there is an included `install.sh` script that will perform all the tasks of installing APF for you.
+APF installs in one step via the included `install.sh` script.
 
 ```bash
 # Default install
@@ -723,9 +751,9 @@ For the complete step-by-step initialization flow — including source file refe
 
 ---
 
-## 4. General Usage
+## 4. Usage
 
-The `/usr/local/sbin/apf` command has a number of options that will ease the day-to-day use of your firewall:
+Day-to-day firewall operations are performed through the `apf` command. See `man apf`(8) for the complete option reference.
 
 ```
 usage: apf [OPTION]
@@ -743,24 +771,28 @@ Firewall Control:
 Trust Management:
   -a HOST [CMT], --allow ...... add host/CC to allow list and load rule
   -d HOST [CMT], --deny ....... add host/CC to deny list and load rule
-  -u HOST, --remove ........... remove host from all trust files
-  --list-allow ................ display allow list entries
-  --list-deny ................. display deny list entries
+  -u HOST, --remove, --unban .. remove host/CC from all trust files
+  --la, --list-allow .......... display allow list entries
+  --ld, --list-deny ........... display deny list entries
   --lookup HOST ............... check if host exists in trust system
 
   Advanced trust syntax:  apf -a "tcp:in:d=22:s=10.0.0.0/8"
                           apf -d "d=3306:s=192.168.1.5"
+  Country codes:          apf -d CN      (deny China)
+                          apf -a US      (allow United States)
+                          apf -d @EU     (deny all of Europe)
+                          apf -d "tcp:in:d=22:s=CN"
 
 Temporary Trust:
-  -ta HOST TTL [CMT] .......... temporarily allow host/CC (5m, 1h, 7d)
-  -td HOST TTL [CMT] .......... temporarily deny host/CC
+  -ta HOST TTL [CMT], --temp-allow  temporarily allow host/CC (5m, 1h, 7d)
+  -td HOST TTL [CMT], --temp-deny   temporarily deny host/CC
   --temp-list ................. list temp entries with remaining TTL
   --temp-flush ................ remove all temporary entries
 
 Diagnostics:
   -g PATTERN, --search ........ search iptables/ipset rules & trust files
   --validate, --check ......... validate config without starting firewall
-  -o, --dump-config ........... output all configuration variables
+  -o, --dump-config, --ovars .. output all configuration variables
   -v, --version ............... output version number
   -h, --help .................. show this help message
 
@@ -790,9 +822,9 @@ The **`--info`** option shows a firewall status summary organized into sections:
 
 The **`-e|--refresh`** option flushes trust chains and reloads them from rule files, re-resolving any DNS names. Useful for dynamic DNS entries in the trust system.
 
-The **`-a|--allow`** and **`-d|--deny`** options add entries to the trust system immediately without a firewall restart. Both accept an optional comment string. The **`-u|--remove`** option removes an address from all trust files. See [section 4.1](#41-trust-system) for details.
+The **`-a|--allow`** and **`-d|--deny`** options add entries to the trust system immediately without a firewall restart. Both accept an optional comment string. The **`-u|--remove`** option removes a host or country code from all trust files. See [section 4.1](#41-trust-system) for details.
 
-The **`--lookup`** option checks whether a host exists in any trust file (allow, deny, global allow, global deny) without searching iptables rules. Exits 0 if found, 1 if not — useful in scripts: `apf --lookup 192.168.1.50 && echo "found"`
+The **`--lookup`** option checks whether a host exists in any trust file (allow, deny, global allow, global deny, CC deny, CC allow) without searching iptables rules. Exits 0 if found, 1 if not — useful in scripts: `apf --lookup 192.168.1.50 && echo "found"`
 
 The **`-g|--search`** option searches all iptables rules (IPv4 + IPv6), ipset sets, and trust files for a pattern match. Case-insensitive, with line-numbered output. Useful for quickly finding which rules or trust entries match a given IP, port, or chain name. Examples:
 
@@ -802,7 +834,7 @@ apf -g DROP
 apf -g :443
 ```
 
-The **`--dump-config`** option outputs all configured variables and their values — useful for troubleshooting or when reporting problems (see [section 6](#6-support-information)).
+The **`--dump-config`** option outputs all configured variables and their values — useful for troubleshooting or when reporting problems (see [Support](#support)).
 
 The **`--validate|--check`** option validates the configuration without starting the firewall. Useful for verifying changes before a restart.
 
@@ -810,7 +842,7 @@ The **`--list-allow`** and **`--list-deny`** options display the contents of the
 
 ### 4.1 Trust System
 
-The trust system in APF is a very traditional setup with two basic trust levels: allow and deny. These two basic trust levels are also extended with two global trust levels that can be imported from a remote server to assist with central trust management in a large scale deployment.
+The trust system in APF manages allow and deny lists with two basic trust levels, extended by two global trust levels that can be imported from a remote server for central trust management across a large deployment.
 
 The two basic trust level files are located at:
 
@@ -962,7 +994,38 @@ When the same IP address is repeatedly temp-denied, APF can automatically promot
 
 For example, setting `PERMBLOCK_COUNT="3"` and `PERMBLOCK_INTERVAL="86400"` will permanently block any IP that is temp-denied 3 or more times within 24 hours. Escalated entries are added to `deny_hosts.rules` with a `"noexpire"` marker so they are not affected by `SET_EXPIRE`.
 
-### 4.5 Troubleshooting
+### 4.5 Exit Codes
+
+APF uses standard exit codes to indicate operation results.
+
+| Code | Meaning |
+|------|---------|
+| `0` | Success |
+| `1` | Error (missing dependency, invalid argument, lock contention, iptables failure) |
+
+See `man apf`(8) EXIT STATUS for the authoritative reference.
+
+---
+
+## Integration
+
+APF is designed to work alongside other rfxn security tools and common server infrastructure.
+
+**BFD (Brute Force Detection)** — BFD uses APF's trust system to block brute-force attackers. When BFD detects repeated authentication failures, it calls `apf -d` to add offending IPs to the deny list. No special configuration is needed; BFD auto-detects APF at runtime.
+
+**Cron** — APF installs a consolidated cron entry (`/etc/cron.d/apf`) with three jobs: daily firewall restart, hourly ipset block list refresh, and per-minute temporary trust expiry. The cron entry is managed by `install.sh` and preserved across upgrades.
+
+**systemd** — The `apf.service` unit supports `start`, `stop`, `restart`, and `status` operations. APF also provides a legacy SysV init script for older systems without systemd.
+
+**Docker / Kubernetes** — Set `DOCKER_COMPAT="auto"` (the default) to preserve container networking rules during firewall operations. See [section 3.9](#39-dockercontainer-compatibility).
+
+**Logrotate** — APF installs a logrotate configuration at `/etc/logrotate.d/apf` for rotating `/var/log/apf_log`. Uses `copytruncate` to avoid disrupting `tail -f` consumers.
+
+---
+
+## Troubleshooting
+
+Common issues and their solutions.
 
 **Locked out of the server?** `DEVEL_MODE="1"` (the default) auto-flushes the firewall every 5 minutes. If DEVEL_MODE is off, rebooting will clear rules unless boot loading is configured (see [section 2.1](#21-boot-loading)).
 
@@ -978,7 +1041,7 @@ For example, setting `PERMBLOCK_COUNT="3"` and `PERMBLOCK_INTERVAL="86400"` will
 
 ---
 
-## 5. License
+## License
 
 APF is developed and supported on a volunteer basis by Ryan MacDonald [ryan@rfxn.com].
 
@@ -986,7 +1049,7 @@ APF (Advanced Policy Firewall) is distributed under the GNU General Public Licen
 
 ---
 
-## 6. Support Information
+## Support
 
 The APF source repository is at: https://github.com/rfxn/advanced-policy-firewall
 

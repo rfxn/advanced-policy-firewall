@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 830 160" width="830" height="160">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#f8fafc"/>
+      <stop offset="100%" stop-color="#f1f5f9"/>
+    </linearGradient>
+    <linearGradient id="flow-fill" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#16a34a" stop-opacity="0.15"/>
+      <stop offset="100%" stop-color="#16a34a" stop-opacity="0"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="2" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+  </defs>
+  <rect width="830" height="160" fill="url(#bg)" rx="8"/>
+
+  <!-- Top bar: lock icon + tagline -->
+  <g transform="translate(40, 18)">
+    <rect x="8" y="16" width="20" height="16" rx="3" fill="none" stroke="#16a34a" stroke-width="1.5" opacity="0.8"/>
+    <path d="M12 16 L12 10 C12 4 24 4 24 10 L24 16" fill="none" stroke="#16a34a" stroke-width="1.5" opacity="0.7"/>
+    <circle cx="18" cy="24" r="2" fill="#16a34a" opacity="0.9"/>
+    <text x="44" y="28" fill="#64748b" font-family="ui-monospace,'Cascadia Code','Source Code Pro',Consolas,monospace" font-size="13">Policy-driven access control for Linux</text>
+  </g>
+
+  <!-- Policy rule tickers (top right) -->
+  <g font-family="ui-monospace,monospace" font-size="9" opacity="0.25">
+    <text x="590" y="22" fill="#16a34a">&#x2713; ALLOW 10.0.0.0/8</text>
+    <text x="610" y="36" fill="#dc2626">&#x2717; DENY 203.0.113.0/24</text>
+    <text x="630" y="50" fill="#16a34a">&#x2713; ALLOW tcp:in:d=443</text>
+  </g>
+
+  <line x1="40" y1="58" x2="790" y2="58" stroke="#94a3b8" stroke-width="0.5" opacity="0.15"/>
+
+  <!-- Connection rate chart -->
+  <g transform="translate(40, 148)" filter="url(#glow)">
+    <line x1="0" y1="0" x2="750" y2="0" stroke="#94a3b8" stroke-width="0.8" stroke-dasharray="3,3" opacity="0.3"/>
+    <polygon points="0,0 20,-8 50,-12 80,-18 110,-15 140,-22 170,-28 200,-25 230,-32 260,-35 290,-30 320,-38 350,-42 380,-36 410,-28 440,-32 470,-45 500,-38 530,-30 560,-25 590,-20 620,-15 660,-18 700,-10 750,0"
+             fill="url(#flow-fill)"/>
+    <polyline points="0,0 20,-8 50,-12 80,-18 110,-15 140,-22 170,-28 200,-25 230,-32 260,-35 290,-30 320,-38 350,-42 380,-36 410,-28 440,-32 470,-45 500,-38 530,-30 560,-25 590,-20 620,-15 660,-18 700,-10 750,0"
+              fill="none" stroke="#16a34a" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/>
+    <circle cx="170" cy="-28" r="3" fill="#dc2626" opacity="0.9"/>
+    <circle cx="170" cy="-28" r="6.5" fill="none" stroke="#dc2626" stroke-width="0.8" opacity="0.4"/>
+    <circle cx="350" cy="-42" r="3" fill="#dc2626" opacity="0.9"/>
+    <circle cx="350" cy="-42" r="6.5" fill="none" stroke="#dc2626" stroke-width="0.8" opacity="0.4"/>
+    <circle cx="470" cy="-45" r="3" fill="#dc2626" opacity="0.9"/>
+    <circle cx="470" cy="-45" r="6.5" fill="none" stroke="#dc2626" stroke-width="0.8" opacity="0.4"/>
+    <line x1="0" y1="-55" x2="750" y2="-55" stroke="#dc2626" stroke-width="1.2" stroke-dasharray="6,4" opacity="0.5"/>
+    <text x="756" y="-51" fill="#dc2626" font-family="ui-monospace,monospace" font-size="9" font-weight="600" opacity="0.7">LIMIT</text>
+  </g>
+</svg>

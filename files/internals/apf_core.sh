@@ -130,6 +130,7 @@ check_deps() {
    hint="microdnf install$pkg_rpm"
   fi
   eout "{glob} missing critical dependencies:$crit" 1
+  elog_event "error_occurred" "error" "{glob} missing critical dependencies:$crit"
   if [ -n "$hint" ]; then
    eout "{glob}   Try: $hint" 1
   fi
@@ -171,6 +172,7 @@ mutex_lock() {
     now=$(date +%s)
     if [ $((now - start_time)) -ge "$ENTER_LOCK_TIMEOUT" ]; then
       eout "{glob} timed out while attempting to gain lock."
+      elog_event "error_occurred" "error" "{glob} timed out while attempting to gain lock"
       exit 1
     fi
     sleep 1

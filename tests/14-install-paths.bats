@@ -104,18 +104,30 @@ teardown_file() {
     [ ! -f "/etc/cron.d/apf_temp" ]
 }
 
-@test "runtime cron refresh.apf cleaned during install" {
+@test "runtime cron refresh.apf replaced with correct content on upgrade" {
     if [ ! -d "/etc/cron.d" ]; then
         skip "cron.d not available"
     fi
-    # Simulate runtime-created refresh cron
+    _clean_test_backup
+    # Enable SET_REFRESH (Docker image defaults to 0 for test isolation)
+    sed -i 's/^SET_REFRESH=.*/SET_REFRESH="10"/' "$APF_DIR/conf.apf"
+    # Simulate stale runtime-created refresh cron (note trailing &, old format)
     echo "*/10 * * * * root /opt/apf/apf --refresh >> /dev/null 2>&1 &" > /etc/cron.d/refresh.apf
     [ -f "/etc/cron.d/refresh.apf" ]
     cd /opt/apf-src
     # install.sh may exit non-zero in Docker (service setup fails) — tolerate it;
-    # we're testing the cron file removal side effect, not install.sh exit code
+    # we're testing the cron re-creation side effect, not install.sh exit code
     INSTALL_PATH="$APF_DIR" bash install.sh >/dev/null 2>&1 || true
-    [ ! -f "/etc/cron.d/refresh.apf" ]
+    # Pre-install cleanup removes the old file; upgrade path re-creates from config
+    [ -f "/etc/cron.d/refresh.apf" ]
+    # New content should NOT have trailing & (old format artifact)
+    run grep '&$' /etc/cron.d/refresh.apf
+    assert_failure
+    # Should contain --refresh
+    run grep -- "--refresh" /etc/cron.d/refresh.apf
+    assert_success
+    rm -f /etc/cron.d/refresh.apf "$APF_DIR/internals/cron.refresh"
+    _clean_test_backup
 }
 
 @test "runtime cron apf_develmode cleaned during install" {
@@ -139,6 +151,56 @@ teardown_file() {
     assert_success
     run grep "/etc/apf/apf" /etc/cron.d/apf
     assert_failure
+}
+
+@test "upgrade with SET_REFRESH enabled recreates refresh.apf" {
+    if [ ! -d "/etc/cron.d" ]; then
+        skip "cron.d not available"
+    fi
+    _clean_test_backup
+    # Enable SET_REFRESH in the live install before upgrade
+    sed -i 's/^SET_REFRESH=.*/SET_REFRESH="10"/' "$APF_DIR/conf.apf"
+    cd /opt/apf-src
+    INSTALL_PATH="$APF_DIR" bash install.sh >/dev/null 2>&1 || true
+    # Pre-install cleanup removes it, but upgrade path should re-create it
+    [ -f "/etc/cron.d/refresh.apf" ]
+    run grep -- "--refresh" /etc/cron.d/refresh.apf
+    assert_success
+    # Clean up for subsequent tests
+    rm -f /etc/cron.d/refresh.apf "$APF_DIR/internals/cron.refresh"
+    _clean_test_backup
+}
+
+@test "upgrade with SET_REFRESH=0 does not create refresh.apf" {
+    if [ ! -d "/etc/cron.d" ]; then
+        skip "cron.d not available"
+    fi
+    _clean_test_backup
+    # Ensure SET_REFRESH is disabled in the live install
+    sed -i 's/^SET_REFRESH=.*/SET_REFRESH="0"/' "$APF_DIR/conf.apf"
+    cd /opt/apf-src
+    INSTALL_PATH="$APF_DIR" bash install.sh >/dev/null 2>&1 || true
+    [ ! -f "/etc/cron.d/refresh.apf" ]
+    _clean_test_backup
+}
+
+@test "upgrade with CT_LIMIT enabled recreates ctlimit.apf" {
+    if [ ! -d "/etc/cron.d" ]; then
+        skip "cron.d not available"
+    fi
+    _clean_test_backup
+    # Enable CT_LIMIT in the live install before upgrade
+    sed -i 's/^CT_LIMIT=.*/CT_LIMIT="150"/' "$APF_DIR/conf.apf"
+    sed -i 's/^CT_INTERVAL=.*/CT_INTERVAL="60"/' "$APF_DIR/conf.apf"
+    cd /opt/apf-src
+    INSTALL_PATH="$APF_DIR" bash install.sh >/dev/null 2>&1 || true
+    # Pre-install cleanup removes it, but upgrade path should re-create it
+    [ -f "/etc/cron.d/ctlimit.apf" ]
+    run grep -- "--ct-scan" /etc/cron.d/ctlimit.apf
+    assert_success
+    # Clean up for subsequent tests
+    rm -f /etc/cron.d/ctlimit.apf "$APF_DIR/internals/cron.ctlimit"
+    _clean_test_backup
 }
 
 # =====================================================================

@@ -26,7 +26,11 @@ apf \- Advanced Policy Firewall
 .RB [ \-\-templ | \-\-tempf ]
 .br
 .B apf
-.RB { \-\-lookup | \-g }
+.B \-\-lookup
+.I HOST
+.br
+.B apf
+.RB { \-g | \-\-search }
 .I PATTERN
 .br
 .B apf
@@ -80,7 +84,7 @@ packet sanity, connlimit, SYN flood, SMTP blocking), subsystem status
 (fast load, RAB, VNET, Docker compat, ipset, GRE, remote block lists),
 logging settings, and recent log entries.
 .TP
-.BR \-t ", " \-\-status
+.BR \-t ", " \-st ", " \-\-status
 Page through the full firewall status log.
 .TP
 .BR \-e ", " \-\-refresh
@@ -120,8 +124,8 @@ Also accepts advanced trust syntax and country codes.
 .BR \-u " \fIHOST\fR, " \-\-remove " \fIHOST\fR, " \-\-unban " \fIHOST\fR"
 Remove
 .I HOST
-from all trust files (allow, deny, global) and immediately remove
-matching rules from the live firewall.
+(or country code) from all trust files (allow, deny, global, CC) and immediately
+remove matching rules from the live firewall.
 Accepts both bare hosts and advanced trust syntax.
 Removing a bare IP also removes any advanced trust entries containing that IP.
 .TP
@@ -138,7 +142,7 @@ Display entries in
 .BR \-\-lookup " \fIHOST\fR"
 Check if
 .I HOST
-exists in any trust file (allow, deny, global allow, global deny).
+exists in any trust file (allow, deny, global allow, global deny, CC deny, CC allow).
 Searches are case\-insensitive with line numbers shown.
 Exits 0 if found, 1 if not found.
 .SS Temporary Trust
@@ -487,7 +491,7 @@ Post\-routing custom rules.
 .I /etc/apf/vnet/
 Per\-IP virtual network policy files.
 .TP
-.I /etc/apf/internals/ctlimit.apf
+.I /etc/apf/internals/apf_ctlimit.sh
 Connection tracking limit internal library (sourced on demand).
 .TP
 .I /etc/cron.d/ctlimit.apf
