@@ -350,7 +350,11 @@ cli_trust_remove() {
 		if valid_cc "$_ctr_last_field" || [[ "$_ctr_last_field" == @* ]]; then
 			# shellcheck disable=SC1090,SC1091
 			. "$INSTALL_PATH/internals/apf_geoip.sh"
-			cli_cc_remove "$_ctr_last_field"
+			if [[ "$_ctr_last_field" == @* ]]; then
+				cli_cc_remove "$_ctr_last_field"
+			else
+				cli_cc_remove_entry "$DIP" "$_ctr_last_field"
+			fi
 			return $?
 		fi
 		if ! valid_trust_entry "$DIP"; then
