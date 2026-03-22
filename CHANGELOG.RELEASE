@@ -14,6 +14,15 @@
          cli_cc_remove_entry() for per-entry targeted removal; continent
          shorthand (@EU etc.) and bare CC codes continue to route to
          cli_cc_remove() (nuke-all behaviour unchanged)
+[Fix] cli_cc_remove_entry(): match LOG rules by proto and port flags
+     separately rather than as a combined fixed string; iptables -S
+     output inserts -m tcp between -p tcp and --dport N, causing
+     grep -F to miss LOG rules and leave them as orphans after targeted
+     advanced CC entry removal
+[New] Add 5 regression tests to tests/35-geoip.bats for granular CC
+     advanced trust entry removal: bare CC entry preservation, targeted
+     iptables rule removal, ipset cleanup when last entry removed, cache
+     preservation when other entries remain, CC_LOG_ONLY targeted removal
 
 - 2.0.2 | Mar 08 2026:
 

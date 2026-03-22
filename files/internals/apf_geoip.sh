@@ -1419,11 +1419,15 @@ cli_cc_remove_entry() {
 			local set4="apf_cc4_${cc}"
 			# Action rule removal — fails silently under CC_LOG_ONLY=1 (no action rule exists)
 			$IPT $IPT_FLAGS -D "$_chain" $match -m set --match-set "$set4" "$ipset_dir" -j "$_action" 2>/dev/null || true
-			# LOG rule removal via eval (handles shell-quoted --log-prefix values)
+			# LOG rule removal via eval (handles shell-quoted --log-prefix values).
+			# iptables -S inserts "-m tcp" between "-p tcp" and "--dport N", so $match
+			# cannot be used as a single fixed-string grep — match proto and port separately.
+			local _port_flag="--${pflow}port"
 			$IPT $IPT_FLAGS -S "$_chain" 2>/dev/null | grep "apf_cc4_${cc}" | while IFS= read -r _rule; do
 				[[ "$_rule" =~ $_cc_eval_re ]] || continue
 				# Only remove LOG rules matching our specific proto/port match
-				if echo "$_rule" | grep -qF -- "$match"; then
+				if echo "$_rule" | grep -qF -- "-p $proto" && \
+				   echo "$_rule" | grep -qF -- "$_port_flag $port"; then
 					eval "$IPT $IPT_FLAGS -D \"$_chain\" ${_rule#-A $_chain }" 2>/dev/null || true
 				fi
 			done
@@ -1436,7 +1440,8 @@ cli_cc_remove_entry() {
 			$IP6T $IPT_FLAGS -D "$_chain" $match -m set --match-set "$set6" "$ipset_dir" -j "$_action" 2>/dev/null || true
 			$IP6T $IPT_FLAGS -S "$_chain" 2>/dev/null | grep "apf_cc6_${cc}" | while IFS= read -r _rule; do
 				[[ "$_rule" =~ $_cc_eval_re ]] || continue
-				if echo "$_rule" | grep -qF -- "$match"; then
+				if echo "$_rule" | grep -qF -- "-p $proto" && \
+				   echo "$_rule" | grep -qF -- "$_port_flag $port"; then
 					eval "$IP6T $IPT_FLAGS -D \"$_chain\" ${_rule#-A $_chain }" 2>/dev/null || true
 				fi
 			done

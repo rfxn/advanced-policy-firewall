@@ -981,6 +981,172 @@ _source_funcs='source '"$APF_DIR"'/internals/apf.lib.sh; CC_DENY_HOSTS='"$APF_DI
     clean_cc_state
 }
 
+# ============================================================
+# Granular CC advanced trust entry removal (2.0.3)
+# ============================================================
+
+@test "apf -u advanced CC entry preserves bare CC entry" {
+    clean_cc_state
+    create_cc_fixture_v4 "ZZ"
+    "$APF" -f 2>/dev/null || true
+    "$APF" -s
+
+    # Add both simple and advanced deny entries
+    "$APF" -d ZZ "simple block"
+    "$APF" -d "tcp:in:d=22:s=ZZ" "advanced ssh block"
+
+    # Verify both are in rules file
+    run grep -Fx "ZZ" "$APF_DIR/cc_deny.rules"
+    assert_success
+    run grep -Fx "tcp:in:d=22:s=ZZ" "$APF_DIR/cc_deny.rules"
+    assert_success
+
+    # Remove only the advanced entry
+    run "$APF" -u "tcp:in:d=22:s=ZZ"
+    assert_success
+
+    # Bare ZZ must still be present in rules file
+    run grep -Fx "ZZ" "$APF_DIR/cc_deny.rules"
+    assert_success
+
+    # Advanced entry must be gone from rules file
+    run grep -Fx "tcp:in:d=22:s=ZZ" "$APF_DIR/cc_deny.rules"
+    assert_failure
+
+    # ipset must still exist (bare entry still active)
+    run ipset list apf_cc4_ZZ
+    assert_success
+
+    # CC_DENY chain must still have match-set rule for ZZ (bare entry loaded)
+    assert_rule_exists_ips CC_DENY "match-set apf_cc4_ZZ src"
+
+    # Clean up
+    "$APF" -u ZZ 2>/dev/null || true
+    clean_cc_state
+}
+
+@test "apf -u advanced CC entry removes only its iptables rules" {
+    clean_cc_state
+    create_cc_fixture_v4 "ZZ"
+    "$APF" -f 2>/dev/null || true
+    "$APF" -s
+
+    # Add two advanced deny entries for different ports
+    "$APF" -d "tcp:in:d=22:s=ZZ" "advanced ssh block"
+    "$APF" -d "tcp:in:d=443:s=ZZ" "advanced https block"
+
+    # Both entries in rules file
+    run grep -Fx "tcp:in:d=22:s=ZZ" "$APF_DIR/cc_deny.rules"
+    assert_success
+    run grep -Fx "tcp:in:d=443:s=ZZ" "$APF_DIR/cc_deny.rules"
+    assert_success
+
+    # Remove only the port 22 entry
+    run "$APF" -u "tcp:in:d=22:s=ZZ"
+    assert_success
+
+    # Port 22 rule must be gone from CC_DENYP
+    run bash -c "iptables -S CC_DENYP 2>/dev/null | grep 'apf_cc4_ZZ' | grep -- '--dport 22'"
+    assert_failure
+
+    # Port 443 rule must still be in CC_DENYP
+    assert_rule_exists_ips CC_DENYP "match-set apf_cc4_ZZ.*dport 443|dport 443.*match-set apf_cc4_ZZ"
+
+    # Port 443 entry must still be in rules file
+    run grep -Fx "tcp:in:d=443:s=ZZ" "$APF_DIR/cc_deny.rules"
+    assert_success
+
+    # Clean up
+    "$APF" -u "tcp:in:d=443:s=ZZ" 2>/dev/null || true
+    clean_cc_state
+}
+
+@test "targeted CC removal destroys ipset when last entry removed" {
+    clean_cc_state
+    create_cc_fixture_v4 "ZZ"
+    "$APF" -f 2>/dev/null || true
+    "$APF" -s
+
+    # Add only an advanced entry (no bare CC)
+    "$APF" -d "tcp:in:d=22:s=ZZ" "only rule"
+
+    # Verify entry persisted
+    run grep -Fx "tcp:in:d=22:s=ZZ" "$APF_DIR/cc_deny.rules"
+    assert_success
+
+    # Remove it — no other ZZ entries remain
+    run "$APF" -u "tcp:in:d=22:s=ZZ"
+    assert_success
+
+    # ipset must be destroyed (no entries remain for ZZ)
+    run ipset list apf_cc4_ZZ 2>/dev/null
+    assert_failure
+
+    # No ZZ references in rules file
+    run grep "ZZ" "$APF_DIR/cc_deny.rules"
+    assert_failure
+
+    clean_cc_state
+}
+
+@test "targeted CC removal preserves cache when other entries remain" {
+    clean_cc_state
+    create_cc_fixture_v4 "ZZ"
+    "$APF" -f 2>/dev/null || true
+    "$APF" -s
+
+    # Add simple + advanced entries
+    "$APF" -d ZZ "simple block"
+    "$APF" -d "tcp:in:d=22:s=ZZ" "advanced ssh block"
+
+    # Verify cache exists before removal
+    [ -f "$APF_DIR/geoip/ZZ.4" ]
+
+    # Remove only the advanced entry
+    run "$APF" -u "tcp:in:d=22:s=ZZ"
+    assert_success
+
+    # Cache file must still exist (bare entry still active)
+    run test -f "$APF_DIR/geoip/ZZ.4"
+    assert_success
+
+    # Clean up
+    "$APF" -u ZZ 2>/dev/null || true
+    clean_cc_state
+}
+
+@test "targeted CC removal under CC_LOG_ONLY removes LOG rule" {
+    clean_cc_state
+    create_cc_fixture_v4 "ZZ"
+    source /opt/tests/helpers/apf-config.sh
+    apf_set_config "CC_LOG_ONLY" "1"
+    "$APF" -f 2>/dev/null || true
+    "$APF" -s
+
+    # Add advanced entry — only LOG rules created, no DROP
+    "$APF" -d "tcp:in:d=22:s=ZZ" "audit ssh block"
+
+    # Verify entry in rules file
+    run grep -Fx "tcp:in:d=22:s=ZZ" "$APF_DIR/cc_deny.rules"
+    assert_success
+
+    # Remove the advanced entry
+    run "$APF" -u "tcp:in:d=22:s=ZZ"
+    assert_success
+
+    # No rules in CC_DENYP matching apf_cc4_ZZ and port 22
+    run bash -c "iptables -S CC_DENYP 2>/dev/null | grep 'apf_cc4_ZZ' | grep -- '--dport 22'"
+    assert_failure
+
+    # Entry must be gone from rules file
+    run grep -Fx "tcp:in:d=22:s=ZZ" "$APF_DIR/cc_deny.rules"
+    assert_failure
+
+    # Restore
+    apf_set_config "CC_LOG_ONLY" "0"
+    clean_cc_state
+}
+
 @test "CC_IPV6=0 excludes IPv6 ipset creation" {
     if ! ip6tables_available; then skip "ip6tables not available"; fi
     clean_cc_state
