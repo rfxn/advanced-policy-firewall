@@ -982,7 +982,7 @@ _source_funcs='source '"$APF_DIR"'/internals/apf.lib.sh; CC_DENY_HOSTS='"$APF_DI
 }
 
 # ============================================================
-# Granular CC advanced trust entry removal (2.0.3)
+# Granular CC advanced trust entry removal (2.0.2)
 # ============================================================
 
 @test "apf -u advanced CC entry preserves bare CC entry" {

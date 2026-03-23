@@ -1335,7 +1335,7 @@ cli_cc_trust_temp() {
 cli_cc_remove_entry() {
 	local IFS=$' \t\n'
 	local entry="$1" cc="$2"
-	local found_in="" found=0
+	local found_in=""
 
 	[ -n "$entry" ] || return 1
 	if ! valid_cc "$cc"; then
@@ -1354,8 +1354,6 @@ cli_cc_remove_entry() {
 	if [ -z "$found_in" ]; then
 		return 1
 	fi
-	found=1
-
 	# Remove entry + its preceding comment from rules file(s)
 	# Comment format: "# added ENTRY on DATE with ..."
 	local escaped_entry
