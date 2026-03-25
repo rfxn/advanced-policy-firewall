@@ -13,16 +13,6 @@
 #   /usr/local/sbin/fwmgr       — legacy binary path (e.g., /usr/local/sbin/bfd)
 #   8          — man page section (e.g., 1, 8)
 #   2002  — copyright start year (e.g., 1999, 2002)
-#   @@PKG_RPM_REQUIRES@@     — Requires: lines (one per line)
-#   @@PKG_RPM_WEAK_DEPS@@    — Recommends/Suggests lines (conditional on el8+)
-#   @@PKG_RPM_BUILD_SECTION@@     — %build section commands
-#   @@PKG_RPM_INSTALL_SECTION@@   — %install section commands
-#   @@PKG_RPM_PRE_SECTION@@       — %pre scriptlet body
-#   @@PKG_RPM_POST_SECTION@@      — %post scriptlet body
-#   @@PKG_RPM_PREUN_SECTION@@     — %preun scriptlet body
-#   @@PKG_RPM_POSTUN_SECTION@@    — %postun scriptlet body
-#   @@PKG_RPM_FILES_SECTION@@     — %files listing
-#   @@PKG_RPM_CHANGELOG@@         — %changelog entries
 #
 %define name    apf
 %define version 2.0.2
@@ -40,8 +30,22 @@ URL:            https://github.com/rfxn/advanced-policy-firewall
 Source0:        %{name}-%{version}.tar.gz
 BuildArch:      noarch
 
-@@PKG_RPM_REQUIRES@@
-@@PKG_RPM_WEAK_DEPS@@
+Requires: bash >= 4.1
+Requires: coreutils
+Requires: iptables
+Requires: iproute
+Requires: kmod
+Requires: sed
+Requires: gawk
+Requires: grep
+Requires: util-linux
+Conflicts: apf-firewall
+%if 0%{?rhel} >= 8 || 0%{?fedora}
+Recommends: cronie
+Recommends: logrotate
+Suggests: ipset
+Suggests: curl
+%endif
 
 %description
 Advanced Policy Firewall (APF) is an iptables/netfilter-based firewall management system for Linux servers. It provides stateful packet filtering, trust-based allow/deny host management, Reactive Address Blocking (RAB), and a Virtual Network (VNET) subsystem for per-IP policies.
@@ -50,27 +54,362 @@ Advanced Policy Firewall (APF) is an iptables/netfilter-based firewall managemen
 %setup -q -n %{name}-%{version}
 
 %build
-@@PKG_RPM_BUILD_SECTION@@
+# Create .pkg copies and sed-transform binary paths
+# Config paths stay as /etc/apf — that IS the config location
+cp apf.service apf.service.pkg
+sed -i 's|/etc/apf/apf|/usr/sbin/apf|g' apf.service.pkg
+
+cp apf.init apf.init.pkg
+sed -i -e 's|/etc/apf/apf|/usr/sbin/apf|g' \
+       -e 's|"$INSTALL_PATH/apf"|"/usr/sbin/apf"|g' apf.init.pkg
+
+cp cron.d.apf cron.d.apf.pkg
+sed -i 's|/etc/apf/apf|/usr/sbin/apf|g' cron.d.apf.pkg
 
 %install
 rm -rf %{buildroot}
-@@PKG_RPM_INSTALL_SECTION@@
+# Binary
+install -D -m 755 files/apf %{buildroot}/usr/sbin/apf
+
+# Config files at /etc/apf/
+install -D -m 640 files/conf.apf %{buildroot}/etc/apf/conf.apf
+install -D -m 640 files/allow_hosts.rules %{buildroot}/etc/apf/allow_hosts.rules
+install -D -m 640 files/deny_hosts.rules %{buildroot}/etc/apf/deny_hosts.rules
+install -D -m 640 files/cc_allow.rules %{buildroot}/etc/apf/cc_allow.rules
+install -D -m 640 files/cc_deny.rules %{buildroot}/etc/apf/cc_deny.rules
+install -D -m 750 files/hook_pre.sh %{buildroot}/etc/apf/hook_pre.sh
+install -D -m 750 files/hook_post.sh %{buildroot}/etc/apf/hook_post.sh
+install -D -m 640 files/sysctl.rules %{buildroot}/etc/apf/sysctl.rules
+install -D -m 640 files/sdrop_hosts.rules %{buildroot}/etc/apf/sdrop_hosts.rules
+install -D -m 640 files/silent_ips.rules %{buildroot}/etc/apf/silent_ips.rules
+install -D -m 640 files/VERSION %{buildroot}/etc/apf/VERSION
+
+# APF-managed rules (not conffiles — receive updates)
+for f in glob_allow.rules glob_deny.rules bt.rules log.rules main.rules \
+         ds_hosts.rules ecnshame_hosts.rules gre.rules ipset.rules \
+         preroute.rules postroute.rules; do
+    install -D -m 640 "files/$f" "%{buildroot}/etc/apf/$f"
+done
+
+# internals.conf (conffile, real file at /etc/apf/internals/)
+install -D -m 640 files/internals/internals.conf %{buildroot}/etc/apf/internals/internals.conf
+
+# Libraries at /usr/lib/apf/internals/
+for f in apf.lib.sh apf_core.sh apf_cli.sh apf_ipt.sh apf_trust.sh \
+         apf_validate.sh apf_ipset.sh apf_dlist.sh apf_geoip.sh \
+         apf_ctlimit.sh elog_lib.sh geoip_lib.sh pkg_lib.sh; do
+    install -D -m 644 "files/internals/$f" "%{buildroot}/usr/lib/apf/internals/$f"
+done
+
+# Executables
+install -D -m 755 files/internals/gretunnel.sh %{buildroot}/usr/lib/apf/internals/gretunnel.sh
+
+# Data files at /usr/lib/apf/internals/
+for f in cports.common icmp.types private.networks reserved.networks \
+         multicast.networks rab.ports; do
+    install -D -m 644 "files/internals/$f" "%{buildroot}/usr/lib/apf/internals/$f"
+done
+
+# Extras
+install -D -m 755 files/extras/importconf %{buildroot}/usr/lib/apf/extras/importconf
+install -D -m 755 files/extras/get_ports %{buildroot}/usr/lib/apf/extras/get_ports
+
+# VNET
+install -D -m 755 files/vnet/vnetgen %{buildroot}/usr/lib/apf/vnet/vnetgen
+install -D -m 640 files/vnet/main.vnet %{buildroot}/etc/apf/vnet/main.vnet
+install -D -m 640 files/vnet/vnetgen.def %{buildroot}/etc/apf/vnet/vnetgen.def
+
+# State directories
+install -d -m 750 %{buildroot}/var/lib/apf/tmp
+install -d -m 750 %{buildroot}/etc/apf/geoip
+install -d -m 750 %{buildroot}/var/log/apf
+
+# System integration (from .pkg copies)
+install -D -m 644 apf.service.pkg %{buildroot}/usr/lib/systemd/system/apf.service
+%if 0%{?el7}
+install -D -m 755 apf.init.pkg %{buildroot}/etc/init.d/apf
+%endif
+install -D -m 644 cron.d.apf.pkg %{buildroot}/etc/cron.d/apf
+install -D -m 644 logrotate.d.apf %{buildroot}/etc/logrotate.d/apf
+install -D -m 644 apf.bash-completion %{buildroot}/usr/share/bash-completion/completions/apf
+
+# Man page and docs
+install -D -m 644 apf.8 %{buildroot}/usr/share/man/man8/apf.8
+install -D -m 644 README.md %{buildroot}/usr/share/doc/apf/README.md
+install -D -m 644 CHANGELOG %{buildroot}/usr/share/doc/apf/CHANGELOG
+install -D -m 644 FLOW %{buildroot}/usr/share/doc/apf/FLOW
+
+# Symlink farm: internals/ per-file symlinks
+for f in apf.lib.sh apf_core.sh apf_cli.sh apf_ipt.sh apf_trust.sh \
+         apf_validate.sh apf_ipset.sh apf_dlist.sh apf_geoip.sh \
+         apf_ctlimit.sh elog_lib.sh geoip_lib.sh pkg_lib.sh \
+         gretunnel.sh cports.common icmp.types private.networks \
+         reserved.networks multicast.networks rab.ports; do
+    ln -s "/usr/lib/apf/internals/$f" "%{buildroot}/etc/apf/internals/$f"
+done
+
+# Symlink farm: directory symlinks
+ln -s /usr/lib/apf/extras %{buildroot}/etc/apf/extras
+ln -s /usr/share/doc/apf %{buildroot}/etc/apf/doc
+
+# Symlink farm: VNET executable
+ln -s /usr/lib/apf/vnet/vnetgen %{buildroot}/etc/apf/vnet/vnetgen
+
+# Symlink farm: binary compat
+install -d %{buildroot}/usr/local/sbin
+ln -s /usr/sbin/apf %{buildroot}/usr/local/sbin/apf
+ln -s /usr/sbin/apf %{buildroot}/usr/local/sbin/fwmgr
+
+# Symlink manifest for pkg_fhs_verify_farm() runtime repair
+cat > %{buildroot}/usr/lib/apf/internals/.symlink-manifest <<'MANIFEST'
+# pkg_lib:symlink-manifest:1
+/etc/apf/internals/apf.lib.sh	/usr/lib/apf/internals/apf.lib.sh
+/etc/apf/internals/apf_core.sh	/usr/lib/apf/internals/apf_core.sh
+/etc/apf/internals/apf_cli.sh	/usr/lib/apf/internals/apf_cli.sh
+/etc/apf/internals/apf_ipt.sh	/usr/lib/apf/internals/apf_ipt.sh
+/etc/apf/internals/apf_trust.sh	/usr/lib/apf/internals/apf_trust.sh
+/etc/apf/internals/apf_validate.sh	/usr/lib/apf/internals/apf_validate.sh
+/etc/apf/internals/apf_ipset.sh	/usr/lib/apf/internals/apf_ipset.sh
+/etc/apf/internals/apf_dlist.sh	/usr/lib/apf/internals/apf_dlist.sh
+/etc/apf/internals/apf_geoip.sh	/usr/lib/apf/internals/apf_geoip.sh
+/etc/apf/internals/apf_ctlimit.sh	/usr/lib/apf/internals/apf_ctlimit.sh
+/etc/apf/internals/elog_lib.sh	/usr/lib/apf/internals/elog_lib.sh
+/etc/apf/internals/geoip_lib.sh	/usr/lib/apf/internals/geoip_lib.sh
+/etc/apf/internals/pkg_lib.sh	/usr/lib/apf/internals/pkg_lib.sh
+/etc/apf/internals/gretunnel.sh	/usr/lib/apf/internals/gretunnel.sh
+/etc/apf/internals/cports.common	/usr/lib/apf/internals/cports.common
+/etc/apf/internals/icmp.types	/usr/lib/apf/internals/icmp.types
+/etc/apf/internals/private.networks	/usr/lib/apf/internals/private.networks
+/etc/apf/internals/reserved.networks	/usr/lib/apf/internals/reserved.networks
+/etc/apf/internals/multicast.networks	/usr/lib/apf/internals/multicast.networks
+/etc/apf/internals/rab.ports	/usr/lib/apf/internals/rab.ports
+/etc/apf/extras	/usr/lib/apf/extras
+/etc/apf/doc	/usr/share/doc/apf
+/etc/apf/vnet/vnetgen	/usr/lib/apf/vnet/vnetgen
+/usr/local/sbin/apf	/usr/sbin/apf
+/usr/local/sbin/fwmgr	/usr/sbin/apf
+MANIFEST
 
 %pre
-@@PKG_RPM_PRE_SECTION@@
+# Detect install.sh-based installation (binary is a regular file, not a symlink)
+if [ -f "%{legacy_path}/apf" ] && [ ! -L "%{legacy_path}/internals/apf.lib.sh" ] && [ ! -L "%{legacy_path}/apf" ]; then
+    _bkdir="%{legacy_path}.bk.$(date +%%Y%%m%%d-%%s)"
+    echo "Backing up existing install.sh installation to $_bkdir"
+    cp -a "%{legacy_path}" "$_bkdir"
+    rm -f "%{legacy_path}.bk.last"
+    ln -s "$_bkdir" "%{legacy_path}.bk.last"
+    # Preserve state files
+    if [ -d "%{legacy_path}/tmp" ]; then
+        mkdir -p /var/lib/apf/tmp
+        cp -a "%{legacy_path}"/tmp/* /var/lib/apf/tmp/ 2>/dev/null || true
+    fi
+    # Stop old services
+    for _initdir in /etc/rc.d/init.d /etc/init.d; do
+        if [ -f "$_initdir/apf" ]; then
+            "$_initdir/apf" stop 2>/dev/null || true
+            if command -v chkconfig >/dev/null 2>&1; then
+                chkconfig --del apf 2>/dev/null || true
+            elif command -v update-rc.d >/dev/null 2>&1; then
+                update-rc.d -f apf remove 2>/dev/null || true
+            fi
+        fi
+    done
+    if command -v systemctl >/dev/null 2>&1; then
+        systemctl stop apf.service 2>/dev/null || true
+    fi
+    # Do NOT rm -rf %{legacy_path} — APF's legacy path IS the config dir;
+    # package overwrites files in place
+fi
 
 %post
-@@PKG_RPM_POST_SECTION@@
+# Run importconf if migrating from install.sh backup
+if [ -d "%{legacy_path}.bk.last" ] && [ -x /usr/lib/apf/extras/importconf ]; then
+    INSTALL_PATH="%{legacy_path}" /usr/lib/apf/extras/importconf || true
+fi
+# Reload systemd
+if command -v systemctl >/dev/null 2>&1; then
+    systemctl daemon-reload 2>/dev/null || true
+fi
+# Disable conflicting firewalls if active
+for _svc in firewalld ufw; do
+    if command -v systemctl >/dev/null 2>&1 && systemctl is-active --quiet "$_svc" 2>/dev/null; then
+        systemctl stop "$_svc" 2>/dev/null || true
+        systemctl mask "$_svc" 2>/dev/null || true
+    fi
+done
 
 %preun
-@@PKG_RPM_PREUN_SECTION@@
+if [ "$1" = "0" ]; then
+    # Full removal (not upgrade)
+    /usr/sbin/apf --flush 2>/dev/null || true
+    # Stop SysV
+    for _initdir in /etc/rc.d/init.d /etc/init.d; do
+        if [ -f "$_initdir/apf" ]; then
+            "$_initdir/apf" stop 2>/dev/null || true
+            if command -v chkconfig >/dev/null 2>&1; then
+                chkconfig --del apf 2>/dev/null || true
+            fi
+        fi
+    done
+    # Stop systemd
+    if command -v systemctl >/dev/null 2>&1; then
+        systemctl stop apf.service 2>/dev/null || true
+        systemctl disable apf.service 2>/dev/null || true
+    fi
+fi
 
 %postun
-@@PKG_RPM_POSTUN_SECTION@@
+if [ "$1" = "0" ]; then
+    # Full removal — clean symlinks and runtime files
+    rm -f /usr/local/sbin/apf /usr/local/sbin/fwmgr 2>/dev/null || true
+    # Clean per-file symlinks in /etc/apf/internals/ (leave internals.conf — conffile)
+    find /etc/apf/internals/ -maxdepth 1 -type l -delete 2>/dev/null || true
+    # Clean directory symlinks
+    rm -f /etc/apf/extras /etc/apf/doc 2>/dev/null || true
+    # Clean VNET symlink
+    rm -f /etc/apf/vnet/vnetgen 2>/dev/null || true
+    # Clean runtime cron entries (not package-managed)
+    rm -f /etc/cron.d/refresh.apf /etc/cron.d/apf_develmode /etc/cron.d/ctlimit.apf 2>/dev/null || true
+    # Clean generated VNET rules
+    rm -f /etc/apf/vnet/*.rules 2>/dev/null || true
+    # Clean GeoIP cache
+    rm -rf /etc/apf/geoip/ 2>/dev/null || true
+    # Clean lock/temp files
+    rm -rf /var/lib/apf/tmp/* 2>/dev/null || true
+fi
+if command -v systemctl >/dev/null 2>&1; then
+    systemctl daemon-reload 2>/dev/null || true
+fi
 
 %files
 %license COPYING.GPL
-@@PKG_RPM_FILES_SECTION@@
+# Binary
+%attr(755,root,root) /usr/sbin/apf
+
+# Config files (conffiles — preserved on upgrade)
+%config(noreplace) %attr(640,root,root) /etc/apf/conf.apf
+%config(noreplace) %attr(640,root,root) /etc/apf/allow_hosts.rules
+%config(noreplace) %attr(640,root,root) /etc/apf/deny_hosts.rules
+%config(noreplace) %attr(640,root,root) /etc/apf/cc_allow.rules
+%config(noreplace) %attr(640,root,root) /etc/apf/cc_deny.rules
+%config(noreplace) %attr(750,root,root) /etc/apf/hook_pre.sh
+%config(noreplace) %attr(750,root,root) /etc/apf/hook_post.sh
+%config(noreplace) %attr(640,root,root) /etc/apf/sysctl.rules
+%config(noreplace) %attr(640,root,root) /etc/apf/sdrop_hosts.rules
+%config(noreplace) %attr(640,root,root) /etc/apf/silent_ips.rules
+%config(noreplace) %attr(640,root,root) /etc/apf/internals/internals.conf
+
+# APF-managed rules
+%attr(640,root,root) /etc/apf/VERSION
+%attr(640,root,root) /etc/apf/glob_allow.rules
+%attr(640,root,root) /etc/apf/glob_deny.rules
+%attr(640,root,root) /etc/apf/bt.rules
+%attr(640,root,root) /etc/apf/log.rules
+%attr(640,root,root) /etc/apf/main.rules
+%attr(640,root,root) /etc/apf/ds_hosts.rules
+%attr(640,root,root) /etc/apf/ecnshame_hosts.rules
+%attr(640,root,root) /etc/apf/gre.rules
+%attr(640,root,root) /etc/apf/ipset.rules
+%attr(640,root,root) /etc/apf/preroute.rules
+%attr(640,root,root) /etc/apf/postroute.rules
+
+# VNET templates
+%attr(640,root,root) /etc/apf/vnet/main.vnet
+%attr(640,root,root) /etc/apf/vnet/vnetgen.def
+
+# Libraries
+%dir /usr/lib/apf
+%dir /usr/lib/apf/internals
+/usr/lib/apf/internals/apf.lib.sh
+/usr/lib/apf/internals/apf_core.sh
+/usr/lib/apf/internals/apf_cli.sh
+/usr/lib/apf/internals/apf_ipt.sh
+/usr/lib/apf/internals/apf_trust.sh
+/usr/lib/apf/internals/apf_validate.sh
+/usr/lib/apf/internals/apf_ipset.sh
+/usr/lib/apf/internals/apf_dlist.sh
+/usr/lib/apf/internals/apf_geoip.sh
+/usr/lib/apf/internals/apf_ctlimit.sh
+/usr/lib/apf/internals/elog_lib.sh
+/usr/lib/apf/internals/geoip_lib.sh
+/usr/lib/apf/internals/pkg_lib.sh
+%attr(755,root,root) /usr/lib/apf/internals/gretunnel.sh
+/usr/lib/apf/internals/cports.common
+/usr/lib/apf/internals/icmp.types
+/usr/lib/apf/internals/private.networks
+/usr/lib/apf/internals/reserved.networks
+/usr/lib/apf/internals/multicast.networks
+/usr/lib/apf/internals/rab.ports
+/usr/lib/apf/internals/.symlink-manifest
+
+# Extras
+%dir /usr/lib/apf/extras
+%attr(755,root,root) /usr/lib/apf/extras/importconf
+%attr(755,root,root) /usr/lib/apf/extras/get_ports
+
+# VNET executable
+%dir /usr/lib/apf/vnet
+%attr(755,root,root) /usr/lib/apf/vnet/vnetgen
+
+# State directories
+%dir %attr(750,root,root) /var/lib/apf
+%dir %attr(750,root,root) /var/lib/apf/tmp
+%dir %attr(750,root,root) /etc/apf/geoip
+%dir %attr(750,root,root) /var/log/apf
+
+# Directories for config and symlinks
+%dir /etc/apf
+%dir /etc/apf/internals
+%dir /etc/apf/vnet
+
+# Symlink farm: internals per-file
+/etc/apf/internals/apf.lib.sh
+/etc/apf/internals/apf_core.sh
+/etc/apf/internals/apf_cli.sh
+/etc/apf/internals/apf_ipt.sh
+/etc/apf/internals/apf_trust.sh
+/etc/apf/internals/apf_validate.sh
+/etc/apf/internals/apf_ipset.sh
+/etc/apf/internals/apf_dlist.sh
+/etc/apf/internals/apf_geoip.sh
+/etc/apf/internals/apf_ctlimit.sh
+/etc/apf/internals/elog_lib.sh
+/etc/apf/internals/geoip_lib.sh
+/etc/apf/internals/pkg_lib.sh
+/etc/apf/internals/gretunnel.sh
+/etc/apf/internals/cports.common
+/etc/apf/internals/icmp.types
+/etc/apf/internals/private.networks
+/etc/apf/internals/reserved.networks
+/etc/apf/internals/multicast.networks
+/etc/apf/internals/rab.ports
+
+# Symlink farm: directory and binary
+/etc/apf/extras
+/etc/apf/doc
+/etc/apf/vnet/vnetgen
+/usr/local/sbin/apf
+/usr/local/sbin/fwmgr
+
+# System integration
+/usr/lib/systemd/system/apf.service
+%if 0%{?el7}
+/etc/init.d/apf
+%endif
+/etc/cron.d/apf
+/etc/logrotate.d/apf
+/usr/share/bash-completion/completions/apf
+
+# Man page
+/usr/share/man/man8/apf.8*
+
+# Docs
+%doc /usr/share/doc/apf/README.md
+%doc /usr/share/doc/apf/CHANGELOG
+%doc /usr/share/doc/apf/FLOW
 
 %changelog
-@@PKG_RPM_CHANGELOG@@
+* Thu Mar 26 2026 R-fx Networks <proj@rfxn.com> - 2.0.2-1
+- Initial RPM package for APF 2.0.2
+- FHS-compliant layout with backward-compatible symlink farm
+- Migration support from install.sh-based installations via importconf

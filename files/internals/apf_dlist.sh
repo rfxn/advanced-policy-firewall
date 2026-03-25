@@ -36,7 +36,7 @@ download_url() {
 dlist_resnet() {
  if [ -f "$RESNET" ]; then
         command cp "$RESNET" "$RESNET.bk"
-        chmod 600 "$RESNET" "$RESNET.bk"
+        command chmod 600 "$RESNET" "$RESNET.bk"
  fi
 if ( [ -n "$CURL" ] || [ -n "$WGET" ] ) && [ -f "$RESNET" ]; then
    local url_tmp
@@ -45,19 +45,19 @@ if ( [ -n "$CURL" ] || [ -n "$WGET" ] ) && [ -f "$RESNET" ]; then
    eout "{resnet} downloading $DLIST_RESERVED_URL"
    if download_url "$DLIST_RESERVED_URL" "$url_tmp"; then
         eout "{resnet} parsing download into $RESNET"
-        cat "$url_tmp" > "$RESNET"
+        command cat "$url_tmp" > "$RESNET"
    else
         eout "{resnet} download of $DLIST_RESERVED_URL failed"
 	 if [ -f "$RESNET.bk" ]; then
 	     command cp "$RESNET.bk" "$RESNET"
-	     chmod 600 "$RESNET" "$RESNET.bk"
+	     command chmod 600 "$RESNET" "$RESNET.bk"
 	 fi
    fi
    command rm -f "$url_tmp"
 else
  if [ -f "$RESNET.bk" ]; then
 	command cp "$RESNET.bk" "$RESNET"
-	chmod 600 "$RESNET" "$RESNET.bk"
+	command chmod 600 "$RESNET" "$RESNET.bk"
  fi
 fi
 }
@@ -67,7 +67,7 @@ local tag="$1" url="$2" hosts_file="$3" parse_mode="${4:-standard}"
 # Backup existing file
 if [ -f "$hosts_file" ]; then
    command cp "$hosts_file" "$hosts_file.bk"
-   chmod 600 "$hosts_file" "$hosts_file.bk"
+   command chmod 600 "$hosts_file" "$hosts_file.bk"
 fi
 local url_tmp
 url_tmp=$(mktemp "$INSTALL_PATH/.apf-XXXXXX")
@@ -96,7 +96,7 @@ else
             "url=$url"
         if [ -f "$hosts_file.bk" ]; then
             command cp "$hosts_file.bk" "$hosts_file"
-            chmod 600 "$hosts_file" "$hosts_file.bk"
+            command chmod 600 "$hosts_file" "$hosts_file.bk"
         fi
 fi
 command rm -f "$url_tmp"
@@ -106,7 +106,7 @@ dlist_php() {
 if [ -n "$DLIST_PHP_URL" ] && [ "$DLIST_PHP" == "1" ] && ( [ -n "$CURL" ] || [ -n "$WGET" ] ); then
    dlist_download "php" "$DLIST_PHP_URL" "$PHP_HOSTS"
 else
-   command rm -f "$PHP_HOSTS"; touch "$PHP_HOSTS"; chmod 600 "$PHP_HOSTS"
+   command rm -f "$PHP_HOSTS"; command touch "$PHP_HOSTS"; command chmod 600 "$PHP_HOSTS"
 fi
 }
 
@@ -145,7 +145,7 @@ dlist_dshield() {
 if [ -n "$DLIST_DSHIELD_URL" ] && [ "$DLIST_DSHIELD" == "1" ] && ( [ -n "$CURL" ] || [ -n "$WGET" ] ); then
    dlist_download "dshield" "$DLIST_DSHIELD_URL" "$DS_HOSTS"
 else
-   command rm -f "$DS_HOSTS"; touch "$DS_HOSTS"; chmod 600 "$DS_HOSTS"
+   command rm -f "$DS_HOSTS"; command touch "$DS_HOSTS"; command chmod 600 "$DS_HOSTS"
 fi
 }
 
@@ -155,7 +155,7 @@ dlist_spamhaus() {
 if [ -n "$DLIST_SPAMHAUS_URL" ] && [ "$DLIST_SPAMHAUS" == "1" ] && ( [ -n "$CURL" ] || [ -n "$WGET" ] ); then
    dlist_download "sdrop" "$DLIST_SPAMHAUS_URL" "$DROP_HOSTS" "spamhaus"
 else
-   command rm -f "$DROP_HOSTS"; touch "$DROP_HOSTS"; chmod 600 "$DROP_HOSTS"
+   command rm -f "$DROP_HOSTS"; command touch "$DROP_HOSTS"; command chmod 600 "$DROP_HOSTS"
 fi
 }
 
@@ -165,7 +165,7 @@ dlist_ecnshame() {
 if [ -n "$DLIST_ECNSHAME_URL" ] && [ "$DLIST_ECNSHAME" == "1" ] && ( [ -n "$CURL" ] || [ -n "$WGET" ] ); then
    dlist_download "ecnshame" "$DLIST_ECNSHAME_URL" "$ECNSHAME_HOSTS"
 else
-   command rm -f "$ECNSHAME_HOSTS"; touch "$ECNSHAME_HOSTS"; chmod 600 "$ECNSHAME_HOSTS"
+   command rm -f "$ECNSHAME_HOSTS"; command touch "$ECNSHAME_HOSTS"; command chmod 600 "$ECNSHAME_HOSTS"
 fi
 }
 
@@ -217,8 +217,8 @@ if [ -n "$_gtd_url" ] && [ "$USE_RGT" == "1" ] && ( [ -n "$CURL" ] || [ -n "$WGE
    command rm -f "$url_tmp"
 else
    command rm -f "$_gtd_hosts"
-   touch "$_gtd_hosts"
-   chmod 600 "$_gtd_hosts"
+   command touch "$_gtd_hosts"
+   command chmod 600 "$_gtd_hosts"
 fi
 }
 

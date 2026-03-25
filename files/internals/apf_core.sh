@@ -158,7 +158,7 @@ mutex_lock() {
   start_time=$(date +%s)
   while true; do
     if (set -C; echo "$$" > "$LOCK_FILE") 2>/dev/null; then
-      chmod 600 "$LOCK_FILE"
+      command chmod 600 "$LOCK_FILE"
       APF_MUTEX_LOCKED="1"
       return 0
     fi
@@ -321,7 +321,7 @@ else
 	if [ ! "$1" = "1" ]; then
 		eout "{glob} flushing & zeroing chain policies"
 	fi
-	chains=$(cat /proc/net/ip_tables_names 2>/dev/null)
+	chains=$(command cat /proc/net/ip_tables_names 2>/dev/null)
 	# Fallback for nft backend where /proc/net/ip_tables_names is absent
 	if [ -z "$chains" ]; then
 		chains="filter nat mangle raw"
@@ -333,7 +333,7 @@ else
 	ipt -P FORWARD ACCEPT
 
 	if [ "$USE_IPV6" == "1" ]; then
-		chains6=$(cat /proc/net/ip6_tables_names 2>/dev/null)
+		chains6=$(command cat /proc/net/ip6_tables_names 2>/dev/null)
 		# Fallback for nft backend where /proc/net/ip6_tables_names is absent
 		if [ -z "$chains6" ]; then
 			chains6="filter nat mangle raw"
@@ -411,7 +411,7 @@ firewall_info() {
 		[ "$deny_count" -gt 0 ] 2>/dev/null || deny_count=0
 	fi
 	if [ -f "$ALLOW_HOSTS" ] || [ -f "$DENY_HOSTS" ]; then
-		temp_count=$(cat "$ALLOW_HOSTS" "$DENY_HOSTS" "$CC_DENY_HOSTS" "$CC_ALLOW_HOSTS" 2>/dev/null | grep -c '# added .* ttl=.*expire=')
+		temp_count=$(command cat "$ALLOW_HOSTS" "$DENY_HOSTS" "$CC_DENY_HOSTS" "$CC_ALLOW_HOSTS" 2>/dev/null | grep -c '# added .* ttl=.*expire=')
 		[ "$temp_count" -gt 0 ] 2>/dev/null || temp_count=0
 	fi
 	echo "  Allow entries:    $allow_count"
@@ -660,8 +660,8 @@ if [ "$SET_REFRESH" != "0" ] && [ -n "$SET_REFRESH" ]; then
 cat<<EOF > "$INSTALL_PATH/internals/cron.refresh"
 */$SET_REFRESH * * * * root $INSTALL_PATH/apf --refresh >> /dev/null 2>&1
 EOF
-	chmod 644 "$INSTALL_PATH/internals/cron.refresh"
-	ln -fs "$INSTALL_PATH/internals/cron.refresh" /etc/cron.d/refresh.apf
+	command chmod 644 "$INSTALL_PATH/internals/cron.refresh"
+	command ln -fs "$INSTALL_PATH/internals/cron.refresh" /etc/cron.d/refresh.apf
 	eout "{glob} SET_REFRESH is set to $SET_REFRESH minutes"
 else
 	command rm -f /etc/cron.d/refresh.apf
@@ -677,8 +677,8 @@ if ct_enabled; then
 cat<<EOF > "$INSTALL_PATH/internals/cron.ctlimit"
 */$ct_min * * * * root $INSTALL_PATH/apf --ct-scan >> /dev/null 2>&1
 EOF
-	chmod 644 "$INSTALL_PATH/internals/cron.ctlimit"
-	ln -fs "$INSTALL_PATH/internals/cron.ctlimit" /etc/cron.d/ctlimit.apf
+	command chmod 644 "$INSTALL_PATH/internals/cron.ctlimit"
+	command ln -fs "$INSTALL_PATH/internals/cron.ctlimit" /etc/cron.d/ctlimit.apf
 	eout "{ct_limit} CT_LIMIT is set to $CT_LIMIT (scan every ${ct_min}m)"
 else
 	command rm -f /etc/cron.d/ctlimit.apf "$INSTALL_PATH/internals/cron.ctlimit"
@@ -1206,16 +1206,16 @@ eout "{glob} activating firewall"
 # record our last full load
 date +"%s" > "$INSTALL_PATH/internals/.last.full"
 if [ ! -f "$DS_HOSTS" ]; then
-	touch "$DS_HOSTS"
-	chmod 640 "$DS_HOSTS"
+	command touch "$DS_HOSTS"
+	command chmod 640 "$DS_HOSTS"
 fi
 if [ ! -f "$DENY_HOSTS" ]; then
-        touch "$DENY_HOSTS"
-        chmod 640 "$DENY_HOSTS"
+        command touch "$DENY_HOSTS"
+        command chmod 640 "$DENY_HOSTS"
 fi
 if [ ! -f "$ALLOW_HOSTS" ]; then
-        touch "$ALLOW_HOSTS"
-        chmod 640 "$ALLOW_HOSTS"
+        command touch "$ALLOW_HOSTS"
+        command chmod 640 "$ALLOW_HOSTS"
 fi
 # check dev mode
 devm

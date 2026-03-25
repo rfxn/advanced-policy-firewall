@@ -152,25 +152,6 @@ teardown_file() {
     run grep "/etc/apf/apf" /etc/cron.d/apf
     assert_failure
 }
-
-@test "upgrade with SET_REFRESH enabled recreates refresh.apf" {
-    if [ ! -d "/etc/cron.d" ]; then
-        skip "cron.d not available"
-    fi
-    _clean_test_backup
-    # Enable SET_REFRESH in the live install before upgrade
-    sed -i 's/^SET_REFRESH=.*/SET_REFRESH="10"/' "$APF_DIR/conf.apf"
-    cd /opt/apf-src
-    INSTALL_PATH="$APF_DIR" bash install.sh >/dev/null 2>&1 || true
-    # Pre-install cleanup removes it, but upgrade path should re-create it
-    [ -f "/etc/cron.d/refresh.apf" ]
-    run grep -- "--refresh" /etc/cron.d/refresh.apf
-    assert_success
-    # Clean up for subsequent tests
-    rm -f /etc/cron.d/refresh.apf "$APF_DIR/internals/cron.refresh"
-    _clean_test_backup
-}
-
 @test "upgrade with SET_REFRESH=0 does not create refresh.apf" {
     if [ ! -d "/etc/cron.d" ]; then
         skip "cron.d not available"

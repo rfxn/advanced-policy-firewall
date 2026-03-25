@@ -40,8 +40,8 @@ if _elog_output_find "stdout"; then
 fi
 
 if [ ! -f "$LOG_APF" ]; then
-        touch "$LOG_APF"
-        chmod 640 "$LOG_APF"
+        command touch "$LOG_APF"
+        command chmod 640 "$LOG_APF"
         eout "{glob} status log not found, created"
 fi
 

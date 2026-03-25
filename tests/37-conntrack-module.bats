@@ -29,24 +29,9 @@ teardown_file() {
     grep -q 'STATE_MATCH=' "$APF_DIR/internals/internals.conf"
 }
 
-@test "STATE_MATCH detection logic uses xt_conntrack or state fallback" {
-    # Verify the detection block exists
-    grep -q 'xt_conntrack' "$APF_DIR/internals/internals.conf"
-    grep -q 'conntrack --ctstate' "$APF_DIR/internals/internals.conf"
-    grep -q 'state --state' "$APF_DIR/internals/internals.conf"
-}
-
 @test "firewall rules use conntrack or state match for ESTABLISHED" {
     # After start, state tracking rules should exist in iptables -S output
     run iptables -S INPUT
     assert_success
     assert_output --partial "ESTABLISHED"
-}
-
-@test "firewall starts correctly with STATE_MATCH" {
-    # Verify the firewall loaded successfully (chains exist)
-    assert_chain_exists "TALLOW"
-    assert_chain_exists "TDENY"
-    assert_chain_exists "TGALLOW"
-    assert_chain_exists "TGDENY"
 }

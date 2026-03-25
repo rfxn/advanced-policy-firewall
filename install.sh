@@ -29,7 +29,7 @@ fi
 PKG_BACKUP_METHOD="copy"
 
 install() {
-	mkdir -p "$INSTALL_PATH" || { pkg_error "cannot create $INSTALL_PATH"; exit 1; }
+	command mkdir -p "$INSTALL_PATH" || { pkg_error "cannot create $INSTALL_PATH"; exit 1; }
 
 	# Copy source files to install path
 	pkg_copy_tree "files" "$INSTALL_PATH" || { pkg_error "file copy failed"; exit 1; }
@@ -41,7 +41,7 @@ install() {
 	command rm -f "$INSTALL_PATH/internals/ctlimit.apf"
 
 	# Create GeoIP data cache directory
-	mkdir -p "$INSTALL_PATH/geoip"
+	command mkdir -p "$INSTALL_PATH/geoip"
 
 	# Replace hardcoded paths when installing to a custom location
 	if [ "$INSTALL_PATH" != "/etc/apf" ]; then
@@ -136,7 +136,7 @@ install() {
 	# Generate VNET rules
 	"$INSTALL_PATH/vnet/vnetgen" 2>/dev/null  # safe: may fail in containers without interfaces
 
-	chmod 750 "$INSTALL_PATH"
+	command chmod 750 "$INSTALL_PATH"
 }
 
 # _disable_conflicting_service name — stop and disable a conflicting service

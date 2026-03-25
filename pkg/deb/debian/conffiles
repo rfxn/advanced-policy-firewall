@@ -3,7 +3,15 @@
 # Lists config files that dpkg should preserve on upgrade (conffile handling).
 # Each line is an absolute path to a configuration file.
 #
-# Placeholder:
-#   @@PKG_DEB_CONFFILES@@  — one absolute path per line for each config file
 #
-@@PKG_DEB_CONFFILES@@
+/etc/apf/conf.apf
+/etc/apf/internals/internals.conf
+/etc/apf/allow_hosts.rules
+/etc/apf/deny_hosts.rules
+/etc/apf/cc_allow.rules
+/etc/apf/cc_deny.rules
+/etc/apf/hook_pre.sh
+/etc/apf/hook_post.sh
+/etc/apf/sysctl.rules
+/etc/apf/sdrop_hosts.rules
+/etc/apf/silent_ips.rules

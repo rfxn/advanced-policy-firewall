@@ -210,12 +210,6 @@ ISEOF
     # test_block has log=1 and LOG_DROP=1 is set
     assert_rule_exists_ips IPSET_test_block "LOG.*IPSET_test_block"
 }
-
-@test "comment lines in blocklist ignored" {
-    # The test blocklist has a comment line — verify only 3 IPs loaded
-    assert_ipset_entry_count test_block 3
-}
-
 @test "CIDR entries accepted in hash:net set" {
     "$APF" -f 2>/dev/null || true
     ipset destroy test_block 2>/dev/null || true

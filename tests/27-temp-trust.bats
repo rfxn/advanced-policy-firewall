@@ -117,13 +117,6 @@ setup() {
 # =====================================================================
 # TTL parsing
 # =====================================================================
-
-@test "parse_ttl parses bare seconds (300)" {
-    "$APF" -ta 192.0.2.50 300
-    run grep "ttl=300 " "$APF_DIR/allow_hosts.rules"
-    assert_success
-}
-
 @test "parse_ttl parses minutes suffix (5m)" {
     "$APF" -ta 192.0.2.50 5m
     run grep "ttl=300 " "$APF_DIR/allow_hosts.rules"

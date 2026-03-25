@@ -91,7 +91,7 @@ geoip_download() {
 		return 0
 	fi
 
-	mkdir -p "$CC_DATA_DIR" 2>/dev/null  # safe: parent dir always exists
+	command mkdir -p "$CC_DATA_DIR" 2>/dev/null  # safe: parent dir always exists
 	dl_tmp=$(mktemp "$INSTALL_PATH/.apf-geoip-XXXXXX")
 	_apf_reg_tmp "$dl_tmp"
 	_cc_lower=$(echo "$cc" | tr '[:upper:]' '[:lower:]')
@@ -140,8 +140,8 @@ geoip_download() {
 	fi
 
 	# Cache validated data
-	cat "$dl_tmp" > "$cache_file"
-	chmod 640 "$cache_file"
+	command cat "$dl_tmp" > "$cache_file"
+	command chmod 640 "$cache_file"
 	command rm -f "$dl_tmp"
 	eout "{geoip} cached $valid_count CIDRs for $cc (IPv$family)"
 	return 0
@@ -718,7 +718,7 @@ _geoip_world_fetch() {
 	local url="https://www.ipdeny.com/ipblocks/data/countries/all-zones.tar.gz"
 	local tmp_tar tmp_dir count=0
 
-	mkdir -p "$CC_DATA_DIR" 2>/dev/null  # safe: parent dir always exists
+	command mkdir -p "$CC_DATA_DIR" 2>/dev/null  # safe: parent dir always exists
 	tmp_tar=$(mktemp "$INSTALL_PATH/.apf-geoip-XXXXXX") || return 1
 	_apf_reg_tmp "$tmp_tar"
 	tmp_dir=$(mktemp -d "$INSTALL_PATH/.apf-geoip-world-XXXXXX") || { command rm -f "$tmp_tar"; return 1; }
@@ -749,8 +749,8 @@ _geoip_world_fetch() {
 		fi
 		cc=$(echo "$cc_lower" | tr '[:lower:]' '[:upper:]')
 		if [ "$_overwrite" = "1" ] || [ ! -f "$CC_DATA_DIR/${cc}.4" ]; then
-			cat "$f" > "$CC_DATA_DIR/${cc}.4"
-			chmod 640 "$CC_DATA_DIR/${cc}.4"
+			command cat "$f" > "$CC_DATA_DIR/${cc}.4"
+			command chmod 640 "$CC_DATA_DIR/${cc}.4"
 			count=$((count + 1))
 		fi
 	done
@@ -758,7 +758,7 @@ _geoip_world_fetch() {
 	command rm -f "$tmp_tar"
 	command rm -rf "$tmp_dir"
 
-	touch "$CC_DATA_DIR/.world_cached"
+	command touch "$CC_DATA_DIR/.world_cached"
 	eout "{geoip} world GeoIP data cached: $count new countries"
 	return 0
 }

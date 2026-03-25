@@ -18,12 +18,12 @@
 #
 # Placeholders:
 #   apf        — package name
-#   awk '/version/ {print $2}' /etc/apf/VERSION — shell command to extract version from source tree
-#   @@PKG_GIT_EXCLUDES@@ — extra --exclude flags for tar fallback
+#   (version cmd)   — shell command to extract version from source tree
+#   (git excludes)   — extra --exclude flags for tar fallback
 #
 
 PROJDIR := $(realpath $(dir $(MAKEFILE_LIST))/..)
-VERSION := $(shell awk '/version/ {print $2}' /etc/apf/VERSION)
+VERSION := $(shell awk '/version/ {print $$2}' $(PROJDIR)/files/VERSION)
 NAME    := apf
 TARBALL := $(NAME)-$(VERSION).tar.gz
 BUILDDIR := $(CURDIR)/build
@@ -51,7 +51,9 @@ $(BUILDDIR)/$(TARBALL):
 	        --exclude='CLAUDE.md' --exclude='PLAN*.md' \
 	        --exclude='AUDIT.md' --exclude='MEMORY.md' \
 	        --exclude='pkg/build' \
-	        @@PKG_GIT_EXCLUDES@@ \
+	        --exclude='REGR.md' \
+	        --exclude='docs/specs' \
+	        --exclude='.rdf' \
 	        . ; \
 	fi
 
@@ -101,13 +103,13 @@ deb-debian12:
 test-rpm-rocky9: rpm-el9
 	cp $(CURDIR)/test/test-pkg-install.sh $(BUILDDIR)/rpms/
 	docker build -t $(NAME)-test-rpm-rocky9 \
-	    -f $(CURDIR)/test/Dockerfile.test-rpm-rocky9 $(BUILDDIR)/rpms
+	    -f $(CURDIR)/docker/Dockerfile.test-rpm $(BUILDDIR)/rpms
 	docker run --rm --privileged $(NAME)-test-rpm-rocky9
 
 test-deb-debian12: deb-debian12
 	cp $(CURDIR)/test/test-pkg-install.sh $(BUILDDIR)/debs/
 	docker build -t $(NAME)-test-deb-debian12 \
-	    -f $(CURDIR)/test/Dockerfile.test-deb-debian12 $(BUILDDIR)/debs
+	    -f $(CURDIR)/docker/Dockerfile.test-deb $(BUILDDIR)/debs
 	docker run --rm --privileged $(NAME)-test-deb-debian12
 
 # --- Clean ---

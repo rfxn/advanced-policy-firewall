@@ -4,11 +4,6 @@
 # Pre-install scriptlet: detects and backs up existing install.sh-based
 # installations before package lays down FHS files.
 #
-# Placeholders:
-#   apf           — package name
-#   /etc/apf   — legacy install path (e.g., /usr/local/bfd)
-#   apf       — binary name (e.g., bfd)
-#   @@PKG_PREINST_EXTRA@@  — project-specific pre-install commands (optional)
 #
 set -e
 
@@ -19,7 +14,7 @@ case "$1" in
         # Detect and back up existing install.sh-based installation
         # A real (non-package) install has the binary as a regular file,
         # not a symlink (which package installs create via symlink farm)
-        if [ -f "$LEGACY_PATH/apf" ] && [ ! -L "$LEGACY_PATH/internals" ] && [ ! -L "$LEGACY_PATH/apf" ]; then
+        if [ -f "$LEGACY_PATH/apf" ] && [ ! -L "$LEGACY_PATH/internals/apf.lib.sh" ] && [ ! -L "$LEGACY_PATH/apf" ]; then
             # This is a real (non-package) install — back up
             _bkdir="${LEGACY_PATH}.bk.$(date +%Y%m%d-%s)"
             echo "Backing up existing install.sh installation to $_bkdir"
@@ -54,10 +49,9 @@ case "$1" in
             if command -v systemctl >/dev/null 2>&1; then
                 systemctl stop apf.service 2>/dev/null || true
             fi
-            # Remove old install — package will lay down new files
-            rm -rf "$LEGACY_PATH"
+            # Do NOT rm -rf $LEGACY_PATH — APF's legacy path IS the config dir;
+            # package overwrites files in place
         fi
-@@PKG_PREINST_EXTRA@@
         ;;
 esac
 

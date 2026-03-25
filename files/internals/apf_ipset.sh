@@ -221,7 +221,7 @@ if [ -f "$ts_file" ]; then
 fi
 printf '%s\n' "${ts_name}:${ts_epoch}" >> "$ts_tmp"
 command cp "$ts_tmp" "$ts_file"
-chmod 600 "$ts_file"
+command chmod 600 "$ts_file"
 command rm -f "$ts_tmp"
 }
 

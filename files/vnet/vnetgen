@@ -28,8 +28,8 @@ fi
 _vnet_create_rule() {
         local addr="$1"
         if [ ! -f "$INSTALL_PATH/vnet/$addr.rules" ]; then
-                touch "$INSTALL_PATH/vnet/$addr.rules"
-                chmod 600 "$INSTALL_PATH/vnet/$addr.rules"
+                command touch "$INSTALL_PATH/vnet/$addr.rules"
+                command chmod 600 "$INSTALL_PATH/vnet/$addr.rules"
                 . "$INSTALL_PATH/vnet/vnetgen.def"
         fi
 }

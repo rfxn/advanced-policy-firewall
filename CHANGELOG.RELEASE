@@ -137,9 +137,9 @@
       trim() uses cat+rm instead of mv
 [Fix] vnetgen: strip Docker @ifN suffix from ip link output to prevent
       duplicate VNET rules in containers
-[Fix] Portability: replace bare rm/mv/cp with command rm/mv/cp across all
-      shipping files for portable coreutils resolution on pre-usr-merge
-      (CentOS 6, Ubuntu 12.04) and modern distros
+[Fix] Portability: command prefix on all coreutils (rm, mv, cp, chmod,
+      mkdir, touch, ln, cat) across all shipping files for portable
+      resolution on pre-usr-merge distros (CentOS 6, Ubuntu 12.04)
 
   -- Changes --
 
@@ -181,7 +181,7 @@
 
   -- Test Suite --
 
-[New] 39 BATS test files with 672 tests: trust system, advanced trust syntax,
+[New] 39 BATS test files with 664 tests: trust system, advanced trust syntax,
       temp trust, GeoIP, CT_LIMIT, SYN flood, hooks, VNET, fast load, CLI,
       FQDN resolution, block escalation, and regression coverage
 [New] UAT acceptance suite: 14 scenario tests exercising trust lifecycle,

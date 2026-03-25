@@ -3,7 +3,7 @@
 #
 # Placeholders:
 #   apf        — package name
-#   awk '/version/ {print $2}' /etc/apf/VERSION — shell command to extract version from source tree
+#   awk '/version/ {print $2}' /src/apf/files/VERSION — shell command to extract version from source tree
 #
 FROM debian:12
 
@@ -19,7 +19,7 @@ WORKDIR /src/apf/pkg
 
 # Build tarball, then DEB — use explicit version to avoid glob issues
 RUN set -e && \
-    VERSION=$(awk '/version/ {print $2}' /etc/apf/VERSION) && \
+    VERSION=$(awk '/version/ {print $2}' /src/apf/files/VERSION) && \
     make source && \
     mkdir -p build/deb-build && \
     cd build/deb-build && \

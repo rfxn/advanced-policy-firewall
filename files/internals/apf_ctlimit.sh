@@ -50,10 +50,10 @@ _ct_build_exempt() {
 
 	# Local server addresses
 	if [ -f "$INSTALL_PATH/internals/.localaddrs" ]; then
-		cat "$INSTALL_PATH/internals/.localaddrs" >> "$exempt_file"
+		command cat "$INSTALL_PATH/internals/.localaddrs" >> "$exempt_file"
 	fi
 	if [ -f "$INSTALL_PATH/internals/.localaddrs6" ]; then
-		cat "$INSTALL_PATH/internals/.localaddrs6" >> "$exempt_file"
+		command cat "$INSTALL_PATH/internals/.localaddrs6" >> "$exempt_file"
 	fi
 
 	# Allow hosts (strip comments and blank lines)
@@ -86,7 +86,7 @@ _ct_read_conntrack() {
 	if [ -n "$CONNTRACK" ]; then
 		$CONNTRACK -L 2>/dev/null
 	elif [ -f /proc/net/nf_conntrack ]; then
-		cat /proc/net/nf_conntrack
+		command cat /proc/net/nf_conntrack
 	else
 		return 1
 	fi
@@ -220,14 +220,14 @@ ct_scan() {
 	local exempt_tmp
 	exempt_tmp=$(mktemp "$INSTALL_PATH/.apf-ctexempt.XXXXXX")
 	_apf_reg_tmp "$exempt_tmp"
-	chmod 600 "$exempt_tmp"
+	command chmod 600 "$exempt_tmp"
 
 	_ct_build_exempt "$exempt_tmp"
 
 	local ct_data_tmp
 	ct_data_tmp=$(mktemp "$INSTALL_PATH/.apf-ctdata.XXXXXX")
 	_apf_reg_tmp "$ct_data_tmp"
-	chmod 600 "$ct_data_tmp"
+	command chmod 600 "$ct_data_tmp"
 
 	if ! _ct_read_conntrack > "$ct_data_tmp" 2>/dev/null; then
 		eout "{ct_limit} conntrack data unavailable (no conntrack binary or /proc/net/nf_conntrack)"

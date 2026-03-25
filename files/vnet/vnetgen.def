@@ -1,4 +1,4 @@
-cat > /etc/apf/vnet/$addr.rules <<EOF
+command cat > /etc/apf/vnet/$addr.rules <<EOF
 eout "{glob} loading $addr.rules"
 
 # $addr.rules

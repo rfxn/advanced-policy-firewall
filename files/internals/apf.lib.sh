@@ -43,7 +43,7 @@ devm() {
                 eout "{glob} !!DEVELOPMENT MODE ENABLED!! - firewall will flush every 5 minutes." 1
         fi
         echo "*/5 * * * * root $INSTALL_PATH/apf -f >> /dev/null 2>&1" > "$cron_file"
-        chmod 644 "$cron_file"
+        command chmod 644 "$cron_file"
  elif [ "$DEVEL_MODE" == "0" ]; then
         command rm -f "$cron_file"
  fi
@@ -95,7 +95,7 @@ trim() {
                 _trim_tmp=$(mktemp "$(dirname "$FILE")/.trim.XXXXXX")
                 _apf_reg_tmp "$_trim_tmp"
                 tail -n "$MAXLINES" "$FILE" > "$_trim_tmp"
-                cat "$_trim_tmp" > "$FILE"
+                command cat "$_trim_tmp" > "$FILE"
                 command rm -f "$_trim_tmp"
         fi
  fi

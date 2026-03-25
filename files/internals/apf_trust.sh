@@ -855,7 +855,7 @@ record_block() {
 	fi
 
 	command mv -f "$tmpfile" "$history_file"
-	chmod 640 "$history_file"
+	command chmod 640 "$history_file"
 }
 
 check_block_escalation() {

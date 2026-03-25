@@ -82,7 +82,7 @@ list() {
 echo "Loading iptables rules..."
 iptc=$(mktemp "$INSTALL_PATH/.iptrules.XXXXXX")
 _apf_reg_tmp "$iptc"
-chmod 600 "$iptc"
+command chmod 600 "$iptc"
 $IPT $IPT_FLAGS --verbose --numeric --line-numbers --list >> "$iptc"
 if [ "$USE_IPV6" == "1" ] && [ -n "$IP6T" ]; then
 	echo "" >> "$iptc"
@@ -108,7 +108,7 @@ if [ -n "$EDITOR_CMD" ]; then
 elif [ -t 1 ]; then
 	${PAGER:-more} "$iptc"
 else
-	cat "$iptc"
+	command cat "$iptc"
 fi
 command rm -f "$iptc"
 }

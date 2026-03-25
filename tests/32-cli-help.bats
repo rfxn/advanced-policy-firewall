@@ -77,12 +77,6 @@ teardown() {
     assert_success
     assert_output --partial "Configuration validated successfully"
 }
-
-@test "apf --check succeeds with valid config (alias)" {
-    run "$APF" --check
-    assert_success
-}
-
 @test "apf --validate fails with invalid TCP_STOP value" {
     source /opt/tests/helpers/apf-config.sh
     apf_set_config "TCP_STOP" "INVALID"

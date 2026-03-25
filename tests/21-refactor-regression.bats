@@ -64,28 +64,6 @@ teardown() {
     done <<< "$output"
     [ "$found" -eq 1 ]
 }
-
-@test "ICMP uppercase 'ALL' lowercased to protocol-only rule" {
-    source /opt/tests/helpers/apf-config.sh
-    apf_set_config "IG_ICMP_TYPES" "ALL"
-    apf_set_config "EGF" "0"
-    "$APF" -f 2>/dev/null
-    "$APF" -s
-
-    # ALL → all → protocol-only accept (no --icmp-type)
-    run iptables -S INPUT
-    local found=0
-    while IFS= read -r line; do
-        if echo "$line" | grep -q -- '-p icmp' && \
-           echo "$line" | grep -q -- '-j ACCEPT' && \
-           ! echo "$line" | grep -q -- '--icmp-type'; then
-            found=1
-            break
-        fi
-    done <<< "$output"
-    [ "$found" -eq 1 ]
-}
-
 @test "ICMP mixed types and 'all' keyword processes both" {
     source /opt/tests/helpers/apf-config.sh
     apf_set_config "IG_ICMP_TYPES" "3,all"

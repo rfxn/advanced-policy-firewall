@@ -15,9 +15,9 @@
 #   /usr/local/sbin/fwmgr      — legacy binary path
 #   /etc/apf    — legacy install path
 #   8         — man page section
-#   @@PKG_TEST_FHS_FILES@@  — check_file calls for FHS file layout
-#   @@PKG_TEST_SYMLINKS@@   — check_link calls for symlink farm
-#   @@PKG_TEST_EXTRA@@      — project-specific verification tests (optional)
+#   (fhs files)     — check_file calls for FHS file layout
+#   (symlinks)      — check_link calls for symlink farm
+#   (extra tests)   — project-specific verification tests (optional)
 #
 set -euo pipefail
 
@@ -85,12 +85,37 @@ echo ""
 # --- Test 1: FHS paths exist ---
 echo "--- Test 1: FHS file layout ---"
 check_file /usr/sbin/apf "Executable"
-@@PKG_TEST_FHS_FILES@@
+check_file /etc/apf/conf.apf "Config: conf.apf"
+check_file /etc/apf/internals/internals.conf "Config: internals.conf"
+check_file /etc/apf/allow_hosts.rules "Config: allow_hosts.rules"
+check_file /etc/apf/deny_hosts.rules "Config: deny_hosts.rules"
+check_file /usr/lib/apf/internals/apf.lib.sh "Library: apf.lib.sh"
+check_file /usr/lib/apf/internals/apf_core.sh "Library: apf_core.sh"
+check_file /usr/lib/apf/internals/pkg_lib.sh "Library: pkg_lib.sh"
+check_file /usr/lib/apf/extras/importconf "Executable: importconf"
+check_file /usr/lib/apf/extras/get_ports "Executable: get_ports"
+check_file /usr/lib/apf/vnet/vnetgen "Executable: vnetgen"
+check_file /usr/lib/apf/internals/.symlink-manifest "Manifest: .symlink-manifest"
+check_file /etc/apf/vnet/main.vnet "Template: main.vnet"
+check_file /etc/cron.d/apf "System: cron"
+check_file /etc/logrotate.d/apf "System: logrotate"
+check_file /usr/share/bash-completion/completions/apf "System: bash-completion"
+check_file /usr/share/doc/apf/README.md "Doc: README.md"
+check_file /var/lib/apf/tmp "State: tmp dir"
+check_file /var/log/apf "State: log dir"
 echo ""
 
 # --- Test 2: Symlink farm ---
 echo "--- Test 2: Symlink farm ---"
-@@PKG_TEST_SYMLINKS@@
+check_link /etc/apf/internals/apf.lib.sh /usr/lib/apf/internals/apf.lib.sh "Symlink: apf.lib.sh"
+check_link /etc/apf/internals/apf_core.sh /usr/lib/apf/internals/apf_core.sh "Symlink: apf_core.sh"
+check_link /etc/apf/internals/apf_trust.sh /usr/lib/apf/internals/apf_trust.sh "Symlink: apf_trust.sh"
+check_link /etc/apf/internals/pkg_lib.sh /usr/lib/apf/internals/pkg_lib.sh "Symlink: pkg_lib.sh"
+check_link /etc/apf/internals/cports.common /usr/lib/apf/internals/cports.common "Symlink: cports.common"
+check_link /etc/apf/extras /usr/lib/apf/extras "Symlink: extras dir"
+check_link /etc/apf/doc /usr/share/doc/apf "Symlink: doc dir"
+check_link /etc/apf/vnet/vnetgen /usr/lib/apf/vnet/vnetgen "Symlink: vnetgen"
+check_link /usr/local/sbin/apf /usr/sbin/apf "Symlink: /usr/local/sbin/apf"
 check_link /usr/local/sbin/fwmgr /usr/sbin/apf "Symlink: /usr/local/sbin/fwmgr"
 echo ""
 
@@ -104,7 +129,43 @@ echo "--- Test 4: Man page ---"
 check_file /usr/share/man/man8/apf.8* "Man page"
 echo ""
 
-@@PKG_TEST_EXTRA@@
+# --- Test: Conffile count ---
+echo "--- Test: Conffile list ---"
+if [ "$PKG_TYPE" = "rpm" ]; then
+    confcount=$(rpm -qc apf 2>/dev/null | wc -l)
+else
+    confcount=$(grep -c '^/' /var/lib/dpkg/info/apf.conffiles 2>/dev/null || echo 0)
+fi
+if [ "$confcount" -eq 11 ]; then
+    pass "Conffile count ($confcount)"
+else
+    fail "Conffile count ($confcount, expected 11)"
+fi
+echo ""
+
+# --- Test: Symlink manifest ---
+echo "--- Test: Symlink manifest ---"
+manifest="/usr/lib/apf/internals/.symlink-manifest"
+if [ -f "$manifest" ]; then
+    mcount=$(grep -c $'\t' "$manifest")
+    if [ "$mcount" -ge 20 ]; then
+        pass "Manifest entries ($mcount)"
+    else
+        fail "Manifest entries ($mcount, expected >= 20)"
+    fi
+else
+    fail "Manifest file missing ($manifest)"
+fi
+echo ""
+
+# --- Test: Service unit ---
+echo "--- Test: Service unit ---"
+if [ "$PKG_TYPE" = "rpm" ]; then
+    check_file /usr/lib/systemd/system/apf.service "systemd unit (RPM)"
+else
+    check_file /lib/systemd/system/apf.service "systemd unit (DEB)"
+fi
+echo ""
 
 # --- Test: Execution ---
 echo "--- Test: apf execution ---"

@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# pkg_lib.sh — Shared Packaging & Installer Library 1.0.5
+# pkg_lib.sh — Shared Packaging & Installer Library 1.0.6
 ###
 # Copyright (C) 2002-2026 R-fx Networks <proj@rfxn.com>
 #                         Ryan MacDonald <ryan@rfxn.com>
@@ -29,7 +29,7 @@
 [[ -n "${_PKG_LIB_LOADED:-}" ]] && return 0 2>/dev/null
 _PKG_LIB_LOADED=1
 # shellcheck disable=SC2034 # version checked by consumers
-PKG_LIB_VERSION="1.0.5"
+PKG_LIB_VERSION="1.0.6"
 
 # Configurable defaults — consuming projects override via environment
 PKG_NO_COLOR="${PKG_NO_COLOR:-0}"
@@ -3021,6 +3021,135 @@ pkg_fhs_gen_sed_pairs() {
 	done
 
 	return 0
+}
+
+# pkg_fhs_gen_manifest legacy_root — generate symlink manifest from FHS registry
+# Arguments:
+#   $1 — legacy install root (e.g., "/etc/apf", "/usr/local/bfd")
+# Writes a tab-separated manifest to stdout mapping legacy symlink paths
+# to their FHS target paths. Used at package build time to produce a
+# manifest file consumed by pkg_fhs_verify_farm() at runtime.
+# Output format:
+#   # pkg_lib:symlink-manifest:1
+#   {legacy_root}/{src}\t{fhs_dest}
+pkg_fhs_gen_manifest() {
+	local legacy_root="$1"
+
+	if [[ -z "$legacy_root" ]]; then
+		pkg_error "pkg_fhs_gen_manifest: legacy_root required"
+		return 1
+	fi
+
+	local count=${#_PKG_FHS_SRCS[@]}
+	if [[ "$count" -eq 0 ]]; then
+		pkg_warn "pkg_fhs_gen_manifest: no files registered"
+		return 0
+	fi
+
+	echo "# pkg_lib:symlink-manifest:1"
+
+	local i
+	for ((i = 0; i < count; i++)); do
+		printf '%s\t%s\n' "${legacy_root}/${_PKG_FHS_SRCS[$i]}" "${_PKG_FHS_DESTS[$i]}"
+	done
+
+	return 0
+}
+
+# pkg_fhs_verify_farm manifest_path — verify and repair symlink farm from manifest
+# Arguments:
+#   $1 — path to manifest file (e.g., "$INSTALL_PATH/internals/.symlink-manifest")
+# Reads the manifest and verifies each symlink entry. Repairs broken, missing,
+# wrong-target, and regular-file-replaced symlinks when the target exists.
+# Returns 0 if all symlinks are valid (including after repair).
+# Returns 1 if any target is missing or a directory blocks a symlink path.
+# Returns 0 silently if the manifest file does not exist (install.sh layout).
+pkg_fhs_verify_farm() {
+	local manifest_path="$1"
+
+	if [[ -z "$manifest_path" ]]; then
+		pkg_error "pkg_fhs_verify_farm: manifest_path required"
+		return 1
+	fi
+
+	# No manifest = install.sh layout, no symlink farm to verify
+	if [[ ! -f "$manifest_path" ]]; then
+		return 0
+	fi
+
+	local rc=0
+	local link_path target
+
+	while IFS=$'\t' read -r link_path target; do
+		# Skip blank lines
+		[[ -z "$link_path" ]] && continue
+		# Skip comment lines
+		[[ "$link_path" = \#* ]] && continue
+		# Skip malformed lines (no target after tab-split)
+		if [[ -z "$target" ]]; then
+			pkg_warn "malformed manifest line: ${link_path}"
+			continue
+		fi
+
+		# State: valid symlink, correct target — skip
+		if [[ -L "$link_path" ]]; then
+			local current_target
+			current_target=$(readlink "$link_path")
+			if [[ "$current_target" = "$target" ]]; then
+				# Correct — check target still exists
+				if [[ -e "$link_path" ]]; then
+					continue
+				fi
+				# Symlink is correct but target is gone (dangling)
+				pkg_error "symlink target missing: ${target} — reinstall package"
+				rc=1
+				continue
+			fi
+
+			# State: valid symlink, wrong target
+			if [[ -e "$link_path" ]]; then
+				# Wrong target but points to something that exists
+				pkg_symlink "$target" "$link_path"
+				pkg_warn "repaired symlink (wrong target): ${link_path}"
+				continue
+			fi
+
+			# Broken symlink (dangling) with wrong target — check if correct target exists
+			if [[ -e "$target" ]]; then
+				pkg_symlink "$target" "$link_path"
+				pkg_warn "repaired symlink: ${link_path} -> ${target}"
+			else
+				pkg_error "symlink target missing: ${target} — reinstall package"
+				rc=1
+			fi
+			continue
+		fi
+
+		# State: directory at link path (not a symlink)
+		if [[ -d "$link_path" ]]; then
+			pkg_error "directory exists at symlink path: ${link_path} — remove manually"
+			rc=1
+			continue
+		fi
+
+		# State: regular file at link path (not a symlink)
+		if [[ -e "$link_path" ]]; then
+			pkg_symlink "$target" "$link_path"
+			pkg_warn "replaced regular file with symlink: ${link_path}"
+			continue
+		fi
+
+		# State: nothing at link path (missing)
+		if [[ -e "$target" ]]; then
+			pkg_symlink "$target" "$link_path"
+			pkg_warn "repaired symlink: ${link_path} -> ${target}"
+		else
+			pkg_error "symlink target missing: ${target} — reinstall package"
+			rc=1
+		fi
+	done < "$manifest_path"
+
+	return "$rc"
 }
 
 # ══════════════════════════════════════════════════════════════════

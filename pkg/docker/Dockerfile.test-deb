@@ -3,13 +3,13 @@
 #
 # Placeholders:
 #   apf             — package name
-#   @@PKG_DEB_TEST_DEPS@@    — runtime dependencies to install before testing
+#   (deb test deps)   — runtime dependencies to install before testing
 #
 FROM debian:12
 
 # Install dependencies that apf requires at runtime
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends @@PKG_DEB_TEST_DEPS@@ && \
+    apt-get install -y --no-install-recommends bash coreutils iptables iproute2 kmod sed gawk grep procps && \
     rm -rf /var/lib/apt/lists/*
 
 # Copy DEB and test script from build context

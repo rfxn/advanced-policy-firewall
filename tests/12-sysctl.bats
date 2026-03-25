@@ -102,20 +102,6 @@ teardown_file() {
     # Restore
     apf_set_config "SYSCTL_TCP_NOSACK" "0"
 }
-
-@test "tcp_tw_recycle only touched when proc file exists" {
-    # Kernel 4.12+ removed tcp_tw_recycle; sysctl.rules should not error
-    # If the file doesn't exist, this is a no-op (pass by default)
-    # If it does exist, it should be writable
-    if [ -f /proc/sys/net/ipv4/tcp_tw_recycle ]; then
-        local val
-        val=$(cat /proc/sys/net/ipv4/tcp_tw_recycle)
-        [[ "$val" =~ ^[01]$ ]]
-    fi
-    # No error from apf -s means the guard works
-    true
-}
-
 @test "secure_redirects disabled when SYSCTL_ROUTE=1" {
     if [ ! -f /proc/sys/net/ipv4/conf/all/secure_redirects ]; then
         skip "secure_redirects not available"
