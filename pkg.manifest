@@ -32,8 +32,8 @@ PKG_DEP_RPM="iptables iproute kmod bash coreutils"
 PKG_DEP_DEB="iptables iproute2 kmod bash coreutils"
 
 # Conflicts
-PKG_CONFLICTS_RPM="firewalld ufw"
-PKG_CONFLICTS_DEB="firewalld ufw"
+PKG_CONFLICTS_RPM="apf-firewall"
+PKG_CONFLICTS_DEB="apf-firewall"
 
 # Service files (relative to source root)
 PKG_SERVICE_FILE="apf.service"

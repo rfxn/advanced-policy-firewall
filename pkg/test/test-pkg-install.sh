@@ -40,10 +40,13 @@ check_file() {
 check_link() {
 	local link="$1" target="$2" desc="$3"
 	if [ -L "$link" ]; then
-		local actual
+		local actual actual_resolved target_resolved
 		actual=$(readlink "$link")
-		if [ "$actual" = "$target" ]; then
-			pass "$desc ($link -> $target)"
+		# DEB uses relative symlinks (e.g., ../../sbin/apf); resolve both to absolute for comparison
+		actual_resolved=$(readlink -f "$link" 2>/dev/null || echo "$actual")
+		target_resolved=$(readlink -f "$target" 2>/dev/null || echo "$target")
+		if [ "$actual" = "$target" ] || [ "$actual_resolved" = "$target_resolved" ]; then
+			pass "$desc ($link -> $actual)"
 		else
 			fail "$desc ($link -> $actual, expected $target)"
 		fi
@@ -100,7 +103,7 @@ check_file /etc/apf/vnet/main.vnet "Template: main.vnet"
 check_file /etc/cron.d/apf "System: cron"
 check_file /etc/logrotate.d/apf "System: logrotate"
 check_file /usr/share/bash-completion/completions/apf "System: bash-completion"
-check_file /usr/share/doc/apf/README.md "Doc: README.md"
+check_file /usr/share/doc/apf/README* "Doc: README"
 check_file /var/lib/apf/tmp "State: tmp dir"
 check_file /var/log/apf "State: log dir"
 echo ""
@@ -133,13 +136,20 @@ echo ""
 echo "--- Test: Conffile list ---"
 if [ "$PKG_TYPE" = "rpm" ]; then
     confcount=$(rpm -qc apf 2>/dev/null | wc -l)
+    # RPM: exactly 11 conffiles (from %config(noreplace))
+    if [ "$confcount" -eq 11 ]; then
+        pass "Conffile count ($confcount)"
+    else
+        fail "Conffile count ($confcount, expected 11)"
+    fi
 else
     confcount=$(grep -c '^/' /var/lib/dpkg/info/apf.conffiles 2>/dev/null || echo 0)
-fi
-if [ "$confcount" -eq 11 ]; then
-    pass "Conffile count ($confcount)"
-else
-    fail "Conffile count ($confcount, expected 11)"
+    # DEB: exactly 11 conffiles (explicit list via debian/apf.conffiles)
+    if [ "$confcount" -eq 11 ]; then
+        pass "Conffile count ($confcount)"
+    else
+        fail "Conffile count ($confcount, expected 11)"
+    fi
 fi
 echo ""
 

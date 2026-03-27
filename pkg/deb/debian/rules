@@ -93,6 +93,20 @@ override_dh_auto_install:
 	    '/usr/local/sbin/fwmgr	/usr/sbin/apf' \
 	    > $${DESTDIR}/usr/lib/apf/internals/.symlink-manifest
 
+override_dh_installdeb:
+	dh_installdeb
+	# debhelper-compat=13 auto-detects ALL /etc/ files as conffiles.
+	# APF has 28+ files under /etc/ but only 11 are true conffiles
+	# (user-editable config). The rest are APF-managed rule templates
+	# and symlinks that should receive updates on upgrade without
+	# prompting. Replace the auto-generated list with our explicit list.
+	#
+	# NOTE: verify_farm creates relative symlinks (../usr/lib/...) which
+	# triggers 25 pkg_fhs_verify_farm() warnings on first run after DEB
+	# install. Self-corrects on first APF startup. Deferred to pkg_lib
+	# v1.0.7 — relative vs absolute is a pkg_lib concern, not APF.
+	cp debian/apf.conffiles debian/apf/DEBIAN/conffiles
+
 override_dh_auto_test:
 	# Skip — tests require privileged Docker environment
 

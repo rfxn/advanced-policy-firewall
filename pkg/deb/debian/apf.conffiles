@@ -1,0 +1,11 @@
+/etc/apf/conf.apf
+/etc/apf/allow_hosts.rules
+/etc/apf/deny_hosts.rules
+/etc/apf/cc_allow.rules
+/etc/apf/cc_deny.rules
+/etc/apf/hook_pre.sh
+/etc/apf/hook_post.sh
+/etc/apf/sysctl.rules
+/etc/apf/sdrop_hosts.rules
+/etc/apf/silent_ips.rules
+/etc/apf/internals/internals.conf

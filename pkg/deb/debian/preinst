@@ -18,14 +18,14 @@ case "$1" in
             # This is a real (non-package) install — back up
             _bkdir="${LEGACY_PATH}.bk.$(date +%Y%m%d-%s)"
             echo "Backing up existing install.sh installation to $_bkdir"
-            cp -a "$LEGACY_PATH" "$_bkdir"
-            rm -f "${LEGACY_PATH}.bk.last"
-            ln -s "$_bkdir" "${LEGACY_PATH}.bk.last"
+            command cp -a "$LEGACY_PATH" "$_bkdir"
+            command rm -f "${LEGACY_PATH}.bk.last"
+            command ln -s "$_bkdir" "${LEGACY_PATH}.bk.last"
             # Preserve state files
             if [ -d "$LEGACY_PATH/tmp" ]; then
-                mkdir -p /var/lib/apf/tmp
+                command mkdir -p /var/lib/apf/tmp
                 # cp may fail if tmp/ is empty — safe to ignore
-                cp -a "$LEGACY_PATH"/tmp/* /var/lib/apf/tmp/ 2>/dev/null || true
+                command cp -a "$LEGACY_PATH"/tmp/* /var/lib/apf/tmp/ 2>/dev/null || true
             fi
             # Stop SysVinit services if present — the old install.sh-based
             # installation may have registered init scripts that conflict with

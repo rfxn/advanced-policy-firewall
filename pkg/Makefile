@@ -38,7 +38,8 @@ source: $(BUILDDIR)/$(TARBALL)
 # Use git archive when available (native builds), fall back to tar
 $(BUILDDIR)/$(TARBALL):
 	mkdir -p $(BUILDDIR)
-	@if command -v git >/dev/null 2>&1 && [ -d "$(PROJDIR)/.git" ]; then \
+	@if command -v git >/dev/null 2>&1 && [ -d "$(PROJDIR)/.git" ] && \
+	    git -C "$(PROJDIR)" rev-parse HEAD >/dev/null 2>&1; then \
 	    cd $(PROJDIR) && \
 	    git archive --format=tar.gz --prefix=$(NAME)-$(VERSION)/ \
 	        -o $(BUILDDIR)/$(TARBALL) HEAD; \
@@ -54,7 +55,7 @@ $(BUILDDIR)/$(TARBALL):
 	        --exclude='REGR.md' \
 	        --exclude='docs/specs' \
 	        --exclude='.rdf' \
-	        . ; \
+	        . || [ $$? -eq 1 ]; \
 	fi
 
 # --- Native RPM build ---

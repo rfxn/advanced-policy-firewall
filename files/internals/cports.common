@@ -5,7 +5,9 @@
 _port_filter_loop() {
 	local ports="$1" proto="$2" ipt_fn="$3" chain="$4" direction="$5"
 	local i
-	for i in ${ports//,/ }; do
+	# shellcheck disable=SC2086
+	ports=$(printf '%s\n' ${ports//,/ } | command awk '!seen[$0]++' | command tr '\n' ' ')
+	for i in $ports; do
 		expand_port "$i"; i="$_PORT"
 		$ipt_fn -A "$chain" -p "$proto" --dport "$i" -j ACCEPT
 		eout "{glob} opening $direction $proto port $i on $VNET"
@@ -18,7 +20,9 @@ _port_filter_loop() {
 _uid_filter_loop() {
 	local entries="$1" proto="$2"
 	local i uid port
-	for i in ${entries//,/ }; do
+	# shellcheck disable=SC2086
+	entries=$(printf '%s\n' ${entries//,/ } | command awk '!seen[$0]++' | command tr '\n' ' ')
+	for i in $entries; do
 		uid="${i%%:*}"
 		port="${i#*:}"
 		expand_port "$port"; port="$_PORT"
@@ -29,7 +33,9 @@ _uid_filter_loop() {
 
 # Per-port connection limiting (connlimit) — must precede ACCEPT rules
 if [ -n "$IG_TCP_CLIMIT" ]; then
-for i in ${IG_TCP_CLIMIT//,/ }; do
+# shellcheck disable=SC2086
+IG_TCP_CLIMIT=$(printf '%s\n' ${IG_TCP_CLIMIT//,/ } | command awk '!seen[$0]++' | command tr '\n' ' ')
+for i in $IG_TCP_CLIMIT; do
 	[ -z "$i" ] && continue
 	clport="${i%%:*}"; cllimit="${i#*:}"
 	expand_port "$clport"; clport="$_PORT"
@@ -39,7 +45,9 @@ done
 fi
 
 if [ -n "$IG_UDP_CLIMIT" ]; then
-for i in ${IG_UDP_CLIMIT//,/ }; do
+# shellcheck disable=SC2086
+IG_UDP_CLIMIT=$(printf '%s\n' ${IG_UDP_CLIMIT//,/ } | command awk '!seen[$0]++' | command tr '\n' ' ')
+for i in $IG_UDP_CLIMIT; do
 	[ -z "$i" ] && continue
 	clport="${i%%:*}"; cllimit="${i#*:}"
 	expand_port "$clport"; clport="$_PORT"
@@ -65,9 +73,11 @@ _icmp_filter() {
 	fi
 	local suffix=""
 	[ -n "$addr_arg" ] && suffix=" on $VNET"
-	for i in ${types//,/ }; do
+	# shellcheck disable=SC2086
+	types=$(printf '%s\n' ${types//,/ } | command awk '!seen[$0]++' | command tr '\n' ' ')
+	for i in $types; do
 		[ -z "$i" ] && continue
-		i=$(echo "$i" | tr '[:upper:]' '[:lower:]')
+		i=$(echo "$i" | command tr '[:upper:]' '[:lower:]')
 		if [ "$i" == "all" ]; then
 			$ipt_fn -A $chain -p $proto $addr_arg $eargs -j ACCEPT
 			eout "{glob} opening $direction $proto all$suffix"
@@ -115,7 +125,9 @@ if [ -n "$EG_DROP_CMD" ]; then
 		ipt4 -F _DEG_TEST >> /dev/null 2>&1
 		ipt4 -X _DEG_TEST >> /dev/null 2>&1
 		ipt4 -N DEG
-		for i in ${EG_DROP_CMD//,/ }; do
+		# shellcheck disable=SC2086
+		EG_DROP_CMD=$(printf '%s\n' ${EG_DROP_CMD//,/ } | command awk '!seen[$0]++' | command tr '\n' ' ')
+		for i in $EG_DROP_CMD; do
 			si="${i:0:6}"
 			if [ "$LOG_DROP" == "1" ]; then
 			  ipt4 -A DEG -m owner --cmd-owner=$i -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** DEG_$si ** "

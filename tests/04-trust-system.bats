@@ -178,22 +178,6 @@ setup() {
     assert_rule_exists_ip6s TDENY "2001:db8::51"
 }
 
-@test "plain IPv6 in allow_hosts.rules creates ip6tables rules" {
-    if ! ip6tables_available; then skip "ip6tables not available"; fi
-    echo "2001:db8::50" >> "$APF_DIR/allow_hosts.rules"
-    "$APF" -f 2>/dev/null || true
-    "$APF" -s
-    assert_rule_exists_ip6s TALLOW "-s 2001:db8::50"
-    assert_rule_exists_ip6s TALLOW "-d 2001:db8::50"
-}
-
-@test "plain IPv6 in deny_hosts.rules creates ip6tables rules" {
-    if ! ip6tables_available; then skip "ip6tables not available"; fi
-    echo "2001:db8::51" >> "$APF_DIR/deny_hosts.rules"
-    "$APF" -f 2>/dev/null || true
-    "$APF" -s
-    assert_rule_exists_ip6s TDENY "2001:db8::51"
-}
 
 @test "apf -u removes IPv6 from file and chain" {
     if ! ip6tables_available; then skip "ip6tables not available"; fi

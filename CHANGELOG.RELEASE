@@ -71,6 +71,13 @@
 [New] Bash tab completion: apf.bash-completion installed to
       /etc/bash_completion.d/apf; context-sensitive completions for trust
       hosts, temp TTL values, and country codes
+[New] RPM and DEB packaging with FHS-compliant layout: binary at /usr/sbin/apf,
+      libraries at /usr/lib/apf/internals/, config at /etc/apf/; 25-symlink
+      backward-compatible farm for /etc/apf/internals/; .symlink-manifest and
+      pkg_fhs_verify_farm() startup self-healing; Docker build infrastructure
+      (RPM el7/el9, DEB Debian 12); package install verification test suite;
+      migration from install.sh via importconf; 11 RPM conffiles with
+      %config(noreplace)
 
   -- Bug Fixes --
 
@@ -140,9 +147,18 @@
 [Fix] Portability: command prefix on all coreutils (rm, mv, cp, chmod,
       mkdir, touch, ln, cat) across all shipping files for portable
       resolution on pre-usr-merge distros (CentOS 6, Ubuntu 12.04)
+[Fix] GeoIP temp trust: add duplicate check to cli_cc_trust_temp() matching
+      permanent path; prevents duplicate iptables rules when CC already exists
+[Fix] Port dedup: deduplicate comma-separated port lists before rule
+      generation in _port_filter_loop, _uid_filter_loop, _icmp_filter,
+      cdports, and BLK_P2P_PORTS; prevents duplicate iptables rules from
+      duplicate config entries
 
   -- Changes --
 
+[Change] --lookup FQDN resolution: trust_lookup() now resolves FQDN entries
+      in trust files when queried with an IP; uses resolved= metadata first,
+      falls back to live DNS; shows matched FQDN with resolved IPs
 [Change] Conntrack module migration: use -m conntrack --ctstate when available,
       falling back to -m state --state on legacy systems
 [Change] File-based flock mutex: replace FD-based exec/flock with noclobber +

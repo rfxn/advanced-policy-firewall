@@ -12,28 +12,28 @@ LEGACY_PATH="/etc/apf"
 case "$1" in
     configure)
         # Set permissions on config files
-        chmod 640 /etc/apf/conf.apf /etc/apf/internals/internals.conf \
+        command chmod 640 /etc/apf/conf.apf /etc/apf/internals/internals.conf \
             /etc/apf/allow_hosts.rules /etc/apf/deny_hosts.rules \
             /etc/apf/cc_allow.rules /etc/apf/cc_deny.rules \
             /etc/apf/sysctl.rules /etc/apf/sdrop_hosts.rules \
-            /etc/apf/silent_ips.rules 2>/dev/null || true
-        chmod 750 /etc/apf/hook_pre.sh /etc/apf/hook_post.sh 2>/dev/null || true
-        chmod 750 /var/lib/apf/tmp /etc/apf/geoip /var/log/apf 2>/dev/null || true
+            /etc/apf/silent_ips.rules 2>/dev/null || true  # files may not exist on first install
+        command chmod 750 /etc/apf/hook_pre.sh /etc/apf/hook_post.sh 2>/dev/null || true  # hooks may not exist yet
+        command chmod 750 /var/lib/apf/tmp /etc/apf/geoip /var/log/apf 2>/dev/null || true  # dirs may not exist yet
         # Run importconf if migrating from install.sh backup
         if [ -d "${LEGACY_PATH}.bk.last" ]; then
             if [ -x /usr/lib/apf/extras/importconf ]; then
-                INSTALL_PATH="$LEGACY_PATH" /usr/lib/apf/extras/importconf || true
+                INSTALL_PATH="$LEGACY_PATH" /usr/lib/apf/extras/importconf || true  # importconf may fail on corrupt backup
             fi
         fi
         # Reload systemd
         if command -v systemctl >/dev/null 2>&1; then
-            systemctl daemon-reload 2>/dev/null || true
+            systemctl daemon-reload 2>/dev/null || true  # systemd may not be running
         fi
         # Disable conflicting firewalls if active
         for _svc in firewalld ufw; do
-            if command -v systemctl >/dev/null 2>&1 && systemctl is-active --quiet "$_svc" 2>/dev/null; then
-                systemctl stop "$_svc" 2>/dev/null || true
-                systemctl mask "$_svc" 2>/dev/null || true
+            if command -v systemctl >/dev/null 2>&1 && systemctl is-active --quiet "$_svc" 2>/dev/null; then  # suppress stderr if service unknown
+                systemctl stop "$_svc" 2>/dev/null || true  # service may resist stop
+                systemctl mask "$_svc" 2>/dev/null || true  # mask may fail on read-only fs
             fi
         done
         ;;

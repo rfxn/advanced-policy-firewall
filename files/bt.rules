@@ -197,7 +197,9 @@ if [ -n "$BLK_P2P_PORTS" ]; then
         eout "{blk_p2p} set active BLK_P2P"
         # Drop traffic to/from common p2p ports
         ipt -N P2P
-        for i in ${BLK_P2P_PORTS//,/ }; do
+        # shellcheck disable=SC2086
+        BLK_P2P_PORTS=$(printf '%s\n' ${BLK_P2P_PORTS//,/ } | command awk '!seen[$0]++' | command tr '\n' ' ')
+        for i in $BLK_P2P_PORTS; do
                 PORT=$i
                 if [[ "$i" != *_* ]]; then
                         eout "{blk_p2p} deny all to/from tcp port $i"

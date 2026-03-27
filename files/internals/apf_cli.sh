@@ -237,6 +237,31 @@ trust_lookup() {
 		fi
 	done
 
+	# FQDN resolution pass: if queried host is an IP (v4 or v6), check FQDN entries
+	if ! is_fqdn "$host"; then
+		local _tl_line
+		for pair in "ALLOW:$ALLOW_HOSTS" "DENY:$DENY_HOSTS" "GLOBAL ALLOW:$GALLOW_HOSTS" "GLOBAL DENY:$GDENY_HOSTS"; do
+			label="${pair%%:*}"
+			file="${pair#*:}"
+			[ -f "$file" ] || continue
+			while IFS= read -r _tl_line; do
+				[[ "$_tl_line" =~ ^# ]] && continue
+				[ -z "$_tl_line" ] && continue
+				is_fqdn "$_tl_line" || continue
+				if _resolve_fqdn_metadata "$_tl_line"; then
+					case ",$_FQDN_RESOLVED_IPS," in
+						*",$host,"*)
+							echo "${label} (${file##*/}) [FQDN: $_tl_line -> $_FQDN_RESOLVED_IPS]:"
+							grep -in -- "$_tl_line" "$file" 2>/dev/null  # safe: file validated above
+							echo ""
+							found=1
+							;;
+					esac
+				fi
+			done < "$file"
+		done
+	fi
+
 	if [ "$found" -eq 0 ]; then
 		echo "$host not found in any trust file."
 		return 1

@@ -9,7 +9,7 @@ FROM debian:12
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-        build-essential debhelper devscripts tar gzip make && \
+        build-essential debhelper devscripts tar gzip make git && \
     rm -rf /var/lib/apt/lists/*
 
 # Copy project source

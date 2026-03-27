@@ -434,6 +434,29 @@ _source_funcs='source '"$APF_DIR"'/internals/apf.lib.sh; CC_DENY_HOSTS='"$APF_DI
     clean_cc_state
 }
 
+@test "apf -td CC after permanent CC reports duplicate" {
+    clean_cc_state
+    create_cc_fixture_v4 "ZZ"
+    "$APF" -f 2>/dev/null || true
+    "$APF" -s
+
+    # Add permanent CC deny
+    "$APF" -d ZZ "perm test"
+
+    # Attempt temp add of same CC — should report duplicate
+    run "$APF" -td ZZ 1h "temp dupe test"
+    assert_output --partial "already exists"
+
+    # Verify only one set of CC_DENY rules for ZZ (no duplicates)
+    local count
+    count=$(iptables -S CC_DENY 2>/dev/null | grep -c 'apf_cc4_ZZ' || true)
+    [ "$count" -le 2 ]  # 1 LOG + 1 DROP = 2 max
+
+    # Clean up
+    "$APF" -u ZZ 2>/dev/null || true
+    clean_cc_state
+}
+
 # ============================================================
 # Audit mode — CC_LOG_ONLY=1
 # ============================================================

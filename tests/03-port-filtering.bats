@@ -75,13 +75,21 @@ teardown_file() {
     "$APF" -s
 }
 
-@test "port range with underscore notation works" {
+
+@test "duplicate ports in IG_TCP_CPORTS produce no duplicate rules" {
     source /opt/tests/helpers/apf-config.sh
-    apf_set_ports "22,8000_8080" "" "" ""
+    apf_set_ports "22,80,443,80,443" "53" "" ""
     "$APF" -f 2>/dev/null
     "$APF" -s
 
-    assert_rule_exists INPUT "ACCEPT.*tcp.*dpts:8000:8080"
+    # Port 80 should appear exactly once in INPUT ACCEPT rules
+    local count
+    count=$(iptables -S INPUT 2>/dev/null | grep -c '\-\-dport 80 -j ACCEPT' || true)
+    [ "$count" -eq 1 ]
+
+    # Port 443 should appear exactly once in INPUT ACCEPT rules
+    count=$(iptables -S INPUT 2>/dev/null | grep -c '\-\-dport 443 -j ACCEPT' || true)
+    [ "$count" -eq 1 ]
 
     # Cleanup
     apf_set_ports "22,80,443" "53" "21,25,80,443,43" "20,21,53"

@@ -5,22 +5,22 @@ set -e
 case "$1" in
     remove|deconfigure)
         # Flush firewall rules
-        /usr/sbin/apf --flush 2>/dev/null || true
+        /usr/sbin/apf --flush 2>/dev/null || true  # firewall may not be running
         # Stop SysV services
         for _initdir in /etc/rc.d/init.d /etc/init.d; do
             if [ -f "$_initdir/apf" ]; then
-                "$_initdir/apf" stop 2>/dev/null || true
+                "$_initdir/apf" stop 2>/dev/null || true  # service may not be running
                 if command -v chkconfig >/dev/null 2>&1; then
-                    chkconfig --del apf 2>/dev/null || true
+                    chkconfig --del apf 2>/dev/null || true  # service may not be registered
                 elif command -v update-rc.d >/dev/null 2>&1; then
-                    update-rc.d -f apf remove 2>/dev/null || true
+                    update-rc.d -f apf remove 2>/dev/null || true  # links may already be removed
                 fi
             fi
         done
         # Stop systemd service
         if command -v systemctl >/dev/null 2>&1; then
-            systemctl stop apf.service 2>/dev/null || true
-            systemctl disable apf.service 2>/dev/null || true
+            systemctl stop apf.service 2>/dev/null || true  # service may not be running
+            systemctl disable apf.service 2>/dev/null || true  # service may not be enabled
         fi
         ;;
 esac

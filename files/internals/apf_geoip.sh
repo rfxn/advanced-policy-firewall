@@ -1295,6 +1295,16 @@ cli_cc_trust_temp() {
 			eout "{geoip} processing $cc ($_cur/$_total)"
 		fi
 
+		# Duplicate check across both CC files
+		if [ -f "$CC_DENY_HOSTS" ] && grep -v '^#' "$CC_DENY_HOSTS" 2>/dev/null | grep -Fxq "$cc"; then  # safe: file may be empty
+			echo "$cc already exists in cc_deny.rules"
+			continue
+		fi
+		if [ -f "$CC_ALLOW_HOSTS" ] && grep -v '^#' "$CC_ALLOW_HOSTS" 2>/dev/null | grep -Fxq "$cc"; then  # safe: file may be empty
+			echo "$cc already exists in cc_allow.rules"
+			continue
+		fi
+
 		# Download and populate ipset
 		geoip_download "$cc" "4"
 		geoip_populate_set "$cc" "4"

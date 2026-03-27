@@ -5,25 +5,25 @@ set -e
 case "$1" in
     remove)
         # Clean runtime-created files only — conffiles preserved per Debian policy
-        rm -f /etc/cron.d/refresh.apf /etc/cron.d/apf_develmode /etc/cron.d/ctlimit.apf 2>/dev/null || true
-        rm -f /etc/apf/vnet/*.rules 2>/dev/null || true
-        rm -rf /etc/apf/geoip/ 2>/dev/null || true
-        rm -rf /var/lib/apf/tmp/* 2>/dev/null || true
-        find /etc/apf/internals/ -maxdepth 1 -type l -delete 2>/dev/null || true
-        rm -f /etc/apf/extras /etc/apf/doc 2>/dev/null || true
-        rm -f /etc/apf/vnet/vnetgen 2>/dev/null || true
-        rm -f /usr/local/sbin/apf /usr/local/sbin/fwmgr 2>/dev/null || true
+        command rm -f /etc/cron.d/refresh.apf /etc/cron.d/apf_develmode /etc/cron.d/ctlimit.apf 2>/dev/null || true  # cron files may not exist
+        command rm -f /etc/apf/vnet/*.rules 2>/dev/null || true  # generated VNET rules may not exist
+        command rm -rf /etc/apf/geoip/ 2>/dev/null || true  # GeoIP cache may not exist
+        command rm -rf /var/lib/apf/tmp/* 2>/dev/null || true  # tmp dir may be empty
+        command find /etc/apf/internals/ -maxdepth 1 -type l -delete 2>/dev/null || true  # dir may not exist
+        command rm -f /etc/apf/extras /etc/apf/doc 2>/dev/null || true  # symlinks may not exist
+        command rm -f /etc/apf/vnet/vnetgen 2>/dev/null || true  # symlink may not exist
+        command rm -f /usr/local/sbin/apf /usr/local/sbin/fwmgr 2>/dev/null || true  # compat symlinks may not exist
         if command -v systemctl >/dev/null 2>&1; then
-            systemctl daemon-reload 2>/dev/null || true
+            systemctl daemon-reload 2>/dev/null || true  # systemd may not be running
         fi
         ;;
     purge)
-        rm -rf /etc/apf 2>/dev/null || true
-        rm -rf /var/lib/apf 2>/dev/null || true
-        rm -rf /var/log/apf 2>/dev/null || true
-        rm -f /usr/local/sbin/apf /usr/local/sbin/fwmgr 2>/dev/null || true
+        command rm -rf /etc/apf 2>/dev/null || true  # dir may already be removed
+        command rm -rf /var/lib/apf 2>/dev/null || true  # state dir may not exist
+        command rm -rf /var/log/apf 2>/dev/null || true  # log dir may not exist
+        command rm -f /usr/local/sbin/apf /usr/local/sbin/fwmgr 2>/dev/null || true  # compat symlinks may not exist
         if command -v systemctl >/dev/null 2>&1; then
-            systemctl daemon-reload 2>/dev/null || true
+            systemctl daemon-reload 2>/dev/null || true  # systemd may not be running
         fi
         ;;
 esac

@@ -195,27 +195,27 @@ MANIFEST
 if [ -f "%{legacy_path}/apf" ] && [ ! -L "%{legacy_path}/internals/apf.lib.sh" ] && [ ! -L "%{legacy_path}/apf" ]; then
     _bkdir="%{legacy_path}.bk.$(date +%%Y%%m%%d-%%s)"
     echo "Backing up existing install.sh installation to $_bkdir"
-    cp -a "%{legacy_path}" "$_bkdir"
-    rm -f "%{legacy_path}.bk.last"
-    ln -s "$_bkdir" "%{legacy_path}.bk.last"
+    command cp -a "%{legacy_path}" "$_bkdir"
+    command rm -f "%{legacy_path}.bk.last"
+    command ln -s "$_bkdir" "%{legacy_path}.bk.last"
     # Preserve state files
     if [ -d "%{legacy_path}/tmp" ]; then
-        mkdir -p /var/lib/apf/tmp
-        cp -a "%{legacy_path}"/tmp/* /var/lib/apf/tmp/ 2>/dev/null || true
+        command mkdir -p /var/lib/apf/tmp
+        command cp -a "%{legacy_path}"/tmp/* /var/lib/apf/tmp/ 2>/dev/null || true  # tmp/ may be empty
     fi
     # Stop old services
     for _initdir in /etc/rc.d/init.d /etc/init.d; do
         if [ -f "$_initdir/apf" ]; then
-            "$_initdir/apf" stop 2>/dev/null || true
+            "$_initdir/apf" stop 2>/dev/null || true  # service may not be running
             if command -v chkconfig >/dev/null 2>&1; then
-                chkconfig --del apf 2>/dev/null || true
+                chkconfig --del apf 2>/dev/null || true  # service may not be registered
             elif command -v update-rc.d >/dev/null 2>&1; then
-                update-rc.d -f apf remove 2>/dev/null || true
+                update-rc.d -f apf remove 2>/dev/null || true  # links may already be removed
             fi
         fi
     done
     if command -v systemctl >/dev/null 2>&1; then
-        systemctl stop apf.service 2>/dev/null || true
+        systemctl stop apf.service 2>/dev/null || true  # service may not exist
     fi
     # Do NOT rm -rf %{legacy_path} — APF's legacy path IS the config dir;
     # package overwrites files in place
@@ -224,61 +224,61 @@ fi
 %post
 # Run importconf if migrating from install.sh backup
 if [ -d "%{legacy_path}.bk.last" ] && [ -x /usr/lib/apf/extras/importconf ]; then
-    INSTALL_PATH="%{legacy_path}" /usr/lib/apf/extras/importconf || true
+    INSTALL_PATH="%{legacy_path}" /usr/lib/apf/extras/importconf || true  # importconf may fail on corrupt backup
 fi
 # Reload systemd
 if command -v systemctl >/dev/null 2>&1; then
-    systemctl daemon-reload 2>/dev/null || true
+    systemctl daemon-reload 2>/dev/null || true  # systemd may not be running
 fi
 # Disable conflicting firewalls if active
 for _svc in firewalld ufw; do
-    if command -v systemctl >/dev/null 2>&1 && systemctl is-active --quiet "$_svc" 2>/dev/null; then
-        systemctl stop "$_svc" 2>/dev/null || true
-        systemctl mask "$_svc" 2>/dev/null || true
+    if command -v systemctl >/dev/null 2>&1 && systemctl is-active --quiet "$_svc" 2>/dev/null; then  # suppress stderr if service unknown
+        systemctl stop "$_svc" 2>/dev/null || true  # service may resist stop
+        systemctl mask "$_svc" 2>/dev/null || true  # mask may fail on read-only fs
     fi
 done
 
 %preun
 if [ "$1" = "0" ]; then
     # Full removal (not upgrade)
-    /usr/sbin/apf --flush 2>/dev/null || true
+    /usr/sbin/apf --flush 2>/dev/null || true  # firewall may not be running
     # Stop SysV
     for _initdir in /etc/rc.d/init.d /etc/init.d; do
         if [ -f "$_initdir/apf" ]; then
-            "$_initdir/apf" stop 2>/dev/null || true
+            "$_initdir/apf" stop 2>/dev/null || true  # service may not be running
             if command -v chkconfig >/dev/null 2>&1; then
-                chkconfig --del apf 2>/dev/null || true
+                chkconfig --del apf 2>/dev/null || true  # service may not be registered
             fi
         fi
     done
     # Stop systemd
     if command -v systemctl >/dev/null 2>&1; then
-        systemctl stop apf.service 2>/dev/null || true
-        systemctl disable apf.service 2>/dev/null || true
+        systemctl stop apf.service 2>/dev/null || true  # service may not be running
+        systemctl disable apf.service 2>/dev/null || true  # service may not be enabled
     fi
 fi
 
 %postun
 if [ "$1" = "0" ]; then
     # Full removal — clean symlinks and runtime files
-    rm -f /usr/local/sbin/apf /usr/local/sbin/fwmgr 2>/dev/null || true
+    command rm -f /usr/local/sbin/apf /usr/local/sbin/fwmgr 2>/dev/null || true  # compat symlinks may not exist
     # Clean per-file symlinks in /etc/apf/internals/ (leave internals.conf — conffile)
-    find /etc/apf/internals/ -maxdepth 1 -type l -delete 2>/dev/null || true
+    command find /etc/apf/internals/ -maxdepth 1 -type l -delete 2>/dev/null || true  # dir may not exist
     # Clean directory symlinks
-    rm -f /etc/apf/extras /etc/apf/doc 2>/dev/null || true
+    command rm -f /etc/apf/extras /etc/apf/doc 2>/dev/null || true  # symlinks may not exist
     # Clean VNET symlink
-    rm -f /etc/apf/vnet/vnetgen 2>/dev/null || true
+    command rm -f /etc/apf/vnet/vnetgen 2>/dev/null || true  # symlink may not exist
     # Clean runtime cron entries (not package-managed)
-    rm -f /etc/cron.d/refresh.apf /etc/cron.d/apf_develmode /etc/cron.d/ctlimit.apf 2>/dev/null || true
+    command rm -f /etc/cron.d/refresh.apf /etc/cron.d/apf_develmode /etc/cron.d/ctlimit.apf 2>/dev/null || true  # cron files may not exist
     # Clean generated VNET rules
-    rm -f /etc/apf/vnet/*.rules 2>/dev/null || true
+    command rm -f /etc/apf/vnet/*.rules 2>/dev/null || true  # generated rules may not exist
     # Clean GeoIP cache
-    rm -rf /etc/apf/geoip/ 2>/dev/null || true
+    command rm -rf /etc/apf/geoip/ 2>/dev/null || true  # GeoIP cache may not exist
     # Clean lock/temp files
-    rm -rf /var/lib/apf/tmp/* 2>/dev/null || true
+    command rm -rf /var/lib/apf/tmp/* 2>/dev/null || true  # tmp dir may be empty
 fi
 if command -v systemctl >/dev/null 2>&1; then
-    systemctl daemon-reload 2>/dev/null || true
+    systemctl daemon-reload 2>/dev/null || true  # systemd may not be running
 fi
 
 %files

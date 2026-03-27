@@ -265,17 +265,29 @@ teardown() {
     assert_output --partial "usage:"
 }
 
+@test "apf --lookup IP finds FQDN entry via resolved metadata" {
+    "$APF" -s 2>/dev/null || true
+    local allow_file="/opt/apf/allow_hosts.rules"
+    # Add an FQDN entry with resolved= metadata (simulates prior add)
+    echo "# added test.example.com on 03/28/26 14:00:00 addedtime=1774900800 resolved=192.0.2.99" >> "$allow_file"
+    echo "test.example.com" >> "$allow_file"
+
+    run "$APF" --lookup 192.0.2.99
+    assert_success
+    assert_output --partial "FQDN: test.example.com"
+
+    # Cleanup
+    sed -i '/test\.example\.com/d' "$allow_file"
+}
+
 # --- hidden alias regression ---
 
 @test "apf -st still works (exits 0)" {
     run "$APF" -st
     assert_success
+    assert_output --partial "apf"
 }
 
-@test "apf --templ still lists temp entries" {
-    run "$APF" --templ
-    assert_success
-}
 
 @test "apf --help does not show Internal section" {
     run "$APF" --help

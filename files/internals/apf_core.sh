@@ -575,7 +575,9 @@ fi
 cdports() {
 if [ -n "$BLK_PORTS" ]; then
 	eout "{glob} loading common drop ports"
-for i in ${BLK_PORTS//,/ }; do
+# shellcheck disable=SC2086
+BLK_PORTS=$(printf '%s\n' ${BLK_PORTS//,/ } | command awk '!seen[$0]++' | command tr '\n' ' ')
+for i in $BLK_PORTS; do
 	expand_port "$i"; i="$_PORT"
 	ipt -A INPUT  -p tcp --dport $i -j $TCP_STOP
 	ipt -A INPUT  -p udp --dport $i -j $UDP_STOP

@@ -32,6 +32,7 @@ teardown_file() {
 @test "apf -v outputs version (alias)" {
     run "$APF" -v
     assert_success
+    assert_output "2.0.2"
 }
 
 @test "apf with no args shows help and exits 1" {
@@ -52,6 +53,7 @@ teardown_file() {
 @test "apf -t shows status log" {
     run "$APF" -t
     assert_success
+    assert_output --partial "apf"
 }
 
 @test "apf -o dumps config variables" {
