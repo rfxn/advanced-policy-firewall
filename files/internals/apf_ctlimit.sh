@@ -358,3 +358,26 @@ cli_ct_scan() {
 cli_ct_status() {
 	ct_status
 }
+
+## Dispatch: apf ct <verb> [args]
+_dispatch_ct() {
+	case "${1:-}" in
+	-h|--help) _ct_help ;;
+	""|status) cli_ct_status ;;
+	scan)
+		if ct_enabled; then
+			mutex_lock; cli_ct_scan
+		else
+			echo "CT_LIMIT not enabled (CT_LIMIT=0 in conf.apf)"
+		fi
+		;;
+	*)  _ct_help; return 1 ;;
+	esac
+}
+
+_ct_help() {
+	echo "usage: apf ct <command>"
+	echo ""
+	echo "  scan                   run CT_LIMIT scan and block offenders"
+	echo "  status                 show CT_LIMIT config and last scan info"
+}

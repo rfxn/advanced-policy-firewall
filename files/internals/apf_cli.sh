@@ -18,64 +18,36 @@ _APF_CLI_LOADED=1
 APF_CLI_VERSION="1.0.0"
 
 help() {
-	echo "usage: apf [OPTION]"
+	echo "usage: apf [COMMAND] [OPTIONS]"
 	echo ""
-	echo "Firewall Control:"
-	echo "  -s, --start ................. load all firewall rules"
-	echo "  -r, --restart ............... flush & reload all firewall rules"
-	echo "  -f, --stop, --flush ......... flush all firewall rules"
-	echo "  --rules ..................... dump active rules to stdout"
-	echo "  -l, --list .................. view all firewall rules in editor"
-	echo "  --info ...................... show firewall status summary"
-	echo "  -t, --status ................ page through full status log"
-	echo "  -e, --refresh ............... refresh & re-resolve DNS in trust rules"
+	echo "COMMANDS:"
+	echo "  -s              load all firewall rules"
+	echo "  -f              flush all firewall rules"
+	echo "  -r              flush & reload all firewall rules"
+	echo "  -a HOST [CMT]   allow host (IP/CIDR/FQDN/CC)"
+	echo "  -d HOST [CMT]   deny host"
+	echo "  -u HOST         remove host from all lists"
+	echo "  -g PATTERN      search rules and trust files"
 	echo ""
-	echo "Trust Management:"
-	echo "  -a HOST [CMT], --allow ...... add host/CC to allow list and load rule"
-	echo "  -d HOST [CMT], --deny ....... add host/CC to deny list and load rule"
-	echo "  -u HOST, --remove, --unban .. remove host/CC from all trust files"
-	echo "  --la, --list-allow .......... display allow list entries"
-	echo "  --ld, --list-deny ........... display deny list entries"
-	echo "  --lookup HOST ............... check if host exists in trust system"
+	echo "SUBCOMMANDS:"
+	echo "  trust           trust system management"
+	echo "  cc              country code / GeoIP operations"
+	echo "  config          configuration and validation"
+	echo "  status          firewall status and diagnostics"
+	echo "  gre             GRE tunnel management"
+	echo "  ipset           ipset block list management"
+	echo "  ct              connection tracking limit"
 	echo ""
-	echo "  Advanced trust syntax:  apf -a \"tcp:in:d=22:s=10.0.0.0/8\""
-	echo "                          apf -d \"d=3306:s=192.168.1.5\""
-	echo "  Country codes:          apf -d CN      (deny China)"
-	echo "                          apf -a US      (allow United States)"
-	echo "                          apf -d @EU     (deny all of Europe)"
-	echo "                          apf -d \"tcp:in:d=22:s=CN\""
+	echo "UTILITIES:"
+	echo "  -e              refresh & re-resolve DNS in trust rules"
+	echo "  -l              view all firewall rules in editor"
+	echo "  -t              page through full status log"
+	echo "  -o              output all configuration variables"
+	echo "  -v              output version number"
+	echo "  -h, --help      show this help message"
 	echo ""
-	echo "Temporary Trust:"
-	echo "  -ta HOST TTL [CMT], --temp-allow  temporarily allow host/CC (5m, 1h, 7d)"
-	echo "  -td HOST TTL [CMT], --temp-deny   temporarily deny host/CC"
-	echo "  --temp-list ................. list temp entries with remaining TTL"
-	echo "  --temp-flush ................ remove all temporary entries"
-	echo ""
-	echo "Diagnostics:"
-	echo "  -g PATTERN, --search ........ search iptables/ipset rules & trust files"
-	echo "  --validate, --check ......... validate config without starting firewall"
-	echo "  -o, --dump-config, --ovars .. output all configuration variables"
-	echo "  -v, --version ............... output version number"
-	echo "  -h, --help .................. show this help message"
-	echo ""
-	echo "Country Code Filtering:"
-	echo "  --cc ........................ show GeoIP status overview"
-	echo "  --cc CC ..................... show detail for country/continent (CN, @EU)"
-	echo "  --cc IP ..................... look up country for an IP or CIDR"
-	echo "  --cc-update ................. refresh GeoIP data and ipsets"
-	echo ""
-	echo "  NOTE: cc_allow.rules is a STRICT allowlist — all countries NOT listed"
-	echo "        are blocked. Add admin IPs to allow_hosts.rules first."
-	echo ""
-	echo "Connection Tracking Limit:"
-	echo "  --ct-scan ................... run CT_LIMIT scan and block offenders"
-	echo "  --ct-status ................. show CT_LIMIT config and last scan info"
-	echo ""
-	echo "Subsystems:"
-	echo "  --ipset-update .............. hot-reload ipset block lists"
-	echo "  --gre-up .................... bring up GRE tunnels"
-	echo "  --gre-down .................. tear down GRE tunnels"
-	echo "  --gre-status ................ show GRE tunnel status"
+	echo "Run 'apf <command> --help' for subcommand details."
+	echo "CSF users: run 'apf --csf-help' for a command mapping."
 }
 
 list() {
@@ -218,7 +190,7 @@ ovars() {
 trust_lookup() {
 	local host="$1"
 	if [ -z "$host" ]; then
-		echo "usage: apf --lookup HOST"
+		echo "usage: apf trust lookup HOST"
 		return 1
 	fi
 	local found=0
@@ -286,4 +258,87 @@ cl_cports() {
 	SMTP_ALLOWUSER=""
 	SMTP_ALLOWGROUP=""
 	EG_DROP_CMD=""
+}
+
+## Dispatch: apf status <verb>
+_dispatch_status() {
+	case "${1:-}" in
+	"")
+		firewall_info
+		;;
+	-h|--help)
+		_status_help
+		;;
+	rules)  rules ;;
+	log)    status ;;
+	*)      _status_help; return 1 ;;
+	esac
+}
+
+## Dispatch: apf config <verb>
+_dispatch_config() {
+	case "${1:-}" in
+	-h|--help|"") _config_help ;;
+	dump)     apf_banner; ovars ;;
+	validate) cli_validate ;;
+	*)        _config_help; return 1 ;;
+	esac
+}
+
+_status_help() {
+	echo "usage: apf status <command>"
+	echo ""
+	echo "  (none)                 show firewall status summary (= apf --info)"
+	echo "  rules                  dump active rules to stdout (= apf --rules)"
+	echo "  log                    page through full status log (= apf -t)"
+}
+
+_config_help() {
+	echo "usage: apf config <command>"
+	echo ""
+	echo "  dump                   output all configuration variables (= apf -o)"
+	echo "  validate               validate config without starting firewall"
+}
+
+_csf_help() {
+	echo "CSF-to-APF Command Reference"
+	echo ""
+	echo "SERVICE:"
+	echo "  csf -s          =  apf -s              start firewall"
+	echo "  csf -f          =  apf -f              stop/flush firewall"
+	echo "  csf -r          =  apf -r              restart firewall"
+	echo ""
+	echo "ALLOW / DENY:"
+	echo "  csf -a IP       =  apf -a IP           allow host"
+	echo "  csf -d IP       =  apf -d IP           deny host"
+	echo "  csf -ar IP      =  apf -u IP           remove from allow"
+	echo "  csf -dr IP      =  apf -u IP           remove from deny"
+	echo ""
+	echo "TEMPORARY:"
+	echo "  csf -ta IP TTL  =  apf trust temp add IP TTL"
+	echo "  csf -td IP TTL  =  apf trust temp deny IP TTL"
+	echo "  csf -t          =  apf trust temp list"
+	echo "  csf -tr IP      =  apf -u IP           remove temp entry"
+	echo "  csf -tf         =  apf trust temp flush"
+	echo ""
+	echo "SEARCH / LOOKUP:"
+	echo "  csf -g IP       =  apf -g IP           search rules"
+	echo "  csf -i IP       =  apf cc lookup IP    GeoIP lookup"
+	echo "  csf -l          =  apf -l              list iptables rules"
+	echo ""
+	echo "COUNTRY BLOCKING:"
+	echo "  CC_DENY in csf.conf  =  apf -d CN      per-CC via trust system"
+	echo "  CC_ALLOW in csf.conf =  apf -a US      via cc_allow.rules"
+	echo ""
+	echo "CONFIG:"
+	echo "  csf --check     =  apf config validate"
+	echo ""
+	echo "DIFFERENCES:"
+	echo "  * APF -u searches ALL lists (no need for separate -ar/-dr)"
+	echo "  * APF country blocking uses rules files, not config variables"
+	echo "  * APF advanced syntax uses ':' separator (CSF uses '|')"
+	echo "    CSF: tcp|in|d=22|s=10.0.0.0/8"
+	echo "    APF: tcp:in:d=22:s=10.0.0.0/8"
+	echo "  * APF DEVEL_MODE = CSF TESTING (auto-flush safety net)"
+	echo "  * APF has no LFD -- use BFD for brute-force detection"
 }

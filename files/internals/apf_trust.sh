@@ -1379,3 +1379,128 @@ refresh() {
 	deny_hosts $DENY_HOSTS TDENY
         ipt -F REFRESH_TEMP
 }
+
+## Shared helper: trust remove with output (eliminates triple duplication)
+# Used by: _dispatch_trust(remove), _dispatch_trust_temp(remove), and Tier 1 -u
+_cli_trust_remove_with_output() {
+	local host="$1"
+	if cli_trust_remove "$host"; then
+		eout "{trust} removed $host from trust system"
+		elog_event "trust_removed" "info" "{trust} removed $host from trust system" \
+			"host=$host"
+		if [ "$SET_VERBOSE" != "1" ]; then
+			echo "Removed $host from trust system."
+		fi
+	else
+		eout "{trust} $host not found in trust system"
+		if [ "$SET_VERBOSE" != "1" ]; then
+			echo "$host not found in trust system." >&2
+		fi
+	fi
+}
+
+## Dispatch: apf trust <verb> [args]
+_dispatch_trust() {
+	case "${1:-}" in
+	-h|--help|"") _trust_help ;;
+	add)
+		shift; mutex_lock
+		cli_trust "TALLOW" "ALLOW" "$ALLOW_HOSTS" "$@" || exit 1
+		;;
+	deny)
+		shift; mutex_lock
+		cli_trust "TDENY" "DENY" "$DENY_HOSTS" "$@" || exit 1
+		;;
+	remove)
+		shift; mutex_lock
+		_cli_trust_remove_with_output "$1"
+		;;
+	list)
+		shift
+		case "${1:-}" in
+		--allow) list_trust_file "$ALLOW_HOSTS" "allow_hosts.rules" ;;
+		--deny)  list_trust_file "$DENY_HOSTS" "deny_hosts.rules" ;;
+		--temp)  list_temp_entries ;;
+		*)       list_trust_file "$ALLOW_HOSTS" "allow_hosts.rules"
+		         echo ""
+		         list_trust_file "$DENY_HOSTS" "deny_hosts.rules" ;;
+		esac
+		;;
+	lookup)
+		shift; trust_lookup "$@" || exit 1
+		;;
+	refresh)
+		mutex_lock; refresh
+		;;
+	flush)
+		shift
+		case "${1:-}" in
+		--deny)  echo "apf trust flush --deny: not yet implemented" >&2; exit 1 ;;
+		--allow) echo "apf trust flush --allow: not yet implemented" >&2; exit 1 ;;
+		--temp)  mutex_lock; flush_temp_entries ;;
+		*)       _trust_help; return 1 ;;
+		esac
+		;;
+	temp)
+		shift; _dispatch_trust_temp "$@"
+		;;
+	*)  _trust_help; return 1 ;;
+	esac
+}
+
+## Dispatch: apf trust temp <verb> [args]
+_dispatch_trust_temp() {
+	case "${1:-}" in
+	-h|--help|"") _trust_temp_help ;;
+	add)
+		shift; mutex_lock
+		cli_trust_temp "TALLOW" "ALLOW" "$ALLOW_HOSTS" "$@" || exit 1
+		;;
+	deny)
+		shift; mutex_lock
+		cli_trust_temp "TDENY" "DENY" "$DENY_HOSTS" "$@" || exit 1
+		;;
+	remove)
+		shift; mutex_lock
+		_cli_trust_remove_with_output "$1"
+		;;
+	list)  list_temp_entries ;;
+	flush) mutex_lock; flush_temp_entries ;;
+	expire)
+		if grep -q '# added .* ttl=' "$ALLOW_HOSTS" "$DENY_HOSTS" "$CC_DENY_HOSTS" "$CC_ALLOW_HOSTS" 2>/dev/null; then  # safe: files may not exist during first run
+			mutex_lock; expire_temp_entries
+		fi
+		;;
+	*)  _trust_temp_help; return 1 ;;
+	esac
+}
+
+_trust_help() {
+	echo "usage: apf trust <command> [args]"
+	echo ""
+	echo "  add HOST [CMT]         allow a host (= apf -a)"
+	echo "  deny HOST [CMT]        deny a host (= apf -d)"
+	echo "  remove HOST            remove from all lists (= apf -u)"
+	echo "  list                   show all trust entries"
+	echo "  list --allow           show allow entries only"
+	echo "  list --deny            show deny entries only"
+	echo "  list --temp            show temporary entries with TTL"
+	echo "  lookup HOST            check if host exists in trust system"
+	echo "  refresh                re-resolve FQDNs (= apf -e)"
+	echo "  flush --temp           remove all temporary entries"
+	echo "  temp                   temporary trust operations (see: apf trust temp --help)"
+	echo ""
+	echo "  Advanced syntax:  apf trust deny \"tcp:in:d=22:s=10.0.0.0/8\""
+	echo "  Country codes:    apf trust deny CN"
+	echo "                    apf trust deny @EU"
+}
+
+_trust_temp_help() {
+	echo "usage: apf trust temp <command> [args]"
+	echo ""
+	echo "  add HOST TTL [CMT]     temporarily allow host (5m, 1h, 7d)"
+	echo "  deny HOST TTL [CMT]    temporarily deny host"
+	echo "  remove HOST            remove temporary entry"
+	echo "  list                   list temp entries with remaining TTL"
+	echo "  flush                  remove all temporary entries"
+}

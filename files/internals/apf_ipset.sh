@@ -306,3 +306,33 @@ while IFS= read -r line; do
 done < "$ipset_rules"
 command rm -f "$INSTALL_PATH/internals/.ipset.timestamps"
 }
+
+## Dispatch: apf ipset <verb> [args]
+_dispatch_ipset() {
+	case "${1:-}" in
+	-h|--help) _ipset_help ;;
+	""|status)
+		if [ "$USE_IPSET" == "1" ] && [ -n "$IPSET" ]; then
+			echo "ipset: enabled"
+			$IPSET list -n 2>/dev/null  # safe: read-only listing
+		else
+			echo "ipset not enabled (USE_IPSET=0 in conf.apf)"
+		fi
+		;;
+	update)
+		if [ "$USE_IPSET" == "1" ]; then
+			mutex_lock; ipset_update
+		else
+			echo "ipset not enabled (USE_IPSET=0 in conf.apf)"
+		fi
+		;;
+	*)  _ipset_help; return 1 ;;
+	esac
+}
+
+_ipset_help() {
+	echo "usage: apf ipset <command>"
+	echo ""
+	echo "  update                 hot-reload ipset block lists"
+	echo "  status                 show ipset list names"
+}

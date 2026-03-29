@@ -39,6 +39,13 @@
       --lookup HOST (trust file search), --validate/--check (config dry-run),
       --list-allow/--list-deny (filtered trust display),
       --cc/--cc-update (GeoIP status and refresh), --dump-config, -h/--help
+[New] CLI subcommand architecture: apf <noun> <verb> dispatch
+      - 7 subcommand groups: trust, cc, config, status, gre, ipset, ct
+      - Three-tier help: COMMANDS / SUBCOMMANDS / UTILITIES
+      - Per-group help via 'apf <command> --help'
+[New] CSF compatibility: -ar, -dr, -tr, -i aliases; apf --csf-help mapping
+[New] Subcommand-aware bash tab completion
+[Change] All 2.0.x flat flags preserved as silent aliases
 [New] Per-port connection limiting via xt_connlimit: IG_TCP_CLIMIT and
       IG_UDP_CLIMIT with port:limit pairs, port range support, VNET binding
 [New] ipset 7-field format: per-list refresh interval and max entry count;

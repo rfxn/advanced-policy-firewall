@@ -43,23 +43,21 @@ teardown() {
 @test "apf --help shows section headers" {
     run "$APF" --help
     assert_success
-    assert_output --partial "Firewall Control:"
-    assert_output --partial "Trust Management:"
-    assert_output --partial "Temporary Trust:"
-    assert_output --partial "Diagnostics:"
-    assert_output --partial "Subsystems:"
+    assert_output --partial "COMMANDS:"
+    assert_output --partial "SUBCOMMANDS:"
+    assert_output --partial "UTILITIES:"
 }
 
-@test "apf -h includes new options in output" {
+@test "apf -h includes subcommand groups in output" {
     run "$APF" -h
     assert_success
-    assert_output --partial "--validate"
-    assert_output --partial "--list-allow"
-    assert_output --partial "--list-deny"
-    assert_output --partial "--dump-config"
-    assert_output --partial "--rules"
-    assert_output --partial "--info"
-    assert_output --partial "--lookup"
+    assert_output --partial "trust"
+    assert_output --partial "cc"
+    assert_output --partial "config"
+    assert_output --partial "status"
+    assert_output --partial "gre"
+    assert_output --partial "ipset"
+    assert_output --partial "ct"
 }
 
 # --- --dump-config ---
@@ -335,3 +333,180 @@ teardown() {
 # terminates APF directly; the EXIT trap ensures cleanup. Interface failure
 # cannot be tested with VF_ROUTE=0 (Docker default). The start success path
 # is covered by tests/01-install-cli.bats and numerous other test files.
+
+# --- subcommand dispatch (G1) ---
+
+@test "apf trust add routes to cli_trust" {
+    "$APF" -s >/dev/null 2>&1 || true
+    run "$APF" trust add 192.0.2.1 "test add"
+    assert_success
+    assert_output --partial "192.0.2.1"
+}
+
+@test "apf trust deny routes to cli_trust" {
+    "$APF" -s >/dev/null 2>&1 || true
+    run "$APF" trust deny 192.0.2.1 "test deny"
+    assert_success
+    assert_output --partial "192.0.2.1"
+}
+
+@test "apf trust remove routes to trust remove" {
+    "$APF" -s >/dev/null 2>&1 || true
+    "$APF" trust add 192.0.2.50 "remove test" >/dev/null 2>&1 || true
+    run "$APF" trust remove 192.0.2.50
+    assert_success
+    assert_output --partial "192.0.2.50"
+}
+
+@test "apf config validate succeeds with valid config" {
+    run "$APF" config validate
+    assert_success
+}
+
+@test "apf config dump outputs config variables" {
+    run "$APF" config dump
+    assert_success
+    assert_output --partial "INSTALL_PATH"
+}
+
+@test "apf status shows firewall status summary" {
+    "$APF" -s >/dev/null 2>&1 || true
+    run "$APF" status
+    assert_success
+    assert_output --partial "Firewall Status"
+}
+
+@test "apf status rules outputs iptables rules" {
+    "$APF" -s >/dev/null 2>&1 || true
+    run "$APF" status rules
+    assert_success
+    assert_output --partial "-A"
+}
+
+@test "apf status log exits 0" {
+    PAGER=cat run "$APF" status log
+    assert_success
+}
+
+# --- per-group help (G3) ---
+
+@test "apf trust --help shows trust verbs" {
+    run "$APF" trust --help
+    assert_success
+    assert_output --partial "add HOST"
+    assert_output --partial "deny HOST"
+    assert_output --partial "remove HOST"
+    assert_output --partial "lookup HOST"
+}
+
+@test "apf trust (bare) shows help" {
+    run "$APF" trust
+    assert_success
+    assert_output --partial "usage: apf trust"
+}
+
+@test "apf config --help shows config verbs" {
+    run "$APF" config --help
+    assert_success
+    assert_output --partial "dump"
+    assert_output --partial "validate"
+}
+
+@test "apf status --help shows status verbs" {
+    run "$APF" status --help
+    assert_success
+    assert_output --partial "rules"
+    assert_output --partial "log"
+}
+
+# --- Tier 1 vs Tier 2 equivalence (G4) ---
+
+@test "Tier 1 -o matches Tier 2 config dump output" {
+    run "$APF" -o
+    local tier1_output="$output"
+    run "$APF" config dump
+    assert_equal "$output" "$tier1_output"
+}
+
+@test "Tier 1 -a matches Tier 2 trust add behavior" {
+    "$APF" -s >/dev/null 2>&1 || true
+    run "$APF" -a 192.0.2.70 "tier1 test"
+    assert_success
+    assert_output --partial "192.0.2.70"
+    "$APF" -u 192.0.2.70 >/dev/null 2>&1 || true
+    run "$APF" trust add 192.0.2.70 "tier2 test"
+    assert_success
+    assert_output --partial "192.0.2.70"
+}
+
+@test "Tier 1 -u matches Tier 2 trust remove behavior" {
+    "$APF" -s >/dev/null 2>&1 || true
+    "$APF" -a 192.0.2.71 "equiv test" >/dev/null 2>&1 || true
+    run "$APF" -u 192.0.2.71
+    assert_success
+    assert_output --partial "192.0.2.71"
+    "$APF" trust add 192.0.2.72 "equiv test" >/dev/null 2>&1 || true
+    run "$APF" trust remove 192.0.2.72
+    assert_success
+    assert_output --partial "192.0.2.72"
+}
+
+# --- CSF compat (G5) ---
+
+@test "apf -ar routes to trust remove" {
+    "$APF" -s >/dev/null 2>&1 || true
+    "$APF" trust add 192.0.2.60 "csf test" >/dev/null 2>&1 || true
+    run "$APF" -ar 192.0.2.60
+    assert_success
+    assert_output --partial "192.0.2.60"
+}
+
+@test "apf -dr routes to trust remove" {
+    "$APF" -s >/dev/null 2>&1 || true
+    "$APF" trust deny 192.0.2.61 "csf test" >/dev/null 2>&1 || true
+    run "$APF" -dr 192.0.2.61
+    assert_success
+    assert_output --partial "192.0.2.61"
+}
+
+@test "apf --csf-help shows mapping table" {
+    run "$APF" --csf-help
+    assert_success
+    assert_output --partial "CSF-to-APF"
+    assert_output --partial "csf -a"
+    assert_output --partial "csf -d"
+}
+
+# --- completion (G6) ---
+
+@test "completion script sources without error" {
+    local comp_file
+    if [ -f /etc/bash_completion.d/apf ]; then
+        comp_file="/etc/bash_completion.d/apf"
+    elif [ -f /opt/tests/apf.bash-completion ]; then
+        comp_file="/opt/tests/apf.bash-completion"
+    else
+        skip "completion script not found"
+    fi
+    run bash -n "$comp_file"
+    assert_success
+}
+
+# --- unknown verb / edge cases (G7, E9) ---
+
+@test "apf trust badverb exits 1 with help" {
+    run "$APF" trust badverb
+    assert_failure
+    assert_output --partial "usage: apf trust"
+}
+
+@test "apf badnoun exits 1" {
+    run "$APF" badnoun
+    assert_failure
+}
+
+@test "apf trust flush without target exits 1 with help" {
+    run "$APF" trust flush
+    assert_failure
+    assert_output --partial "usage: apf trust"
+}

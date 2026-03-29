@@ -65,6 +65,8 @@ See [CHANGELOG](CHANGELOG) for the complete release notes.
   - [3.16 Implicit Blocking](#316-implicit-blocking)
   - [3.17 Firewall Order](#317-firewall-order-of-operations)
 - [4. Usage](#4-usage)
+  - [Subcommand Reference](#subcommand-reference)
+  - [Classic Flag Reference](#classic-flag-reference)
   - [4.1 Trust System](#41-trust-system)
   - [4.2 Global Trust](#42-global-trust-system)
   - [4.3 Advanced Trust Syntax](#43-advanced-trust-syntax)
@@ -753,11 +755,93 @@ For the complete step-by-step initialization flow — including source file refe
 
 ## 4. Usage
 
-Day-to-day firewall operations are performed through the `apf` command. See `man apf`(8) for the complete option reference.
+Day-to-day firewall operations are performed through the `apf` command. APF supports both classic single-letter flags and a structured `apf <noun> <verb>` subcommand syntax. All existing flags continue to work; subcommands provide a discoverable alternative. See `man apf`(8) for the complete reference.
 
 ```
-usage: apf [OPTION]
+usage: apf [COMMAND] [OPTIONS]
 
+COMMANDS:
+  -s              load all firewall rules
+  -f              flush all firewall rules
+  -r              flush & reload all firewall rules
+  -a HOST [CMT]   allow host (IP/CIDR/FQDN/CC)
+  -d HOST [CMT]   deny host
+  -u HOST         remove host from all lists
+  -g PATTERN      search rules and trust files
+
+SUBCOMMANDS:
+  trust           trust system management
+  cc              country code / GeoIP operations
+  config          configuration and validation
+  status          firewall status and diagnostics
+  gre             GRE tunnel management
+  ipset           ipset block list management
+  ct              connection tracking limit
+
+UTILITIES:
+  -e              refresh & re-resolve DNS in trust rules
+  -l              view all firewall rules in editor
+  -t              page through full status log
+  -o              output all configuration variables
+  -v              output version number
+  -h, --help      show this help message
+
+Run 'apf <command> --help' for subcommand details.
+CSF users: run 'apf --csf-help' for a command mapping.
+```
+
+### Subcommand Reference
+
+Each subcommand group has its own verbs and help (`apf <noun> --help`). The table below summarizes available operations with their classic flag equivalents:
+
+| Subcommand | Verb | Classic Equivalent | Description |
+|------------|------|--------------------|-------------|
+| **trust** | `add HOST [CMT]` | `apf -a` | Allow a host |
+| | `deny HOST [CMT]` | `apf -d` | Deny a host |
+| | `remove HOST` | `apf -u` | Remove from all lists |
+| | `list [--allow\|--deny\|--temp]` | `--la`, `--ld`, `--templ` | Show trust entries |
+| | `lookup HOST` | `--lookup` | Check if host is trusted |
+| | `refresh` | `apf -e` | Re-resolve FQDNs |
+| | `flush --temp` | `--tempf` | Remove all temp entries |
+| | `temp add HOST TTL [CMT]` | `apf -ta` | Temporarily allow |
+| | `temp deny HOST TTL [CMT]` | `apf -td` | Temporarily deny |
+| | `temp remove HOST` | `apf -u` | Remove temp entry |
+| | `temp list` | `--templ` | List temp entries with TTL |
+| | `temp flush` | `--tempf` | Remove all temp entries |
+| **cc** | `info [CC\|IP]` | `--cc [CC\|IP]` | GeoIP overview or detail |
+| | `lookup IP` | `--cc IP` | Country lookup for IP |
+| | `update` | `--cc-update` | Refresh GeoIP data |
+| **config** | `dump` | `apf -o` | Output all config variables |
+| | `validate` | `--validate` | Validate config |
+| **status** | _(none)_ | `--info` | Firewall status summary |
+| | `rules` | `--rules` | Dump active rules to stdout |
+| | `log` | `apf -t` | Page through status log |
+| **gre** | `up` | `--gre-up` | Bring up GRE tunnels |
+| | `down` | `--gre-down` | Tear down GRE tunnels |
+| | `status` | `--gre-status` | Show tunnel status |
+| **ipset** | `update` | `--ipset-update` | Hot-reload block lists |
+| | `status` | — | Show ipset list names |
+| **ct** | `scan` | `--ct-scan` | Run CT_LIMIT scan |
+| | `status` | `--ct-status` | Show CT_LIMIT config |
+
+**Examples using subcommand syntax:**
+
+```bash
+apf trust add 192.168.1.100 "office gateway"
+apf trust deny CN
+apf trust temp deny 203.0.113.50 1h "brute force"
+apf trust list --temp
+apf cc info CN
+apf cc lookup 8.8.8.8
+apf status rules | grep DROP
+apf config validate
+```
+
+### Classic Flag Reference
+
+All 2.0.x flags remain available as silent aliases. The full classic flag set:
+
+```
 Firewall Control:
   -s, --start ................. load all firewall rules
   -r, --restart ............... flush & reload all firewall rules
@@ -795,6 +879,7 @@ Diagnostics:
   -o, --dump-config, --ovars .. output all configuration variables
   -v, --version ............... output version number
   -h, --help .................. show this help message
+  --csf-help .................. CSF-to-APF command mapping
 
 Country Code Filtering:
   --cc ........................ show GeoIP status overview

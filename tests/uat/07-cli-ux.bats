@@ -34,10 +34,9 @@ teardown_file() {
 @test "UAT: help covers all major sections" {
     run apf -h
     assert_success
-    assert_output --partial "Firewall Control"
-    assert_output --partial "Trust Management"
-    assert_output --partial "Temporary Trust"
-    assert_output --partial "Diagnostics"
+    assert_output --partial "COMMANDS"
+    assert_output --partial "SUBCOMMANDS"
+    assert_output --partial "UTILITIES"
 }
 
 # bats test_tags=uat,uat:cli-ux

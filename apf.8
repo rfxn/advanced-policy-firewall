@@ -41,6 +41,11 @@ apf \- Advanced Policy Firewall
 .br
 .B apf
 .RB [ \-\-ipset\-update | \-\-gre\-up | \-\-gre\-down | \-\-gre\-status ]
+.br
+.B apf
+.RB { trust | cc | config | status | gre | ipset | ct }
+.RI [ verb ]
+.RI [ args ]
 .SH DESCRIPTION
 Advanced Policy Firewall (APF) is an iptables/netfilter\-based firewall
 management system for Linux servers.
@@ -189,6 +194,10 @@ Output the version number.
 .TP
 .BR \-h ", " \-\-help
 Show usage help and exit.
+.TP
+.B \-\-csf\-help
+Show CSF\-to\-APF command mapping for users migrating from ConfigServer
+Security & Firewall.
 .SS Country Code Filtering
 .TP
 .BR \-\-cc " [\fICC\fR | \fIIP\fR]"
@@ -246,6 +255,138 @@ Tear down GRE tunnels.
 .TP
 .B \-\-gre\-status
 Show GRE tunnel status.
+.SH SUBCOMMANDS
+APF supports a structured
+.B apf \fInoun\fR \fIverb\fR
+syntax for grouping related operations.
+All existing single\-letter and long\-option flags continue to work as before;
+subcommands provide an alternative interface.
+Run
+.B apf \fInoun\fR \-\-help
+for verb\-level usage of any group.
+.SS trust \(em Trust System Management
+.TP
+.B apf trust add \fIHOST\fR [\fICOMMENT\fR]
+Allow a host (equivalent to
+.BR "apf \-a" ).
+.TP
+.B apf trust deny \fIHOST\fR [\fICOMMENT\fR]
+Deny a host (equivalent to
+.BR "apf \-d" ).
+.TP
+.B apf trust remove \fIHOST\fR
+Remove host from all trust lists (equivalent to
+.BR "apf \-u" ).
+.TP
+.B apf trust list \fR[\fB\-\-allow\fR | \fB\-\-deny\fR | \fB\-\-temp\fR]
+Show trust entries. Without a flag, shows all entries.
+.B \-\-allow
+and
+.B \-\-deny
+show only allow or deny entries;
+.B \-\-temp
+shows temporary entries with remaining TTL.
+.TP
+.B apf trust lookup \fIHOST\fR
+Check if host exists in the trust system (equivalent to
+.BR "\-\-lookup" ).
+.TP
+.B apf trust refresh
+Re\-resolve FQDNs in trust rules (equivalent to
+.BR "apf \-e" ).
+.TP
+.B apf trust flush \-\-temp
+Remove all temporary trust entries (equivalent to
+.BR "\-\-tempf" ).
+.TP
+.B apf trust temp add \fIHOST\fR \fITTL\fR [\fICOMMENT\fR]
+Temporarily allow a host (equivalent to
+.BR "apf \-ta" ).
+.TP
+.B apf trust temp deny \fIHOST\fR \fITTL\fR [\fICOMMENT\fR]
+Temporarily deny a host (equivalent to
+.BR "apf \-td" ).
+.TP
+.B apf trust temp remove \fIHOST\fR
+Remove a temporary trust entry (equivalent to
+.BR "apf \-u" ).
+.TP
+.B apf trust temp list
+List temporary entries with remaining TTL (equivalent to
+.BR "\-\-templ" ).
+.TP
+.B apf trust temp flush
+Remove all temporary entries (equivalent to
+.BR "\-\-tempf" ).
+.SS cc \(em Country Code / GeoIP Operations
+.TP
+.B apf cc
+Show GeoIP country code filtering overview (equivalent to
+.BR "\-\-cc" ).
+.TP
+.B apf cc info \fR[\fICC\fR | \fIIP\fR]
+Show detail for a country code or look up the country for an IP address
+(equivalent to
+.BR "\-\-cc CC" " or " "\-\-cc IP" ).
+.TP
+.B apf cc lookup \fIIP\fR
+Look up which country an IP address belongs to.
+.TP
+.B apf cc update
+Refresh GeoIP data and rebuild ipsets (equivalent to
+.BR "\-\-cc\-update" ).
+.SS config \(em Configuration and Validation
+.TP
+.B apf config dump
+Output all configuration variables (equivalent to
+.BR "apf \-o" ).
+.TP
+.B apf config validate
+Validate configuration without starting the firewall (equivalent to
+.BR "\-\-validate" ).
+.SS status \(em Firewall Status and Diagnostics
+.TP
+.B apf status
+Show firewall status summary (equivalent to
+.BR "\-\-info" ).
+.TP
+.B apf status rules
+Dump active iptables rules to stdout (equivalent to
+.BR "\-\-rules" ).
+.TP
+.B apf status log
+Page through the full status log (equivalent to
+.BR "apf \-t" ).
+.SS gre \(em GRE Tunnel Management
+.TP
+.B apf gre up
+Bring up GRE tunnels (equivalent to
+.BR "\-\-gre\-up" ).
+.TP
+.B apf gre down
+Tear down GRE tunnels (equivalent to
+.BR "\-\-gre\-down" ).
+.TP
+.B apf gre status
+Show GRE tunnel status (equivalent to
+.BR "\-\-gre\-status" ).
+.SS ipset \(em ipset Block List Management
+.TP
+.B apf ipset update
+Hot\-reload ipset block lists (equivalent to
+.BR "\-\-ipset\-update" ).
+.TP
+.B apf ipset status
+Show ipset list names and status.
+.SS ct \(em Connection Tracking Limit
+.TP
+.B apf ct scan
+Run a CT_LIMIT scan and block offenders (equivalent to
+.BR "\-\-ct\-scan" ).
+.TP
+.B apf ct status
+Show CT_LIMIT configuration and last scan info (equivalent to
+.BR "\-\-ct\-status" ).
 .SH TRUST SYSTEM
 APF uses file\-based trust lists for allow and deny rules:
 .TP
@@ -601,6 +742,42 @@ Restart the firewall after configuration changes:
 .PP
 .RS
 .B apf \-r
+.RE
+.PP
+Using subcommand syntax to manage trust:
+.PP
+.RS
+.B apf trust add 192.168.1.100 "office gateway"
+.RE
+.PP
+.RS
+.B apf trust deny CN
+.RE
+.PP
+.RS
+.B apf trust temp deny 203.0.113.50 1h "brute force"
+.RE
+.PP
+.RS
+.B apf trust list \-\-temp
+.RE
+.PP
+Using subcommand syntax for GeoIP and diagnostics:
+.PP
+.RS
+.B apf cc info CN
+.RE
+.PP
+.RS
+.B apf cc lookup 8.8.8.8
+.RE
+.PP
+.RS
+.B apf status rules | grep DROP
+.RE
+.PP
+.RS
+.B apf config validate
 .RE
 .SH SEE ALSO
 .BR iptables (8),

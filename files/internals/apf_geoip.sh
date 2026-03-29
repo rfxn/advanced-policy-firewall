@@ -1640,3 +1640,34 @@ _expire_cc_temp_entry() {
 	fi
 	return 0
 }
+
+## Dispatch: apf cc <verb> [args]
+_dispatch_cc() {
+	case "${1:-}" in
+	-h|--help) _cc_help ;;
+	"")        geoip_info ;;
+	info)      shift; geoip_info "$@" || exit 1 ;;
+	lookup)    shift; geoip_info "$@" || exit 1 ;;
+	update)    mutex_lock; geoip_update ;;
+	*)
+		# Bare argument: could be CC or IP — route to geoip_info
+		if valid_cc "$1" 2>/dev/null || valid_host "$1" 2>/dev/null; then  # safe: validation only
+			geoip_info "$@" || exit 1
+		else
+			_cc_help; return 1
+		fi
+		;;
+	esac
+}
+
+_cc_help() {
+	echo "usage: apf cc <command> [args]"
+	echo ""
+	echo "  info [CC|IP]           show GeoIP overview or detail for CC/IP"
+	echo "  lookup IP              look up country for an IP or CIDR"
+	echo "  update                 refresh GeoIP data and ipsets"
+	echo ""
+	echo "  Examples:  apf cc              (overview)"
+	echo "             apf cc info CN      (country detail)"
+	echo "             apf cc lookup 8.8.8.8"
+}

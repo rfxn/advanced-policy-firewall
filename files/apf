@@ -55,10 +55,12 @@ trap '_apf_cleanup_tmp; mutex_unlock' EXIT
 if [ "$_APF_LOCKED" != "1" ]; then
   case "$1" in
     -s|--start|-f|--stop|--flush|-e|--refresh|\
-    -a|--allow|-d|--deny|-u|--remove|--unban|\
+    -a|-d|-u|--remove|--unban|\
     -ta|--temp-allow|-td|--temp-deny|\
     --tempf|--temp-flush|--temp-expire|\
-    --ipset-update|--gre-up|--gre-down|--cc-update|--ct-scan)
+    --ipset-update|--gre-up|--gre-down|--cc-update|--ct-scan|\
+    -ar|-dr|-tr|\
+    trust)
       if command -v flock >/dev/null 2>&1; then
         _APF_LOCKED=1 flock -w "$ENTER_LOCK_TIMEOUT" "$LOCK_FILE" "$0" "$@"
         exit $?
@@ -89,141 +91,159 @@ case "$1" in
 	sleep 2
 	$0 --start || exit $?
 	;;
--a|--allow)
+-a)
 	mutex_lock
 	# Propagate exit code: invalid host, duplicate, or rule failure → exit 1
 	cli_trust "TALLOW" "ALLOW" "$ALLOW_HOSTS" "$2" "$3" || exit 1
 	;;
--d|--deny)
+-d)
 	mutex_lock
 	# Propagate exit code: invalid host, duplicate, or rule failure → exit 1
 	cli_trust "TDENY" "DENY" "$DENY_HOSTS" "$2" "$3" || exit 1
 	;;
--u|--remove|--unban)
+-u)
 	mutex_lock
-	if cli_trust_remove "$2"; then
-		eout "{trust} removed $2 from trust system"
-		elog_event "trust_removed" "info" "{trust} removed $2 from trust system" \
-			"host=$2"
-		if [ "$SET_VERBOSE" != "1" ]; then
-			echo "Removed $2 from trust system."
-		fi
-	else
-		eout "{trust} $2 not found in trust system"
-		if [ "$SET_VERBOSE" != "1" ]; then
-			echo "$2 not found in trust system." >&2
-		fi
-	fi
+	_cli_trust_remove_with_output "$2"
 	;;
 -e|--refresh)
 	mutex_lock
 	refresh
 	;;
--o|--ovars|--dump-config)
+-o)
 	apf_banner
 	ovars
 	;;
 -v|--version)
 	echo "$VER"
 	;;
---ipset-update)
-	if [ "$USE_IPSET" == "1" ]; then
-		mutex_lock
-		ipset_update
-	else
-		echo "ipset not enabled (USE_IPSET=0 in conf.apf)"
-	fi
-	;;
---gre-up)
-	if [ "$USE_GRE" == "1" ]; then
-		mutex_lock
-		gre_init
-	else
-		echo "GRE tunnels not enabled (USE_GRE=0 in conf.apf)"
-	fi
-	;;
---gre-down)
-	if [ "$USE_GRE" == "1" ]; then
-		mutex_lock
-		gre_teardown
-	else
-		echo "GRE tunnels not enabled (USE_GRE=0 in conf.apf)"
-	fi
-	;;
---gre-status)
-	gre_status
-	;;
 -g|--search)
 	search "$2"
-	;;
--ta|--temp-allow)
-	mutex_lock
-	cli_trust_temp "TALLOW" "ALLOW" "$ALLOW_HOSTS" "$2" "$3" "$4" || exit 1
-	;;
--td|--temp-deny)
-	mutex_lock
-	cli_trust_temp "TDENY" "DENY" "$DENY_HOSTS" "$2" "$3" "$4" || exit 1
-	;;
---templ|--temp-list)
-	list_temp_entries
-	;;
---tempf|--temp-flush)
-	mutex_lock
-	flush_temp_entries
-	;;
---temp-expire)
-	if grep -q '# added .* ttl=' "$ALLOW_HOSTS" "$DENY_HOSTS" "$CC_DENY_HOSTS" "$CC_ALLOW_HOSTS" 2>/dev/null; then
-		mutex_lock
-		expire_temp_entries
-	fi
 	;;
 -h|--help)
 	apf_banner
 	help
 	;;
---validate|--check)
-	cli_validate
+
+# --- Tier 2: Subcommand noun dispatch ---
+trust)
+	_dispatch_trust "${@:2}" || exit $?
+	;;
+cc)
+	# shellcheck disable=SC1090,SC1091
+	. "$INSTALL_PATH/internals/apf_geoip.sh"
+	_dispatch_cc "${@:2}" || exit $?
+	;;
+config)
+	_dispatch_config "${@:2}" || exit $?
+	;;
+status)
+	_dispatch_status "${@:2}" || exit $?
+	;;
+gre)
+	_dispatch_gre "${@:2}" || exit $?
+	;;
+ipset)
+	_dispatch_ipset "${@:2}" || exit $?
+	;;
+ct)
+	# shellcheck disable=SC1090,SC1091
+	. "$INSTALL_PATH/internals/apf_ctlimit.sh"
+	_dispatch_ct "${@:2}" || exit $?
+	;;
+
+# --- Tier 3: Legacy 2.0.x aliases (silent, route through dispatch) ---
+--allow)
+	_dispatch_trust add "${@:2}"
+	;;
+--deny)
+	_dispatch_trust deny "${@:2}"
+	;;
+--remove|--unban)
+	_dispatch_trust remove "${@:2}"
+	;;
+-ta|--temp-allow)
+	_dispatch_trust temp add "${@:2}"
+	;;
+-td|--temp-deny)
+	_dispatch_trust temp deny "${@:2}"
+	;;
+--templ|--temp-list)
+	_dispatch_trust temp list
+	;;
+--tempf|--temp-flush)
+	_dispatch_trust temp flush
+	;;
+--temp-expire)
+	_dispatch_trust temp expire
 	;;
 --la|--list-allow)
-	list_trust_file "$ALLOW_HOSTS" "allow_hosts.rules"
+	_dispatch_trust list --allow
 	;;
 --ld|--list-deny)
-	list_trust_file "$DENY_HOSTS" "deny_hosts.rules"
-	;;
---rules)
-	rules
-	;;
---info)
-	firewall_info
+	_dispatch_trust list --deny
 	;;
 --lookup)
-	trust_lookup "$2" || exit 1
+	_dispatch_trust lookup "${@:2}"
+	;;
+--validate|--check)
+	_dispatch_config validate
+	;;
+--dump-config|--ovars)
+	_dispatch_config dump
+	;;
+--rules)
+	_dispatch_status rules
+	;;
+--info)
+	_dispatch_status
 	;;
 --ct-scan)
-	if ct_enabled; then
-		mutex_lock
-		# shellcheck disable=SC1090,SC1091
-		. "$INSTALL_PATH/internals/apf_ctlimit.sh"
-		cli_ct_scan
-	else
-		echo "CT_LIMIT not enabled (CT_LIMIT=0 in conf.apf)"
-	fi
+	# shellcheck disable=SC1090,SC1091
+	. "$INSTALL_PATH/internals/apf_ctlimit.sh"
+	_dispatch_ct scan
 	;;
 --ct-status)
 	# shellcheck disable=SC1090,SC1091
 	. "$INSTALL_PATH/internals/apf_ctlimit.sh"
-	cli_ct_status
+	_dispatch_ct status
 	;;
 --cc)
 	# shellcheck disable=SC1090,SC1091
 	. "$INSTALL_PATH/internals/apf_geoip.sh"
-	geoip_info "$2" || exit 1
+	_dispatch_cc info "${@:2}"
 	;;
 --cc-update)
-	mutex_lock
 	# shellcheck disable=SC1090,SC1091
 	. "$INSTALL_PATH/internals/apf_geoip.sh"
-	geoip_update
+	_dispatch_cc update
+	;;
+--ipset-update)
+	_dispatch_ipset update
+	;;
+--gre-up)
+	_dispatch_gre up
+	;;
+--gre-down)
+	_dispatch_gre down
+	;;
+--gre-status)
+	_dispatch_gre status
+	;;
+--csf-help)
+	_csf_help
+	;;
+
+# --- Tier 4: CSF compat aliases (silent) ---
+-ar|-dr)
+	_dispatch_trust remove "${@:2}"
+	;;
+-tr)
+	_dispatch_trust temp remove "${@:2}"
+	;;
+-i)
+	# shellcheck disable=SC1090,SC1091
+	. "$INSTALL_PATH/internals/apf_geoip.sh"
+	_dispatch_cc lookup "${@:2}"
 	;;
 *)
 	apf_banner

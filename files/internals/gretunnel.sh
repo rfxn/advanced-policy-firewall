@@ -313,3 +313,34 @@ gre_status() {
 		$IPT $IPT_FLAGS -L GRE_OUT -nv 2>/dev/null || echo "  GRE_OUT chain: not found"
 	fi
 }
+
+## Dispatch: apf gre <verb> [args]
+_dispatch_gre() {
+	case "${1:-}" in
+	-h|--help) _gre_help ;;
+	""|status) gre_status ;;
+	up)
+		if [ "$USE_GRE" == "1" ]; then
+			mutex_lock; gre_init
+		else
+			echo "GRE tunnels not enabled (USE_GRE=0 in conf.apf)"
+		fi
+		;;
+	down)
+		if [ "$USE_GRE" == "1" ]; then
+			mutex_lock; gre_teardown
+		else
+			echo "GRE tunnels not enabled (USE_GRE=0 in conf.apf)"
+		fi
+		;;
+	*)  _gre_help; return 1 ;;
+	esac
+}
+
+_gre_help() {
+	echo "usage: apf gre <command>"
+	echo ""
+	echo "  up                     bring up GRE tunnels"
+	echo "  down                   tear down GRE tunnels"
+	echo "  status                 show GRE tunnel status"
+}
