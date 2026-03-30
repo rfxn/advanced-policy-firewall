@@ -103,6 +103,12 @@ _apf_completions() {
 		local nouns="trust cc config status gre ipset ct"
 		if [[ "$cur" == -* ]]; then
 			local long="--start --restart --stop --flush --help --version"
+			long="$long --allow --deny --remove --unban --lookup"
+			long="$long --validate --check --rules --info --dump-config --ovars"
+			long="$long --la --list-allow --ld --list-deny"
+			long="$long --temp-allow --temp-deny --temp-list --temp-flush"
+			long="$long --cc --cc-update --ct-scan --ct-status --csf-help"
+			long="$long --gre-up --gre-down --gre-status --ipset-update"
 			COMPREPLY=( $(compgen -W "$flags $long" -- "$cur") )
 		else
 			COMPREPLY=( $(compgen -W "$flags $nouns" -- "$cur") )
@@ -135,7 +141,7 @@ _apf_completions() {
 		[ "$COMP_CWORD" -eq 2 ] && COMPREPLY=( $(compgen -W "scan status" -- "$cur") )
 		;;
 	# Legacy flag context completions
-	-a|--allow|-d|--deny|-u|--remove|--unban|--lookup)
+	-a|--allow|-d|--deny|-u|--remove|--unban|--lookup|-ar|-dr|-tr)
 		[ "$COMP_CWORD" -eq 2 ] && _apf_complete_hosts
 		;;
 	-ta|--temp-allow|-td|--temp-deny)
@@ -143,7 +149,7 @@ _apf_completions() {
 		[ "$pos" -eq 1 ] && _apf_complete_hosts
 		[ "$pos" -eq 2 ] && _apf_complete_ttl
 		;;
-	--cc)
+	--cc|-i)
 		[ "$COMP_CWORD" -eq 2 ] && _apf_complete_cc
 		;;
 	esac

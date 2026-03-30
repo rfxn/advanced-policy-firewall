@@ -78,11 +78,9 @@ install() {
 	fi
 
 	# Bash tab completion
-	if [ -f "apf.bash-completion" ]; then
-		pkg_bash_completion "apf.bash-completion" "apf"
-		if [ "$INSTALL_PATH" != "/etc/apf" ]; then
-			pkg_sed_replace "/etc/apf" "$INSTALL_PATH" /etc/bash_completion.d/apf
-		fi
+	pkg_bash_completion "apf.bash-completion" "apf"
+	if [ "$INSTALL_PATH" != "/etc/apf" ]; then
+		pkg_sed_replace "/etc/apf" "$INSTALL_PATH" /etc/bash_completion.d/apf
 	fi
 
 	# Service installation: systemd unit or SysV init script
@@ -258,6 +256,7 @@ EOF
 	fi
 
 	pkg_success "APF ${VER} upgrade complete"
+	pkg_info "Tab completion updated — reload with: . /etc/bash_completion.d/apf"
 else
 	# --- Fresh install path ---
 	pkg_header "APF" "$VER" "install"
@@ -275,4 +274,5 @@ else
 	pkg_info "Ports shown for reference only — configure manually in conf.apf"
 	_check_deps
 	pkg_success "APF ${VER} installation complete"
+	pkg_info "Tab completion available — reload with: . /etc/bash_completion.d/apf"
 fi
