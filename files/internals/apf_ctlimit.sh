@@ -371,7 +371,7 @@ _dispatch_ct() {
 			echo "CT_LIMIT not enabled (CT_LIMIT=0 in conf.apf)"
 		fi
 		;;
-	*)  _ct_help; return 1 ;;
+	*)  _cli_unknown_verb "apf ct" "$1" "scan status"; return 1 ;;
 	esac
 }
 
@@ -380,4 +380,7 @@ _ct_help() {
 	echo ""
 	echo "  scan                   run CT_LIMIT scan and block offenders"
 	echo "  status                 show CT_LIMIT config and last scan info"
+	echo ""
+	echo "  Examples:  apf ct scan"
+	echo "             apf ct status"
 }

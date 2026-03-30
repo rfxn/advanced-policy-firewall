@@ -1646,15 +1646,23 @@ _dispatch_cc() {
 	case "${1:-}" in
 	-h|--help) _cc_help ;;
 	"")        geoip_info ;;
-	info)      shift; geoip_info "$@" || exit 1 ;;
-	lookup)    shift; geoip_info "$@" || exit 1 ;;
+	info)
+		shift
+		if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then _cc_help; exit 0; fi
+		geoip_info "$@" || exit 1
+		;;
+	lookup)
+		shift
+		if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then _cc_help; exit 0; fi
+		geoip_info "$@" || exit 1
+		;;
 	update)    mutex_lock; geoip_update ;;
 	*)
 		# Bare argument: could be CC or IP — route to geoip_info
 		if valid_cc "$1" 2>/dev/null || valid_host "$1" 2>/dev/null; then  # safe: validation only
 			geoip_info "$@" || exit 1
 		else
-			_cc_help; return 1
+			_cli_unknown_verb "apf cc" "$1" "info lookup update"; return 1
 		fi
 		;;
 	esac

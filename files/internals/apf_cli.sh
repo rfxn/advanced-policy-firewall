@@ -17,37 +17,152 @@ _APF_CLI_LOADED=1
 # shellcheck disable=SC2034
 APF_CLI_VERSION="1.0.0"
 
+# --- CLI color helpers ---
+# Respects NO_COLOR (https://no-color.org/) and non-TTY output.
+# Called once at source time; functions are no-ops when color is off.
+_CLI_BOLD=""
+_CLI_DIM=""
+_CLI_RESET=""
+
+_cli_color_init() {
+    # NO_COLOR: any non-empty value disables color
+    if [ -n "${NO_COLOR:-}" ]; then
+        return 0
+    fi
+    # Only colorize when stdout is a terminal
+    if [ ! -t 1 ]; then
+        return 0
+    fi
+    # TERM=dumb has no color support
+    if [ "${TERM:-}" = "dumb" ]; then
+        return 0
+    fi
+    _CLI_BOLD=$'\033[1m'
+    _CLI_DIM=$'\033[2m'
+    _CLI_RESET=$'\033[0m'
+}
+_cli_color_init
+
+# --- "Did you mean?" typo correction ---
+# Pure-bash Levenshtein distance using two-row DP.
+# Bash 4.1+ compatible: no associative arrays, no nameref.
+_cli_levenshtein() {
+    local s="$1" t="$2"
+    local s_len=${#s} t_len=${#t}
+    local i j cost
+
+    # Fast paths
+    if [ "$s_len" -eq 0 ]; then echo "$t_len"; return; fi
+    if [ "$t_len" -eq 0 ]; then echo "$s_len"; return; fi
+
+    # prev_row[j] = distance for first i chars of s vs first j chars of t
+    local prev_row=() curr_row=()
+    for (( j = 0; j <= t_len; j++ )); do
+        prev_row[$j]=$j
+    done
+
+    for (( i = 1; i <= s_len; i++ )); do
+        curr_row[0]=$i
+        for (( j = 1; j <= t_len; j++ )); do
+            if [ "${s:i-1:1}" = "${t:j-1:1}" ]; then
+                cost=0
+            else
+                cost=1
+            fi
+            # min(delete, insert, substitute)
+            local del=$(( prev_row[j] + 1 ))
+            local ins=$(( curr_row[j-1] + 1 ))
+            local sub=$(( prev_row[j-1] + cost ))
+            local min=$del
+            [ "$ins" -lt "$min" ] && min=$ins
+            [ "$sub" -lt "$min" ] && min=$sub
+            curr_row[$j]=$min
+        done
+        # swap rows
+        for (( j = 0; j <= t_len; j++ )); do
+            prev_row[$j]=${curr_row[$j]}
+        done
+    done
+    echo "${prev_row[$t_len]}"
+}
+
+# Find closest match within threshold. Returns best match on stdout,
+# or empty string if no match within threshold.
+# Usage: _cli_did_you_mean "input" "word1 word2 word3" [threshold]
+_cli_did_you_mean() {
+    local input="$1" candidates="$2" threshold="${3:-3}"
+    local best="" best_dist=999 dist
+    local candidate
+    for candidate in $candidates; do
+        dist=$(_cli_levenshtein "$input" "$candidate")
+        if [ "$dist" -lt "$best_dist" ]; then
+            best_dist=$dist
+            best="$candidate"
+        fi
+    done
+    if [ "$best_dist" -le "$threshold" ] && [ "$best_dist" -gt 0 ]; then
+        echo "$best"
+    fi
+}
+
+# Print targeted error for unknown command with optional suggestion.
+# Usage: _cli_unknown_command "apf" "$1" "trust cc config ..."
+_cli_unknown_command() {
+    local prefix="$1" input="$2" candidates="$3"
+    local suggestion
+    suggestion=$(_cli_did_you_mean "$input" "$candidates")
+    if [ -n "$suggestion" ]; then
+        echo "${prefix}: unknown command '${input}'. Did you mean '${suggestion}'?" >&2
+    else
+        echo "${prefix}: unknown command '${input}'. See '${prefix} --help'." >&2
+    fi
+}
+
+# Print targeted error for unknown verb with optional suggestion.
+# Usage: _cli_unknown_verb "apf trust" "$1" "add deny remove ..."
+_cli_unknown_verb() {
+    local prefix="$1" input="$2" candidates="$3"
+    local suggestion
+    suggestion=$(_cli_did_you_mean "$input" "$candidates")
+    if [ -n "$suggestion" ]; then
+        echo "${prefix}: unknown verb '${input}'. Did you mean '${suggestion}'?" >&2
+    else
+        echo "${prefix}: unknown verb '${input}'. See '${prefix} --help'." >&2
+    fi
+}
+
 help() {
-	echo "usage: apf [COMMAND] [OPTIONS]"
-	echo ""
-	echo "COMMANDS:"
-	echo "  -s              load all firewall rules"
-	echo "  -f              flush all firewall rules"
-	echo "  -r              flush & reload all firewall rules"
-	echo "  -a HOST [CMT]   allow host (IP/CIDR/FQDN/CC)"
-	echo "  -d HOST [CMT]   deny host"
-	echo "  -u HOST         remove host from all lists"
-	echo "  -g PATTERN      search rules and trust files"
-	echo ""
-	echo "SUBCOMMANDS:"
-	echo "  trust           trust system management"
-	echo "  cc              country code / GeoIP operations"
-	echo "  config          configuration and validation"
-	echo "  status          firewall status and diagnostics"
-	echo "  gre             GRE tunnel management"
-	echo "  ipset           ipset block list management"
-	echo "  ct              connection tracking limit"
-	echo ""
-	echo "UTILITIES:"
-	echo "  -e              refresh & re-resolve DNS in trust rules"
-	echo "  -l              view all firewall rules in editor"
-	echo "  -t              page through full status log"
-	echo "  -o              output all configuration variables"
-	echo "  -v              output version number"
-	echo "  -h, --help      show this help message"
-	echo ""
-	echo "Run 'apf <command> --help' for subcommand details."
-	echo "CSF users: run 'apf --csf-help' for a command mapping."
+    echo "usage: apf [COMMAND] [OPTIONS]"
+    echo ""
+    echo "${_CLI_BOLD}COMMANDS:${_CLI_RESET}"
+    echo "  -s              load all firewall rules"
+    echo "  -f              flush all firewall rules"
+    echo "  -r              flush & reload all firewall rules"
+    echo "  -a HOST [CMT]   allow host (IP/CIDR/FQDN/CC)"
+    echo "  -d HOST [CMT]   deny host"
+    echo "  -u HOST         remove host from all lists"
+    echo "  -g PATTERN      search rules and trust files"
+    echo ""
+    echo "${_CLI_BOLD}SUBCOMMANDS:${_CLI_RESET}"
+    echo "  trust           trust system management"
+    echo "  cc              country code / GeoIP operations"
+    echo "  config          configuration and validation"
+    echo "  status          firewall status and diagnostics"
+    echo "  gre             GRE tunnel management"
+    echo "  ipset           ipset block list management"
+    echo "  ct              connection tracking limit"
+    echo ""
+    echo "${_CLI_BOLD}UTILITIES:${_CLI_RESET}"
+    echo "  -e              refresh & re-resolve DNS in trust rules"
+    echo "  -l              view all firewall rules in editor"
+    echo "  -t              page through full status log"
+    echo "  -o              output all configuration variables"
+    echo "  -v              output version number"
+    echo "  -h              show this help message"
+    echo "  --help          open full manual page"
+    echo ""
+    echo "Run 'apf <command> --help' for subcommand details."
+    echo "CSF users: run 'apf --csf-help' for a command mapping."
 }
 
 list() {
@@ -271,7 +386,7 @@ _dispatch_status() {
 		;;
 	rules)  rules ;;
 	log)    status ;;
-	*)      _status_help; return 1 ;;
+	*)  _cli_unknown_verb "apf status" "$1" "rules log"; return 1 ;;
 	esac
 }
 
@@ -281,7 +396,7 @@ _dispatch_config() {
 	-h|--help|"") _config_help ;;
 	dump)     apf_banner; ovars ;;
 	validate) cli_validate ;;
-	*)        _config_help; return 1 ;;
+	*)  _cli_unknown_verb "apf config" "$1" "dump validate"; return 1 ;;
 	esac
 }
 
@@ -291,6 +406,9 @@ _status_help() {
 	echo "  (none)                 show firewall status summary (= apf --info)"
 	echo "  rules                  dump active rules to stdout (= apf --rules)"
 	echo "  log                    page through full status log (= apf -t)"
+	echo ""
+	echo "  Examples:  apf status              (summary)"
+	echo "             apf status rules | grep TALLOW"
 }
 
 _config_help() {
@@ -298,6 +416,9 @@ _config_help() {
 	echo ""
 	echo "  dump                   output all configuration variables (= apf -o)"
 	echo "  validate               validate config without starting firewall"
+	echo ""
+	echo "  Examples:  apf config validate"
+	echo "             apf config dump | grep TCP"
 }
 
 _csf_help() {

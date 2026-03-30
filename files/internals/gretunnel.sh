@@ -333,7 +333,7 @@ _dispatch_gre() {
 			echo "GRE tunnels not enabled (USE_GRE=0 in conf.apf)"
 		fi
 		;;
-	*)  _gre_help; return 1 ;;
+	*)  _cli_unknown_verb "apf gre" "$1" "up down status"; return 1 ;;
 	esac
 }
 
@@ -343,4 +343,7 @@ _gre_help() {
 	echo "  up                     bring up GRE tunnels"
 	echo "  down                   tear down GRE tunnels"
 	echo "  status                 show GRE tunnel status"
+	echo ""
+	echo "  Examples:  apf gre up"
+	echo "             apf gre status"
 }

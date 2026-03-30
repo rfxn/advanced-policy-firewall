@@ -494,10 +494,10 @@ teardown() {
 
 # --- unknown verb / edge cases (G7, E9) ---
 
-@test "apf trust badverb exits 1 with help" {
+@test "apf trust badverb exits 1 with targeted error" {
     run "$APF" trust badverb
     assert_failure
-    assert_output --partial "usage: apf trust"
+    assert_output --partial "unknown verb"
 }
 
 @test "apf badnoun exits 1" {
@@ -505,8 +505,184 @@ teardown() {
     assert_failure
 }
 
-@test "apf trust flush without target exits 1 with help" {
+@test "apf trust flush without target exits 1 with error" {
     run "$APF" trust flush
     assert_failure
+    assert_output --partial "expected --temp"
+}
+
+# --- color infrastructure (Phase 1) ---
+
+@test "apf -h piped output contains no ANSI escape codes" {
+    local output_text
+    output_text=$("$APF" -h 2>&1)
+    # ANSI escapes use ESC (0x1b) character — portable detection without grep -P
+    if printf '%s' "$output_text" | grep -q $'\x1b\['; then
+        echo "Found ANSI escapes in piped output" >&2
+        return 1
+    fi
+}
+
+@test "apf -h still shows section headers" {
+    run "$APF" -h
+    assert_success
+    assert_output --partial "COMMANDS:"
+    assert_output --partial "SUBCOMMANDS:"
+    assert_output --partial "UTILITIES:"
+}
+
+# --- Levenshtein / did-you-mean unit tests (Phase 2) ---
+
+@test "_cli_did_you_mean finds closest match for typo" {
+    run bash -c "source $APF_DIR/conf.apf; source $APF_DIR/internals/internals.conf; source $APF_DIR/internals/apf.lib.sh; _cli_did_you_mean trsut 'trust cc config status gre ipset ct'"
+    assert_success
+    assert_output "trust"
+}
+
+@test "_cli_did_you_mean returns empty for unrelated input" {
+    run bash -c "source $APF_DIR/conf.apf; source $APF_DIR/internals/internals.conf; source $APF_DIR/internals/apf.lib.sh; _cli_did_you_mean zzzzzzz 'trust cc config status gre ipset ct'"
+    assert_success
+    assert_output ""
+}
+
+@test "_cli_did_you_mean returns empty for exact match (distance 0)" {
+    run bash -c "source $APF_DIR/conf.apf; source $APF_DIR/internals/internals.conf; source $APF_DIR/internals/apf.lib.sh; _cli_did_you_mean trust 'trust cc config status gre ipset ct'"
+    assert_success
+    assert_output ""
+}
+
+# --- progressive disclosure (Phase 3) ---
+
+@test "apf -h shows brief help (usage line)" {
+    run "$APF" -h
+    assert_success
+    assert_output --partial "usage: apf"
+    assert_output --partial "COMMANDS:"
+}
+
+@test "apf --help falls back to brief help when man page unavailable" {
+    # In Docker test containers, man page may not be installed
+    if man -w apf >/dev/null 2>&1; then
+        skip "man page is installed — cannot test fallback"
+    fi
+    run "$APF" --help
+    assert_success
+    assert_output --partial "usage: apf"
+}
+
+@test "apf -h shows --help opens manual hint" {
+    run "$APF" -h
+    assert_success
+    assert_output --partial "open full manual page"
+}
+
+# --- examples in help (Phase 4) ---
+
+@test "apf trust --help includes examples" {
+    run "$APF" trust --help
+    assert_success
+    assert_output --partial "Examples:"
+}
+
+@test "apf config --help includes examples" {
+    run "$APF" config --help
+    assert_success
+    assert_output --partial "Examples:"
+}
+
+@test "apf status --help includes examples" {
+    run "$APF" status --help
+    assert_success
+    assert_output --partial "Examples:"
+}
+
+# --- help subcommand (Phase 5) ---
+
+@test "apf help shows brief help" {
+    run "$APF" help
+    assert_success
+    assert_output --partial "usage: apf"
+}
+
+@test "apf help trust shows trust help" {
+    run "$APF" help trust
+    assert_success
     assert_output --partial "usage: apf trust"
+}
+
+@test "apf help cc shows cc help" {
+    run "$APF" help cc
+    assert_success
+    assert_output --partial "usage: apf cc"
+}
+
+@test "apf help config shows config help" {
+    run "$APF" help config
+    assert_success
+    assert_output --partial "usage: apf config"
+}
+
+@test "apf help status shows status help" {
+    run "$APF" help status
+    assert_success
+    assert_output --partial "usage: apf status"
+}
+
+@test "apf help badnoun exits 1 with error" {
+    run "$APF" help badnoun
+    assert_failure
+    assert_output --partial "unknown topic"
+}
+
+@test "apf trust add --help shows trust help (not host error)" {
+    run "$APF" trust add --help
+    assert_success
+    assert_output --partial "usage: apf trust"
+}
+
+@test "apf trust temp add --help shows temp help" {
+    run "$APF" trust temp add --help
+    assert_success
+    assert_output --partial "usage: apf trust temp"
+}
+
+# --- targeted error messages (Phase 6) ---
+
+@test "apf unknown command shows targeted error" {
+    run "$APF" badcmd
+    assert_failure
+    assert_output --partial "unknown command 'badcmd'"
+}
+
+@test "apf typo suggests closest command" {
+    run "$APF" trsut
+    assert_failure
+    assert_output --partial "Did you mean"
+    assert_output --partial "trust"
+}
+
+@test "apf trust unknown verb shows targeted error" {
+    run "$APF" trust badverb
+    assert_failure
+    assert_output --partial "unknown verb 'badverb'"
+}
+
+@test "apf trust typo suggests closest verb" {
+    run "$APF" trust addd
+    assert_failure
+    assert_output --partial "Did you mean"
+    assert_output --partial "add"
+}
+
+@test "apf config typo suggests closest verb" {
+    run "$APF" config valdate
+    assert_failure
+    assert_output --partial "Did you mean"
+    assert_output --partial "validate"
+}
+
+@test "apf completely wrong command shows See hint (no suggestion)" {
+    run "$APF" zzzzzzz
+    assert_failure
+    assert_output --partial "See 'apf --help'"
 }

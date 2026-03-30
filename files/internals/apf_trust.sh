@@ -1404,15 +1404,21 @@ _dispatch_trust() {
 	case "${1:-}" in
 	-h|--help|"") _trust_help ;;
 	add)
-		shift; mutex_lock
+		shift
+		if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then _trust_help; exit 0; fi
+		mutex_lock
 		cli_trust "TALLOW" "ALLOW" "$ALLOW_HOSTS" "$@" || exit 1
 		;;
 	deny)
-		shift; mutex_lock
+		shift
+		if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then _trust_help; exit 0; fi
+		mutex_lock
 		cli_trust "TDENY" "DENY" "$DENY_HOSTS" "$@" || exit 1
 		;;
 	remove)
-		shift; mutex_lock
+		shift
+		if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then _trust_help; exit 0; fi
+		mutex_lock
 		_cli_trust_remove_with_output "$1"
 		;;
 	list)
@@ -1427,7 +1433,9 @@ _dispatch_trust() {
 		esac
 		;;
 	lookup)
-		shift; trust_lookup "$@" || exit 1
+		shift
+		if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then _trust_help; exit 0; fi
+		trust_lookup "$@" || exit 1
 		;;
 	refresh)
 		mutex_lock; refresh
@@ -1438,13 +1446,13 @@ _dispatch_trust() {
 		--deny)  echo "apf trust flush --deny: not yet implemented" >&2; exit 1 ;;
 		--allow) echo "apf trust flush --allow: not yet implemented" >&2; exit 1 ;;
 		--temp)  mutex_lock; flush_temp_entries ;;
-		*)       _trust_help; return 1 ;;
+		*)       echo "apf trust flush: expected --temp, --deny, or --allow." >&2; return 1 ;;
 		esac
 		;;
 	temp)
 		shift; _dispatch_trust_temp "$@"
 		;;
-	*)  _trust_help; return 1 ;;
+	*)  _cli_unknown_verb "apf trust" "$1" "add deny remove list lookup refresh flush temp"; return 1 ;;
 	esac
 }
 
@@ -1453,15 +1461,21 @@ _dispatch_trust_temp() {
 	case "${1:-}" in
 	-h|--help|"") _trust_temp_help ;;
 	add)
-		shift; mutex_lock
+		shift
+		if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then _trust_temp_help; exit 0; fi
+		mutex_lock
 		cli_trust_temp "TALLOW" "ALLOW" "$ALLOW_HOSTS" "$@" || exit 1
 		;;
 	deny)
-		shift; mutex_lock
+		shift
+		if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then _trust_temp_help; exit 0; fi
+		mutex_lock
 		cli_trust_temp "TDENY" "DENY" "$DENY_HOSTS" "$@" || exit 1
 		;;
 	remove)
-		shift; mutex_lock
+		shift
+		if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then _trust_temp_help; exit 0; fi
+		mutex_lock
 		_cli_trust_remove_with_output "$1"
 		;;
 	list)  list_temp_entries ;;
@@ -1471,7 +1485,7 @@ _dispatch_trust_temp() {
 			mutex_lock; expire_temp_entries
 		fi
 		;;
-	*)  _trust_temp_help; return 1 ;;
+	*)  _cli_unknown_verb "apf trust temp" "$1" "add deny remove list flush"; return 1 ;;
 	esac
 }
 
@@ -1493,6 +1507,10 @@ _trust_help() {
 	echo "  Advanced syntax:  apf trust deny \"tcp:in:d=22:s=10.0.0.0/8\""
 	echo "  Country codes:    apf trust deny CN"
 	echo "                    apf trust deny @EU"
+	echo ""
+	echo "  Examples:  apf trust add 10.0.0.1 \"office server\""
+	echo "             apf trust deny tcp:in:d=22:s=10.0.0.0/8"
+	echo "             apf trust list --temp"
 }
 
 _trust_temp_help() {
@@ -1503,4 +1521,7 @@ _trust_temp_help() {
 	echo "  remove HOST            remove temporary entry"
 	echo "  list                   list temp entries with remaining TTL"
 	echo "  flush                  remove all temporary entries"
+	echo ""
+	echo "  Examples:  apf trust temp add 10.0.0.1 1h \"maintenance\""
+	echo "             apf trust temp deny 192.168.1.50 30m"
 }

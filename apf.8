@@ -43,6 +43,10 @@ apf \- Advanced Policy Firewall
 .RB [ \-\-ipset\-update | \-\-gre\-up | \-\-gre\-down | \-\-gre\-status ]
 .br
 .B apf
+.B help
+.RI [ topic ]
+.br
+.B apf
 .RB { trust | cc | config | status | gre | ipset | ct }
 .RI [ verb ]
 .RI [ args ]
@@ -264,6 +268,17 @@ subcommands provide an alternative interface.
 Run
 .B apf \fInoun\fR \-\-help
 for verb\-level usage of any group.
+.SS help \(em Built\-in Help
+.TP
+.B apf help
+Show brief command reference (equivalent to
+.BR "apf \-h" ).
+.TP
+.B apf help \fItopic\fR
+Show help for a specific subcommand group (e.g.,
+.BR "apf help trust" ).
+Available topics:
+.BR trust ", " cc ", " config ", " status ", " gre ", " ipset ", " ct .
 .SS trust \(em Trust System Management
 .TP
 .B apf trust add \fIHOST\fR [\fICOMMENT\fR]
@@ -582,6 +597,20 @@ USE_GRE, GRE_PERSIST, GRE_KEEPALIVE, GRE_MTU, GRE_TTL.
 .B Logging & Kernel Tuning
 Log targets (LOG, NFLOG, or deprecated ULOG), rate limits, sysctl tunables,
 conntrack, helper chains.
+.SH ENVIRONMENT
+.TP
+.B NO_COLOR
+When set to any non\-empty value, disables ANSI color output in help and
+error messages.
+See
+.UR https://no\-color.org/
+no\-color.org
+.UE .
+.TP
+.B TERM
+If set to
+.BR dumb ,
+color output is also suppressed.
 .SH FILES
 .TP
 .I /etc/apf/conf.apf

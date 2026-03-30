@@ -326,7 +326,7 @@ _dispatch_ipset() {
 			echo "ipset not enabled (USE_IPSET=0 in conf.apf)"
 		fi
 		;;
-	*)  _ipset_help; return 1 ;;
+	*)  _cli_unknown_verb "apf ipset" "$1" "update status"; return 1 ;;
 	esac
 }
 
@@ -335,4 +335,7 @@ _ipset_help() {
 	echo ""
 	echo "  update                 hot-reload ipset block lists"
 	echo "  status                 show ipset list names"
+	echo ""
+	echo "  Examples:  apf ipset update"
+	echo "             apf ipset status"
 }

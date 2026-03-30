@@ -78,7 +78,7 @@ teardown_file() {
 @test "dispatch: _dispatch_trust invalid verb returns 1" {
     run bash -c "source $APF_DIR/conf.apf; source $APF_DIR/internals/internals.conf; source $APF_DIR/internals/apf.lib.sh; _dispatch_trust badverb"
     assert_failure
-    assert_output --partial "usage: apf trust"
+    assert_output --partial "unknown verb"
 }
 
 # --- _cc_help ---

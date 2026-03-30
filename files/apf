@@ -50,7 +50,7 @@ trap '_apf_cleanup_tmp; mutex_unlock' EXIT
 
 # Acquire exclusive lock for mutating operations via file-based flock.
 # Re-invokes this script under flock; child sees _APF_LOCKED=1 and skips gate.
-# Read-only ops (-l, -t, -o, -v, -g, -h, --templ, --gre-status, --la, --ld, --validate, --rules, --info, --lookup, --cc, --ct-status) excluded.
+# Read-only ops (-l, -t, -o, -v, -g, -h, --help, help, --templ, --gre-status, --la, --ld, --validate, --rules, --info, --lookup, --cc, --ct-status) excluded.
 # Restart (-r) excluded — sub-invocations lock individually to avoid deadlock.
 if [ "$_APF_LOCKED" != "1" ]; then
   case "$1" in
@@ -119,9 +119,43 @@ case "$1" in
 -g|--search)
 	search "$2"
 	;;
--h|--help)
+-h)
 	apf_banner
 	help
+	;;
+--help)
+	# Progressive disclosure: --help opens the full man page
+	if command -v man >/dev/null 2>&1 && man -w apf >/dev/null 2>&1; then  # safe: checking availability only
+		man apf
+	else
+		apf_banner
+		help
+	fi
+	;;
+
+help)
+	case "${2:-}" in
+	"")     apf_banner; help ;;
+	trust)  _dispatch_trust --help ;;
+	cc)
+		# shellcheck disable=SC1090,SC1091
+		. "$INSTALL_PATH/internals/apf_geoip.sh"
+		_dispatch_cc --help
+		;;
+	config) _dispatch_config --help ;;
+	status) _dispatch_status --help ;;
+	gre)    _dispatch_gre --help ;;
+	ipset)  _dispatch_ipset --help ;;
+	ct)
+		# shellcheck disable=SC1090,SC1091
+		. "$INSTALL_PATH/internals/apf_ctlimit.sh"
+		_dispatch_ct --help
+		;;
+	*)
+		echo "apf: unknown topic '${2}'. See 'apf help'." >&2
+		exit 1
+		;;
+	esac
 	;;
 
 # --- Tier 2: Subcommand noun dispatch ---
@@ -245,9 +279,13 @@ ct)
 	. "$INSTALL_PATH/internals/apf_geoip.sh"
 	_dispatch_cc lookup "${@:2}"
 	;;
-*)
+"")
 	apf_banner
 	help
+	exit 1
+	;;
+*)
+	_cli_unknown_command "apf" "$1" "trust cc config status gre ipset ct help -s -f -r -a -d -u -g -e -l -t -o -v -h"
 	exit 1
 	;;
 esac
