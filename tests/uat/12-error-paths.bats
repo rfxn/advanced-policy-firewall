@@ -67,5 +67,5 @@ teardown_file() {
 @test "UAT: unknown CLI flag exits non-zero with usage" {
     uat_capture "error-paths" apf --nonexistent-flag
     assert_failure
-    assert_output --partial "usage"
+    assert_output --partial "unknown command"
 }

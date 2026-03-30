@@ -1208,7 +1208,7 @@ _source_funcs='source '"$APF_DIR"'/internals/apf.lib.sh; CC_DENY_HOSTS='"$APF_DI
     "$APF" -s
 
     run "$APF" -u XX
-    # apf -u does not exit non-zero on not-found, but prints message
+    [ "$status" -ne 0 ]
     assert_output --partial "not found"
 
     clean_cc_state

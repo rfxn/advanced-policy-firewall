@@ -274,7 +274,11 @@ ct_scan() {
 			eout "{ct_limit} blocking $_addr ($_count connections, limit $_effective_limit)"
 			elog_event "block_added" "warn" "{ct_limit} blocking $_addr ($_count connections, limit $_effective_limit)" \
 				"host=$_addr" "conns=$_count" "limit=$_effective_limit"
-			"$INSTALL_PATH/apf" -td "$_addr" "$CT_BLOCK_TIME" "CT_LIMIT exceeded ($_count conns)" 2>/dev/null
+			if ! "$INSTALL_PATH/apf" -td "$_addr" "$CT_BLOCK_TIME" "CT_LIMIT exceeded ($_count conns)"; then
+				eout "{ct_limit} failed to block $_addr — apf -td returned non-zero"
+				elog_event "block_failed" "error" "{ct_limit} failed to block $_addr" \
+					"host=$_addr" "conns=$_count" "limit=$_effective_limit"
+			fi
 
 			# CT_PERMANENT=0: remove block history entry to prevent PERMBLOCK
 			# escalation. The temp-deny is active but won't count toward

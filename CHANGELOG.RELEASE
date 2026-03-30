@@ -43,9 +43,8 @@
       - 7 subcommand groups: trust, cc, config, status, gre, ipset, ct
       - Three-tier help: COMMANDS / SUBCOMMANDS / UTILITIES
       - Per-group help via 'apf <command> --help'
-[New] CSF compatibility: -ar, -dr, -tr, -i aliases; apf --csf-help mapping
-[New] Subcommand-aware bash tab completion
-[Change] All 2.0.x flat flags preserved as silent aliases
+      - CSF compatibility aliases (-ar, -dr, -tr, -i); apf --csf-help mapping
+      - All 2.0.x flat flags preserved as silent aliases
 [New] Per-port connection limiting via xt_connlimit: IG_TCP_CLIMIT and
       IG_UDP_CLIMIT with port:limit pairs, port range support, VNET binding
 [New] ipset 7-field format: per-list refresh interval and max entry count;
@@ -76,8 +75,8 @@
       page, symlinks, and audit log directory; prompts before removing
       install directory and logs
 [New] Bash tab completion: apf.bash-completion installed to
-      /etc/bash_completion.d/apf; context-sensitive completions for trust
-      hosts, temp TTL values, and country codes
+      /etc/bash_completion.d/apf; subcommand-aware with context-sensitive
+      completions for trust hosts, temp TTL values, and country codes
 [New] RPM and DEB packaging with FHS-compliant layout: binary at /usr/sbin/apf,
       libraries at /usr/lib/apf/internals/, config at /etc/apf/; 25-symlink
       backward-compatible farm for /etc/apf/internals/; .symlink-manifest and
@@ -96,19 +95,16 @@
 [Fix] install.sh: fix directory permissions (dirs=750, files=640); verify
       source files before install; prevent backup collision; add root check;
       re-create periodic cron entries (refresh, CT scan) on upgrade
-[Fix] Trust system: anchor grep/sed patterns to prevent IP substring
-      collisions; spec-based iptables rule deletion in cli_trust_remove();
-      glob expansion protection in trust_parse_fields(); control character
-      and metacharacter rejection in valid_trust_entry()
+[Fix] Trust validation: anchor grep/sed patterns to prevent IP substring
+      collisions; glob expansion protection in trust_parse_fields(); control
+      character and metacharacter rejection in valid_trust_entry(); add hint
+      for abbreviated CIDR notation (e.g., '0/0' -> '0.0.0.0/0')
 [Fix] Add mutex_lock to -a, -d, -u, -ta, -td CLI handlers; closes race
       window with cron --temp-expire on flock-absent systems
-[Fix] Advanced trust removal: also delete iptables rules from TGALLOW/TGDENY
-      chains; entries from global trust files were left in live iptables until
-      next refresh or restart
-[Fix] flush_temp_entries(): move orphan comment cleanup after cli_trust_remove
-      so FQDN resolved= metadata is available for IP resolution during removal
-[Fix] trust validation: add hint for abbreviated CIDR notation (e.g., '0/0'
-      -> '0.0.0.0/0') across cli_trust(), cli_trust_remove(), cli_trust_temp()
+[Fix] Trust removal: spec-based iptables rule deletion in cli_trust_remove();
+      also delete from TGALLOW/TGDENY chains (global trust entries were left
+      in live iptables until restart); reorder orphan comment cleanup so FQDN
+      resolved= metadata is available for IP resolution
 [Fix] lgate_mac(): use $VF_LGATE instead of undefined $LGATE_MAC; gateway
       MAC filtering was non-functional
 [Fix] expirebans(): fix $ip variable shadowing global iproute2 path; defer
@@ -135,7 +131,8 @@
 [Fix] GeoIP: fix IPv4-as-FQDN false positive in --cc IP lookup; fix IFS
       leak corrupting LOG rules; fix --cc-update timestamp tracking; fix temp
       CC expiry destroying permanent entries; harden eval in LOG rule removal;
-      reject unknown country codes in --cc detail display
+      reject unknown country codes in --cc detail display; add duplicate
+      check to cli_cc_trust_temp() preventing duplicate iptables rules
 [Fix] ipset_migrate_rules(): add 5-field (v2.0.1) to 7-field migration;
       5-field entries were silently dropped on upgrade
 [Fix] glob_allow/deny_download(): validate entries with valid_host() instead
@@ -143,10 +140,10 @@
 [Fix] ctlimit.apf: add valid_ip_cidr() guard on conntrack-sourced IPs;
       fix grep -Fv substring match that could remove unrelated IP entries;
       add numeric validation for VNET-overridden CT_LIMIT values
-[Fix] CLI feedback: unknown options exit 1; error messages to stderr;
-      list() uses cat for pipes and silent pager fallback for TTY
-[Fix] Duplicate stdout output: restrict stdout output module to elog() source
-      only; elog_event() structured events route to audit/SIEM, not terminal
+[Fix] CLI output: unknown options exit 1; error messages to stderr;
+      list() uses cat for pipes and silent pager fallback for TTY; restrict
+      elog stdout module to elog() source only to prevent duplicate output
+      from elog_event() structured events
 [Fix] Preserve file inodes: logrotate copytruncate for tail -f consumers;
       trim() uses cat+rm instead of mv
 [Fix] vnetgen: strip Docker @ifN suffix from ip link output to prevent
@@ -154,12 +151,12 @@
 [Fix] Portability: command prefix on all coreutils (rm, mv, cp, chmod,
       mkdir, touch, ln, cat) across all shipping files for portable
       resolution on pre-usr-merge distros (CentOS 6, Ubuntu 12.04)
-[Fix] GeoIP temp trust: add duplicate check to cli_cc_trust_temp() matching
-      permanent path; prevents duplicate iptables rules when CC already exists
 [Fix] Port dedup: deduplicate comma-separated port lists before rule
       generation in _port_filter_loop, _uid_filter_loop, _icmp_filter,
       cdports, and BLK_P2P_PORTS; prevents duplicate iptables rules from
       duplicate config entries
+[Fix] --help: detect minimized Ubuntu/Debian man stub and fall back to
+      built-in help instead of displaying "unminimize" advisory
 
   -- Changes --
 
@@ -183,31 +180,11 @@
       with bash builtins across hot paths
 [Change] refresh(): exit 0 (not 1) when trust rules are unchanged since
       last refresh; may affect automation checking for non-zero on no-op
-[Change] Internal restructuring: decompose functions.apf (3,291 lines) into
-      8 sub-libraries via apf.lib.sh hub; remove dead code and unused
-      variables; clean up deprecated function parameters
-[Change] Update vendored libraries: pkg_lib.sh v1.0.5 (config merge API),
-      elog_lib.sh v1.0.4 (JSON-escape fixes), geoip_lib.sh v1.0.4 (input
-      validation, TLS fallback, IPv6 database functions)
 
   -- Documentation --
 
 [New] Man page: apf.8 covering all CLI operations, trust system, country
       code filtering, and configuration reference
-[New] FLOW.md: standalone order-of-operations document with INPUT chain
-      precedence table and fast/full load conditions
 [New] README restructured to rfxn documentation convention: banner SVGs,
       What's New section, Exit Codes table, Quick Start, SECURITY.md and
       CONTRIBUTING.md companion files
-[Fix] Documentation alignment: sync CLI aliases, CC examples, --lookup scope,
-      and man page section references across help(), apf.8, and README
-
-  -- Test Suite --
-
-[New] 39 BATS test files with 664 tests: trust system, advanced trust syntax,
-      temp trust, GeoIP, CT_LIMIT, SYN flood, hooks, VNET, fast load, CLI,
-      FQDN resolution, block escalation, and regression coverage
-[New] UAT acceptance suite: 14 scenario tests exercising trust lifecycle,
-      firewall lifecycle, port filtering, IPv6, and error paths
-[Change] Test infrastructure: batsman v1.2.0 with parallel execution;
-      per-test teardown; centralized cleanup to prevent cascading failures

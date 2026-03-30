@@ -179,7 +179,11 @@ teardown_file() {
     [ -f "/etc/cron.d/ctlimit.apf" ]
     run grep -- "--ct-scan" /etc/cron.d/ctlimit.apf
     assert_success
-    # Clean up for subsequent tests
+    # Clean up for subsequent tests — restore CT_LIMIT to default and
+    # rebuild .clean so reset_apf doesn't carry the poisoned value
+    sed -i 's/^CT_LIMIT=.*/CT_LIMIT="0"/' "$APF_DIR/conf.apf"
+    sed -i 's/^CT_INTERVAL=.*/CT_INTERVAL="60"/' "$APF_DIR/conf.apf"
+    cp "$APF_DIR/conf.apf" "$APF_DIR/conf.apf.clean"
     rm -f /etc/cron.d/ctlimit.apf "$APF_DIR/internals/cron.ctlimit"
     _clean_test_backup
 }

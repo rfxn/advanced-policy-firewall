@@ -220,12 +220,12 @@ elog_init() {
 
 	# Create log directory
 	if [ ! -d "$_log_dir" ]; then
-		if ! mkdir -p "$_log_dir" 2>/dev/null; then  # suppress permission errors; failure handled below
+		if ! command mkdir -p "$_log_dir" 2>/dev/null; then  # suppress permission errors; failure handled below
 			echo "elog_lib: failed to create log directory: $_log_dir" >&2
 			umask "$_old_umask"
 			return 1
 		fi
-		chmod 750 "$_log_dir"
+		command chmod 750 "$_log_dir"
 	fi
 
 	# Touch log files with correct permissions
@@ -233,12 +233,12 @@ elog_init() {
 	for _f in "$_log_file" "$_audit_file"; do
 		[ -z "$_f" ] && continue  # skip empty paths (audit disabled)
 		if [ ! -f "$_f" ]; then
-			touch "$_f" 2>/dev/null || {  # suppress permission errors; failure handled in || block
+			command touch "$_f" 2>/dev/null || {  # suppress permission errors; failure handled in || block
 				echo "elog_lib: failed to create log file: $_f" >&2
 				umask "$_old_umask"
 				return 1
 			}
-			chmod 640 "$_f"
+			command chmod 640 "$_f"
 		fi
 	done
 
@@ -248,7 +248,7 @@ elog_init() {
 	# replacing a file the consumer may be actively writing to
 	if [ -n "${ELOG_LEGACY_LOG:-}" ]; then
 		if [ ! -f "$ELOG_LEGACY_LOG" ]; then
-			ln -sf "$_log_file" "$ELOG_LEGACY_LOG" 2>/dev/null || true  # safe: legacy symlink is optional
+			command ln -sf "$_log_file" "$ELOG_LEGACY_LOG" 2>/dev/null || true  # safe: legacy symlink is optional
 		fi
 	fi
 
@@ -327,14 +327,24 @@ _elog_truncate_check() {
 	_count=$(wc -l < "$_file")
 	_count="${_count## }"
 	if [ "$_count" -gt "$_max" ]; then
-		local _tmpf
+		local _tmpf _saved_hup _saved_term _saved_int
 		_tmpf=$(mktemp "${_file}.XXXXXX") || return 0
+		_saved_hup=$(trap -p HUP)
+		_saved_term=$(trap -p TERM)
+		_saved_int=$(trap -p INT)
 		# shellcheck disable=SC2064
-		trap "command rm -f '$_tmpf'" HUP TERM INT
+		trap "command rm -f '$_tmpf'; $_saved_hup" HUP
+		# shellcheck disable=SC2064
+		trap "command rm -f '$_tmpf'; $_saved_term" TERM
+		# shellcheck disable=SC2064
+		trap "command rm -f '$_tmpf'; $_saved_int" INT
 		tail -n "$_max" "$_file" > "$_tmpf"
-		cat "$_tmpf" > "$_file"
+		command cat "$_tmpf" > "$_file"
 		command rm -f "$_tmpf"
-		trap - HUP TERM INT
+		# Restore original traps or reset to default if none existed
+		if [ -n "$_saved_hup" ]; then eval "$_saved_hup"; else trap - HUP; fi
+		if [ -n "$_saved_term" ]; then eval "$_saved_term"; else trap - TERM; fi
+		if [ -n "$_saved_int" ]; then eval "$_saved_int"; else trap - INT; fi
 	fi
 }
 

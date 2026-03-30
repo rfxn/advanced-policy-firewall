@@ -481,7 +481,7 @@ _trust_check_duplicate() {
 
 cli_trust() {
  local CHAIN="$1" ACTION="$2" FILE="$3" HOST="$4" CMT="$5"
- local tlist f valtrust TIME JACTION ADDED_EPOCH
+ local tlist f TIME JACTION ADDED_EPOCH
  if [ -z "$HOST" ]; then
         echo "an FQDN or IP address is required for this option" >&2
         return 1
@@ -591,9 +591,8 @@ cli_trust() {
 	return 1
  fi
  _trust_check_duplicate "$HOST"
- valtrust="$tlist"
  load_local_addrs
- if [ "$valtrust" ]; then
+ if [ "$tlist" ]; then
          echo "$HOST already exists in $tlist"
  elif is_fqdn "$HOST"; then
 	# FQDN — resolve before iptables
@@ -661,7 +660,7 @@ cli_trust() {
 
 cli_trust_temp() {
  local CHAIN="$1" ACTION="$2" FILE="$3" HOST="$4" TTL_STR="$5" CMT="$6"
- local tlist f valtrust TIME EXPIRE_EPOCH JACTION EXPIRE_DISP
+ local tlist f TIME EXPIRE_EPOCH JACTION EXPIRE_DISP
  if [ -z "$HOST" ]; then
 	echo "an FQDN or IP address is required for this option" >&2
 	return 1
@@ -713,9 +712,8 @@ cli_trust_temp() {
 	return 1
  fi
  _trust_check_duplicate "$HOST"
- valtrust="$tlist"
  load_local_addrs
- if [ "$valtrust" ]; then
+ if [ "$tlist" ]; then
 	echo "$HOST already exists in $tlist"
  elif is_fqdn "$_VTE_IP"; then
 	# FQDN (bare or in advanced syntax) — resolve before iptables
@@ -1396,6 +1394,7 @@ _cli_trust_remove_with_output() {
 		if [ "$SET_VERBOSE" != "1" ]; then
 			echo "$host not found in trust system." >&2
 		fi
+		return 1
 	fi
 }
 
@@ -1419,7 +1418,7 @@ _dispatch_trust() {
 		shift
 		if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then _trust_help; exit 0; fi
 		mutex_lock
-		_cli_trust_remove_with_output "$1"
+		_cli_trust_remove_with_output "$1" || exit 1
 		;;
 	list)
 		shift
@@ -1476,7 +1475,7 @@ _dispatch_trust_temp() {
 		shift
 		if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then _trust_temp_help; exit 0; fi
 		mutex_lock
-		_cli_trust_remove_with_output "$1"
+		_cli_trust_remove_with_output "$1" || exit 1
 		;;
 	list)  list_temp_entries ;;
 	flush) mutex_lock; flush_temp_entries ;;

@@ -200,47 +200,25 @@ if [ -n "$BLK_P2P_PORTS" ]; then
         # shellcheck disable=SC2086
         BLK_P2P_PORTS=$(printf '%s\n' ${BLK_P2P_PORTS//,/ } | command awk '!seen[$0]++' | command tr '\n' ' ')
         for i in $BLK_P2P_PORTS; do
-                PORT=$i
-                if [[ "$i" != *_* ]]; then
-                        eout "{blk_p2p} deny all to/from tcp port $i"
-                        eout "{blk_p2p} deny all to/from udp port $i"
-                        if [ "$LOG_DROP" == "1" ]; then
-                         ipt -A P2P -p tcp --sport 1024:65534 --dport $PORT -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** P2P ** "
-                        fi
-                        ipt -A P2P -p tcp --dport $PORT -j REJECT
-                        if [ "$LOG_DROP" == "1" ]; then
-                         ipt -A P2P -p tcp --dport 1024:65534 --sport $PORT -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** P2P ** "
-                        fi
-                        ipt -A P2P -p tcp --dport 1024:65534 --sport $PORT -j REJECT
-                        if [ "$LOG_DROP" == "1" ]; then
-                         ipt -A P2P -p udp --sport 1024:65534 --dport $PORT -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** P2P ** "
-                        fi
-                        ipt -A P2P -p udp --sport 1024:65534 --dport $PORT -j REJECT
-                        if [ "$LOG_DROP" == "1" ]; then
-                         ipt -A P2P -p udp --dport 1024:65534 --sport $PORT -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** P2P ** "
-                        fi
-                        ipt -A P2P -p udp --dport 1024:65534 --sport $PORT -j REJECT
-                else
-                        expand_port "$i"; PORTST="$_PORT"
-                        eout "{blk_p2p} deny all to/from tcp port $PORTST"
-                        eout "{blk_p2p} deny all to/from udp port $PORTST"
-                        if [ "$LOG_DROP" == "1" ]; then
-                         ipt -A P2P -p tcp --sport 1024:65534 --dport $PORTST -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** P2P ** "
-                        fi
-                        ipt -A P2P -p tcp --sport 1024:65534 --dport $PORTST -j REJECT
-                        if [ "$LOG_DROP" == "1" ]; then
-                         ipt -A P2P -p tcp --dport 1024:65534 --sport $PORTST -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** P2P ** "
-                        fi
-                        ipt -A P2P -p tcp --dport 1024:65534 --sport $PORTST -j REJECT
-                        if [ "$LOG_DROP" == "1" ]; then
-                         ipt -A P2P -p udp --sport 1024:65534 --dport $PORTST -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** P2P ** "
-                        fi
-                        ipt -A P2P -p udp --sport 1024:65534 --dport $PORTST -j REJECT
-                        if [ "$LOG_DROP" == "1" ]; then
-                         ipt -A P2P -p udp --dport 1024:65534 --sport $PORTST -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** P2P ** "
-                        fi
-                        ipt -A P2P -p udp --dport 1024:65534 --sport $PORTST -j REJECT
+                expand_port "$i"
+                eout "{blk_p2p} deny all to/from tcp port $_PORT"
+                eout "{blk_p2p} deny all to/from udp port $_PORT"
+                if [ "$LOG_DROP" == "1" ]; then
+                 ipt -A P2P -p tcp --sport 1024:65534 --dport $_PORT -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** P2P ** "
                 fi
+                ipt -A P2P -p tcp --dport $_PORT -j REJECT
+                if [ "$LOG_DROP" == "1" ]; then
+                 ipt -A P2P -p tcp --dport 1024:65534 --sport $_PORT -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** P2P ** "
+                fi
+                ipt -A P2P -p tcp --dport 1024:65534 --sport $_PORT -j REJECT
+                if [ "$LOG_DROP" == "1" ]; then
+                 ipt -A P2P -p udp --sport 1024:65534 --dport $_PORT -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** P2P ** "
+                fi
+                ipt -A P2P -p udp --sport 1024:65534 --dport $_PORT -j REJECT
+                if [ "$LOG_DROP" == "1" ]; then
+                 ipt -A P2P -p udp --dport 1024:65534 --sport $_PORT -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** P2P ** "
+                fi
+                ipt -A P2P -p udp --dport 1024:65534 --sport $_PORT -j REJECT
         done
         ipt -A INPUT -j P2P
         ipt -A OUTPUT -j P2P

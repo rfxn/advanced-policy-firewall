@@ -860,6 +860,12 @@ allow_hosts $ALLOW_HOSTS TALLOW
 elog_event "rule_loaded" "info" "{trust} trust chains loaded" \
 	"allow=$ALLOW_HOSTS" "deny=$DENY_HOSTS"
 
+# Resolve local nameservers once for RAB and DNS sections
+LDNS=""
+if [ -f "/etc/resolv.conf" ]; then
+	LDNS=$(grep -v "#" /etc/resolv.conf | grep -w nameserver | awk '{print$2}' | grep -v 127.0.0.1)
+fi
+
 # RAB default drop for events
 check_rab
 if [ "$RAB" == "1" ]; then
@@ -899,7 +905,6 @@ if [ "$RAB" == "1" ]; then
   esac
   eout "{rab} RAB_PSCAN monitored ports $RAB_PSCAN_PORTS"
   ipt -N RABPSCAN
-  LDNS=$(grep -v "#" /etc/resolv.conf | grep -w nameserver | awk '{print$2}' | grep -v 127.0.0.1)
   if [ "$LDNS" ]; then
 	for i in $LDNS; do
 		if ipt_for_host "$i"; then
@@ -957,7 +962,6 @@ ipt -A INPUT  -p tcp ! --syn $STATE_MATCH NEW -j $ALL_STOP
 
 # DNS
 if [ -f "/etc/resolv.conf" ] && [ "$RESV_DNS" == "1" ]; then
-LDNS=$(grep -v "#" /etc/resolv.conf | grep -w nameserver | awk '{print$2}' | grep -v 127.0.0.1)
   if [ -n "$LDNS" ]; then
         for i in $LDNS; do
         eout "{glob} resolv dns discovery for $i"

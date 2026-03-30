@@ -249,7 +249,7 @@ pkg_detect_os() {
 	# Fallback: /etc/redhat-release
 	if [[ -f /etc/redhat-release ]]; then
 		_PKG_OS_FAMILY="rhel"
-		_PKG_OS_NAME=$(cat /etc/redhat-release 2>/dev/null) || _PKG_OS_NAME="RHEL-family"
+		_PKG_OS_NAME=$(command cat /etc/redhat-release 2>/dev/null) || _PKG_OS_NAME="RHEL-family"
 		# Extract version number (first numeric sequence with optional dots)
 		local ver_pat='[0-9]+(\.[0-9]+)*'
 		if [[ "$_PKG_OS_NAME" =~ $ver_pat ]]; then
@@ -273,7 +273,7 @@ pkg_detect_os() {
 	if [[ -f /etc/debian_version ]]; then
 		_PKG_OS_FAMILY="debian"
 		_PKG_OS_ID="debian"
-		_PKG_OS_VERSION=$(cat /etc/debian_version 2>/dev/null) || _PKG_OS_VERSION=""
+		_PKG_OS_VERSION=$(command cat /etc/debian_version 2>/dev/null) || _PKG_OS_VERSION=""
 		_PKG_OS_NAME="Debian ${_PKG_OS_VERSION}"
 		return 0
 	fi
@@ -282,7 +282,7 @@ pkg_detect_os() {
 	if [[ -f /etc/gentoo-release ]]; then
 		_PKG_OS_FAMILY="gentoo"
 		_PKG_OS_ID="gentoo"
-		_PKG_OS_NAME=$(cat /etc/gentoo-release 2>/dev/null) || _PKG_OS_NAME="Gentoo"
+		_PKG_OS_NAME=$(command cat /etc/gentoo-release 2>/dev/null) || _PKG_OS_NAME="Gentoo"
 		return 0
 	fi
 
@@ -290,7 +290,7 @@ pkg_detect_os() {
 	if [[ -f /etc/slackware-version ]]; then
 		_PKG_OS_FAMILY="slackware"
 		_PKG_OS_ID="slackware"
-		_PKG_OS_NAME=$(cat /etc/slackware-version 2>/dev/null) || _PKG_OS_NAME="Slackware"
+		_PKG_OS_NAME=$(command cat /etc/slackware-version 2>/dev/null) || _PKG_OS_NAME="Slackware"
 		local ver_pat='[0-9]+(\.[0-9]+)*'
 		if [[ "$_PKG_OS_NAME" =~ $ver_pat ]]; then
 			_PKG_OS_VERSION="${BASH_REMATCH[0]}"
@@ -333,7 +333,7 @@ pkg_detect_init() {
 	# Check /proc/1/comm if it exists (may not on CentOS 6)
 	if [[ -f /proc/1/comm ]]; then
 		local pid1_comm
-		pid1_comm=$(cat /proc/1/comm 2>/dev/null) || pid1_comm=""
+		pid1_comm=$(command cat /proc/1/comm 2>/dev/null) || pid1_comm=""
 		case "$pid1_comm" in
 			systemd)  _PKG_INIT_SYSTEM="systemd" ;;
 			init)     _PKG_INIT_SYSTEM="sysv" ;;
@@ -591,7 +591,7 @@ pkg_backup() {
 	local symlink_path
 	symlink_path="$(dirname "$install_path")/${PKG_BACKUP_SYMLINK}"
 	command rm -f "$symlink_path"
-	ln -s "$backup_path" "$symlink_path" || {
+	command ln -s "$backup_path" "$symlink_path" || {
 		pkg_warn "pkg_backup: failed to create symlink ${symlink_path}"
 	}
 
@@ -744,7 +744,7 @@ pkg_restore_files() {
 
 	# Create install path if it does not exist
 	if [[ ! -d "$install_path" ]]; then
-		mkdir -p "$install_path" || {
+		command mkdir -p "$install_path" || {
 			pkg_error "pkg_restore_files: failed to create ${install_path}"
 			return 1
 		}
@@ -763,7 +763,7 @@ pkg_restore_files() {
 
 			# Ensure destination directory exists
 			if [[ ! -d "$dest_dir" ]]; then
-				mkdir -p "$dest_dir" || continue
+				command mkdir -p "$dest_dir" || continue
 			fi
 
 			rc=0
@@ -815,7 +815,7 @@ pkg_restore_dir() {
 
 	# Ensure destination parent directory exists
 	if [[ ! -d "$dest_parent" ]]; then
-		mkdir -p "$dest_parent" || {
+		command mkdir -p "$dest_parent" || {
 			pkg_error "pkg_restore_dir: failed to create ${dest_parent}"
 			return 1
 		}
@@ -856,7 +856,7 @@ pkg_copy_tree() {
 
 	# Create destination if it does not exist
 	if [[ ! -d "$dest_dir" ]]; then
-		mkdir -p "$dest_dir" || {
+		command mkdir -p "$dest_dir" || {
 			pkg_error "pkg_copy_tree: failed to create ${dest_dir}"
 			return 1
 		}
@@ -905,7 +905,7 @@ pkg_set_perms() {
 	for exec_file in "$@"; do
 		local full_path="${base_path}/${exec_file}"
 		if [[ -f "$full_path" ]]; then
-			chmod "$dir_mode" "$full_path" || {
+			command chmod "$dir_mode" "$full_path" || {
 				pkg_warn "pkg_set_perms: failed to set exec mode on ${exec_file}"
 			}
 		fi
@@ -931,13 +931,13 @@ pkg_create_dirs() {
 	local dir rc=0
 	for dir in "$@"; do
 		if [[ ! -d "$dir" ]]; then
-			mkdir -p "$dir" || {
+			command mkdir -p "$dir" || {
 				pkg_error "pkg_create_dirs: failed to create ${dir}"
 				rc=1
 				continue
 			}
 		fi
-		chmod "$mode" "$dir" || {
+		command chmod "$mode" "$dir" || {
 			pkg_warn "pkg_create_dirs: failed to set mode ${mode} on ${dir}"
 		}
 	done
@@ -963,7 +963,7 @@ pkg_symlink() {
 	# Remove existing link or file at link_path
 	command rm -f "$link_path" 2>/dev/null  # safe: only removes file/symlink, not dir
 
-	ln -s "$target" "$link_path" || {
+	command ln -s "$target" "$link_path" || {
 		pkg_error "pkg_symlink: failed to create symlink ${link_path} -> ${target}"
 		return 1
 	}
@@ -1196,7 +1196,7 @@ pkg_service_install() {
 		pkg_error "pkg_service_install: failed to copy init script to ${init_dir}"
 		return 1
 	}
-	chmod 755 "${init_dir}/${name}"
+	command chmod 755 "${init_dir}/${name}"
 
 	return 0
 }
@@ -1568,7 +1568,7 @@ pkg_service_enable() {
 			for rl in $PKG_SLACKWARE_RUNLEVELS; do
 				rc_dir="/etc/rc.d/rc${rl}.d"
 				if [[ -d "$rc_dir" ]]; then
-					ln -sf "$init_script" "${rc_dir}/S${PKG_SLACKWARE_PRIORITY}${name}"
+					command ln -sf "$init_script" "${rc_dir}/S${PKG_SLACKWARE_PRIORITY}${name}"
 				fi
 			done
 			return 0
@@ -1813,7 +1813,7 @@ pkg_rclocal_add() {
 		local rclocal_dir
 		rclocal_dir=$(dirname "$rclocal")
 		if [[ ! -d "$rclocal_dir" ]]; then
-			mkdir -p "$rclocal_dir" || {
+			command mkdir -p "$rclocal_dir" || {
 				pkg_error "pkg_rclocal_add: failed to create directory ${rclocal_dir}"
 				return 1
 			}
@@ -1822,7 +1822,7 @@ pkg_rclocal_add() {
 			pkg_error "pkg_rclocal_add: failed to create ${rclocal}"
 			return 1
 		}
-		chmod 755 "$rclocal"
+		command chmod 755 "$rclocal"
 	fi
 
 	# Idempotency: check if entry already present
@@ -1918,7 +1918,7 @@ pkg_cron_install() {
 	local dest_dir
 	dest_dir=$(dirname "$dest")
 	if [[ ! -d "$dest_dir" ]]; then
-		mkdir -p "$dest_dir" || {
+		command mkdir -p "$dest_dir" || {
 			pkg_error "pkg_cron_install: failed to create directory ${dest_dir}"
 			return 1
 		}
@@ -1929,7 +1929,7 @@ pkg_cron_install() {
 		return 1
 	}
 
-	chmod "$mode" "$dest" || {
+	command chmod "$mode" "$dest" || {
 		pkg_warn "pkg_cron_install: failed to set mode ${mode} on ${dest}"
 	}
 
@@ -1950,7 +1950,7 @@ pkg_cron_remove() {
 
 	local path
 	for path in "$@"; do
-		if [[ -f "$path" ]]; then
+		if [[ -f "$path" ]] || [[ -L "$path" ]]; then
 			command rm -f "$path" || pkg_warn "pkg_cron_remove: failed to remove ${path}"
 		fi
 	done
@@ -2121,7 +2121,7 @@ _pkg_man_dir() {
 
 	# Fallback: create standard path
 	local fallback="/usr/share/man/man${section}"
-	mkdir -p "$fallback" || {
+	command mkdir -p "$fallback" || {
 		pkg_error "_pkg_man_dir: failed to create ${fallback}"
 		return 1
 	}
@@ -2200,7 +2200,7 @@ pkg_man_install() {
 		command rm -f "${tmpfile}.gz"
 		return 1
 	}
-	chmod 644 "$dest"
+	command chmod 644 "$dest"
 	command rm -f "${tmpfile}.gz"
 
 	pkg_info "installed man page: ${name}(${section})"
@@ -2229,7 +2229,7 @@ _pkg_install_sysfile() {
 	fi
 
 	if [[ ! -d "$dest_dir" ]]; then
-		mkdir -p "$dest_dir" || {
+		command mkdir -p "$dest_dir" || {
 			pkg_error "${func_name}: failed to create ${dest_dir}"
 			return 1
 		}
@@ -2239,7 +2239,7 @@ _pkg_install_sysfile() {
 		pkg_error "${func_name}: failed to install ${name}"
 		return 1
 	}
-	chmod 644 "${dest_dir}/${name}"
+	command chmod 644 "${dest_dir}/${name}"
 
 	return 0
 }
@@ -2284,7 +2284,7 @@ pkg_doc_install() {
 	fi
 
 	if [[ ! -d "$dest_dir" ]]; then
-		mkdir -p "$dest_dir" || {
+		command mkdir -p "$dest_dir" || {
 			pkg_error "pkg_doc_install: failed to create ${dest_dir}"
 			return 1
 		}
@@ -2457,7 +2457,7 @@ pkg_config_merge() {
 	local output_dir
 	output_dir=$(dirname "$output")
 	if [[ ! -d "$output_dir" ]]; then
-		mkdir -p "$output_dir" || {
+		command mkdir -p "$output_dir" || {
 			pkg_error "pkg_config_merge: failed to create output directory ${output_dir}"
 			return 1
 		}
@@ -2529,7 +2529,7 @@ pkg_config_merge() {
 	}
 
 	if [[ -n "$_preserve_mode" ]]; then
-		chmod "$_preserve_mode" "$output" || pkg_warn "pkg_config_merge: failed to restore permissions on ${output}"
+		command chmod "$_preserve_mode" "$output" || pkg_warn "pkg_config_merge: failed to restore permissions on ${output}"
 	fi
 
 	return 0
@@ -2748,7 +2748,7 @@ pkg_fhs_install() {
 
 		# Create destination directory if needed
 		if [[ ! -d "$dest_dir" ]]; then
-			mkdir -p "$dest_dir" || {
+			command mkdir -p "$dest_dir" || {
 				pkg_error "pkg_fhs_install: failed to create directory ${dest_dir}"
 				rc=1
 				failed=$((failed + 1))
@@ -2779,7 +2779,7 @@ pkg_fhs_install() {
 		fi
 
 		# Set permissions
-		chmod "${_PKG_FHS_MODES[$i]}" "$dest_path" 2>/dev/null  # best-effort chmod
+		command chmod "${_PKG_FHS_MODES[$i]}" "$dest_path" 2>/dev/null  # best-effort chmod
 	done
 
 	local installed=$((count - failed))
@@ -2819,7 +2819,7 @@ pkg_fhs_symlink_farm() {
 
 		# Create parent directory for the symlink
 		if [[ ! -d "$link_dir" ]]; then
-			mkdir -p "$link_dir" || {
+			command mkdir -p "$link_dir" || {
 				pkg_error "pkg_fhs_symlink_farm: failed to create ${link_dir}"
 				rc=1
 				failed=$((failed + 1))
@@ -3230,24 +3230,10 @@ pkg_uninstall_man() {
 	return 0
 }
 
-# pkg_uninstall_cron paths... — remove cron files
-# Arguments:
-#   $1+ — cron file paths to remove (e.g., "/etc/cron.d/bfd", "/etc/cron.daily/bfd")
-# Skips paths that do not exist. Returns 0 always (best-effort removal).
+# pkg_uninstall_cron paths... — remove cron files (uninstall alias)
+# Delegates to pkg_cron_remove; kept for API compatibility with uninstall scripts.
 pkg_uninstall_cron() {
-	if [[ $# -eq 0 ]]; then
-		pkg_error "pkg_uninstall_cron: at least one path required"
-		return 1
-	fi
-
-	local path
-	for path in "$@"; do
-		if [[ -f "$path" ]] || [[ -L "$path" ]]; then
-			command rm -f "$path" || pkg_warn "pkg_uninstall_cron: failed to remove ${path}"
-		fi
-	done
-
-	return 0
+	pkg_cron_remove "$@"
 }
 
 # pkg_uninstall_logrotate name — remove logrotate config

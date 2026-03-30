@@ -744,7 +744,7 @@ _geoip_download_ipdeny_bulk() {
 	local tmp_tar tmp_dir count=0
 
 	[[ -n "$output_dir" ]] || return 1
-	mkdir -p "$output_dir" 2>/dev/null || return 1  # permission errors caught by || return
+	command mkdir -p "$output_dir" 2>/dev/null || return 1  # permission errors caught by || return
 
 	tmp_tar=$(mktemp "${output_dir}/.bulk-XXXXXX") || return 1
 	tmp_dir=$(mktemp -d "${output_dir}/.bulk-extract-XXXXXX") || { command rm -f "$tmp_tar"; return 1; }
@@ -809,7 +809,7 @@ geoip_build_ipdb() {
 
 	tmpdir=$(mktemp -d "${output}.build-XXXXXX") || return 1
 	local zones_dir="$tmpdir/zones"
-	mkdir -p "$zones_dir"
+	command mkdir -p "$zones_dir"
 
 	# Strategy 1: bulk tarball (~1MB, one download for all countries)
 	local bulk_ok=0
@@ -893,7 +893,7 @@ geoip_build_ip6db() {
 
 	tmpdir=$(mktemp -d "${output}.build6-XXXXXX") || return 1
 	local zones_dir="$tmpdir/zones"
-	mkdir -p "$zones_dir"
+	command mkdir -p "$zones_dir"
 
 	# Per-country cascade (no bulk IPv6 tarball available)
 	local cc cidr_file

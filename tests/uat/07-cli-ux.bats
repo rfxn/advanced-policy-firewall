@@ -84,7 +84,7 @@ teardown_file() {
 @test "UAT: invalid flag shows help and exits non-zero" {
     uat_capture "cli-ux" apf --invalid-flag
     assert_failure
-    assert_output --partial "usage"
+    assert_output --partial "unknown command"
 }
 
 # bats test_tags=uat,uat:cli-ux

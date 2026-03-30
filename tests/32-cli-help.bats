@@ -423,9 +423,13 @@ teardown() {
 
 @test "Tier 1 -o matches Tier 2 config dump output" {
     run "$APF" -o
-    local tier1_output="$output"
+    # Strip volatile TIME= line to avoid race across second boundary
+    local tier1_output
+    tier1_output=$(echo "$output" | grep -v '^TIME=')
     run "$APF" config dump
-    assert_equal "$output" "$tier1_output"
+    local tier2_output
+    tier2_output=$(echo "$output" | grep -v '^TIME=')
+    assert_equal "$tier2_output" "$tier1_output"
 }
 
 @test "Tier 1 -a matches Tier 2 trust add behavior" {

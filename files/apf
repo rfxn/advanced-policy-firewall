@@ -103,7 +103,7 @@ case "$1" in
 	;;
 -u)
 	mutex_lock
-	_cli_trust_remove_with_output "$2"
+	_cli_trust_remove_with_output "$2" || exit 1
 	;;
 -e|--refresh)
 	mutex_lock
@@ -125,7 +125,11 @@ case "$1" in
 	;;
 --help)
 	# Progressive disclosure: --help opens the full man page
-	if command -v man >/dev/null 2>&1 && man -w apf >/dev/null 2>&1; then  # safe: checking availability only
+	# Guard: minimized Ubuntu/Debian Docker images replace man(1) with a
+	# stub that prints an "unminimize" advisory instead of rendering pages
+	if command -v man >/dev/null 2>&1 && \
+	   man -w apf >/dev/null 2>&1 && \
+	   ! man apf 2>&1 | command head -1 | command grep -q "minimized"; then  # safe: detect man stub
 		man apf
 	else
 		apf_banner

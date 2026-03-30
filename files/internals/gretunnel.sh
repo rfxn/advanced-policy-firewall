@@ -233,22 +233,25 @@ gre_init() {
 	eout "{gre} tunnel initialization complete"
 }
 
+_gre_remove_chains() {
+	if $IPT $IPT_FLAGS -L GRE_IN -n >/dev/null 2>&1; then
+		ipt4 -D INPUT -j GRE_IN 2>/dev/null || true  # safe: rule may not exist if chain is inactive
+		ipt4 -F GRE_IN
+		ipt4 -X GRE_IN
+	fi
+	if $IPT $IPT_FLAGS -L GRE_OUT -n >/dev/null 2>&1; then
+		ipt4 -D OUTPUT -j GRE_OUT 2>/dev/null || true  # safe: rule may not exist if chain is inactive
+		ipt4 -F GRE_OUT
+		ipt4 -X GRE_OUT
+	fi
+}
+
 gre_flush() {
 	if [ "$USE_GRE" != "1" ]; then
 		return
 	fi
 
-	# Remove chains if they exist
-	if $IPT $IPT_FLAGS -L GRE_IN -n >/dev/null 2>&1; then
-		ipt4 -D INPUT -j GRE_IN 2>/dev/null || true
-		ipt4 -F GRE_IN
-		ipt4 -X GRE_IN
-	fi
-	if $IPT $IPT_FLAGS -L GRE_OUT -n >/dev/null 2>&1; then
-		ipt4 -D OUTPUT -j GRE_OUT 2>/dev/null || true
-		ipt4 -F GRE_OUT
-		ipt4 -X GRE_OUT
-	fi
+	_gre_remove_chains
 
 	# Tear down interfaces if not persistent
 	if [ "$GRE_PERSIST" != "1" ]; then
@@ -266,17 +269,7 @@ gre_teardown() {
 		> "$tracking"
 	fi
 
-	# Clean up firewall chains
-	if $IPT $IPT_FLAGS -L GRE_IN -n >/dev/null 2>&1; then
-		ipt4 -D INPUT -j GRE_IN 2>/dev/null || true
-		ipt4 -F GRE_IN
-		ipt4 -X GRE_IN
-	fi
-	if $IPT $IPT_FLAGS -L GRE_OUT -n >/dev/null 2>&1; then
-		ipt4 -D OUTPUT -j GRE_OUT 2>/dev/null || true
-		ipt4 -F GRE_OUT
-		ipt4 -X GRE_OUT
-	fi
+	_gre_remove_chains
 
 	eout "{gre} all tunnels torn down"
 }
