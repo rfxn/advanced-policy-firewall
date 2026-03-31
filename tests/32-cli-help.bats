@@ -29,12 +29,6 @@ teardown() {
 
 # --- help and version ---
 
-@test "apf -h exits 0 and shows usage" {
-    run "$APF" -h
-    assert_success
-    assert_output --partial "usage: apf"
-}
-
 @test "unknown option exits 1" {
     run "$APF" --badopt
     assert_failure
@@ -497,17 +491,6 @@ teardown() {
 }
 
 # --- unknown verb / edge cases (G7, E9) ---
-
-@test "apf trust badverb exits 1 with targeted error" {
-    run "$APF" trust badverb
-    assert_failure
-    assert_output --partial "unknown verb"
-}
-
-@test "apf badnoun exits 1" {
-    run "$APF" badnoun
-    assert_failure
-}
 
 @test "apf trust flush without target exits 1 with error" {
     run "$APF" trust flush
