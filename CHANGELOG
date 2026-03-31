@@ -157,9 +157,19 @@
       duplicate config entries
 [Fix] --help: detect minimized Ubuntu/Debian man stub and fall back to
       built-in help instead of displaying "unminimize" advisory
+[Fix] GeoIP CC trust: temp→perm upgrade preserves entry when adding a CC
+      permanently that already exists as temporary; strips ttl/expire markers
+      instead of silently skipping (UAT-002)
+[Fix] refresh: REFRESH_TEMP now includes IPs from advanced trust entries
+      (proto:flow:d=port:s=FQDN); previously skipped all entries containing
+      '=' leaving advanced FQDN rules unprotected during refresh (F-PR-006)
 
   -- Changes --
 
+[Change] cli_trust/cli_trust_temp refactor: extract _cli_trust_write_entry()
+      and _cli_trust_resolve_fqdn() shared helpers; reduces 6 inline
+      comment-writing blocks and 3 FQDN resolve+local-addr checks to
+      single-source-of-truth helpers (R-CL-002)
 [Change] --lookup FQDN resolution: trust_lookup() now resolves FQDN entries
       in trust files when queried with an IP; uses resolved= metadata first,
       falls back to live DNS; shows matched FQDN with resolved IPs

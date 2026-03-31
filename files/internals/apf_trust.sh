@@ -466,6 +466,49 @@ _trust_action_target() {
 	fi
 }
 
+# Write a trust entry (comment + data line) to a trust file.
+# Centralizes the comment format for cli_trust() and cli_trust_temp().
+# Args: host file comment [extra_key=val ...]
+# Extra args are appended to metadata (e.g., ttl=N expire=E resolved=IPs).
+_cli_trust_write_entry() {
+	local host="$1" file="$2" comment="$3"
+	shift 3
+	local TIME ADDED_EPOCH CMT="$comment"
+	TIME=$(date +"%D %H:%M:%S")
+	ADDED_EPOCH=$(date +%s)
+	_sanitize_comment
+	local meta="addedtime=$ADDED_EPOCH"
+	local _wte_arg
+	for _wte_arg in "$@"; do
+		[ -n "$_wte_arg" ] && meta="$meta $_wte_arg"
+	done
+	if [ -n "$CMT" ]; then
+		echo "# added $host on $TIME $meta with comment: $CMT" >> "$file"
+	else
+		echo "# added $host on $TIME $meta" >> "$file"
+	fi
+	echo "$host" >> "$file"
+}
+
+# Resolve FQDN to IPs and check that none resolve to a local address.
+# Sets _RESOLVED_IPS on success (newline-separated).
+# Returns 0 (success), 1 (resolve failed), 2 (resolves to local addr).
+_cli_trust_resolve_fqdn() {
+	local host="$1"
+	if ! resolve_fqdn "$host"; then
+		echo "Failed to resolve FQDN '$host'" >&2
+		return 1
+	fi
+	local _crf_rip
+	while IFS= read -r _crf_rip; do
+		if is_local_addr "$_crf_rip"; then
+			echo "$host resolves to local address $_crf_rip and can not be added to the trust system" >&2
+			return 2
+		fi
+	done <<< "$_RESOLVED_IPS"
+	return 0
+}
+
 ## Check if a trust entry already exists in any trust file.
 # Sets caller's $tlist to space-separated list of files containing the entry.
 # Args: host_entry
@@ -481,7 +524,7 @@ _trust_check_duplicate() {
 
 cli_trust() {
  local CHAIN="$1" ACTION="$2" FILE="$3" HOST="$4" CMT="$5"
- local tlist f TIME JACTION ADDED_EPOCH
+ local tlist f JACTION
  if [ -z "$HOST" ]; then
         echo "an FQDN or IP address is required for this option" >&2
         return 1
@@ -511,29 +554,13 @@ cli_trust() {
 		echo "$HOST already exists in $tlist"
 	elif is_fqdn "$_VTE_IP"; then
 		# Advanced syntax with FQDN — resolve before iptables
-		if ! resolve_fqdn "$_VTE_IP"; then
-			echo "Failed to resolve FQDN '$_VTE_IP'" >&2
-			return 1
-		fi
-		local _ct_rip _ct_skip=0
-		while IFS= read -r _ct_rip; do
-			if is_local_addr "$_ct_rip"; then
-				echo "$_VTE_IP resolves to local address $_ct_rip and can not be added to the trust system" >&2
-				_ct_skip=1; break
-			fi
-		done <<< "$_RESOLVED_IPS"
-		if [ "$_ct_skip" == "0" ]; then
-			TIME=$(date +"%D %H:%M:%S")
-			ADDED_EPOCH=$(date +%s)
-			_sanitize_comment
+		local _ct_rc=0
+		_cli_trust_resolve_fqdn "$_VTE_IP" || _ct_rc=$?
+		if [ "$_ct_rc" -eq 1 ]; then return 1; fi
+		if [ "$_ct_rc" -eq 0 ]; then
 			local _ct_csv="${_RESOLVED_IPS//$'\n'/,}"
-			if [ -n "$CMT" ]; then
-				echo "# added $HOST on $TIME addedtime=$ADDED_EPOCH resolved=$_ct_csv with comment: $CMT" >> "$FILE"
-			else
-				echo "# added $HOST on $TIME addedtime=$ADDED_EPOCH resolved=$_ct_csv" >> "$FILE"
-			fi
-			echo "$HOST" >> "$FILE"
-			local _ct_resolved_entry
+			_cli_trust_write_entry "$HOST" "$FILE" "$CMT" "resolved=$_ct_csv"
+			local _ct_rip _ct_resolved_entry
 			while IFS= read -r _ct_rip; do
 				# Substitute FQDN with resolved IP in entry
 				_ct_resolved_entry="${HOST//$_VTE_IP/$_ct_rip}"
@@ -550,15 +577,7 @@ cli_trust() {
 	elif is_local_addr "$_VTE_IP"; then
 		echo "$_VTE_IP is a local address and can not be added to the trust system" >&2
 	else
-		TIME=$(date +"%D %H:%M:%S")
-		ADDED_EPOCH=$(date +%s)
-		_sanitize_comment
-		if [ -n "$CMT" ]; then
-			echo "# added $HOST on $TIME addedtime=$ADDED_EPOCH with comment: $CMT" >> "$FILE"
-		else
-			echo "# added $HOST on $TIME addedtime=$ADDED_EPOCH" >> "$FILE"
-		fi
-		echo "$HOST" >> "$FILE"
+		_cli_trust_write_entry "$HOST" "$FILE" "$CMT"
 		if trust_entry_rule "$HOST" "$CHAIN" "$ACTION" "-I"; then
 			eout "{trust} added $ACTION $_TER_DESC"
 			elog_event "trust_added" "info" "{trust} added $ACTION $_TER_DESC" \
@@ -596,29 +615,14 @@ cli_trust() {
          echo "$HOST already exists in $tlist"
  elif is_fqdn "$HOST"; then
 	# FQDN — resolve before iptables
-	if ! resolve_fqdn "$HOST"; then
-		echo "Failed to resolve FQDN '$HOST'" >&2
-		return 1
-	fi
-	local _ct_rip _ct_skip=0
-	while IFS= read -r _ct_rip; do
-		if is_local_addr "$_ct_rip"; then
-			echo "$HOST resolves to local address $_ct_rip and can not be added to the trust system" >&2
-			_ct_skip=1; break
-		fi
-	done <<< "$_RESOLVED_IPS"
-	if [ "$_ct_skip" == "0" ]; then
-		TIME=$(date +"%D %H:%M:%S")
-		ADDED_EPOCH=$(date +%s)
-		_sanitize_comment
+	local _ct_rc=0
+	_cli_trust_resolve_fqdn "$HOST" || _ct_rc=$?
+	if [ "$_ct_rc" -eq 1 ]; then return 1; fi
+	if [ "$_ct_rc" -eq 0 ]; then
 		local _ct_csv="${_RESOLVED_IPS//$'\n'/,}"
+		_cli_trust_write_entry "$HOST" "$FILE" "$CMT" "resolved=$_ct_csv"
 		_trust_action_target
-		if [ "$CMT" ]; then
-			echo "# added $HOST on $TIME addedtime=$ADDED_EPOCH resolved=$_ct_csv with comment: $CMT" >> "$FILE"
-		else
-			echo "# added $HOST on $TIME addedtime=$ADDED_EPOCH resolved=$_ct_csv" >> "$FILE"
-		fi
-		echo "$HOST" >> "$FILE"
+		local _ct_rip
 		while IFS= read -r _ct_rip; do
 			if ipt_for_host "$_ct_rip"; then
 				$IPT_H $IPT_FLAGS -I $CHAIN -s "$_ct_rip" -j $JACTION
@@ -637,15 +641,7 @@ cli_trust() {
  elif ! ipt_for_host "$HOST"; then
          echo "$HOST appears to be IPv6 but USE_IPV6 is not enabled" >&2
  else
-         TIME=$(date +"%D %H:%M:%S")
-	ADDED_EPOCH=$(date +%s)
-	_sanitize_comment
-	if [ "$CMT" ]; then
-		echo "# added $HOST on $TIME addedtime=$ADDED_EPOCH with comment: $CMT" >> "$FILE"
-	else
-		echo "# added $HOST on $TIME addedtime=$ADDED_EPOCH" >> "$FILE"
-	fi
-         echo "$HOST" >> "$FILE"
+	_cli_trust_write_entry "$HOST" "$FILE" "$CMT"
 	_trust_action_target
          $IPT_H $IPT_FLAGS -I $CHAIN -s "$HOST" -j $JACTION
         	$IPT_H $IPT_FLAGS -I $CHAIN -d "$HOST" -j $JACTION
@@ -660,7 +656,7 @@ cli_trust() {
 
 cli_trust_temp() {
  local CHAIN="$1" ACTION="$2" FILE="$3" HOST="$4" TTL_STR="$5" CMT="$6"
- local tlist f TIME EXPIRE_EPOCH JACTION EXPIRE_DISP
+ local tlist f EXPIRE_EPOCH JACTION EXPIRE_DISP
  if [ -z "$HOST" ]; then
 	echo "an FQDN or IP address is required for this option" >&2
 	return 1
@@ -717,32 +713,18 @@ cli_trust_temp() {
 	echo "$HOST already exists in $tlist"
  elif is_fqdn "$_VTE_IP"; then
 	# FQDN (bare or in advanced syntax) — resolve before iptables
-	if ! resolve_fqdn "$_VTE_IP"; then
-		echo "Failed to resolve FQDN '$_VTE_IP'" >&2
-		return 1
-	fi
-	local _ctt_rip _ctt_skip=0
-	while IFS= read -r _ctt_rip; do
-		if is_local_addr "$_ctt_rip"; then
-			echo "$_VTE_IP resolves to local address $_ctt_rip and can not be added to the trust system" >&2
-			_ctt_skip=1; break
-		fi
-	done <<< "$_RESOLVED_IPS"
-	if [ "$_ctt_skip" == "0" ]; then
-		TIME=$(date +"%D %H:%M:%S")
-		_sanitize_comment
+	local _ctt_rc=0
+	_cli_trust_resolve_fqdn "$_VTE_IP" || _ctt_rc=$?
+	if [ "$_ctt_rc" -eq 1 ]; then return 1; fi
+	if [ "$_ctt_rc" -eq 0 ]; then
 		EXPIRE_EPOCH=$(($(date +%s) + _TTL_SECONDS))
 		local _ctt_csv="${_RESOLVED_IPS//$'\n'/,}"
-		if [ -n "$CMT" ]; then
-			echo "# added $HOST on $TIME ttl=$_TTL_SECONDS expire=$EXPIRE_EPOCH resolved=$_ctt_csv with comment: $CMT" >> "$FILE"
-		else
-			echo "# added $HOST on $TIME ttl=$_TTL_SECONDS expire=$EXPIRE_EPOCH resolved=$_ctt_csv" >> "$FILE"
-		fi
-		echo "$HOST" >> "$FILE"
+		_cli_trust_write_entry "$HOST" "$FILE" "$CMT" \
+			"ttl=$_TTL_SECONDS" "expire=$EXPIRE_EPOCH" "resolved=$_ctt_csv"
 		EXPIRE_DISP=$(date -d "@$EXPIRE_EPOCH" +"%D %H:%M:%S")
 		if [[ "$HOST" == *=* ]]; then
 			# Advanced syntax with FQDN
-			local _ctt_resolved_entry
+			local _ctt_rip _ctt_resolved_entry
 			while IFS= read -r _ctt_rip; do
 				_ctt_resolved_entry="${HOST//$_VTE_IP/$_ctt_rip}"
 				if trust_entry_rule "$_ctt_resolved_entry" "$CHAIN" "$ACTION" "-I"; then
@@ -758,6 +740,7 @@ cli_trust_temp() {
 		else
 			# Bare FQDN
 			_trust_action_target
+			local _ctt_rip
 			while IFS= read -r _ctt_rip; do
 				if ipt_for_host "$_ctt_rip"; then
 					$IPT_H $IPT_FLAGS -I $CHAIN -s "$_ctt_rip" -j $JACTION
@@ -776,15 +759,9 @@ cli_trust_temp() {
  elif is_local_addr "$_VTE_IP"; then
 	echo "$_VTE_IP is a local address and can not be added to the trust system" >&2
  else
-	TIME=$(date +"%D %H:%M:%S")
-	_sanitize_comment
 	EXPIRE_EPOCH=$(($(date +%s) + _TTL_SECONDS))
-	if [ -n "$CMT" ]; then
-		echo "# added $HOST on $TIME ttl=$_TTL_SECONDS expire=$EXPIRE_EPOCH with comment: $CMT" >> "$FILE"
-	else
-		echo "# added $HOST on $TIME ttl=$_TTL_SECONDS expire=$EXPIRE_EPOCH" >> "$FILE"
-	fi
-	echo "$HOST" >> "$FILE"
+	_cli_trust_write_entry "$HOST" "$FILE" "$CMT" \
+		"ttl=$_TTL_SECONDS" "expire=$EXPIRE_EPOCH"
 
 	if [[ "$HOST" == *=* ]]; then
 		# Advanced syntax — use trust_entry_rule for iptables insertion
@@ -1322,21 +1299,36 @@ refresh() {
 	# Populate REFRESH_TEMP from trust files (more reliable than iptables-save
 	# parsing, which can miss entries added since last save)
 	ipt -F REFRESH_TEMP
-	local _rf_file _rf_line _rf_rip
+	local _rf_file _rf_line _rf_rip _rf_pip
 	for _rf_file in "$ALLOW_HOSTS" "$GALLOW_HOSTS"; do
 		[ -f "$_rf_file" ] || continue
 		while IFS= read -r _rf_line; do
-			# Skip comments, empty lines, metadata (key=val), and advanced
-			# trust entries (proto:flow:d=port:s=ip) — advanced entries need
-			# protocol/port/direction parsing that REFRESH_TEMP does not
-			# implement; bare IPv6 addresses pass through (contain : but no =)
-			case "$_rf_line" in '#'*|''|*=*) continue ;; esac
-			if is_fqdn "$_rf_line"; then
+			case "$_rf_line" in '#'*|'') continue ;; esac
+			if [[ "$_rf_line" == *=* ]]; then
+				# Advanced entry — extract IP for REFRESH_TEMP protection
+				trust_protect_ipv6 "$_rf_line"
+				trust_parse_fields "$_TPV6_RESULT"
+				_trust_unpack_fields || continue
+				_rf_pip="$_TUF_PIP"
+				if is_fqdn "$_rf_pip"; then
+					if resolve_fqdn "$_rf_pip"; then
+						while IFS= read -r _rf_rip; do
+							if ipt_for_host "$_rf_rip"; then
+								$IPT_H $IPT_FLAGS -A REFRESH_TEMP -s "$_rf_rip" -j ACCEPT 2>/dev/null  # safe: chain may not exist during refresh
+								$IPT_H $IPT_FLAGS -A REFRESH_TEMP -d "$_rf_rip" -j ACCEPT 2>/dev/null  # safe: chain may not exist during refresh
+							fi
+						done <<< "$_RESOLVED_IPS"
+					fi
+				elif ipt_for_host "$_rf_pip"; then
+					$IPT_H $IPT_FLAGS -A REFRESH_TEMP -s "$_rf_pip" -j ACCEPT 2>/dev/null  # safe: chain may not exist during refresh
+					$IPT_H $IPT_FLAGS -A REFRESH_TEMP -d "$_rf_pip" -j ACCEPT 2>/dev/null  # safe: chain may not exist during refresh
+				fi
+			elif is_fqdn "$_rf_line"; then
 				if resolve_fqdn "$_rf_line"; then
 					while IFS= read -r _rf_rip; do
 						if ipt_for_host "$_rf_rip"; then
-							$IPT_H $IPT_FLAGS -A REFRESH_TEMP -s "$_rf_rip" -j ACCEPT 2>/dev/null
-							$IPT_H $IPT_FLAGS -A REFRESH_TEMP -d "$_rf_rip" -j ACCEPT 2>/dev/null
+							$IPT_H $IPT_FLAGS -A REFRESH_TEMP -s "$_rf_rip" -j ACCEPT 2>/dev/null  # safe: chain may not exist during refresh
+							$IPT_H $IPT_FLAGS -A REFRESH_TEMP -d "$_rf_rip" -j ACCEPT 2>/dev/null  # safe: chain may not exist during refresh
 						fi
 					done <<< "$_RESOLVED_IPS"
 				fi
@@ -1349,13 +1341,32 @@ refresh() {
 	for _rf_file in "$DENY_HOSTS" "$GDENY_HOSTS"; do
 		[ -f "$_rf_file" ] || continue
 		while IFS= read -r _rf_line; do
-			case "$_rf_line" in '#'*|''|*=*) continue ;; esac
-			if is_fqdn "$_rf_line"; then
+			case "$_rf_line" in '#'*|'') continue ;; esac
+			if [[ "$_rf_line" == *=* ]]; then
+				# Advanced entry — extract IP for REFRESH_TEMP protection
+				trust_protect_ipv6 "$_rf_line"
+				trust_parse_fields "$_TPV6_RESULT"
+				_trust_unpack_fields || continue
+				_rf_pip="$_TUF_PIP"
+				if is_fqdn "$_rf_pip"; then
+					if resolve_fqdn "$_rf_pip"; then
+						while IFS= read -r _rf_rip; do
+							if ipt_for_host "$_rf_rip"; then
+								$IPT_H $IPT_FLAGS -A REFRESH_TEMP -s "$_rf_rip" -j $ALL_STOP 2>/dev/null  # safe: chain may not exist during refresh
+								$IPT_H $IPT_FLAGS -A REFRESH_TEMP -d "$_rf_rip" -j $ALL_STOP 2>/dev/null  # safe: chain may not exist during refresh
+							fi
+						done <<< "$_RESOLVED_IPS"
+					fi
+				elif ipt_for_host "$_rf_pip"; then
+					$IPT_H $IPT_FLAGS -A REFRESH_TEMP -s "$_rf_pip" -j $ALL_STOP 2>/dev/null  # safe: chain may not exist during refresh
+					$IPT_H $IPT_FLAGS -A REFRESH_TEMP -d "$_rf_pip" -j $ALL_STOP 2>/dev/null  # safe: chain may not exist during refresh
+				fi
+			elif is_fqdn "$_rf_line"; then
 				if resolve_fqdn "$_rf_line"; then
 					while IFS= read -r _rf_rip; do
 						if ipt_for_host "$_rf_rip"; then
-							$IPT_H $IPT_FLAGS -A REFRESH_TEMP -s "$_rf_rip" -j $ALL_STOP 2>/dev/null
-							$IPT_H $IPT_FLAGS -A REFRESH_TEMP -d "$_rf_rip" -j $ALL_STOP 2>/dev/null
+							$IPT_H $IPT_FLAGS -A REFRESH_TEMP -s "$_rf_rip" -j $ALL_STOP 2>/dev/null  # safe: chain may not exist during refresh
+							$IPT_H $IPT_FLAGS -A REFRESH_TEMP -d "$_rf_rip" -j $ALL_STOP 2>/dev/null  # safe: chain may not exist during refresh
 						fi
 					done <<< "$_RESOLVED_IPS"
 				fi

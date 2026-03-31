@@ -1110,12 +1110,32 @@ cli_cc_trust() {
 		fi
 
 		# Duplicate check across both CC files
+		local _cct_dup_file=""
 		if grep -v '^#' "$CC_DENY_HOSTS" 2>/dev/null | grep -Fxq "$cc"; then
-			echo "$cc already exists in cc_deny.rules"
-			continue
+			_cct_dup_file="$CC_DENY_HOSTS"
+		elif grep -v '^#' "$CC_ALLOW_HOSTS" 2>/dev/null | grep -Fxq "$cc"; then
+			_cct_dup_file="$CC_ALLOW_HOSTS"
 		fi
-		if grep -v '^#' "$CC_ALLOW_HOSTS" 2>/dev/null | grep -Fxq "$cc"; then
-			echo "$cc already exists in cc_allow.rules"
+		if [ -n "$_cct_dup_file" ]; then
+			# Check if existing entry is temporary (has ttl= and expire= markers)
+			if grep -F "# added $cc " "$_cct_dup_file" 2>/dev/null | grep -q 'ttl=.*expire='; then
+				if [ "$_cct_dup_file" = "$cc_file" ]; then
+					# Upgrade temp → permanent: strip ttl/expire markers
+					sed -i "s/\(# added ${cc} .* addedtime=[0-9]*\) ttl=[0-9]* expire=[0-9]*/\1/" "$cc_file"
+					local cc_name
+					cc_name=$(geoip_cc_name "$cc")
+					eout "{trust} upgraded $cc_name ($cc) from temporary to permanent"
+					if [ "$SET_VERBOSE" != "1" ]; then
+						echo "Upgraded $cc_name ($cc) from temporary to permanent."
+					fi
+					elog_event "trust_upgraded" "info" "{trust} upgraded $cc_name ($cc) to permanent" \
+						"host=$cc" "action=$action"
+				else
+					echo "$cc already exists in ${_cct_dup_file##*/}" >&2
+				fi
+				continue
+			fi
+			echo "$cc already exists in ${_cct_dup_file##*/}"
 			continue
 		fi
 
