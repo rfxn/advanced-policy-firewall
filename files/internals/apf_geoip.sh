@@ -511,7 +511,7 @@ _geoip_add_simple_rules() {
 }
 
 ## Add advanced (proto:flow:port:CC) iptables rule.
-# Uses trust_parse_fields() from functions.apf for parsing.
+# Uses trust_parse_fields() from apf_trust.sh for parsing.
 # Args: entry cc chain action
 _geoip_add_advanced_rule() {
 	# Reset IFS defensively — prevents future regressions if callers
@@ -1131,7 +1131,7 @@ cli_cc_trust() {
 					elog_event "trust_upgraded" "info" "{trust} upgraded $cc_name ($cc) to permanent" \
 						"host=$cc" "action=$action"
 				else
-					echo "$cc already exists in ${_cct_dup_file##*/}" >&2
+					echo "$cc already exists in ${_cct_dup_file##*/}"
 				fi
 				continue
 			fi

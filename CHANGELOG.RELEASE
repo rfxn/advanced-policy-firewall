@@ -169,7 +169,9 @@
 [Change] cli_trust/cli_trust_temp refactor: extract _cli_trust_write_entry()
       and _cli_trust_resolve_fqdn() shared helpers; reduces 6 inline
       comment-writing blocks and 3 FQDN resolve+local-addr checks to
-      single-source-of-truth helpers (R-CL-002)
+      single-source-of-truth helpers; normalizes trust comment format to
+      always include addedtime= metadata (temp entries previously omitted
+      it; CC temp entries and permanent entries already included it) (R-CL-002)
 [Change] --lookup FQDN resolution: trust_lookup() now resolves FQDN entries
       in trust files when queried with an IP; uses resolved= metadata first,
       falls back to live DNS; shows matched FQDN with resolved IPs
