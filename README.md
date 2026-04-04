@@ -198,8 +198,10 @@ ls /lib/modules/$(uname -r)/kernel/net/netfilter/
 
 - RHEL / Rocky Linux / AlmaLinux 8, 9
 - CentOS 7 (legacy support)
+- CentOS 6 (deep legacy support)
 - Debian 12
 - Ubuntu 20.04, 24.04
+- Ubuntu 12.04 (deep legacy support)
 
 APF will generally run on any Linux distribution that provides iptables (legacy or nft backend) and a bash shell with standard GNU utilities (grep, awk, sed, etc.).
 
@@ -297,6 +299,7 @@ The following files are located under your install path (`/etc/apf` by default):
 | `postroute.rules` | Post-routing custom rules |
 | `vnet/` | Per-IP virtual network policy files |
 | `/etc/cron.d/apf` | Consolidated cron: daily restart, hourly ipset refresh, per-minute temp trust expiry |
+| `/etc/cron.d/ctlimit.apf` | CT_LIMIT scan cron job (created when CT_LIMIT > 0) |
 | `/etc/bash_completion.d/apf` | Bash tab completion for apf command-line options |
 | `/var/log/apf_log` | Default status log location |
 | `/var/log/apf/audit.log` | Structured JSONL audit log (config, service state, rule events) |

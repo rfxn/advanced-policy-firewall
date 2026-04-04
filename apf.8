@@ -554,6 +554,41 @@ Days between automatic data refresh via \-\-cc\-update (0 to disable).
 .TP
 .B CC_IPV6
 Include IPv6 country blocks when USE_IPV6=1.
+.SH VIRTUAL NETWORK (VNET)
+The VNET subsystem creates per\-IP firewall policies for systems with multiple
+IP addresses. When
+.B SET_VNET=1
+is set in
+.IR conf.apf ,
+APF detects aliased IPs on the untrusted interface and generates a
+.I vnet/IP.rules
+file for each one. These rule files can override global port filtering
+variables (e.g., IG_TCP_CPORTS, EG_TCP_CPORTS) and include custom
+iptables entries for that specific IP.
+.PP
+VNET is IPv4\-only. To create a per\-IP policy, copy the generated
+default rules file and customize:
+.PP
+.in +4
+.nf
+cp /etc/apf/vnet/192.168.1.10.rules.default /etc/apf/vnet/192.168.1.10.rules
+vi /etc/apf/vnet/192.168.1.10.rules
+apf \-r
+.fi
+.in
+.PP
+The connection tracking limit scanner (CT_LIMIT) also supports per\-IP
+overrides: set
+.B CT_LIMIT=\(dq500\(dq
+in a VNET rules file for a different threshold on that IP.
+.PP
+See
+.B SET_VNET
+and
+.B SET_ADDIFACE
+in
+.I conf.apf
+for configuration.
 .SH CONFIGURATION
 All configuration is in a single file,
 .IR conf.apf ,
@@ -669,6 +704,9 @@ CT_LIMIT scan cron job (created when CT_LIMIT > 0).
 .TP
 .I /etc/cron.d/apf
 Consolidated cron: daily restart, hourly ipset refresh, per\-minute temp expiry.
+.TP
+.I /etc/logrotate.d/apf
+Log rotation configuration for APF status and audit logs.
 .TP
 .I /etc/bash_completion.d/apf
 Bash tab completion for apf command\-line options.

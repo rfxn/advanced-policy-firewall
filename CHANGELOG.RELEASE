@@ -163,9 +163,17 @@
 [Fix] refresh: REFRESH_TEMP now includes IPs from advanced trust entries
       (proto:flow:d=port:s=FQDN); previously skipped all entries containing
       '=' leaving advanced FQDN rules unprotected during refresh (F-PR-006)
+[Fix] Inline comment compliance: add missing inline comments to 41
+      2>/dev/null suppressions in apf_trust.sh and 4 || true suppressions
+      in apf_geoip.sh; all iptables delete, DNS resolution, and trust file
+      operations now document why error suppression is safe
 
   -- Changes --
 
+[Change] Documentation: add VNET section to man page; add logrotate to FILES;
+      add -ta/-td to bash completion; add CentOS 6 and Ubuntu 12.04 to
+      README platforms; add ctlimit cron to README key files; expose
+      ELOG_AUDIT_FILE in conf.apf
 [Change] cli_trust/cli_trust_temp refactor: extract _cli_trust_write_entry()
       and _cli_trust_resolve_fqdn() shared helpers; reduces 6 inline
       comment-writing blocks and 3 FQDN resolve+local-addr checks to
