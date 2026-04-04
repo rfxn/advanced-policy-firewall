@@ -1314,27 +1314,27 @@ refresh() {
 					if resolve_fqdn "$_rf_pip"; then
 						while IFS= read -r _rf_rip; do
 							if ipt_for_host "$_rf_rip"; then
-								$IPT_H $IPT_FLAGS -A REFRESH_TEMP -s "$_rf_rip" -j ACCEPT 2>/dev/null  # safe: chain may not exist during refresh
-								$IPT_H $IPT_FLAGS -A REFRESH_TEMP -d "$_rf_rip" -j ACCEPT 2>/dev/null  # safe: chain may not exist during refresh
+								$IPT_H $IPT_FLAGS -A REFRESH_TEMP -s "$_rf_rip" -j ACCEPT 2>/dev/null  # safe: rule may fail for edge-case IP format
+								$IPT_H $IPT_FLAGS -A REFRESH_TEMP -d "$_rf_rip" -j ACCEPT 2>/dev/null  # safe: rule may fail for edge-case IP format
 							fi
 						done <<< "$_RESOLVED_IPS"
 					fi
 				elif ipt_for_host "$_rf_pip"; then
-					$IPT_H $IPT_FLAGS -A REFRESH_TEMP -s "$_rf_pip" -j ACCEPT 2>/dev/null  # safe: chain may not exist during refresh
-					$IPT_H $IPT_FLAGS -A REFRESH_TEMP -d "$_rf_pip" -j ACCEPT 2>/dev/null  # safe: chain may not exist during refresh
+					$IPT_H $IPT_FLAGS -A REFRESH_TEMP -s "$_rf_pip" -j ACCEPT 2>/dev/null  # safe: rule may fail for edge-case IP format
+					$IPT_H $IPT_FLAGS -A REFRESH_TEMP -d "$_rf_pip" -j ACCEPT 2>/dev/null  # safe: rule may fail for edge-case IP format
 				fi
 			elif is_fqdn "$_rf_line"; then
 				if resolve_fqdn "$_rf_line"; then
 					while IFS= read -r _rf_rip; do
 						if ipt_for_host "$_rf_rip"; then
-							$IPT_H $IPT_FLAGS -A REFRESH_TEMP -s "$_rf_rip" -j ACCEPT 2>/dev/null  # safe: chain may not exist during refresh
-							$IPT_H $IPT_FLAGS -A REFRESH_TEMP -d "$_rf_rip" -j ACCEPT 2>/dev/null  # safe: chain may not exist during refresh
+							$IPT_H $IPT_FLAGS -A REFRESH_TEMP -s "$_rf_rip" -j ACCEPT 2>/dev/null  # safe: rule may fail for edge-case IP format
+							$IPT_H $IPT_FLAGS -A REFRESH_TEMP -d "$_rf_rip" -j ACCEPT 2>/dev/null  # safe: rule may fail for edge-case IP format
 						fi
 					done <<< "$_RESOLVED_IPS"
 				fi
 			elif ipt_for_host "$_rf_line"; then
-				$IPT_H $IPT_FLAGS -A REFRESH_TEMP -s "$_rf_line" -j ACCEPT 2>/dev/null  # safe: chain may not exist during refresh
-				$IPT_H $IPT_FLAGS -A REFRESH_TEMP -d "$_rf_line" -j ACCEPT 2>/dev/null  # safe: chain may not exist during refresh
+				$IPT_H $IPT_FLAGS -A REFRESH_TEMP -s "$_rf_line" -j ACCEPT 2>/dev/null  # safe: rule may fail for edge-case IP format
+				$IPT_H $IPT_FLAGS -A REFRESH_TEMP -d "$_rf_line" -j ACCEPT 2>/dev/null  # safe: rule may fail for edge-case IP format
 			fi
 		done < "$_rf_file"
 	done
@@ -1352,27 +1352,27 @@ refresh() {
 					if resolve_fqdn "$_rf_pip"; then
 						while IFS= read -r _rf_rip; do
 							if ipt_for_host "$_rf_rip"; then
-								$IPT_H $IPT_FLAGS -A REFRESH_TEMP -s "$_rf_rip" -j $ALL_STOP 2>/dev/null  # safe: chain may not exist during refresh
-								$IPT_H $IPT_FLAGS -A REFRESH_TEMP -d "$_rf_rip" -j $ALL_STOP 2>/dev/null  # safe: chain may not exist during refresh
+								$IPT_H $IPT_FLAGS -A REFRESH_TEMP -s "$_rf_rip" -j $ALL_STOP 2>/dev/null  # safe: rule may fail for edge-case IP format
+								$IPT_H $IPT_FLAGS -A REFRESH_TEMP -d "$_rf_rip" -j $ALL_STOP 2>/dev/null  # safe: rule may fail for edge-case IP format
 							fi
 						done <<< "$_RESOLVED_IPS"
 					fi
 				elif ipt_for_host "$_rf_pip"; then
-					$IPT_H $IPT_FLAGS -A REFRESH_TEMP -s "$_rf_pip" -j $ALL_STOP 2>/dev/null  # safe: chain may not exist during refresh
-					$IPT_H $IPT_FLAGS -A REFRESH_TEMP -d "$_rf_pip" -j $ALL_STOP 2>/dev/null  # safe: chain may not exist during refresh
+					$IPT_H $IPT_FLAGS -A REFRESH_TEMP -s "$_rf_pip" -j $ALL_STOP 2>/dev/null  # safe: rule may fail for edge-case IP format
+					$IPT_H $IPT_FLAGS -A REFRESH_TEMP -d "$_rf_pip" -j $ALL_STOP 2>/dev/null  # safe: rule may fail for edge-case IP format
 				fi
 			elif is_fqdn "$_rf_line"; then
 				if resolve_fqdn "$_rf_line"; then
 					while IFS= read -r _rf_rip; do
 						if ipt_for_host "$_rf_rip"; then
-							$IPT_H $IPT_FLAGS -A REFRESH_TEMP -s "$_rf_rip" -j $ALL_STOP 2>/dev/null  # safe: chain may not exist during refresh
-							$IPT_H $IPT_FLAGS -A REFRESH_TEMP -d "$_rf_rip" -j $ALL_STOP 2>/dev/null  # safe: chain may not exist during refresh
+							$IPT_H $IPT_FLAGS -A REFRESH_TEMP -s "$_rf_rip" -j $ALL_STOP 2>/dev/null  # safe: rule may fail for edge-case IP format
+							$IPT_H $IPT_FLAGS -A REFRESH_TEMP -d "$_rf_rip" -j $ALL_STOP 2>/dev/null  # safe: rule may fail for edge-case IP format
 						fi
 					done <<< "$_RESOLVED_IPS"
 				fi
 			elif ipt_for_host "$_rf_line"; then
-				$IPT_H $IPT_FLAGS -A REFRESH_TEMP -s "$_rf_line" -j $ALL_STOP 2>/dev/null  # safe: chain may not exist during refresh
-				$IPT_H $IPT_FLAGS -A REFRESH_TEMP -d "$_rf_line" -j $ALL_STOP 2>/dev/null  # safe: chain may not exist during refresh
+				$IPT_H $IPT_FLAGS -A REFRESH_TEMP -s "$_rf_line" -j $ALL_STOP 2>/dev/null  # safe: rule may fail for edge-case IP format
+				$IPT_H $IPT_FLAGS -A REFRESH_TEMP -d "$_rf_line" -j $ALL_STOP 2>/dev/null  # safe: rule may fail for edge-case IP format
 			fi
 		done < "$_rf_file"
 	done

@@ -810,7 +810,7 @@ LOG_APF="/var/log/apf_log"
 
 # Location of the structured JSONL audit log. Records config changes, service
 # state transitions, trust operations, and firewall events. Leave commented to
-# use the default ($LOG_APF directory + audit.log).
+# use the default (ELOG_LOG_DIR/audit.log, i.e., /var/log/apf/audit.log).
 #ELOG_AUDIT_FILE="/var/log/apf/audit.log"
 
 # iptables locking support (-w flag). Prevents lock contention when

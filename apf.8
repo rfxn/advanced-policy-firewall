@@ -566,12 +566,12 @@ file for each one. These rule files can override global port filtering
 variables (e.g., IG_TCP_CPORTS, EG_TCP_CPORTS) and include custom
 iptables entries for that specific IP.
 .PP
-VNET is IPv4\-only. To create a per\-IP policy, copy the generated
-default rules file and customize:
+VNET is IPv4\-only. When the firewall starts with SET_VNET=1, vnetgen
+creates a default rules file for each detected IP. To customize a
+per\-IP policy, edit the generated file and restart:
 .PP
 .in +4
 .nf
-cp /etc/apf/vnet/192.168.1.10.rules.default /etc/apf/vnet/192.168.1.10.rules
 vi /etc/apf/vnet/192.168.1.10.rules
 apf \-r
 .fi
