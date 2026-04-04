@@ -59,8 +59,11 @@ teardown_file() {
     "$APF" -f 2>/dev/null || true
     source /opt/tests/helpers/teardown-netns.sh
     # Remove test /etc/hosts entries (Docker-safe: sed -i fails on bind mounts)
-    grep -v "test-fqdn-" /etc/hosts > /tmp/hosts_cleanup.tmp && \
-        cat /tmp/hosts_cleanup.tmp > /etc/hosts && rm -f /tmp/hosts_cleanup.tmp
+    local _htmp
+    _htmp=$(mktemp /tmp/hosts_cleanup.XXXXXX)
+    grep -v "test-fqdn-" /etc/hosts > "$_htmp" && \
+        cat "$_htmp" > /etc/hosts
+    rm -f "$_htmp"
 }
 
 setup() {
@@ -279,14 +282,16 @@ teardown() {
     "$APF" -r
     assert_rule_exists_ips TALLOW "-s $IP_SINGLE.*-j ACCEPT"
     # Change the /etc/hosts mapping (Docker-safe: sed -i fails on bind mounts)
+    local _htmp
+    _htmp=$(mktemp /tmp/hosts_refresh.XXXXXX)
     sed "s/$IP_SINGLE.*$FQDN_SINGLE/198.51.100.99    $FQDN_SINGLE/" /etc/hosts \
-        > /tmp/hosts_refresh.tmp && cat /tmp/hosts_refresh.tmp > /etc/hosts
+        > "$_htmp" && cat "$_htmp" > /etc/hosts
     "$APF" -e
     assert_rule_exists_ips TALLOW "-s 198.51.100.99.*-j ACCEPT"
     # Restore original mapping
     sed "s/198.51.100.99.*$FQDN_SINGLE/$IP_SINGLE    $FQDN_SINGLE/" /etc/hosts \
-        > /tmp/hosts_refresh.tmp && cat /tmp/hosts_refresh.tmp > /etc/hosts
-    rm -f /tmp/hosts_refresh.tmp
+        > "$_htmp" && cat "$_htmp" > /etc/hosts
+    rm -f "$_htmp"
 }
 
 # =====================================================================

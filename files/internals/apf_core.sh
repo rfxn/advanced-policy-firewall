@@ -659,7 +659,7 @@ pkt_sanity_flags() {
 
 cron_refresh() {
 if [ "$SET_REFRESH" != "0" ] && [ -n "$SET_REFRESH" ]; then
-cat<<EOF > "$INSTALL_PATH/internals/cron.refresh"
+command cat<<EOF > "$INSTALL_PATH/internals/cron.refresh"
 */$SET_REFRESH * * * * root $INSTALL_PATH/apf --refresh >> /dev/null 2>&1
 EOF
 	command chmod 644 "$INSTALL_PATH/internals/cron.refresh"
@@ -676,7 +676,7 @@ cron_ctlimit() {
 if ct_enabled; then
 	local ct_min=$(( ${CT_INTERVAL:-30} / 60 ))
 	[ "$ct_min" -lt 1 ] && ct_min=1
-cat<<EOF > "$INSTALL_PATH/internals/cron.ctlimit"
+command cat<<EOF > "$INSTALL_PATH/internals/cron.ctlimit"
 */$ct_min * * * * root $INSTALL_PATH/apf --ct-scan >> /dev/null 2>&1
 EOF
 	command chmod 644 "$INSTALL_PATH/internals/cron.ctlimit"

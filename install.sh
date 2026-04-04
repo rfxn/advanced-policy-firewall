@@ -96,7 +96,7 @@ install() {
 	elif [ -d "/etc/rc.d/init.d" ] || [ -d "/etc/init.d" ]; then
 		pkg_service_install "apf" "apf.init"
 		local _init_path
-		_init_path=$(_pkg_init_script_path "apf") || true
+		_init_path=$(_pkg_init_script_path "apf") || true  # safe: init path may not exist on systemd-only hosts
 		if [ -n "${_init_path:-}" ] && [ "$INSTALL_PATH" != "/etc/apf" ]; then
 			pkg_sed_replace "/etc/apf" "$INSTALL_PATH" "$_init_path"
 		fi
@@ -235,7 +235,7 @@ if [ -d "$INSTALL_PATH" ]; then
 		_int_re='^[0-9]+$'
 		_sr=$(pkg_config_get "$INSTALL_PATH/conf.apf" "SET_REFRESH") || _sr=""
 		if [[ "$_sr" =~ $_int_re ]] && [ "$_sr" != "0" ]; then
-cat<<EOF > "$INSTALL_PATH/internals/cron.refresh"
+command cat<<EOF > "$INSTALL_PATH/internals/cron.refresh"
 */$_sr * * * * root $INSTALL_PATH/apf --refresh >> /dev/null 2>&1
 EOF
 			command chmod 644 "$INSTALL_PATH/internals/cron.refresh"
@@ -247,7 +247,7 @@ EOF
 			[[ "$_ci" =~ $_int_re ]] || _ci=30
 			_ci=$(( _ci / 60 ))
 			[ "$_ci" -lt 1 ] && _ci=1
-cat<<EOF > "$INSTALL_PATH/internals/cron.ctlimit"
+command cat<<EOF > "$INSTALL_PATH/internals/cron.ctlimit"
 */$_ci * * * * root $INSTALL_PATH/apf --ct-scan >> /dev/null 2>&1
 EOF
 			command chmod 644 "$INSTALL_PATH/internals/cron.ctlimit"
