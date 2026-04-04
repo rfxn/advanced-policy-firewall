@@ -12,7 +12,7 @@
 # temp entry management, trust file loading, refresh cycle
 
 # Source guard
-[[ -n "${_APF_TRUST_LOADED:-}" ]] && return 0 2>/dev/null
+[[ -n "${_APF_TRUST_LOADED:-}" ]] && return 0 2>/dev/null  # safe: return outside function context is benign
 _APF_TRUST_LOADED=1
 
 # shellcheck disable=SC2034
@@ -234,16 +234,16 @@ resolve_fqdn() {
 	fi
 	local raw
 	if [ -n "$TIMEOUT" ]; then
-		raw=$($TIMEOUT "$FQDN_TIMEOUT" $GETENT ahosts "$host" 2>/dev/null)
+		raw=$($TIMEOUT "$FQDN_TIMEOUT" $GETENT ahosts "$host" 2>/dev/null)  # safe: DNS resolution may fail
 	else
-		raw=$($GETENT ahosts "$host" 2>/dev/null)
+		raw=$($GETENT ahosts "$host" 2>/dev/null)  # safe: DNS resolution may fail
 	fi
 	# Fallback: getent hosts (catches IPv6-only entries where ahosts may fail)
 	if [ -z "$raw" ]; then
 		if [ -n "$TIMEOUT" ]; then
-			raw=$($TIMEOUT "$FQDN_TIMEOUT" $GETENT hosts "$host" 2>/dev/null)
+			raw=$($TIMEOUT "$FQDN_TIMEOUT" $GETENT hosts "$host" 2>/dev/null)  # safe: DNS resolution may fail
 		else
-			raw=$($GETENT hosts "$host" 2>/dev/null)
+			raw=$($GETENT hosts "$host" 2>/dev/null)  # safe: DNS resolution may fail
 		fi
 	fi
 	if [ -z "$raw" ]; then
@@ -279,7 +279,7 @@ _resolve_fqdn_metadata() {
 	local _rfm_rline
 	for f in "$ALLOW_HOSTS" "$DENY_HOSTS" "$GALLOW_HOSTS" "$GDENY_HOSTS"; do
 		[ -f "$f" ] || continue
-		_rfm_rline=$(grep -F "resolved=" "$f" 2>/dev/null | grep -F "$fqdn" | head -n1)
+		_rfm_rline=$(grep -F "resolved=" "$f" 2>/dev/null | grep -F "$fqdn" | head -n1)  # safe: file read may race with deletion
 		if [ -n "$_rfm_rline" ]; then
 			_FQDN_RESOLVED_IPS="${_rfm_rline##*resolved=}"
 			_FQDN_RESOLVED_IPS="${_FQDN_RESOLVED_IPS%% *}"
@@ -298,18 +298,18 @@ _resolve_fqdn_metadata() {
 _trust_remove_ip_rules() {
 	local ip="$1"
 	if ! ipt_for_host "$ip"; then return; fi
-	$IPT_H $IPT_FLAGS -D INPUT -s "$ip" -j ACCEPT 2>/dev/null && found=1
-	$IPT_H $IPT_FLAGS -D OUTPUT -d "$ip" -j ACCEPT 2>/dev/null && found=1
-	$IPT_H $IPT_FLAGS -D INPUT -s "$ip" -j $ALL_STOP 2>/dev/null && found=1
-	$IPT_H $IPT_FLAGS -D OUTPUT -d "$ip" -j $ALL_STOP 2>/dev/null && found=1
-	$IPT_H $IPT_FLAGS -D TALLOW -s "$ip" -j ACCEPT 2>/dev/null && found=1
-	$IPT_H $IPT_FLAGS -D TALLOW -d "$ip" -j ACCEPT 2>/dev/null && found=1
-	$IPT_H $IPT_FLAGS -D TDENY -s "$ip" -j $ALL_STOP 2>/dev/null && found=1
-	$IPT_H $IPT_FLAGS -D TDENY -d "$ip" -j $ALL_STOP 2>/dev/null && found=1
-	$IPT_H $IPT_FLAGS -D TGALLOW -s "$ip" -j ACCEPT 2>/dev/null && found=1
-	$IPT_H $IPT_FLAGS -D TGALLOW -d "$ip" -j ACCEPT 2>/dev/null && found=1
-	$IPT_H $IPT_FLAGS -D TGDENY -s "$ip" -j $ALL_STOP 2>/dev/null && found=1
-	$IPT_H $IPT_FLAGS -D TGDENY -d "$ip" -j $ALL_STOP 2>/dev/null && found=1
+	$IPT_H $IPT_FLAGS -D INPUT -s "$ip" -j ACCEPT 2>/dev/null && found=1  # safe: rule may not exist if chain is inactive
+	$IPT_H $IPT_FLAGS -D OUTPUT -d "$ip" -j ACCEPT 2>/dev/null && found=1  # safe: rule may not exist if chain is inactive
+	$IPT_H $IPT_FLAGS -D INPUT -s "$ip" -j $ALL_STOP 2>/dev/null && found=1  # safe: rule may not exist if chain is inactive
+	$IPT_H $IPT_FLAGS -D OUTPUT -d "$ip" -j $ALL_STOP 2>/dev/null && found=1  # safe: rule may not exist if chain is inactive
+	$IPT_H $IPT_FLAGS -D TALLOW -s "$ip" -j ACCEPT 2>/dev/null && found=1  # safe: rule may not exist if chain is inactive
+	$IPT_H $IPT_FLAGS -D TALLOW -d "$ip" -j ACCEPT 2>/dev/null && found=1  # safe: rule may not exist if chain is inactive
+	$IPT_H $IPT_FLAGS -D TDENY -s "$ip" -j $ALL_STOP 2>/dev/null && found=1  # safe: rule may not exist if chain is inactive
+	$IPT_H $IPT_FLAGS -D TDENY -d "$ip" -j $ALL_STOP 2>/dev/null && found=1  # safe: rule may not exist if chain is inactive
+	$IPT_H $IPT_FLAGS -D TGALLOW -s "$ip" -j ACCEPT 2>/dev/null && found=1  # safe: rule may not exist if chain is inactive
+	$IPT_H $IPT_FLAGS -D TGALLOW -d "$ip" -j ACCEPT 2>/dev/null && found=1  # safe: rule may not exist if chain is inactive
+	$IPT_H $IPT_FLAGS -D TGDENY -s "$ip" -j $ALL_STOP 2>/dev/null && found=1  # safe: rule may not exist if chain is inactive
+	$IPT_H $IPT_FLAGS -D TGDENY -d "$ip" -j $ALL_STOP 2>/dev/null && found=1  # safe: rule may not exist if chain is inactive
 	# Spec-based cleanup for any remaining rules referencing this IP
 	local _ctr_chain _ctr_rule _ctr_spec
 	for _ctr_chain in INPUT OUTPUT TALLOW TDENY TGALLOW TGDENY; do
@@ -317,8 +317,8 @@ _trust_remove_ip_rules() {
 			[ -z "$_ctr_rule" ] && continue
 			_ctr_spec="${_ctr_rule#-A $_ctr_chain }"
 			# shellcheck disable=SC2086
-			$IPT_H $IPT_FLAGS -D "$_ctr_chain" $_ctr_spec 2>/dev/null && found=1
-		done < <($IPT_H $IPT_FLAGS -S "$_ctr_chain" 2>/dev/null | grep -w -- "$ip")
+			$IPT_H $IPT_FLAGS -D "$_ctr_chain" $_ctr_spec 2>/dev/null && found=1  # safe: rule may not exist
+		done < <($IPT_H $IPT_FLAGS -S "$_ctr_chain" 2>/dev/null | grep -w -- "$ip")  # safe: chain may not exist
 	done
 }
 
@@ -371,23 +371,23 @@ cli_trust_remove() {
 			local _ctr_rip _ctr_resolved_entry
 			for _ctr_rip in ${_FQDN_RESOLVED_IPS//,/ }; do
 				_ctr_resolved_entry="${DIP//$_VTE_IP/$_ctr_rip}"
-				trust_entry_rule "$_ctr_resolved_entry" "TALLOW" "ALLOW" "-D" 2>/dev/null && found=1
-				trust_entry_rule "$_ctr_resolved_entry" "TDENY" "DENY" "-D" 2>/dev/null && found=1
-				trust_entry_rule "$_ctr_resolved_entry" "TGALLOW" "ALLOW" "-D" 2>/dev/null && found=1
-				trust_entry_rule "$_ctr_resolved_entry" "TGDENY" "DENY" "-D" 2>/dev/null && found=1
+				trust_entry_rule "$_ctr_resolved_entry" "TALLOW" "ALLOW" "-D" 2>/dev/null && found=1  # safe: rule may not exist if chain is inactive
+				trust_entry_rule "$_ctr_resolved_entry" "TDENY" "DENY" "-D" 2>/dev/null && found=1  # safe: rule may not exist if chain is inactive
+				trust_entry_rule "$_ctr_resolved_entry" "TGALLOW" "ALLOW" "-D" 2>/dev/null && found=1  # safe: rule may not exist if chain is inactive
+				trust_entry_rule "$_ctr_resolved_entry" "TGDENY" "DENY" "-D" 2>/dev/null && found=1  # safe: rule may not exist if chain is inactive
 			done
 		else
-			trust_entry_rule "$DIP" "TALLOW" "ALLOW" "-D" 2>/dev/null && found=1
-			trust_entry_rule "$DIP" "TDENY" "DENY" "-D" 2>/dev/null && found=1
-			trust_entry_rule "$DIP" "TGALLOW" "ALLOW" "-D" 2>/dev/null && found=1
-			trust_entry_rule "$DIP" "TGDENY" "DENY" "-D" 2>/dev/null && found=1
+			trust_entry_rule "$DIP" "TALLOW" "ALLOW" "-D" 2>/dev/null && found=1  # safe: rule may not exist if chain is inactive
+			trust_entry_rule "$DIP" "TDENY" "DENY" "-D" 2>/dev/null && found=1  # safe: rule may not exist if chain is inactive
+			trust_entry_rule "$DIP" "TGALLOW" "ALLOW" "-D" 2>/dev/null && found=1  # safe: rule may not exist if chain is inactive
+			trust_entry_rule "$DIP" "TGDENY" "DENY" "-D" 2>/dev/null && found=1  # safe: rule may not exist if chain is inactive
 		fi
 		# Remove exact entry + associated comment from trust files
 		local escaped_entry
 		escaped_entry=$(echo "$DIP" | sed 's/[.\/\[\]]/\\&/g')
 		for f in "$ALLOW_HOSTS" "$DENY_HOSTS" "$GALLOW_HOSTS" "$GDENY_HOSTS"; do
 			[ -f "$f" ] || continue
-			if grep -Fq "$DIP" "$f" 2>/dev/null; then
+			if grep -Fq "$DIP" "$f" 2>/dev/null; then  # safe: entry may not exist in file
 				found=1
 			fi
 			sed -i "\%# added ${escaped_entry} %d" "$f"
@@ -425,7 +425,7 @@ cli_trust_remove() {
 		done
 		# Remove FQDN + comment from trust files
 		local escaped_fqdn="${DIP//./\\.}"
-		if grep -q -- "^${escaped_fqdn}$" "$ALLOW_HOSTS" "$DENY_HOSTS" "$GALLOW_HOSTS" "$GDENY_HOSTS" 2>/dev/null; then
+		if grep -q -- "^${escaped_fqdn}$" "$ALLOW_HOSTS" "$DENY_HOSTS" "$GALLOW_HOSTS" "$GDENY_HOSTS" 2>/dev/null; then  # safe: some trust files may not exist
 			found=1
 		fi
 		sed -i "\%# added ${escaped_fqdn} %d" "$ALLOW_HOSTS" "$DENY_HOSTS" "$GALLOW_HOSTS" "$GDENY_HOSTS"
@@ -440,7 +440,7 @@ cli_trust_remove() {
 		_trust_remove_ip_rules "$DIP"
 		# Check trust files for entry before removing
 		local escaped_ip="${DIP//./\\.}"
-		if grep -q -- "^${escaped_ip}\b" "$ALLOW_HOSTS" "$DENY_HOSTS" "$GALLOW_HOSTS" "$GDENY_HOSTS" 2>/dev/null; then
+		if grep -q -- "^${escaped_ip}\b" "$ALLOW_HOSTS" "$DENY_HOSTS" "$GALLOW_HOSTS" "$GDENY_HOSTS" 2>/dev/null; then  # safe: some trust files may not exist
 			found=1
 		fi
 		sed -i "\%^${escaped_ip}\b%d" "$ALLOW_HOSTS" "$DENY_HOSTS" "$GALLOW_HOSTS" "$GDENY_HOSTS"
@@ -1088,7 +1088,7 @@ if [ "$eff_expire" -ge "60" ]; then
                         _eb_date_str="${_eb_date_str%% resolved=*}"
                         _eb_date_str="${_eb_date_str%% with comment:*}"
                         # _eb_date_str is now "MM/DD/YY HH:MM:SS"
-                        ban_time=$(date --date "$_eb_date_str" +%s 2>/dev/null)
+                        ban_time=$(date --date "$_eb_date_str" +%s 2>/dev/null)  # safe: legacy date format may be invalid
                 fi
                 # Validate numeric
                 case "$ban_time" in *[!0-9]*) continue ;; esac
@@ -1123,7 +1123,7 @@ expire_temp_entries() {
 		fi
 		while IFS= read -r line; do
 			_parse_temp_comment "$line"
-			if [ "$current_time" -ge "$_PTC_EPOCH" ] 2>/dev/null; then
+			if [ "$current_time" -ge "$_PTC_EPOCH" ] 2>/dev/null; then  # safe: value may not be numeric
 				eout "{trust} removed expired temp entry for $_PTC_IP"
 				if [ "$_is_cc_file" = "1" ]; then
 					_et_cc_expired+=("$_PTC_IP")
@@ -1148,7 +1148,7 @@ expire_temp_entries() {
 		. "$INSTALL_PATH/internals/apf_geoip.sh"
 		local _et_i
 		for _et_i in "${!_et_cc_expired[@]}"; do
-			_expire_cc_temp_entry "${_et_cc_expired[$_et_i]}" "${_et_cc_files[$_et_i]}" 2>/dev/null
+			_expire_cc_temp_entry "${_et_cc_expired[$_et_i]}" "${_et_cc_files[$_et_i]}" 2>/dev/null  # safe: entry may already be expired
 		done
 	fi
 	if [ "$count" -gt 0 ]; then
@@ -1241,7 +1241,7 @@ flush_temp_entries() {
 		. "$INSTALL_PATH/internals/apf_geoip.sh"
 		local _ft_i
 		for _ft_i in "${!_ft_cc_expired[@]}"; do
-			_expire_cc_temp_entry "${_ft_cc_expired[$_ft_i]}" "${_ft_cc_files[$_ft_i]}" 2>/dev/null
+			_expire_cc_temp_entry "${_ft_cc_expired[$_ft_i]}" "${_ft_cc_files[$_ft_i]}" 2>/dev/null  # safe: entry may already be expired
 		done
 	fi
 	eout "{trust} flushed $count temporary trust entries"
@@ -1257,9 +1257,9 @@ flush_temp_entries() {
 refresh() {
 	# Clean up orphaned temp files from pre-2.0.2 refresh() implementation
 	_apf_cleanup_stale_tmp
-	apf_loaded=$($IPT $IPT_FLAGS --list --numeric 2>/dev/null | grep TALLOW)
+	apf_loaded=$($IPT $IPT_FLAGS --list --numeric 2>/dev/null | grep TALLOW)  # safe: firewall may not be loaded
 	if [ -z "$apf_loaded" ] && [ "$USE_IPV6" == "1" ]; then
-		apf_loaded=$($IP6T $IPT_FLAGS --list --numeric 2>/dev/null | grep TALLOW)
+		apf_loaded=$($IP6T $IPT_FLAGS --list --numeric 2>/dev/null | grep TALLOW)  # safe: firewall may not be loaded
 	fi
 	if [ -z "$apf_loaded" ]; then
 	        eout "{glob} apf does not appear to have rules loaded, doing nothing."
@@ -1333,8 +1333,8 @@ refresh() {
 					done <<< "$_RESOLVED_IPS"
 				fi
 			elif ipt_for_host "$_rf_line"; then
-				$IPT_H $IPT_FLAGS -A REFRESH_TEMP -s "$_rf_line" -j ACCEPT 2>/dev/null
-				$IPT_H $IPT_FLAGS -A REFRESH_TEMP -d "$_rf_line" -j ACCEPT 2>/dev/null
+				$IPT_H $IPT_FLAGS -A REFRESH_TEMP -s "$_rf_line" -j ACCEPT 2>/dev/null  # safe: chain may not exist during refresh
+				$IPT_H $IPT_FLAGS -A REFRESH_TEMP -d "$_rf_line" -j ACCEPT 2>/dev/null  # safe: chain may not exist during refresh
 			fi
 		done < "$_rf_file"
 	done
@@ -1371,8 +1371,8 @@ refresh() {
 					done <<< "$_RESOLVED_IPS"
 				fi
 			elif ipt_for_host "$_rf_line"; then
-				$IPT_H $IPT_FLAGS -A REFRESH_TEMP -s "$_rf_line" -j $ALL_STOP 2>/dev/null
-				$IPT_H $IPT_FLAGS -A REFRESH_TEMP -d "$_rf_line" -j $ALL_STOP 2>/dev/null
+				$IPT_H $IPT_FLAGS -A REFRESH_TEMP -s "$_rf_line" -j $ALL_STOP 2>/dev/null  # safe: chain may not exist during refresh
+				$IPT_H $IPT_FLAGS -A REFRESH_TEMP -d "$_rf_line" -j $ALL_STOP 2>/dev/null  # safe: chain may not exist during refresh
 			fi
 		done < "$_rf_file"
 	done
