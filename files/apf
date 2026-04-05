@@ -55,7 +55,7 @@ trap '_apf_cleanup_tmp; mutex_unlock' EXIT
 if [ "$_APF_LOCKED" != "1" ]; then
   case "$1" in
     -s|--start|-f|--stop|--flush|-e|--refresh|\
-    -a|-d|-u|--remove|--unban|\
+    -a|-d|-u|--allow|--deny|--remove|--unban|\
     -ta|--temp-allow|-td|--temp-deny|\
     --tempf|--temp-flush|--temp-expire|\
     --ipset-update|--gre-up|--gre-down|--cc-update|--ct-scan|\
