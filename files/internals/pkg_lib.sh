@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# pkg_lib.sh — Shared Packaging & Installer Library 1.0.6
+# pkg_lib.sh — Shared Packaging & Installer Library 1.0.8
 ###
 # Copyright (C) 2002-2026 R-fx Networks <proj@rfxn.com>
 #                         Ryan MacDonald <ryan@rfxn.com>
@@ -29,7 +29,7 @@
 [[ -n "${_PKG_LIB_LOADED:-}" ]] && return 0 2>/dev/null
 _PKG_LIB_LOADED=1
 # shellcheck disable=SC2034 # version checked by consumers
-PKG_LIB_VERSION="1.0.7"
+PKG_LIB_VERSION="1.0.8"
 
 # Configurable defaults — consuming projects override via environment
 PKG_NO_COLOR="${PKG_NO_COLOR:-0}"
@@ -706,7 +706,7 @@ pkg_backup_prune() {
 			command rm -rf "$entry_path"
 			pruned=$((pruned + 1))
 		fi
-	done < <(find "$parent_dir" -maxdepth 1 -mindepth 1 -printf '%f\n' 2>/dev/null)
+	done <<< "$(find "$parent_dir" -maxdepth 1 -mindepth 1 -printf '%f\n' 2>/dev/null)"
 
 	if [[ "$pruned" -gt 0 ]]; then
 		pkg_info "pruned ${pruned} old backup(s)"
@@ -773,7 +773,7 @@ pkg_restore_files() {
 			else
 				pkg_warn "pkg_restore_files: failed to restore ${relpath}"
 			fi
-		done < <(find "$backup_path" -name "$pattern" -not -type d 2>/dev/null)
+		done <<< "$(find "$backup_path" -name "$pattern" -not -type d 2>/dev/null)"
 	done
 
 	if [[ "$restored" -eq 0 ]]; then
@@ -960,8 +960,9 @@ pkg_symlink() {
 		return 1
 	fi
 
-	# Reduced TOCTOU: ln -sf replaces rm+ln with a single coreutils call
-	command ln -sf "$target" "$link_path" || {
+	# Reduced TOCTOU: ln -sfn replaces rm+ln with a single coreutils call
+	# -n prevents following existing symlink-to-directory (classic ln -sf gotcha)
+	command ln -sfn "$target" "$link_path" || {
 		pkg_error "pkg_symlink: failed to create symlink ${link_path} -> ${target}"
 		return 1
 	}
