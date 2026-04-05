@@ -352,10 +352,8 @@ teardown() {
     assert_output --partial "192.0.2.50"
 }
 
-@test "apf config validate succeeds with valid config" {
-    run "$APF" config validate
-    assert_success
-}
+# "apf config validate succeeds" — PRUNED (covered by uat/14-subcommand-dispatch.bats:140
+# and legacy form at line 67 above with output assertion)
 
 @test "apf config dump outputs config variables" {
     run "$APF" config dump
