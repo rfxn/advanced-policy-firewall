@@ -3,7 +3,7 @@
 .\"             (C) 2026, Ryan MacDonald <ryan@rfxn.com>
 .\" This program may be freely redistributed under the terms of the GNU GPL v2
 .\"
-.TH APF 8 "March 2026" "APF 2.0.2" "System Administration"
+.TH APF 8 "April 2026" "APF 2.0.2" "System Administration"
 .SH NAME
 apf \- Advanced Policy Firewall
 .SH SYNOPSIS
@@ -634,6 +634,20 @@ Log targets (LOG, NFLOG, or deprecated ULOG), rate limits, sysctl tunables,
 conntrack, helper chains.
 .SH ENVIRONMENT
 .TP
+.B INSTALL_PATH
+Override default install path
+.RB ( /etc/apf ).
+Must be set before running
+.BR install.sh .
+.TP
+.B DEVEL_MODE
+When set to
+.B 1
+in
+.IR conf.apf ,
+a cron job automatically flushes the firewall every 5 minutes to prevent
+lockout during testing.
+.TP
 .B NO_COLOR
 When set to any non\-empty value, disables ANSI color output in help and
 error messages.
@@ -723,21 +737,6 @@ Success.
 .TP
 .B 1
 Error (missing dependency, invalid argument, lock contention, iptables failure).
-.SH ENVIRONMENT
-.TP
-.B INSTALL_PATH
-Override default install path
-.RB ( /etc/apf ).
-Must be set before running
-.BR install.sh .
-.TP
-.B DEVEL_MODE
-When set to
-.B 1
-in
-.IR conf.apf ,
-a cron job automatically flushes the firewall every 5 minutes to prevent
-lockout during testing.
 .SH EXAMPLES
 Start the firewall:
 .PP
