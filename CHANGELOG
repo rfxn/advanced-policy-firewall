@@ -34,21 +34,17 @@
       iptables rules; activated by chmod 750; preserved across upgrades
 [New] Silent IP blocking: silent_ips.rules drops all traffic to/from listed
       addresses with no logging; IPv4/IPv6 supported; preserved across upgrades
-[New] New CLI commands: -g PATTERN (search rules/ipsets/trust files),
-      --rules (dump active rules for piping), --info (firewall status),
-      --lookup HOST (trust file search), --validate/--check (config dry-run),
-      --list-allow/--list-deny (filtered trust display),
-      --cc/--cc-update (GeoIP status and refresh), --dump-config, -h/--help
-[New] CLI subcommand architecture: apf <noun> <verb> dispatch
-      - 7 subcommand groups: trust, cc, config, status, gre, ipset, ct
-      - Three-tier help: COMMANDS / SUBCOMMANDS / UTILITIES
-      - Per-group help via 'apf <command> --help'
-      - CSF compatibility aliases (-ar, -dr, -tr, -i); apf --csf-help mapping
-      - All 2.0.x flat flags preserved as silent aliases
+[New] CLI overhaul: new commands (-g search, --rules, --info, --lookup,
+      --validate, --list-allow/--list-deny, --cc/--cc-update, --dump-config);
+      subcommand architecture (apf <noun> <verb>) with 7 groups (trust, cc,
+      config, status, gre, ipset, ct); per-group help; CSF compatibility
+      aliases (-ar, -dr, -tr, -i) with --csf-help mapping; all 2.0.x flat
+      flags preserved as silent aliases
 [New] Per-port connection limiting via xt_connlimit: IG_TCP_CLIMIT and
       IG_UDP_CLIMIT with port:limit pairs, port range support, VNET binding
 [New] ipset 7-field format: per-list refresh interval and max entry count;
-      backward-compatible auto-migration from 4-field and 5-field formats
+      backward-compatible auto-migration from 4-field and 5-field formats;
+      batch loading via ipset restore for large block lists
 [New] Advanced trust syntax in CLI: apf -a/-d/-ta/-td/-u accept
       proto:flow:port:ip format (e.g., "tcp:in:d=22:s=10.0.0.0/8") for
       protocol/direction/port-scoped trust rules; duplicate detection, IPv6
@@ -56,12 +52,13 @@
 [New] FQDN pre-resolution in trust system: hostnames resolved via getent
       before loading into iptables; multiple A/AAAA records, IPv6 support,
       configurable timeout via FQDN_TIMEOUT; resolved= metadata enables
-      removal without DNS; refresh (apf -e) re-resolves FQDNs
+      removal without DNS; refresh (apf -e) re-resolves FQDNs; --lookup
+      resolves FQDN entries when queried with an IP address
 [New] validate_config(): startup config validation with clear error messages
       covering interfaces, stop targets, rate/burst formats, connlimit
       syntax, RAB parameters, logging, expiry, and sysctl settings
-[New] Ban expiry: structured addedtime=EPOCH markers in permanent trust
-      entries for reliable expiry; backward-compatible with pre-2.0.2 entries
+[New] Ban expiry: structured addedtime=EPOCH markers in all trust entries
+      for reliable expiry; backward-compatible with pre-2.0.2 entries
 [New] Auto-detection for USE_IPSET, IPT_LOCK_SUPPORT, and DOCKER_COMPAT:
       each resolves at startup based on system capabilities; CentOS 6
       (iptables 1.4.7, no -w) safely degrades; replaces hardcoded defaults
@@ -148,9 +145,8 @@
       trim() uses cat+rm instead of mv
 [Fix] vnetgen: strip Docker @ifN suffix from ip link output to prevent
       duplicate VNET rules in containers
-[Fix] Portability: command prefix on all coreutils (rm, mv, cp, chmod,
-      mkdir, touch, ln, cat) across all shipping files for portable
-      resolution on pre-usr-merge distros (CentOS 6, Ubuntu 12.04)
+[Fix] Portability: fix coreutils resolution for pre-usr-merge distros
+      (CentOS 6, Ubuntu 12.04)
 [Fix] Port dedup: deduplicate comma-separated port lists before rule
       generation in _port_filter_loop, _uid_filter_loop, _icmp_filter,
       cdports, and BLK_P2P_PORTS; prevents duplicate iptables rules from
@@ -159,15 +155,10 @@
       built-in help instead of displaying "unminimize" advisory
 [Fix] GeoIP CC trust: temp→perm upgrade preserves entry when adding a CC
       permanently that already exists as temporary; strips ttl/expire markers
-      instead of silently skipping (UAT-002)
+      instead of silently skipping
 [Fix] refresh: REFRESH_TEMP now includes IPs from advanced trust entries
       (proto:flow:d=port:s=FQDN); previously skipped all entries containing
-      '=' leaving advanced FQDN rules unprotected during refresh (F-PR-006)
-
-[Fix] Inline comment compliance: add missing inline comments to 41
-      2>/dev/null suppressions in apf_trust.sh and 4 || true suppressions
-      in apf_geoip.sh; all iptables delete, DNS resolution, and trust file
-      operations now document why error suppression is safe
+      '=' leaving advanced FQDN rules unprotected during refresh
 
   -- Changes --
 
@@ -175,15 +166,6 @@
       add -ta/-td to bash completion; add CentOS 6 and Ubuntu 12.04 to
       README platforms; add ctlimit cron to README key files; expose
       ELOG_AUDIT_FILE in conf.apf
-[Change] cli_trust/cli_trust_temp refactor: extract _cli_trust_write_entry()
-      and _cli_trust_resolve_fqdn() shared helpers; reduces 6 inline
-      comment-writing blocks and 3 FQDN resolve+local-addr checks to
-      single-source-of-truth helpers; normalizes trust comment format to
-      always include addedtime= metadata (temp entries previously omitted
-      it; CC temp entries and permanent entries already included it) (R-CL-002)
-[Change] --lookup FQDN resolution: trust_lookup() now resolves FQDN entries
-      in trust files when queried with an IP; uses resolved= metadata first,
-      falls back to live DNS; shows matched FQDN with resolved IPs
 [Change] Conntrack module migration: use -m conntrack --ctstate when available,
       falling back to -m state --state on legacy systems
 [Change] File-based flock mutex: replace FD-based exec/flock with noclobber +
@@ -194,8 +176,6 @@
 [Change] Fast load uptime threshold raised from 5 to 10 minutes
 [Change] Consolidate 3 cron files into single cron.d.apf with daily restart,
       hourly ipset refresh, and per-minute temp expiry
-[Change] ipset batch loading via ipset restore; reduces load time from
-      minutes to seconds for large block lists
 [Change] Performance: single-pass trust loading with iptables-restore --noflush
       reducing lock acquisitions from O(n) to O(1); subprocess replacement
       with bash builtins across hot paths
@@ -204,11 +184,8 @@
 
   -- Documentation --
 
-[New] Man page: apf.8 covering all CLI operations, trust system, country
-      code filtering, and configuration reference
-[New] README restructured to rfxn documentation convention: banner SVGs,
-      What's New section, Exit Codes table, Quick Start, SECURITY.md and
-      CONTRIBUTING.md companion files
+[New] Man page (apf.8) and README restructure with complete CLI, trust
+      system, GeoIP, and configuration reference
 
 - 2.0.1 | Feb 20 2026:
 
