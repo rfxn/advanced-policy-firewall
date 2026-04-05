@@ -47,7 +47,7 @@ apf \- Advanced Policy Firewall
 .RI [ topic ]
 .br
 .B apf
-.RB { trust | cc | config | status | gre | ipset | ct }
+.RB { trust | status | cc | ct | config | ipset | gre }
 .RI [ verb ]
 .RI [ args ]
 .SH DESCRIPTION
@@ -278,7 +278,7 @@ Show brief command reference (equivalent to
 Show help for a specific subcommand group (e.g.,
 .BR "apf help trust" ).
 Available topics:
-.BR trust ", " cc ", " config ", " status ", " gre ", " ipset ", " ct .
+.BR trust ", " status ", " cc ", " ct ", " config ", " ipset ", " gre .
 .SS trust \(em Trust System Management
 .TP
 .B apf trust add \fIHOST\fR [\fICOMMENT\fR]
@@ -333,6 +333,19 @@ List temporary entries with remaining TTL (equivalent to
 .B apf trust temp flush
 Remove all temporary entries (equivalent to
 .BR "\-\-tempf" ).
+.SS status \(em Firewall Status and Diagnostics
+.TP
+.B apf status
+Show firewall status summary (equivalent to
+.BR "\-\-info" ).
+.TP
+.B apf status rules
+Dump active iptables rules to stdout (equivalent to
+.BR "\-\-rules" ).
+.TP
+.B apf status log
+Page through the full status log (equivalent to
+.BR "apf \-t" ).
 .SS cc \(em Country Code / GeoIP Operations
 .TP
 .B apf cc
@@ -350,6 +363,15 @@ Look up which country an IP address belongs to.
 .B apf cc update
 Refresh GeoIP data and rebuild ipsets (equivalent to
 .BR "\-\-cc\-update" ).
+.SS ct \(em Connection Tracking Limit
+.TP
+.B apf ct scan
+Run a CT_LIMIT scan and block offenders (equivalent to
+.BR "\-\-ct\-scan" ).
+.TP
+.B apf ct status
+Show CT_LIMIT configuration and last scan info (equivalent to
+.BR "\-\-ct\-status" ).
 .SS config \(em Configuration and Validation
 .TP
 .B apf config dump
@@ -359,19 +381,14 @@ Output all configuration variables (equivalent to
 .B apf config validate
 Validate configuration without starting the firewall (equivalent to
 .BR "\-\-validate" ).
-.SS status \(em Firewall Status and Diagnostics
+.SS ipset \(em ipset Block List Management
 .TP
-.B apf status
-Show firewall status summary (equivalent to
-.BR "\-\-info" ).
+.B apf ipset update
+Hot\-reload ipset block lists (equivalent to
+.BR "\-\-ipset\-update" ).
 .TP
-.B apf status rules
-Dump active iptables rules to stdout (equivalent to
-.BR "\-\-rules" ).
-.TP
-.B apf status log
-Page through the full status log (equivalent to
-.BR "apf \-t" ).
+.B apf ipset status
+Show ipset list names and status.
 .SS gre \(em GRE Tunnel Management
 .TP
 .B apf gre up
@@ -385,23 +402,6 @@ Tear down GRE tunnels (equivalent to
 .B apf gre status
 Show GRE tunnel status (equivalent to
 .BR "\-\-gre\-status" ).
-.SS ipset \(em ipset Block List Management
-.TP
-.B apf ipset update
-Hot\-reload ipset block lists (equivalent to
-.BR "\-\-ipset\-update" ).
-.TP
-.B apf ipset status
-Show ipset list names and status.
-.SS ct \(em Connection Tracking Limit
-.TP
-.B apf ct scan
-Run a CT_LIMIT scan and block offenders (equivalent to
-.BR "\-\-ct\-scan" ).
-.TP
-.B apf ct status
-Show CT_LIMIT configuration and last scan info (equivalent to
-.BR "\-\-ct\-status" ).
 .SH TRUST SYSTEM
 APF uses file\-based trust lists for allow and deny rules:
 .TP

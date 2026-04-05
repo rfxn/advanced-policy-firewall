@@ -764,30 +764,31 @@ Day-to-day firewall operations are performed through the `apf` command. APF supp
 usage: apf [COMMAND] [OPTIONS]
 
 COMMANDS:
-  -s              load all firewall rules
-  -f              flush all firewall rules
-  -r              flush & reload all firewall rules
-  -a HOST [CMT]   allow host (IP/CIDR/FQDN/CC)
-  -d HOST [CMT]   deny host
-  -u HOST         remove host from all lists
-  -g PATTERN      search rules and trust files
+  -s, --start              load all firewall rules
+  -f, --stop               flush all firewall rules
+  -r, --restart            flush & reload all firewall rules
+  -a, --allow HOST [CMT]   allow host (IP/CIDR/FQDN/CC)
+  -d, --deny  HOST [CMT]   deny host
+  -u, --remove HOST        remove host from all lists
+  -g, --search PATTERN     search rules and trust files
 
 SUBCOMMANDS:
-  trust           trust system management
-  cc              country code / GeoIP operations
-  config          configuration and validation
-  status          firewall status and diagnostics
-  gre             GRE tunnel management
-  ipset           ipset block list management
-  ct              connection tracking limit
+  trust              trust system management
+  status             firewall status and diagnostics
+  cc                 country code / GeoIP operations
+  ct                 connection tracking limit
+  config             configuration and validation
+  ipset              ipset block list management
+  gre                GRE tunnel management
 
 UTILITIES:
-  -e              refresh & re-resolve DNS in trust rules
-  -l              view all firewall rules in editor
-  -t              page through full status log
-  -o              output all configuration variables
-  -v              output version number
-  -h, --help      show this help message
+  -e, --refresh      refresh & re-resolve DNS in trust rules
+  -l, --list         view all firewall rules in editor
+  -t, --status       page through full status log
+  -o, --dump-config  output all configuration variables
+  -v, --version      output version number
+  -h                 show this help message
+  --help             open full manual page
 
 Run 'apf <command> --help' for subcommand details.
 CSF users: run 'apf --csf-help' for a command mapping.
@@ -811,21 +812,21 @@ Each subcommand group has its own verbs and help (`apf <noun> --help`). The tabl
 | | `temp remove HOST` | `apf -u` | Remove temp entry |
 | | `temp list` | `--templ` | List temp entries with TTL |
 | | `temp flush` | `--tempf` | Remove all temp entries |
-| **cc** | `info [CC\|IP]` | `--cc [CC\|IP]` | GeoIP overview or detail |
-| | `lookup IP` | `--cc IP` | Country lookup for IP |
-| | `update` | `--cc-update` | Refresh GeoIP data |
-| **config** | `dump` | `apf -o` | Output all config variables |
-| | `validate` | `--validate` | Validate config |
 | **status** | _(none)_ | `--info` | Firewall status summary |
 | | `rules` | `--rules` | Dump active rules to stdout |
 | | `log` | `apf -t` | Page through status log |
+| **cc** | `info [CC\|IP]` | `--cc [CC\|IP]` | GeoIP overview or detail |
+| | `lookup IP` | `--cc IP` | Country lookup for IP |
+| | `update` | `--cc-update` | Refresh GeoIP data |
+| **ct** | `scan` | `--ct-scan` | Run CT_LIMIT scan |
+| | `status` | `--ct-status` | Show CT_LIMIT config |
+| **config** | `dump` | `apf -o` | Output all config variables |
+| | `validate` | `--validate` | Validate config |
+| **ipset** | `update` | `--ipset-update` | Hot-reload block lists |
+| | `status` | — | Show ipset list names |
 | **gre** | `up` | `--gre-up` | Bring up GRE tunnels |
 | | `down` | `--gre-down` | Tear down GRE tunnels |
 | | `status` | `--gre-status` | Show tunnel status |
-| **ipset** | `update` | `--ipset-update` | Hot-reload block lists |
-| | `status` | — | Show ipset list names |
-| **ct** | `scan` | `--ct-scan` | Run CT_LIMIT scan |
-| | `status` | `--ct-status` | Show CT_LIMIT config |
 
 **Examples using subcommand syntax:**
 

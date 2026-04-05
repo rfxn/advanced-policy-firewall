@@ -100,7 +100,7 @@ _apf_completions() {
 	# Position 1: flags + subcommand nouns
 	if [ "$COMP_CWORD" -eq 1 ]; then
 		local flags="-s -f -r -a -d -u -g -e -l -t -o -v -h -ta -td"
-		local nouns="help trust cc config status gre ipset ct"
+		local nouns="help trust status cc ct config ipset gre"
 		if [[ "$cur" == -* ]]; then
 			local long="--start --restart --stop --flush --help --version"
 			long="$long --allow --deny --remove --unban --lookup"
@@ -141,7 +141,7 @@ _apf_completions() {
 		[ "$COMP_CWORD" -eq 2 ] && COMPREPLY=( $(compgen -W "scan status" -- "$cur") )
 		;;
 	help)
-		[ "$COMP_CWORD" -eq 2 ] && COMPREPLY=( $(compgen -W "trust cc config status gre ipset ct" -- "$cur") )
+		[ "$COMP_CWORD" -eq 2 ] && COMPREPLY=( $(compgen -W "trust status cc ct config ipset gre" -- "$cur") )
 		;;
 	# Legacy flag context completions
 	-a|--allow|-d|--deny|-u|--remove|--unban|--lookup|-ar|-dr|-tr)

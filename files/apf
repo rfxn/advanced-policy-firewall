@@ -289,7 +289,7 @@ ct)
 	exit 1
 	;;
 *)
-	_cli_unknown_command "apf" "$1" "trust cc config status gre ipset ct help -s -f -r -a -d -u -g -e -l -t -o -v -h"
+	_cli_unknown_command "apf" "$1" "trust status cc ct config ipset gre help -s -f -r -a -d -u -g -e -l -t -o -v -h"
 	exit 1
 	;;
 esac
