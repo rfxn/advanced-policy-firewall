@@ -162,6 +162,7 @@
 
   -- Changes --
 
+[Change] Vendored lib sync: elog_lib 1.0.5, pkg_lib 1.0.7, geoip_lib 1.0.5
 [Change] Documentation: add VNET section to man page; add logrotate to FILES;
       add -ta/-td to bash completion; add CentOS 6 and Ubuntu 12.04 to
       README platforms; add ctlimit cron to README key files; expose

@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# geoip_lib.sh — GeoIP Metadata Library 1.0.4
+# geoip_lib.sh — GeoIP Metadata Library 1.0.5
 ###
 # Copyright (C) 2026 R-fx Networks <proj@rfxn.com>
 #                     Ryan MacDonald <ryan@rfxn.com>
@@ -29,7 +29,7 @@
 _GEOIP_LIB_LOADED=1
 
 # shellcheck disable=SC2034
-GEOIP_LIB_VERSION="1.0.4"
+GEOIP_LIB_VERSION="1.0.5"
 
 # ---------------------------------------------------------------------------
 # Module-level continent CC lists (ISO 3166 assignments per UN geoscheme)
@@ -209,13 +209,20 @@ geoip_all_cc() {
 }
 
 # ---------------------------------------------------------------------------
-# geoip_cc_known — Check if a country code exists in any continent list.
-# Returns 0 if CC is known (found in a continent), 1 if unknown.
-# Args: cc (2-letter uppercase code)
+# _geoip_valid_ipv4 — validate IPv4 dotted-quad with octet range check.
+# Rejects octets >255 (e.g., 999.0.0.1) that a bare [0-9]+ regex would accept.
+# Args: IP
+# Returns: 0 if valid IPv4, 1 otherwise
 # ---------------------------------------------------------------------------
-geoip_cc_known() {
-	local cc="$1"
-	[[ "$(geoip_cc_continent "$cc")" != "unknown" ]]
+_geoip_valid_ipv4() {
+	local ip="$1"
+	local _re='^([0-9]+)\.([0-9]+)\.([0-9]+)\.([0-9]+)$'
+	[[ "$ip" =~ $_re ]] || return 1
+	local i
+	for i in 1 2 3 4; do
+		[ "${BASH_REMATCH[$i]}" -le 255 ] 2>/dev/null || return 1  # non-numeric or >255
+	done
+	return 0
 }
 
 # ===========================================================================
@@ -232,8 +239,9 @@ GEOIP_DL_TIMEOUT="${GEOIP_DL_TIMEOUT:-120}"
 
 # ---------------------------------------------------------------------------
 # _geoip_download_cmd — download URL to file via curl or wget.
-# Internal helper. Tries strict TLS first; falls back to insecure only on
-# TLS-specific errors (curl 35/51/60/77, wget 5) or when GEOIP_TLS_INSECURE=1.
+# Internal helper. Strict TLS by default. Set GEOIP_TLS_INSECURE=1 to allow
+# insecure fallback (analogous to curl --insecure) for legacy systems with
+# untrusted CA bundles or expired certificates.
 # Args: URL OUTPUT
 # Returns: 0 on success, 1 on failure (OUTPUT removed on failure)
 # ---------------------------------------------------------------------------
@@ -246,27 +254,21 @@ _geoip_download_cmd() {
 		"$GEOIP_CURL_BIN" -sfL --connect-timeout "$GEOIP_DL_TIMEOUT" \
 			--max-time "$GEOIP_DL_TIMEOUT" -o "$output" "$url" 2>/dev/null  # curl stderr noise suppressed
 		rc=$?
-		if [[ "$rc" -ne 0 ]]; then
-			# TLS fallback — only on TLS errors (35=SSL connect, 51=peer cert,
-			# 60=CA bundle expired, 77=CA cert path/permissions)
-			# or when forced via GEOIP_TLS_INSECURE=1 for edge-case legacy systems
-			if [[ "$rc" -eq 35 || "$rc" -eq 51 || "$rc" -eq 60 || "$rc" -eq 77 || "${GEOIP_TLS_INSECURE:-0}" == "1" ]]; then
-				"$GEOIP_CURL_BIN" -sfL --insecure --connect-timeout "$GEOIP_DL_TIMEOUT" \
-					--max-time "$GEOIP_DL_TIMEOUT" -o "$output" "$url" 2>/dev/null  # curl stderr noise suppressed
-				rc=$?
-			fi
+		if [[ "$rc" -ne 0 && "${GEOIP_TLS_INSECURE:-0}" == "1" ]]; then
+			# Explicit opt-in insecure fallback for legacy systems (EL6, etc.)
+			"$GEOIP_CURL_BIN" -sfL --insecure --connect-timeout "$GEOIP_DL_TIMEOUT" \
+				--max-time "$GEOIP_DL_TIMEOUT" -o "$output" "$url" 2>/dev/null  # curl stderr noise suppressed
+			rc=$?
 		fi
 	elif [[ -n "$GEOIP_WGET_BIN" ]]; then
 		# Strict TLS first
 		"$GEOIP_WGET_BIN" -q --timeout="$GEOIP_DL_TIMEOUT" -O "$output" "$url" 2>/dev/null  # wget stderr noise suppressed
 		rc=$?
-		if [[ "$rc" -ne 0 ]]; then
-			# TLS fallback — wget exit 5 is SSL verification failure
-			if [[ "$rc" -eq 5 || "${GEOIP_TLS_INSECURE:-0}" == "1" ]]; then
-				"$GEOIP_WGET_BIN" -q --no-check-certificate \
-					--timeout="$GEOIP_DL_TIMEOUT" -O "$output" "$url" 2>/dev/null  # wget stderr noise suppressed
-				rc=$?
-			fi
+		if [[ "$rc" -ne 0 && "${GEOIP_TLS_INSECURE:-0}" == "1" ]]; then
+			# Explicit opt-in insecure fallback for legacy systems (EL6, etc.)
+			"$GEOIP_WGET_BIN" -q --no-check-certificate \
+				--timeout="$GEOIP_DL_TIMEOUT" -O "$output" "$url" 2>/dev/null  # wget stderr noise suppressed
+			rc=$?
 		fi
 	else
 		echo "geoip_lib: neither curl nor wget available" >&2
@@ -282,13 +284,15 @@ _geoip_download_cmd() {
 
 # ---------------------------------------------------------------------------
 # _geoip_validate_cidr_file — validate downloaded CIDR file content.
-# Checks that file has at least one line matching expected CIDR format.
+# Checks that file has at least GEOIP_MIN_CIDR_LINES matching lines
+# in expected CIDR format. Default minimum is 3 to catch truncated or
+# near-empty files that happen to contain one valid-looking line.
 # Args: FILE FAMILY (4 or 6)
-# Returns: 0 if valid, 1 if empty/garbage
+# Returns: 0 if valid, 1 if empty/garbage/below minimum
 # ---------------------------------------------------------------------------
 _geoip_validate_cidr_file() {
 	local file="$1" family="$2"
-	local pat
+	local pat line_count
 
 	[[ -f "$file" ]] || return 1
 	[[ -s "$file" ]] || return 1
@@ -298,7 +302,8 @@ _geoip_validate_cidr_file() {
 	else
 		pat='^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+/[0-9]'
 	fi
-	grep -Eq "$pat" "$file"
+	line_count=$(grep -cE "$pat" "$file" || true)  # grep -c exits 1 on 0 matches
+	[[ "$line_count" -ge "${GEOIP_MIN_CIDR_LINES:-3}" ]]
 }
 
 # ---------------------------------------------------------------------------
@@ -452,11 +457,15 @@ geoip_is_stale() {
 # ---------------------------------------------------------------------------
 geoip_mark_updated() {
 	local data_dir="$1"
+	local _stamp_file
 
 	[[ -n "$data_dir" ]] || return 1
 	[[ -d "$data_dir" ]] || return 1
 
-	date +%s > "$data_dir/.last_update"
+	_stamp_file="$data_dir/.last_update"
+	# Remove symlink if present — prevent following attacker-controlled target
+	[[ ! -L "$_stamp_file" ]] || command rm -f "$_stamp_file"
+	date +%s > "$_stamp_file"
 }
 
 # ---------------------------------------------------------------------------
@@ -475,9 +484,8 @@ geoip_cidr_search() {
 	[[ $# -gt 0 ]] || return 1
 	# IPv6 not supported — caller should use geoip_ip6_lookup
 	[[ "$qip" != *:* ]] || return 1
-	# Validate IPv4 dotted-quad format
-	local _ip4_re='^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$'
-	[[ "$qip" =~ $_ip4_re ]] || return 1
+	# Validate IPv4 dotted-quad format (including octet range)
+	_geoip_valid_ipv4 "$qip" || return 1
 	[[ -n "$GEOIP_AWK_BIN" ]] || { echo "geoip_cidr_search: awk not available" >&2; return 1; }
 
 	"$GEOIP_AWK_BIN" -v qip="$qip" '
@@ -653,9 +661,8 @@ geoip_ip_lookup() {
 	[[ -n "$db_file" ]] || return 1
 	# IPv6 not supported
 	[[ "$ip" != *:* ]] || return 1
-	# Validate IPv4 dotted-quad format
-	local _ip4_re='^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$'
-	[[ "$ip" =~ $_ip4_re ]] || return 1
+	# Validate IPv4 dotted-quad format (including octet range)
+	_geoip_valid_ipv4 "$ip" || return 1
 	[[ -f "$db_file" ]] || return 1
 	[[ -s "$db_file" ]] || return 1
 	[[ -n "$GEOIP_AWK_BIN" ]] || { echo "geoip_ip_lookup: awk not available" >&2; return 1; }
@@ -744,7 +751,7 @@ _geoip_download_ipdeny_bulk() {
 	local tmp_tar tmp_dir count=0
 
 	[[ -n "$output_dir" ]] || return 1
-	command mkdir -p "$output_dir" 2>/dev/null || return 1  # permission errors caught by || return
+	mkdir -p "$output_dir" 2>/dev/null || return 1  # permission errors caught by || return
 
 	tmp_tar=$(mktemp "${output_dir}/.bulk-XXXXXX") || return 1
 	tmp_dir=$(mktemp -d "${output_dir}/.bulk-extract-XXXXXX") || { command rm -f "$tmp_tar"; return 1; }
@@ -789,6 +796,9 @@ _geoip_download_ipdeny_bulk() {
 # sorts by start address, and writes to OUTPUT.
 # Uses ipdeny bulk tarball when available; falls back to per-country
 # cascade (ipverse → ipdeny) for any missing countries.
+# Locking: callers must hold their own lock if concurrent builds are possible.
+# The library does not implement internal locking — consumers (BFD, APF) use
+# their existing lock infrastructure (flock on their own lock files).
 # Args: OUTPUT [MIN_RANGES]
 #   OUTPUT: destination file path for the integer-range database
 #   MIN_RANGES: minimum expected range count (default: 1000; abort if below)
@@ -809,7 +819,7 @@ geoip_build_ipdb() {
 
 	tmpdir=$(mktemp -d "${output}.build-XXXXXX") || return 1
 	local zones_dir="$tmpdir/zones"
-	command mkdir -p "$zones_dir"
+	mkdir -p "$zones_dir"
 
 	# Strategy 1: bulk tarball (~1MB, one download for all countries)
 	local bulk_ok=0
@@ -873,6 +883,7 @@ geoip_build_ipdb() {
 # lexicographically, and writes to OUTPUT.
 # Expected: ~240 serial HTTP downloads, ~30K-60K ranges, ~2-4MB output.
 # Build time: ~2-5 minutes typical (120s timeout per download worst-case).
+# Locking: callers must hold their own lock if concurrent builds are possible.
 # Args: OUTPUT [MIN_RANGES]
 #   OUTPUT: destination file path for the hex-range database
 #   MIN_RANGES: minimum expected range count (default: 500; abort if below)
@@ -893,7 +904,7 @@ geoip_build_ip6db() {
 
 	tmpdir=$(mktemp -d "${output}.build6-XXXXXX") || return 1
 	local zones_dir="$tmpdir/zones"
-	command mkdir -p "$zones_dir"
+	mkdir -p "$zones_dir"
 
 	# Per-country cascade (no bulk IPv6 tarball available)
 	local cc cidr_file

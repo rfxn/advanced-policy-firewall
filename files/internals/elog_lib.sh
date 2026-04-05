@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# elog_lib.sh — Structured Event Logging Library 1.0.4
+# elog_lib.sh — Structured Event Logging Library 1.0.5
 ###
 # Copyright (C) 2002-2026 R-fx Networks <proj@rfxn.com>
 #                         Ryan MacDonald <ryan@rfxn.com>
@@ -29,7 +29,7 @@
 [[ -n "${_ELOG_LIB_LOADED:-}" ]] && return 0 2>/dev/null  # suppress error when executed (not sourced)
 _ELOG_LIB_LOADED=1
 # shellcheck disable=SC2034 # version checked by consumers
-ELOG_LIB_VERSION="1.0.4"
+ELOG_LIB_VERSION="1.0.5"
 
 # --- Configuration variables (set by consumer before sourcing) ---
 # All use ${VAR:-default} — safe when sourced from inside functions (BATS).
@@ -47,6 +47,7 @@ ELOG_LIB_VERSION="1.0.4"
 # ELOG_STDOUT       — "always"|"never"|"flag" (default: always)
 # ELOG_STDOUT_PREFIX — "full"|"short"|"none" (default: full)
 # ELOG_LOG_MAX_LINES — max lines in app log before truncation (0 = disabled)
+# ELOG_AUDIT_MAX_LINES — max lines in audit log before truncation (0 = disabled)
 # ELOG_ROTATE_FREQUENCY — logrotate frequency (default: weekly)
 # ELOG_ROTATE_COUNT — logrotate keep count (default: 12)
 # ELOG_ROTATE_COMPRESS — logrotate compress (default: compress)
@@ -78,6 +79,7 @@ ELOG_LIB_VERSION="1.0.4"
 # --- Internal state ---
 _ELOG_INIT_DONE=0
 _ELOG_WRITE_COUNT=0
+_ELOG_AUDIT_WRITE_COUNT=0
 _ELOG_RET=""
 _ELOG_TRUNCATE_CHECK_INTERVAL=50
 
@@ -132,7 +134,9 @@ _elog_level_name() {
 }
 
 # _elog_json_escape(str) — escape string for safe JSON embedding
-# Handles: backslash, double-quote, newline, tab, carriage return, backspace, form feed
+# Handles C0 control characters (0x01-0x1F) per RFC 8259 §7:
+# Named escapes for 5 chars + backslash + double-quote, then \uXXXX sweep for remaining 26.
+# NUL (0x00) is unreachable — bash cannot store NUL bytes in variables.
 _elog_json_escape() {
 	_ELOG_RET="$1"
 	_ELOG_RET="${_ELOG_RET//\\/\\\\}"
@@ -142,6 +146,21 @@ _elog_json_escape() {
 	_ELOG_RET="${_ELOG_RET//$'\r'/\\r}"
 	_ELOG_RET="${_ELOG_RET//$'\x08'/\\b}"
 	_ELOG_RET="${_ELOG_RET//$'\x0c'/\\f}"
+	# Sweep remaining C0 control characters to \uXXXX per RFC 8259
+	# Named escapes handle: 08(bs) 09(tab) 0a(lf) 0c(ff) 0d(cr)
+	# NUL (0x00) omitted: bash cannot store NUL bytes in variables
+	local _c
+	for _c in $'\x01' $'\x02' $'\x03' $'\x04' $'\x05' $'\x06' $'\x07' \
+	          $'\x0b' $'\x0e' $'\x0f' $'\x10' $'\x11' $'\x12' $'\x13' $'\x14' \
+	          $'\x15' $'\x16' $'\x17' $'\x18' $'\x19' $'\x1a' $'\x1b' $'\x1c' \
+	          $'\x1d' $'\x1e' $'\x1f'; do
+		if [[ "$_ELOG_RET" == *"$_c"* ]]; then
+			# printf to get the hex code for this byte
+			local _hex
+			_hex=$(printf '%04x' "'$_c")
+			_ELOG_RET="${_ELOG_RET//$_c/\\u$_hex}"
+		fi
+	done
 }
 
 # _elog_parse_extras(extras, callback_fn) — parse space-delimited key=value pairs
@@ -220,26 +239,26 @@ elog_init() {
 
 	# Create log directory
 	if [ ! -d "$_log_dir" ]; then
-		if ! command mkdir -p "$_log_dir" 2>/dev/null; then  # suppress permission errors; failure handled below
+		if ! mkdir -p "$_log_dir" 2>/dev/null; then  # suppress permission errors; failure handled below
 			echo "elog_lib: failed to create log directory: $_log_dir" >&2
 			umask "$_old_umask"
 			return 1
 		fi
-		command chmod 750 "$_log_dir"
+		chmod 750 "$_log_dir"
 	fi
 
-	# Touch log files with correct permissions
+	# Touch log files with correct permissions; enforce 640 on existing files
 	local _f
 	for _f in "$_log_file" "$_audit_file"; do
 		[ -z "$_f" ] && continue  # skip empty paths (audit disabled)
 		if [ ! -f "$_f" ]; then
-			command touch "$_f" 2>/dev/null || {  # suppress permission errors; failure handled in || block
+			touch "$_f" 2>/dev/null || {  # suppress permission errors; failure handled in || block
 				echo "elog_lib: failed to create log file: $_f" >&2
 				umask "$_old_umask"
 				return 1
 			}
-			command chmod 640 "$_f"
 		fi
+		chmod 640 "$_f"
 	done
 
 	umask "$_old_umask"
@@ -248,7 +267,7 @@ elog_init() {
 	# replacing a file the consumer may be actively writing to
 	if [ -n "${ELOG_LEGACY_LOG:-}" ]; then
 		if [ ! -f "$ELOG_LEGACY_LOG" ]; then
-			command ln -sf "$_log_file" "$ELOG_LEGACY_LOG" 2>/dev/null || true  # safe: legacy symlink is optional
+			ln -sf "$_log_file" "$ELOG_LEGACY_LOG" 2>/dev/null || true  # safe: legacy symlink is optional
 		fi
 	fi
 
@@ -313,39 +332,46 @@ elog_logrotate_snippet() {
 	LOGROTATE
 }
 
-# _elog_truncate_check() — truncate app log if over ELOG_LOG_MAX_LINES
+# _elog_truncate_check_file(file, max_lines) — truncate a log file if over limit
 # Atomic: tail+cat to preserve inode (critical for inotifywait consumers).
-# Called periodically from elog(), not on every write.
-_elog_truncate_check() {
-	local _max="${ELOG_LOG_MAX_LINES:-0}"
+# Refuses to truncate symlinks. Saves/restores consumer signal handlers.
+_elog_truncate_check_file() {
+	local _file="$1" _max="$2"
 	[ "$_max" -le 0 ] 2>/dev/null && return 0  # suppress non-integer warning when unset/empty
-	local _file="${ELOG_LOG_FILE:-}"
 	[ -z "$_file" ] && return 0
 	[ ! -f "$_file" ] && return 0
+	if [ -L "$_file" ]; then
+		echo "elog_lib: refusing to truncate symlink: $_file" >&2
+		return 1
+	fi
 
 	local _count
 	_count=$(wc -l < "$_file")
 	_count="${_count## }"
 	if [ "$_count" -gt "$_max" ]; then
-		local _tmpf _saved_hup _saved_term _saved_int
+		local _tmpf
 		_tmpf=$(mktemp "${_file}.XXXXXX") || return 0
-		_saved_hup=$(trap -p HUP)
-		_saved_term=$(trap -p TERM)
-		_saved_int=$(trap -p INT)
+		# Save consumer signal handlers before overriding
+		local _prev_trap_hup _prev_trap_term _prev_trap_int
+		_prev_trap_hup=$(trap -p HUP)
+		_prev_trap_term=$(trap -p TERM)
+		_prev_trap_int=$(trap -p INT)
 		# shellcheck disable=SC2064
-		trap "command rm -f '$_tmpf'; $_saved_hup" HUP
-		# shellcheck disable=SC2064
-		trap "command rm -f '$_tmpf'; $_saved_term" TERM
-		# shellcheck disable=SC2064
-		trap "command rm -f '$_tmpf'; $_saved_int" INT
+		trap "command rm -f '$_tmpf'" HUP TERM INT
 		tail -n "$_max" "$_file" > "$_tmpf"
 		command cat "$_tmpf" > "$_file"
 		command rm -f "$_tmpf"
-		# Restore original traps or reset to default if none existed
-		if [ -n "$_saved_hup" ]; then eval "$_saved_hup"; else trap - HUP; fi
-		if [ -n "$_saved_term" ]; then eval "$_saved_term"; else trap - TERM; fi
-		if [ -n "$_saved_int" ]; then eval "$_saved_int"; else trap - INT; fi
+		# Restore consumer signal handlers; reset to default if none were set
+		if [ -n "$_prev_trap_hup" ]; then eval "$_prev_trap_hup"; else trap - HUP; fi
+		if [ -n "$_prev_trap_term" ]; then eval "$_prev_trap_term"; else trap - TERM; fi
+		if [ -n "$_prev_trap_int" ]; then eval "$_prev_trap_int"; else trap - INT; fi
 	fi
+}
+
+# _elog_truncate_check() — truncate app log if over ELOG_LOG_MAX_LINES
+# Wrapper for backward compatibility; called periodically from elog().
+_elog_truncate_check() {
+	_elog_truncate_check_file "${ELOG_LOG_FILE:-}" "${ELOG_LOG_MAX_LINES:-0}"
 }
 
 # _elog_auto_enable — enable output modules on first use (pre-init fallback)
@@ -467,11 +493,22 @@ _elog_module_active() {
 # Built-in Output Handlers
 # ---------------------------------------------------------------------------
 
+# _elog_safe_append(file, line) — append with symlink guard
+# Refuses to write through symlinks to prevent log-target hijacking.
+_elog_safe_append() {
+	local _file="$1" _line="$2"
+	if [ -L "$_file" ]; then
+		echo "elog_lib: refusing to append to symlink: $_file" >&2
+		return 1
+	fi
+	echo "$_line" >> "$_file"
+}
+
 # _elog_out_file formatted_line — append to ELOG_LOG_FILE
 _elog_out_file() {
 	local _line="$1"
 	if [ -n "${ELOG_LOG_FILE:-}" ]; then
-		echo "$_line" >> "$ELOG_LOG_FILE"
+		_elog_safe_append "$ELOG_LOG_FILE" "$_line"
 	fi
 }
 
@@ -480,7 +517,7 @@ _elog_out_file() {
 _elog_out_audit() {
 	local _line="$1"
 	if [ -n "${ELOG_AUDIT_FILE:-}" ]; then
-		echo "$_line" >> "$ELOG_AUDIT_FILE"
+		_elog_safe_append "$ELOG_AUDIT_FILE" "$_line"
 	fi
 }
 
@@ -488,7 +525,7 @@ _elog_out_audit() {
 _elog_out_syslog_file() {
 	local _line="$1"
 	if [ -n "${ELOG_SYSLOG_FILE:-}" ]; then
-		echo "$_line" >> "$ELOG_SYSLOG_FILE"
+		_elog_safe_append "$ELOG_SYSLOG_FILE" "$_line"
 	fi
 }
 
@@ -606,7 +643,7 @@ _elog_fmt_cef() {
 _elog_out_cef() {
 	local _line="$1"
 	if [ -n "${ELOG_CEF_FILE:-}" ]; then
-		echo "$_line" >> "$ELOG_CEF_FILE"
+		_elog_safe_append "$ELOG_CEF_FILE" "$_line"
 	fi
 }
 
@@ -837,7 +874,7 @@ _elog_out_gelf() {
 
 	# Write to capture file if configured (testing/debug)
 	if [ -n "${ELOG_GELF_FILE:-}" ]; then
-		echo "$_line" >> "$ELOG_GELF_FILE"
+		_elog_safe_append "$ELOG_GELF_FILE" "$_line"
 	fi
 
 	# Guard: no host configured = no network send
@@ -1003,7 +1040,7 @@ _elog_out_elk_json() {
 
 	# Write to capture file if configured (testing/debug)
 	if [ -n "${ELOG_ELK_FILE:-}" ]; then
-		echo "$_line" >> "$ELOG_ELK_FILE"
+		_elog_safe_append "$ELOG_ELK_FILE" "$_line"
 	fi
 
 	# Guard: no URL configured = no network send
@@ -1158,9 +1195,10 @@ elog() {
 	_app="${ELOG_APP:-${0##*/}}"
 	_pid="$$"
 
-	# Build classic formatted line
+	# Build classic formatted line — sanitize newlines to prevent log injection
+	local _classic_msg="${_msg//$'\n'/\\n}"
 	local _classic_line
-	_classic_line="$_ts $_host ${_app}(${_pid}): $_msg"
+	_classic_line="$_ts $_host ${_app}(${_pid}): $_classic_msg"
 
 	# Build JSON formatted line
 	local _json_line _esc_msg _tag _esc_tag _json_msg
@@ -1233,7 +1271,7 @@ elog_critical() { elog critical "$@"; }
 # - Builds JSON envelope with mandatory fields: ts, host, app, pid, type, level, msg
 # - Extracts {tag} from message; parses remaining args as key=value extra fields
 # - Extra values must not contain spaces (space-delimited internal format)
-# - Does NOT increment _ELOG_WRITE_COUNT (audit log not subject to truncation)
+# - Increments _ELOG_AUDIT_WRITE_COUNT; truncates audit log when ELOG_AUDIT_MAX_LINES > 0
 # - Returns 0 on success
 elog_event() {
 	local _type="${1:-}"
@@ -1327,12 +1365,13 @@ elog_event() {
 	fi
 	_json_line="${_json_line}${_extra}}"
 
-	# Build classic line: timestamp host app(pid): [type] message
+	# Build classic line — sanitize newlines to prevent log injection
+	local _classic_msg="${_json_msg//$'\n'/\\n}"
 	local _classic_line
 	if [ -n "$_tag" ]; then
-		_classic_line="$_ts $_host ${_app}(${_pid}): [${_type}] {${_tag}} ${_json_msg}"
+		_classic_line="$_ts $_host ${_app}(${_pid}): [${_type}] {${_tag}} ${_classic_msg}"
 	else
-		_classic_line="$_ts $_host ${_app}(${_pid}): [${_type}] ${_json_msg}"
+		_classic_line="$_ts $_host ${_app}(${_pid}): [${_type}] ${_classic_msg}"
 	fi
 
 	# Stage event context for SIEM handlers (CEF, syslog_udp)
@@ -1360,6 +1399,12 @@ elog_event() {
 
 	# Dispatch via event api_source — reaches audit_file and source="all" modules
 	_elog_dispatch "event" "$_classic_line" "$_json_line" "$_level" "$_msg" ""
+
+	# Periodic audit log truncation check
+	_ELOG_AUDIT_WRITE_COUNT=$((_ELOG_AUDIT_WRITE_COUNT + 1))
+	if [ $((_ELOG_AUDIT_WRITE_COUNT % _ELOG_TRUNCATE_CHECK_INTERVAL)) -eq 0 ]; then
+		_elog_truncate_check_file "${ELOG_AUDIT_FILE:-}" "${ELOG_AUDIT_MAX_LINES:-0}"
+	fi
 
 	# Clear staging globals
 	_ELOG_EVT_TS=""

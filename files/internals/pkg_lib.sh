@@ -29,7 +29,7 @@
 [[ -n "${_PKG_LIB_LOADED:-}" ]] && return 0 2>/dev/null
 _PKG_LIB_LOADED=1
 # shellcheck disable=SC2034 # version checked by consumers
-PKG_LIB_VERSION="1.0.6"
+PKG_LIB_VERSION="1.0.7"
 
 # Configurable defaults — consuming projects override via environment
 PKG_NO_COLOR="${PKG_NO_COLOR:-0}"
@@ -249,7 +249,7 @@ pkg_detect_os() {
 	# Fallback: /etc/redhat-release
 	if [[ -f /etc/redhat-release ]]; then
 		_PKG_OS_FAMILY="rhel"
-		_PKG_OS_NAME=$(command cat /etc/redhat-release 2>/dev/null) || _PKG_OS_NAME="RHEL-family"
+		_PKG_OS_NAME=$(cat /etc/redhat-release 2>/dev/null) || _PKG_OS_NAME="RHEL-family"
 		# Extract version number (first numeric sequence with optional dots)
 		local ver_pat='[0-9]+(\.[0-9]+)*'
 		if [[ "$_PKG_OS_NAME" =~ $ver_pat ]]; then
@@ -273,7 +273,7 @@ pkg_detect_os() {
 	if [[ -f /etc/debian_version ]]; then
 		_PKG_OS_FAMILY="debian"
 		_PKG_OS_ID="debian"
-		_PKG_OS_VERSION=$(command cat /etc/debian_version 2>/dev/null) || _PKG_OS_VERSION=""
+		_PKG_OS_VERSION=$(cat /etc/debian_version 2>/dev/null) || _PKG_OS_VERSION=""
 		_PKG_OS_NAME="Debian ${_PKG_OS_VERSION}"
 		return 0
 	fi
@@ -282,7 +282,7 @@ pkg_detect_os() {
 	if [[ -f /etc/gentoo-release ]]; then
 		_PKG_OS_FAMILY="gentoo"
 		_PKG_OS_ID="gentoo"
-		_PKG_OS_NAME=$(command cat /etc/gentoo-release 2>/dev/null) || _PKG_OS_NAME="Gentoo"
+		_PKG_OS_NAME=$(cat /etc/gentoo-release 2>/dev/null) || _PKG_OS_NAME="Gentoo"
 		return 0
 	fi
 
@@ -290,7 +290,7 @@ pkg_detect_os() {
 	if [[ -f /etc/slackware-version ]]; then
 		_PKG_OS_FAMILY="slackware"
 		_PKG_OS_ID="slackware"
-		_PKG_OS_NAME=$(command cat /etc/slackware-version 2>/dev/null) || _PKG_OS_NAME="Slackware"
+		_PKG_OS_NAME=$(cat /etc/slackware-version 2>/dev/null) || _PKG_OS_NAME="Slackware"
 		local ver_pat='[0-9]+(\.[0-9]+)*'
 		if [[ "$_PKG_OS_NAME" =~ $ver_pat ]]; then
 			_PKG_OS_VERSION="${BASH_REMATCH[0]}"
@@ -333,7 +333,7 @@ pkg_detect_init() {
 	# Check /proc/1/comm if it exists (may not on CentOS 6)
 	if [[ -f /proc/1/comm ]]; then
 		local pid1_comm
-		pid1_comm=$(command cat /proc/1/comm 2>/dev/null) || pid1_comm=""
+		pid1_comm=$(cat /proc/1/comm 2>/dev/null) || pid1_comm=""
 		case "$pid1_comm" in
 			systemd)  _PKG_INIT_SYSTEM="systemd" ;;
 			init)     _PKG_INIT_SYSTEM="sysv" ;;
@@ -591,7 +591,7 @@ pkg_backup() {
 	local symlink_path
 	symlink_path="$(dirname "$install_path")/${PKG_BACKUP_SYMLINK}"
 	command rm -f "$symlink_path"
-	command ln -s "$backup_path" "$symlink_path" || {
+	ln -s "$backup_path" "$symlink_path" || {
 		pkg_warn "pkg_backup: failed to create symlink ${symlink_path}"
 	}
 
@@ -744,7 +744,7 @@ pkg_restore_files() {
 
 	# Create install path if it does not exist
 	if [[ ! -d "$install_path" ]]; then
-		command mkdir -p "$install_path" || {
+		mkdir -p "$install_path" || {
 			pkg_error "pkg_restore_files: failed to create ${install_path}"
 			return 1
 		}
@@ -763,7 +763,7 @@ pkg_restore_files() {
 
 			# Ensure destination directory exists
 			if [[ ! -d "$dest_dir" ]]; then
-				command mkdir -p "$dest_dir" || continue
+				mkdir -p "$dest_dir" || continue
 			fi
 
 			rc=0
@@ -815,7 +815,7 @@ pkg_restore_dir() {
 
 	# Ensure destination parent directory exists
 	if [[ ! -d "$dest_parent" ]]; then
-		command mkdir -p "$dest_parent" || {
+		mkdir -p "$dest_parent" || {
 			pkg_error "pkg_restore_dir: failed to create ${dest_parent}"
 			return 1
 		}
@@ -856,7 +856,7 @@ pkg_copy_tree() {
 
 	# Create destination if it does not exist
 	if [[ ! -d "$dest_dir" ]]; then
-		command mkdir -p "$dest_dir" || {
+		mkdir -p "$dest_dir" || {
 			pkg_error "pkg_copy_tree: failed to create ${dest_dir}"
 			return 1
 		}
@@ -905,7 +905,7 @@ pkg_set_perms() {
 	for exec_file in "$@"; do
 		local full_path="${base_path}/${exec_file}"
 		if [[ -f "$full_path" ]]; then
-			command chmod "$dir_mode" "$full_path" || {
+			chmod "$dir_mode" "$full_path" || {
 				pkg_warn "pkg_set_perms: failed to set exec mode on ${exec_file}"
 			}
 		fi
@@ -931,13 +931,13 @@ pkg_create_dirs() {
 	local dir rc=0
 	for dir in "$@"; do
 		if [[ ! -d "$dir" ]]; then
-			command mkdir -p "$dir" || {
+			mkdir -p "$dir" || {
 				pkg_error "pkg_create_dirs: failed to create ${dir}"
 				rc=1
 				continue
 			}
 		fi
-		command chmod "$mode" "$dir" || {
+		chmod "$mode" "$dir" || {
 			pkg_warn "pkg_create_dirs: failed to set mode ${mode} on ${dir}"
 		}
 	done
@@ -960,10 +960,8 @@ pkg_symlink() {
 		return 1
 	fi
 
-	# Remove existing link or file at link_path
-	command rm -f "$link_path" 2>/dev/null  # safe: only removes file/symlink, not dir
-
-	command ln -s "$target" "$link_path" || {
+	# Reduced TOCTOU: ln -sf replaces rm+ln with a single coreutils call
+	command ln -sf "$target" "$link_path" || {
 		pkg_error "pkg_symlink: failed to create symlink ${link_path} -> ${target}"
 		return 1
 	}
@@ -1016,10 +1014,11 @@ pkg_sed_replace() {
 		return 1
 	fi
 
-	# Escape both arguments for sed with | delimiter (handle &, |, /, \)
+	# Escape old_path for BRE search: .*[\^$&|/\ must be escaped
+	# Escape new_path for sed replacement: &|/\ only
 	local esc_old esc_new
-	esc_old=$(printf '%s' "$old_path" | sed 's/[&|/\]/\\&/g')
-	esc_new=$(printf '%s' "$new_path" | sed 's/[&|/\]/\\&/g')
+	esc_old=$(printf '%s' "$old_path" | sed 's/[.*[\^$&|/\\]/\\&/g')
+	esc_new=$(printf '%s' "$new_path" | sed 's/[&|/\\]/\\&/g')
 
 	local file
 	for file in "$@"; do
@@ -1196,7 +1195,7 @@ pkg_service_install() {
 		pkg_error "pkg_service_install: failed to copy init script to ${init_dir}"
 		return 1
 	}
-	command chmod 755 "${init_dir}/${name}"
+	chmod 755 "${init_dir}/${name}"
 
 	return 0
 }
@@ -1568,7 +1567,7 @@ pkg_service_enable() {
 			for rl in $PKG_SLACKWARE_RUNLEVELS; do
 				rc_dir="/etc/rc.d/rc${rl}.d"
 				if [[ -d "$rc_dir" ]]; then
-					command ln -sf "$init_script" "${rc_dir}/S${PKG_SLACKWARE_PRIORITY}${name}"
+					ln -sf "$init_script" "${rc_dir}/S${PKG_SLACKWARE_PRIORITY}${name}"
 				fi
 			done
 			return 0
@@ -1813,7 +1812,7 @@ pkg_rclocal_add() {
 		local rclocal_dir
 		rclocal_dir=$(dirname "$rclocal")
 		if [[ ! -d "$rclocal_dir" ]]; then
-			command mkdir -p "$rclocal_dir" || {
+			mkdir -p "$rclocal_dir" || {
 				pkg_error "pkg_rclocal_add: failed to create directory ${rclocal_dir}"
 				return 1
 			}
@@ -1822,7 +1821,7 @@ pkg_rclocal_add() {
 			pkg_error "pkg_rclocal_add: failed to create ${rclocal}"
 			return 1
 		}
-		command chmod 755 "$rclocal"
+		chmod 755 "$rclocal"
 	fi
 
 	# Idempotency: check if entry already present
@@ -1858,10 +1857,16 @@ pkg_rclocal_remove() {
 			continue
 		fi
 
-		# Check if pattern exists before modifying
-		if ! grep -q "$pattern" "$path" 2>/dev/null; then
+		# Check if pattern exists before modifying (fixed-string match)
+		if ! grep -qF "$pattern" "$path" 2>/dev/null; then
 			continue
 		fi
+
+		# Preserve original permissions before atomic replace
+		local _orig_mode
+		_orig_mode=$(command stat -Lc '%a' "$path" 2>/dev/null) || \
+			_orig_mode=$(command stat -Lf '%OLp' "$path" 2>/dev/null) || \
+			_orig_mode="755"
 
 		# Atomic replace: grep -v to tmpfile, then mv
 		local tmpfile
@@ -1869,11 +1874,16 @@ pkg_rclocal_remove() {
 			pkg_warn "pkg_rclocal_remove: mktemp failed for ${path}"
 			continue
 		}
-		grep -v "$pattern" "$path" > "$tmpfile" 2>/dev/null || true  # safe: grep -v returns 1 when all lines match
+		grep -vF "$pattern" "$path" > "$tmpfile" 2>/dev/null || true  # safe: grep -v returns 1 when all lines match
 		command mv -f "$tmpfile" "$path" || {
 			pkg_warn "pkg_rclocal_remove: failed to update ${path}"
 			command rm -f "$tmpfile"
+			continue
 		}
+
+		# Restore original permissions (mktemp creates 0600; rc.local needs 755)
+		command chmod "$_orig_mode" "$path" || \
+			pkg_warn "pkg_rclocal_remove: failed to restore permissions on ${path}"
 	done
 
 	return 0
@@ -1918,7 +1928,7 @@ pkg_cron_install() {
 	local dest_dir
 	dest_dir=$(dirname "$dest")
 	if [[ ! -d "$dest_dir" ]]; then
-		command mkdir -p "$dest_dir" || {
+		mkdir -p "$dest_dir" || {
 			pkg_error "pkg_cron_install: failed to create directory ${dest_dir}"
 			return 1
 		}
@@ -1929,7 +1939,7 @@ pkg_cron_install() {
 		return 1
 	}
 
-	command chmod "$mode" "$dest" || {
+	chmod "$mode" "$dest" || {
 		pkg_warn "pkg_cron_install: failed to set mode ${mode} on ${dest}"
 	}
 
@@ -1950,7 +1960,7 @@ pkg_cron_remove() {
 
 	local path
 	for path in "$@"; do
-		if [[ -f "$path" ]] || [[ -L "$path" ]]; then
+		if [[ -f "$path" ]]; then
 			command rm -f "$path" || pkg_warn "pkg_cron_remove: failed to remove ${path}"
 		fi
 	done
@@ -2083,9 +2093,10 @@ pkg_cron_restore_schedule() {
 		return 0
 	fi
 
-	# Escape * and / for sed (both old and new schedules)
+	# Escape current_schedule for BRE search: .*[\^$/\ must be escaped
+	# Escape old_schedule for sed replacement: &/\ only
 	local esc_current esc_old
-	esc_current=$(printf '%s' "$current_schedule" | sed 's/[*./\\]/\\&/g')
+	esc_current=$(printf '%s' "$current_schedule" | sed 's/[.*[\^$/\\]/\\&/g')
 	esc_old=$(printf '%s' "$old_schedule" | sed 's/[&/\\]/\\&/g')
 
 	# Replace first occurrence only (sed with address range)
@@ -2121,7 +2132,7 @@ _pkg_man_dir() {
 
 	# Fallback: create standard path
 	local fallback="/usr/share/man/man${section}"
-	command mkdir -p "$fallback" || {
+	mkdir -p "$fallback" || {
 		pkg_error "_pkg_man_dir: failed to create ${fallback}"
 		return 1
 	}
@@ -2177,9 +2188,10 @@ pkg_man_install() {
 		old_str="${pair%%|*}"
 		new_str="${pair#*|}"
 		if [[ -n "$old_str" ]]; then
-			# Escape both strings for sed with | delimiter (handle &, |, /, \)
-			esc_old=$(printf '%s' "$old_str" | sed 's/[&|/\]/\\&/g')
-			esc_new=$(printf '%s' "$new_str" | sed 's/[&|/\]/\\&/g')
+			# Escape old_str for BRE search: .*[\^$&|/\ must be escaped
+			# Escape new_str for sed replacement: &|/\ only
+			esc_old=$(printf '%s' "$old_str" | sed 's/[.*[\^$&|/\\]/\\&/g')
+			esc_new=$(printf '%s' "$new_str" | sed 's/[&|/\\]/\\&/g')
 			sed -i "s|${esc_old}|${esc_new}|g" "$tmpfile" || {
 				pkg_warn "pkg_man_install: sed replacement failed for pair: ${pair}"
 			}
@@ -2200,7 +2212,7 @@ pkg_man_install() {
 		command rm -f "${tmpfile}.gz"
 		return 1
 	}
-	command chmod 644 "$dest"
+	chmod 644 "$dest"
 	command rm -f "${tmpfile}.gz"
 
 	pkg_info "installed man page: ${name}(${section})"
@@ -2229,7 +2241,7 @@ _pkg_install_sysfile() {
 	fi
 
 	if [[ ! -d "$dest_dir" ]]; then
-		command mkdir -p "$dest_dir" || {
+		mkdir -p "$dest_dir" || {
 			pkg_error "${func_name}: failed to create ${dest_dir}"
 			return 1
 		}
@@ -2239,7 +2251,7 @@ _pkg_install_sysfile() {
 		pkg_error "${func_name}: failed to install ${name}"
 		return 1
 	}
-	command chmod 644 "${dest_dir}/${name}"
+	chmod 644 "${dest_dir}/${name}"
 
 	return 0
 }
@@ -2284,7 +2296,7 @@ pkg_doc_install() {
 	fi
 
 	if [[ ! -d "$dest_dir" ]]; then
-		command mkdir -p "$dest_dir" || {
+		mkdir -p "$dest_dir" || {
 			pkg_error "pkg_doc_install: failed to create ${dest_dir}"
 			return 1
 		}
@@ -2316,7 +2328,9 @@ pkg_doc_install() {
 #   $1 — config file path
 #   $2 — variable name to read
 # Reads the first VAR=value or VAR="value" line matching var.
-# Strips surrounding quotes. Echoes value to stdout.
+# Strips surrounding quotes. Echoes raw file bytes to stdout (no shell
+# interpretation — escape sequences like \" and \$ are returned literally).
+# For the shell-interpreted value, source the file instead.
 # Returns 1 if file not found or variable not found.
 pkg_config_get() {
 	local conf_file="$1" var="$2"
@@ -2400,10 +2414,16 @@ pkg_config_set() {
 		return 1
 	fi
 
-	# Escape val for sed replacement (handle &, |, /, \)
+	# Shell-escape val for sourcing safety: \, ", $, ` must be escaped inside double quotes
+	local _shell_val="${val//\\/\\\\}"
+	_shell_val="${_shell_val//\"/\\\"}"
+	_shell_val="${_shell_val//\$/\\\$}"
+	_shell_val="${_shell_val//\`/\\\`}"
+
+	# Escape shell-safe val for sed replacement (handle &, |, /, \)
 	# Pipe must be escaped because the outer sed uses | as delimiter
 	local esc_val
-	esc_val=$(printf '%s' "$val" | sed 's/[&|/\]/\\&/g')
+	esc_val=$(printf '%s' "$_shell_val" | sed 's/[&|/\]/\\&/g')
 
 	# Check if variable already exists (uncommented)
 	if grep -q "^[[:space:]]*${var}=" "$conf_file"; then
@@ -2414,7 +2434,7 @@ pkg_config_set() {
 		}
 	else
 		# Append new variable
-		printf '%s="%s"\n' "$var" "$val" >> "$conf_file" || {
+		printf '%s="%s"\n' "$var" "$_shell_val" >> "$conf_file" || {
 			pkg_error "pkg_config_set: failed to append to ${conf_file}"
 			return 1
 		}
@@ -2457,7 +2477,7 @@ pkg_config_merge() {
 	local output_dir
 	output_dir=$(dirname "$output")
 	if [[ ! -d "$output_dir" ]]; then
-		command mkdir -p "$output_dir" || {
+		mkdir -p "$output_dir" || {
 			pkg_error "pkg_config_merge: failed to create output directory ${output_dir}"
 			return 1
 		}
@@ -2529,7 +2549,7 @@ pkg_config_merge() {
 	}
 
 	if [[ -n "$_preserve_mode" ]]; then
-		command chmod "$_preserve_mode" "$output" || pkg_warn "pkg_config_merge: failed to restore permissions on ${output}"
+		chmod "$_preserve_mode" "$output" || pkg_warn "pkg_config_merge: failed to restore permissions on ${output}"
 	fi
 
 	return 0
@@ -2601,9 +2621,18 @@ pkg_config_migrate_var() {
 			;;
 	esac
 
-	# Escape old_val for sed replacement (handle &, |, /, \)
+	# Shell-escape old_val for sourcing safety: the AWK raw reader returns literal
+	# file bytes between quotes — single-quoted originals lack escape sequences,
+	# so writing them inside double quotes without escaping creates injection vectors.
+	# Escape \, ", $, ` for double-quote context (backslash first to avoid double-escaping).
+	local _shell_val="${old_val//\\/\\\\}"
+	_shell_val="${_shell_val//\"/\\\"}"
+	_shell_val="${_shell_val//\$/\\\$}"
+	_shell_val="${_shell_val//\`/\\\`}"
+
+	# Escape shell-safe val for sed replacement (handle &, |, /, \)
 	local esc_val
-	esc_val=$(printf '%s' "$old_val" | sed 's/[&|/\]/\\&/g')
+	esc_val=$(printf '%s' "$_shell_val" | sed 's/[&|/\]/\\&/g')
 
 	# Replace old_var line with new_var and add migration comment
 	sed -i "s|^[[:space:]]*${old_var}=.*|# migrated: ${old_var} -> ${new_var}\n${new_var}=\"${esc_val}\"|" "$conf_file" || {
@@ -2748,7 +2777,7 @@ pkg_fhs_install() {
 
 		# Create destination directory if needed
 		if [[ ! -d "$dest_dir" ]]; then
-			command mkdir -p "$dest_dir" || {
+			mkdir -p "$dest_dir" || {
 				pkg_error "pkg_fhs_install: failed to create directory ${dest_dir}"
 				rc=1
 				failed=$((failed + 1))
@@ -2779,7 +2808,7 @@ pkg_fhs_install() {
 		fi
 
 		# Set permissions
-		command chmod "${_PKG_FHS_MODES[$i]}" "$dest_path" 2>/dev/null  # best-effort chmod
+		chmod "${_PKG_FHS_MODES[$i]}" "$dest_path" 2>/dev/null  # best-effort chmod
 	done
 
 	local installed=$((count - failed))
@@ -2819,7 +2848,7 @@ pkg_fhs_symlink_farm() {
 
 		# Create parent directory for the symlink
 		if [[ ! -d "$link_dir" ]]; then
-			command mkdir -p "$link_dir" || {
+			mkdir -p "$link_dir" || {
 				pkg_error "pkg_fhs_symlink_farm: failed to create ${link_dir}"
 				rc=1
 				failed=$((failed + 1))
@@ -3230,10 +3259,24 @@ pkg_uninstall_man() {
 	return 0
 }
 
-# pkg_uninstall_cron paths... — remove cron files (uninstall alias)
-# Delegates to pkg_cron_remove; kept for API compatibility with uninstall scripts.
+# pkg_uninstall_cron paths... — remove cron files
+# Arguments:
+#   $1+ — cron file paths to remove (e.g., "/etc/cron.d/bfd", "/etc/cron.daily/bfd")
+# Skips paths that do not exist. Returns 0 always (best-effort removal).
 pkg_uninstall_cron() {
-	pkg_cron_remove "$@"
+	if [[ $# -eq 0 ]]; then
+		pkg_error "pkg_uninstall_cron: at least one path required"
+		return 1
+	fi
+
+	local path
+	for path in "$@"; do
+		if [[ -f "$path" ]] || [[ -L "$path" ]]; then
+			command rm -f "$path" || pkg_warn "pkg_uninstall_cron: failed to remove ${path}"
+		fi
+	done
+
+	return 0
 }
 
 # pkg_uninstall_logrotate name — remove logrotate config
@@ -3308,6 +3351,12 @@ pkg_manifest_load() {
 
 	if [[ ! -f "$manifest_file" ]]; then
 		pkg_error "pkg_manifest_load: file not found: ${manifest_file}"
+		return 1
+	fi
+
+	# Defense-in-depth: reject manifest not owned by current user
+	if [[ ! -O "$manifest_file" ]]; then
+		pkg_error "pkg_manifest_load: ${manifest_file} not owned by current user"
 		return 1
 	fi
 
