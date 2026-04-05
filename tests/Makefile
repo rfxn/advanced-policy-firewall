@@ -28,6 +28,12 @@ test-deep-legacy:
 test-all:
 	@rc=0; for os in $(BATSMAN_OS_ALL); do $(BATSMAN_RUN_TESTS) --os $$os --parallel || rc=1; done; exit $$rc
 
+# ---------------------------------------------------------------------------
+# Dev iteration: abort on first failure (local use — not CI)
+# ---------------------------------------------------------------------------
+test-fast:
+	$(BATSMAN_RUN_TESTS) --abort --parallel
+
 # UAT override: --privileged required for iptables access in UAT scenarios
 uat:
 	BATSMAN_DOCKER_FLAGS="--privileged" $(BATSMAN_RUN_TESTS) -- $(BATSMAN_UAT_PATH)
