@@ -47,6 +47,7 @@ teardown() {
     "$APF" -u 192.0.2.52 2>/dev/null || true
     "$APF" -u 192.0.2.53 2>/dev/null || true
     "$APF" -u 192.0.2.54 2>/dev/null || true
+    "$APF" -u 192.0.2.90 2>/dev/null || true
     "$APF" -u 198.51.100.10 2>/dev/null || true
     "$APF" -u 198.51.100.11 2>/dev/null || true
     "$APF" -u 192.0.2.0/24 2>/dev/null || true
@@ -292,23 +293,25 @@ teardown() {
 # ============================================================================
 
 @test "UAT-009: lookup tracks add/remove lifecycle" {
+    # Use a unique IP — 192.0.2.50 collides with advanced trust entries
+    # in 30-advanced-trust-cli.bats under file-group splitting
     # Initially not found
-    run "$APF" --lookup 192.0.2.50
+    run "$APF" --lookup 192.0.2.90
     assert_failure
 
     # Add to allow
-    "$APF" -a 192.0.2.50 "lifecycle test" 2>/dev/null
+    "$APF" -a 192.0.2.90 "lifecycle test" 2>/dev/null
 
     # Now found as ALLOW
-    run "$APF" --lookup 192.0.2.50
+    run "$APF" --lookup 192.0.2.90
     assert_success
     assert_output --partial "ALLOW"
 
     # Remove
-    "$APF" -u 192.0.2.50
+    "$APF" -u 192.0.2.90
 
     # Gone again
-    run "$APF" --lookup 192.0.2.50
+    run "$APF" --lookup 192.0.2.90
     assert_failure
 }
 
