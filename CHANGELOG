@@ -184,6 +184,10 @@
       with bash builtins across hot paths
 [Change] refresh(): exit 0 (not 1) when trust rules are unchanged since
       last refresh; may affect automation checking for non-zero on no-op
+[Change] Remove vestigial kernel 2.4 ipchains code, orphaned global TIME
+      variable, dead UNAME/LSM/RMM/KREL binary discovery, and unimplemented
+      trust flush --deny/--allow stubs; eliminates 5 unnecessary subshell
+      forks at startup
 
   -- Documentation --
 

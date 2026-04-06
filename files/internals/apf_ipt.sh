@@ -169,14 +169,7 @@ ml() {
 }
 
 modinit() {
- local IPC_VAL modlist mod ip6modlist
- # Remove ipchains module if loaded (kernel 2.4 only)
- if [ "$KREL" == "2.4" ]; then
-  IPC_VAL=$($LSM | grep ipchains)
-  if [ -n "$IPC_VAL" ]; then
-        $RMM ipchains
-  fi
- fi
+ local modlist mod ip6modlist
  if [ "$SET_MONOKERN" != "1" ]; then
         # Loading Kernel Modules
         ml ip_tables 1

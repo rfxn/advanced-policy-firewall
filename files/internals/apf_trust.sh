@@ -1453,10 +1453,8 @@ _dispatch_trust() {
 	flush)
 		shift
 		case "${1:-}" in
-		--deny)  echo "apf trust flush --deny: not yet implemented" >&2; exit 1 ;;
-		--allow) echo "apf trust flush --allow: not yet implemented" >&2; exit 1 ;;
 		--temp)  mutex_lock; flush_temp_entries ;;
-		*)       echo "apf trust flush: expected --temp, --deny, or --allow." >&2; return 1 ;;
+		*)       echo "apf trust flush: expected --temp" >&2; return 1 ;;
 		esac
 		;;
 	temp)
