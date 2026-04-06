@@ -24,6 +24,6 @@ RUN make source && \
     mkdir -p /root/rpmbuild/{SOURCES,SPECS,BUILD,RPMS,SRPMS} && \
     cp build/apf-*.tar.gz /root/rpmbuild/SOURCES/ && \
     cp rpm/apf.spec /root/rpmbuild/SPECS/ && \
-    rpmbuild -bb --define "dist .el7" /root/rpmbuild/SPECS/apf.spec
+    rpmbuild -bb --define "dist .el7" --define "rhel 7" --define "el7 1" /root/rpmbuild/SPECS/apf.spec
 
 CMD cp /root/rpmbuild/RPMS/noarch/*.rpm /output/
