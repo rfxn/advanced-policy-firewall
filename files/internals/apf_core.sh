@@ -163,7 +163,12 @@ mutex_lock() {
       return 0
     fi
     local lock_pid
-    read -r lock_pid < "$LOCK_FILE" 2>/dev/null || lock_pid=""
+    read -r lock_pid < "$LOCK_FILE" 2>/dev/null || lock_pid=""  # safe: file may be empty or unreadable
+    # Empty lock file (left by flock path) -- treat as stale
+    if [ -z "$lock_pid" ] && [ -f "$LOCK_FILE" ]; then
+      command rm -f "$LOCK_FILE"
+      continue
+    fi
     if [ -n "$lock_pid" ] && ! kill -0 "$lock_pid" 2>/dev/null; then
       command rm -f "$LOCK_FILE"
       continue
