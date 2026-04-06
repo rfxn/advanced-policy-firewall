@@ -161,6 +161,16 @@
       '=' leaving advanced FQDN rules unprotected during refresh
 [Fix] pkg_lib 1.0.7 → 1.0.8: process substitution broke sh install.sh on
       bash 4.2 POSIX mode (CentOS 7/6); ln -sfn symlink-to-directory safety
+[Fix] CT_LIMIT: IPv6 conntrack offenders were silently dropped at validation
+      gate (valid_ip_cidr rejects IPv6); IPv6 CIDRs in exempt list were silently
+      ignored by IPv4-only awk parser; now uses valid_host() and awk IPv6 CIDR
+      prefix matching
+[Fix] gretunnel: default keepalive retries to 3 when GRE_KEEPALIVE contains
+      only an interval value; single-field input caused silent ip tunnel failure
+[Fix] bash-completion: apf cc <TAB> now shows verbs and country codes together;
+      _apf_complete_cc() was overwriting the verb COMPREPLY array
+[Fix] mutex_lock: detect and remove empty lock files left by flock wrapper;
+      noclobber fallback timed out after 60s instead of acquiring the lock
 
   -- Changes --
 
