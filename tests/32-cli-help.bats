@@ -485,6 +485,37 @@ teardown() {
     assert_success
 }
 
+@test "completion: apf cc TAB shows verbs and country codes" {
+    local comp_file
+    if [ -f /etc/bash_completion.d/apf ]; then
+        comp_file="/etc/bash_completion.d/apf"
+    elif [ -f /opt/tests/apf.bash-completion ]; then
+        comp_file="/opt/tests/apf.bash-completion"
+    else
+        skip "completion script not found"
+    fi
+    # Populate a CC rules file so _apf_complete_cc finds entries.
+    # The installed completion script has /opt/apf paths (sed-replaced).
+    printf 'US\nDE\n' > "$APF_DIR/cc_deny.rules"
+    # Source the completion script and simulate: apf cc <TAB>
+    run bash -c '
+        source "'"$comp_file"'"
+        COMP_WORDS=(apf cc "")
+        COMP_CWORD=2
+        cur=""
+        _apf_complete_cc_group
+        printf "%s\n" "${COMPREPLY[@]}"
+    '
+    assert_success
+    # Must contain verbs
+    assert_output --partial "info"
+    assert_output --partial "lookup"
+    assert_output --partial "update"
+    # Must also contain country codes from the rules file
+    assert_output --partial "US"
+    assert_output --partial "DE"
+}
+
 # --- unknown verb / edge cases (G7, E9) ---
 
 @test "apf trust flush without target exits 1 with error" {

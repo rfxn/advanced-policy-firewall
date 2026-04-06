@@ -80,8 +80,8 @@ _apf_complete_cc_group() {
 	local pos=$(( COMP_CWORD - 2 ))
 	case "$pos" in
 	0)
-		COMPREPLY=( $(compgen -W "info lookup update" -- "$cur") )
 		_apf_complete_cc
+		COMPREPLY+=( $(compgen -W "info lookup update" -- "$cur") )
 		;;
 	1)
 		local verb="${COMP_WORDS[2]}"
