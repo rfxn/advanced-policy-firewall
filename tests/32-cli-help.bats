@@ -180,7 +180,7 @@ teardown() {
 
 # --- --info ---
 
-@test "apf --info shows status header and trust/config sections" {
+@test "apf --info shows all dashboard sections" {
     "$APF" -s 2>/dev/null || true
     run "$APF" --info
     assert_success
@@ -203,12 +203,6 @@ teardown() {
     assert_output --partial "Packet sanity:"
     assert_output --partial "SYN flood:"
     assert_output --partial "SMTP blocking:"
-}
-
-@test "apf --info shows subsystems and logging sections" {
-    "$APF" -s 2>/dev/null || true
-    run "$APF" --info
-    assert_success
     # Subsystems section
     assert_output --partial "Subsystems:"
     assert_output --partial "Fast load:"
@@ -382,13 +376,14 @@ teardown() {
 
 # --- per-group help (G3) ---
 
-@test "apf trust --help shows trust verbs" {
+@test "apf trust --help shows trust verbs and examples" {
     run "$APF" trust --help
     assert_success
     assert_output --partial "add HOST"
     assert_output --partial "deny HOST"
     assert_output --partial "remove HOST"
     assert_output --partial "lookup HOST"
+    assert_output --partial "Examples:"
 }
 
 @test "apf trust (bare) shows help" {
@@ -397,18 +392,20 @@ teardown() {
     assert_output --partial "usage: apf trust"
 }
 
-@test "apf config --help shows config verbs" {
+@test "apf config --help shows config verbs and examples" {
     run "$APF" config --help
     assert_success
     assert_output --partial "dump"
     assert_output --partial "validate"
+    assert_output --partial "Examples:"
 }
 
-@test "apf status --help shows status verbs" {
+@test "apf status --help shows status verbs and examples" {
     run "$APF" status --help
     assert_success
     assert_output --partial "rules"
     assert_output --partial "log"
+    assert_output --partial "Examples:"
 }
 
 # --- Tier 1 vs Tier 2 equivalence (G4) ---
@@ -559,26 +556,6 @@ teardown() {
     run "$APF" -h
     assert_success
     assert_output --partial "open full manual page"
-}
-
-# --- examples in help (Phase 4) ---
-
-@test "apf trust --help includes examples" {
-    run "$APF" trust --help
-    assert_success
-    assert_output --partial "Examples:"
-}
-
-@test "apf config --help includes examples" {
-    run "$APF" config --help
-    assert_success
-    assert_output --partial "Examples:"
-}
-
-@test "apf status --help includes examples" {
-    run "$APF" status --help
-    assert_success
-    assert_output --partial "Examples:"
 }
 
 # --- help subcommand (Phase 5) ---

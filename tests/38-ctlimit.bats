@@ -229,11 +229,13 @@ _source_ctlimit() {
 
 # ---- Integration tests: CLI and cron ----
 
-@test "--ct-status shows config when disabled" {
+@test "--ct-status shows config, data source, and scan status when disabled" {
     run "$APF" --ct-status
     assert_success
     assert_output --partial "CT_LIMIT=0"
     assert_output --partial "max connections per IP"
+    assert_output --partial "Data source:"
+    assert_output --partial "Last scan: never"
 }
 
 @test "--ct-scan shows disabled message when CT_LIMIT=0" {
@@ -333,17 +335,6 @@ _source_ctlimit() {
     ! ct_enabled
 }
 
-@test "--ct-status shows data source" {
-    run "$APF" --ct-status
-    assert_success
-    assert_output --partial "Data source:"
-}
-
-@test "--ct-status shows last scan: never on fresh install" {
-    run "$APF" --ct-status
-    assert_success
-    assert_output --partial "Last scan: never"
-}
 
 # ---- CT_PERMANENT behavior tests ----
 

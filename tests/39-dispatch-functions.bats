@@ -26,15 +26,10 @@ teardown_file() {
 
 # --- _trust_help ---
 
-@test "dispatch: _trust_help shows usage line" {
+@test "dispatch: _trust_help shows usage and verbs" {
     run bash -c "source $APF_DIR/conf.apf; source $APF_DIR/internals/internals.conf; source $APF_DIR/internals/apf.lib.sh; _trust_help"
     assert_success
     assert_output --partial "usage: apf trust"
-}
-
-@test "dispatch: _trust_help lists add/deny/remove/list/lookup/refresh" {
-    run bash -c "source $APF_DIR/conf.apf; source $APF_DIR/internals/internals.conf; source $APF_DIR/internals/apf.lib.sh; _trust_help"
-    assert_success
     assert_output --partial "add HOST"
     assert_output --partial "deny HOST"
     assert_output --partial "remove HOST"
@@ -45,15 +40,10 @@ teardown_file() {
 
 # --- _trust_temp_help ---
 
-@test "dispatch: _trust_temp_help shows usage line" {
+@test "dispatch: _trust_temp_help shows usage and verbs" {
     run bash -c "source $APF_DIR/conf.apf; source $APF_DIR/internals/internals.conf; source $APF_DIR/internals/apf.lib.sh; _trust_temp_help"
     assert_success
     assert_output --partial "usage: apf trust temp"
-}
-
-@test "dispatch: _trust_temp_help lists add/deny/remove/list/flush" {
-    run bash -c "source $APF_DIR/conf.apf; source $APF_DIR/internals/internals.conf; source $APF_DIR/internals/apf.lib.sh; _trust_temp_help"
-    assert_success
     assert_output --partial "add HOST TTL"
     assert_output --partial "deny HOST TTL"
     assert_output --partial "remove HOST"
@@ -83,15 +73,10 @@ teardown_file() {
 
 # --- _cc_help ---
 
-@test "dispatch: _cc_help shows usage line" {
+@test "dispatch: _cc_help shows usage and verbs" {
     run bash -c "source $APF_DIR/conf.apf; source $APF_DIR/internals/internals.conf; source $APF_DIR/internals/apf.lib.sh; source $APF_DIR/internals/apf_geoip.sh; _cc_help"
     assert_success
     assert_output --partial "usage: apf cc"
-}
-
-@test "dispatch: _cc_help lists info/lookup/update" {
-    run bash -c "source $APF_DIR/conf.apf; source $APF_DIR/internals/internals.conf; source $APF_DIR/internals/apf.lib.sh; source $APF_DIR/internals/apf_geoip.sh; _cc_help"
-    assert_success
     assert_output --partial "info"
     assert_output --partial "lookup"
     assert_output --partial "update"
@@ -107,15 +92,10 @@ teardown_file() {
 
 # --- _ct_help ---
 
-@test "dispatch: _ct_help shows usage line" {
+@test "dispatch: _ct_help shows usage and verbs" {
     run bash -c "source $APF_DIR/conf.apf; source $APF_DIR/internals/internals.conf; source $APF_DIR/internals/apf.lib.sh; source $APF_DIR/internals/apf_ctlimit.sh; _ct_help"
     assert_success
     assert_output --partial "usage: apf ct"
-}
-
-@test "dispatch: _ct_help lists scan/status" {
-    run bash -c "source $APF_DIR/conf.apf; source $APF_DIR/internals/internals.conf; source $APF_DIR/internals/apf.lib.sh; source $APF_DIR/internals/apf_ctlimit.sh; _ct_help"
-    assert_success
     assert_output --partial "scan"
     assert_output --partial "status"
 }
@@ -135,15 +115,10 @@ teardown_file() {
 
 # --- _ipset_help ---
 
-@test "dispatch: _ipset_help shows usage line" {
+@test "dispatch: _ipset_help shows usage and verbs" {
     run bash -c "source $APF_DIR/conf.apf; source $APF_DIR/internals/internals.conf; source $APF_DIR/internals/apf.lib.sh; _ipset_help"
     assert_success
     assert_output --partial "usage: apf ipset"
-}
-
-@test "dispatch: _ipset_help lists update/status" {
-    run bash -c "source $APF_DIR/conf.apf; source $APF_DIR/internals/internals.conf; source $APF_DIR/internals/apf.lib.sh; _ipset_help"
-    assert_success
     assert_output --partial "update"
     assert_output --partial "status"
 }
@@ -158,15 +133,10 @@ teardown_file() {
 
 # --- _gre_help ---
 
-@test "dispatch: _gre_help shows usage line" {
+@test "dispatch: _gre_help shows usage and verbs" {
     run bash -c "source $APF_DIR/conf.apf; source $APF_DIR/internals/internals.conf; source $APF_DIR/internals/apf.lib.sh; _gre_help"
     assert_success
     assert_output --partial "usage: apf gre"
-}
-
-@test "dispatch: _gre_help lists up/down/status" {
-    run bash -c "source $APF_DIR/conf.apf; source $APF_DIR/internals/internals.conf; source $APF_DIR/internals/apf.lib.sh; _gre_help"
-    assert_success
     assert_output --partial "up"
     assert_output --partial "down"
     assert_output --partial "status"

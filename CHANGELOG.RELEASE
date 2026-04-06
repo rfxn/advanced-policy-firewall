@@ -159,13 +159,12 @@
 [Fix] refresh: REFRESH_TEMP now includes IPs from advanced trust entries
       (proto:flow:d=port:s=FQDN); previously skipped all entries containing
       '=' leaving advanced FQDN rules unprotected during refresh
+[Fix] pkg_lib 1.0.7 → 1.0.8: process substitution broke sh install.sh on
+      bash 4.2 POSIX mode (CentOS 7/6); ln -sfn symlink-to-directory safety
 
   -- Changes --
 
 [Change] Vendored lib sync: elog_lib 1.0.5, pkg_lib 1.0.8, geoip_lib 1.0.5
-[Change] tests/infra: batsman 1.4.0 → 1.4.1 — parallel-jobs smoke test fix
-[Fix] pkg_lib 1.0.7 → 1.0.8: process substitution broke sh install.sh on
-      bash 4.2 POSIX mode (CentOS 7/6); ln -sfn symlink-to-directory safety
 [Change] Documentation: add VNET section to man page; add logrotate to FILES;
       add -ta/-td to bash completion; add CentOS 6 and Ubuntu 12.04 to
       README platforms; add ctlimit cron to README key files; expose
