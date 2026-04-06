@@ -129,6 +129,7 @@ create_gretun() {
 	# Keepalive
 	local ka_int ka_ret
 	read -r ka_int ka_ret <<< "$ka"
+	ka_ret="${ka_ret:-3}"
 	if [ "$ka_int" != "0" ] || [ "$ka_ret" != "0" ]; then
 		$ip tunnel change "$linkname" keepalive "$ka_int" "$ka_ret" 2>/dev/null || true  # safe: keepalive may not be supported on older kernels
 		eout "{gre} tunnel $linkname keepalive set to ${ka_int}s ${ka_ret} retries"
