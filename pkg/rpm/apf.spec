@@ -228,7 +228,7 @@ fi
 %post
 # Auto-detect default network interface on fresh install
 if [ "$1" = "1" ] && [ ! -f %{legacy_path}/internals/.apf.restore ]; then
-    _detected=$(ip route show default 2>/dev/null | awk '{for(i=1;i<=NF;i++) if($i=="dev"){print $(i+1);exit}}')
+    _detected=$(ip route show default 2>/dev/null | awk '{for(i=1;i<=NF;i++) if($i=="dev"){print $(i+1);exit}}')  # ip may fail in minimal chroot
     if [ -n "$_detected" ] && [ "$_detected" != "eth0" ]; then
         sed -i "s/^IFACE_UNTRUSTED=\"eth0\"/IFACE_UNTRUSTED=\"$_detected\"/" %{legacy_path}/conf.apf
     fi

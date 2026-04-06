@@ -21,7 +21,7 @@ case "$1" in
         command chmod 750 /var/lib/apf/tmp /etc/apf/geoip /var/log/apf 2>/dev/null || true  # dirs may not exist yet
         # Auto-detect default network interface on fresh install
         if [ -z "$2" ] && [ ! -f /etc/apf/internals/.apf.restore ]; then
-            _detected=$(ip route show default 2>/dev/null | awk '{for(i=1;i<=NF;i++) if($i=="dev"){print $(i+1);exit}}')
+            _detected=$(ip route show default 2>/dev/null | awk '{for(i=1;i<=NF;i++) if($i=="dev"){print $(i+1);exit}}')  # ip may fail in minimal chroot
             if [ -n "$_detected" ] && [ "$_detected" != "eth0" ]; then
                 sed -i "s/^IFACE_UNTRUSTED=\"eth0\"/IFACE_UNTRUSTED=\"$_detected\"/" /etc/apf/conf.apf
             fi
@@ -29,7 +29,7 @@ case "$1" in
         # Run importconf if migrating from install.sh backup
         if [ -d "${LEGACY_PATH}.bk.last" ]; then
             if [ -x /usr/lib/apf/extras/importconf ]; then
-                INSTALL_PATH="$LEGACY_PATH" /usr/lib/apf/extras/importconf || true  # importconf may fail on corrupt backup
+                BK_LAST="${LEGACY_PATH}.bk.last" INSTALL_PATH="$LEGACY_PATH" /usr/lib/apf/extras/importconf || true  # importconf may fail on corrupt backup
             fi
         fi
         # Clean legacy artifacts from install.sh-based installations
