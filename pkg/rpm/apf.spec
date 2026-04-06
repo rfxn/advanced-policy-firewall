@@ -308,8 +308,9 @@ if [ "$1" = "0" ]; then
     # Clean lock/temp files
     command rm -rf /var/lib/apf/tmp/* 2>/dev/null || true  # tmp dir may be empty
     # Clean runtime state files (iptables snapshots, change detection, cron templates)
-    command rm -f /etc/apf/internals/.apf.restore* 2>/dev/null || true  # snapshots may not exist
+    command rm -f /etc/apf/internals/.apf.restore* /etc/apf/internals/.apf6.restore* 2>/dev/null || true  # IPv4+IPv6 snapshots may not exist
     command rm -f /etc/apf/internals/.md5.cores* /etc/apf/internals/.last.vars* 2>/dev/null || true  # change markers may not exist
+    command rm -f /etc/apf/internals/.block_history* 2>/dev/null || true  # CT_LIMIT block history may not exist
     command rm -f /etc/apf/internals/cron.* 2>/dev/null || true  # runtime cron templates may not exist
     command rm -f /etc/apf/lock.utime /etc/apf/.apf-* 2>/dev/null || true  # lock/temp files may not exist
 fi
