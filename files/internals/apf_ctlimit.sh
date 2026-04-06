@@ -108,6 +108,44 @@ _ct_count_ips() {
 	    -v port_filter="$ports" \
 	    -v state_filter="$states" \
 	    -v skip_tw="$skip_tw" '
+	function expand_ipv6(addr,    parts, left, right, nleft, nright, i, missing, result) {
+		if (index(addr, "::") > 0) {
+			split(addr, parts, "::")
+			nleft = split(parts[1], left, ":")
+			nright = split(parts[2], right, ":")
+			if (parts[1] == "") nleft = 0
+			if (parts[2] == "") nright = 0
+			missing = 8 - nleft - nright
+			result = ""
+			for (i = 1; i <= nleft; i++)
+				result = result (i > 1 ? ":" : "") left[i]
+			for (i = 1; i <= missing; i++)
+				result = result (nleft + i > 1 ? ":" : "") "0"
+			for (i = 1; i <= nright; i++)
+				result = result ":" right[i]
+			return result
+		}
+		return addr
+	}
+
+	function hex2dec(s,    i, c, v, result) {
+		result = 0
+		s = tolower(s)
+		for (i = 1; i <= length(s); i++) {
+			c = substr(s, i, 1)
+			if (c >= "0" && c <= "9") v = c + 0
+			else if (c == "a") v = 10
+			else if (c == "b") v = 11
+			else if (c == "c") v = 12
+			else if (c == "d") v = 13
+			else if (c == "e") v = 14
+			else if (c == "f") v = 15
+			else v = 0
+			result = result * 16 + v
+		}
+		return result
+	}
+
 	BEGIN {
 		# Load exemption list
 		while ((getline line < exempt_file) > 0) {
@@ -115,14 +153,29 @@ _ct_count_ips() {
 			if (line == "" || substr(line, 1, 1) == "#") continue
 			# Check if CIDR
 			if (index(line, "/") > 0) {
-				# IPv4 CIDR — parse network and prefix
-				n = split(line, p, "[./]")
-				if (n >= 5 && p[5]+0 >= 0 && p[5]+0 <= 32) {
-					net = (p[1]*16777216) + (p[2]*65536) + (p[3]*256) + p[4]
-					bits = int(p[5]+0)
-					exempt_cidr_count++
-					exempt_cidr_net[exempt_cidr_count] = net
-					exempt_cidr_bits[exempt_cidr_count] = bits
+				if (index(line, ":") > 0) {
+					# IPv6 CIDR — parse network and prefix
+					slash = index(line, "/")
+					v6addr = substr(line, 1, slash - 1)
+					v6bits = int(substr(line, slash + 1) + 0)
+					if (v6bits >= 0 && v6bits <= 128) {
+						expanded = expand_ipv6(v6addr)
+						exempt6_cidr_count++
+						n6 = split(expanded, g6, ":")
+						for (gi = 1; gi <= 8; gi++)
+							exempt6_groups[exempt6_cidr_count, gi] = hex2dec(g6[gi])
+						exempt6_bits[exempt6_cidr_count] = v6bits
+					}
+				} else {
+					# IPv4 CIDR — parse network and prefix
+					n = split(line, p, "[./]")
+					if (n >= 5 && p[5]+0 >= 0 && p[5]+0 <= 32) {
+						net = (p[1]*16777216) + (p[2]*65536) + (p[3]*256) + p[4]
+						bits = int(p[5]+0)
+						exempt_cidr_count++
+						exempt_cidr_net[exempt_cidr_count] = net
+						exempt_cidr_bits[exempt_cidr_count] = bits
+					}
 				}
 			} else {
 				exempt[line] = 1
@@ -145,12 +198,33 @@ _ct_count_ips() {
 		}
 	}
 
-	function is_exempt(addr) {
+	function is_exempt(addr,    n, a, ip_int, i, s, expanded, g, gv, gi, full_groups, remainder, match_ok, group_val) {
 		# Exact match
 		if (addr in exempt) return 1
 
-		# IPv6 — skip CIDR check (IPv4-only CIDRs in exempt list)
-		if (index(addr, ":") > 0) return 0
+		if (index(addr, ":") > 0) {
+			# IPv6 — check against IPv6 CIDRs
+			expanded = expand_ipv6(addr)
+			n = split(expanded, g, ":")
+			for (gi = 1; gi <= 8; gi++)
+				gv[gi] = hex2dec(g[gi])
+			for (i = 1; i <= exempt6_cidr_count; i++) {
+				full_groups = int(exempt6_bits[i] / 16)
+				remainder = exempt6_bits[i] % 16
+				match_ok = 1
+				for (gi = 1; gi <= full_groups; gi++) {
+					if (gv[gi] != exempt6_groups[i, gi]) { match_ok = 0; break }
+				}
+				if (match_ok && remainder > 0) {
+					group_val = full_groups + 1
+					if (int(gv[group_val] / 2^(16 - remainder)) != int(exempt6_groups[i, group_val] / 2^(16 - remainder))) {
+						match_ok = 0
+					}
+				}
+				if (match_ok) return 1
+			}
+			return 0
+		}
 
 		# IPv4 CIDR containment check
 		n = split(addr, a, ".")
@@ -247,7 +321,7 @@ ct_scan() {
 			local _count="${_line%% *}"
 			local _addr="${_line##* }"
 			[ -z "$_addr" ] && continue
-			valid_ip_cidr "$_addr" || continue
+			valid_host "$_addr" || continue
 
 			# Skip if already in deny list (any reason — prevents duplicate blocks)
 			if grep -Fxq "$_addr" "$DENY_HOSTS" 2>/dev/null; then

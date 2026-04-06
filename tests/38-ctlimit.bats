@@ -80,6 +80,7 @@ teardown() {
     source /opt/tests/helpers/reset-apf.sh
     source /opt/tests/helpers/apf-config.sh
     apf_set_interface "veth-pub" ""
+    rm -f "$APF_DIR/internals/.ct_last_scan"
 }
 
 # Helper: source apf_ctlimit.sh with minimal variable setup (no conf.apf sourcing)
@@ -225,6 +226,72 @@ _source_ctlimit() {
     rm -f "$exempt_tmp"
 
     ! echo "$result" | grep -q "192.0.2.50"
+}
+
+@test "awk counter: IPv6 exact exemption works" {
+    _source_ctlimit
+
+    local exempt_tmp
+    exempt_tmp=$(mktemp)
+    echo "127.0.0.0/8" > "$exempt_tmp"
+    echo "2001:db8::50" >> "$exempt_tmp"
+
+    local result
+    result=$(_ct_count_ips "$exempt_tmp" "1" "" "" "0" < "$CT_FIXTURE_DIR/nf_conntrack")
+    rm -f "$exempt_tmp"
+
+    # 2001:db8::50 has 5 connections and threshold is 1, but it is exempt
+    ! echo "$result" | grep -q "2001:db8::50"
+}
+
+@test "awk counter: IPv6 CIDR /32 exemption works" {
+    _source_ctlimit
+
+    local exempt_tmp
+    exempt_tmp=$(mktemp)
+    echo "127.0.0.0/8" > "$exempt_tmp"
+    echo "2001:db8::/32" >> "$exempt_tmp"
+
+    local result
+    result=$(_ct_count_ips "$exempt_tmp" "1" "" "" "0" < "$CT_FIXTURE_DIR/nf_conntrack")
+    rm -f "$exempt_tmp"
+
+    # 2001:db8::50 is within 2001:db8::/32 — should be exempt
+    ! echo "$result" | grep -q "2001:db8::50"
+}
+
+@test "IPv6 address passes validation gate (F1 regression)" {
+    source /opt/tests/helpers/apf-config.sh
+    local offender_ip="2001:db8::99"
+
+    apf_set_config "CT_LIMIT" "5"
+    apf_set_config "CT_INTERVAL" "60"
+    apf_set_config "CT_BLOCK_TIME" "300"
+    apf_set_config "CT_PERMANENT" "1"
+
+    # Restart firewall with CT_LIMIT enabled
+    "$APF" -f 2>/dev/null || true
+    "$APF" -s
+
+    # Create IPv6 offender fixture
+    local fixture="$CT_FIXTURE_DIR/ct_ipv6_test"
+    local i
+    true > "$fixture"
+    for i in $(seq 1 20); do
+        echo "ipv6     10 tcp     6 300 ESTABLISHED src=${offender_ip} dst=2001:db8::1 sport=$((10000+i)) dport=80 src=2001:db8::1 dst=${offender_ip} sport=80 dport=$((10000+i)) [ASSURED] mark=0 use=2" >> "$fixture"
+    done
+
+    _create_mock_conntrack "$fixture" "$CT_FIXTURE_DIR/mock-conntrack-v6"
+    echo "CONNTRACK=\"$CT_FIXTURE_DIR/mock-conntrack-v6\"" >> "$APF_DIR/conf.apf"
+
+    # Run ct_scan — IPv6 offender must NOT be silently dropped
+    "$APF" --ct-scan
+
+    # Verify the IPv6 offender was temp-denied (not silently dropped by valid_ip_cidr)
+    grep -Fq "$offender_ip" "$APF_DIR/deny_hosts.rules"
+
+    # Clean up
+    "$APF" -u "$offender_ip" 2>/dev/null || true
 }
 
 # ---- Integration tests: CLI and cron ----
