@@ -19,8 +19,8 @@ RUN make source && \
     mkdir -p /root/rpmbuild/{SOURCES,SPECS,BUILD,RPMS,SRPMS} && \
     cp build/apf-*.tar.gz /root/rpmbuild/SOURCES/ && \
     cp rpm/apf.spec /root/rpmbuild/SPECS/ && \
-    rpmbuild -bb --define "dist .el8" /root/rpmbuild/SPECS/apf.spec && \
-    rpmbuild -bb --define "dist .el9" /root/rpmbuild/SPECS/apf.spec && \
-    rpmbuild -bb --define "dist .el10" /root/rpmbuild/SPECS/apf.spec
+    rpmbuild -bb --define "dist .el8" --define "rhel 8" /root/rpmbuild/SPECS/apf.spec && \
+    rpmbuild -bb --define "dist .el9" --define "rhel 9" /root/rpmbuild/SPECS/apf.spec && \
+    rpmbuild -bb --define "dist .el10" --define "rhel 10" /root/rpmbuild/SPECS/apf.spec
 
 CMD cp /root/rpmbuild/RPMS/noarch/*.rpm /output/

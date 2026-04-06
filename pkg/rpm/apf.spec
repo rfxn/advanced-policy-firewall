@@ -40,6 +40,10 @@ Requires: gawk
 Requires: grep
 Requires: util-linux
 Conflicts: apf-firewall
+%if 0%{?rhel} >= 10
+Requires: iptables-nft
+Recommends: kernel-modules-extra
+%endif
 %if 0%{?rhel} >= 8 || 0%{?fedora}
 Recommends: cronie
 Recommends: logrotate
