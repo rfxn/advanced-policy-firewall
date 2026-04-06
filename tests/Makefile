@@ -6,6 +6,10 @@ BATSMAN_OS_ALL    := $(BATSMAN_OS_MODERN) $(BATSMAN_OS_LEGACY) $(BATSMAN_OS_DEEP
 BATSMAN_RUN_TESTS := ./run-tests.sh
 BATSMAN_PROJECT   := apf
 
+# Cap cross-OS parallelism: 3 OS targets × 6 groups = 18 privileged containers.
+# Higher values exhaust iptables kernel state and cause group timeouts.
+PARALLEL_JOBS := 3
+
 include infra/include/Makefile.tests
 
 # ---------------------------------------------------------------------------
