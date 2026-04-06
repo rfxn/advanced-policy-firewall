@@ -171,6 +171,18 @@
       _apf_complete_cc() was overwriting the verb COMPREPLY array
 [Fix] mutex_lock: detect and remove empty lock files left by flock wrapper;
       noclobber fallback timed out after 60s instead of acquiring the lock
+[New] RPM/DEB: auto-detect default network interface via ip route on fresh
+      install; sets IFACE_UNTRUSTED in conf.apf when system default differs
+      from eth0
+[Fix] RPM/DEB: remove iptables snapshots, change-detection markers, runtime
+      cron templates, and lock files during package removal; orphan files were
+      preventing /etc/apf/internals/ directory cleanup
+[Fix] RPM/DEB: remove pre-decomposition files (firewall, functions.apf,
+      geoip.apf, ctlimit.apf) and legacy cron entries during migration from
+      install.sh-based installations
+[Fix] DEB: add util-linux to Depends for flock (consistent with RPM)
+[Fix] RPM: pass explicit BK_LAST to importconf instead of relying on fallback
+      symlink resolution
 
   -- Changes --
 

@@ -8,7 +8,7 @@ Homepage: https://github.com/rfxn/advanced-policy-firewall
 
 Package: apf
 Architecture: all
-Depends: bash (>= 4.1), coreutils, iptables, iproute2, kmod, sed, gawk, grep, ${misc:Depends}
+Depends: bash (>= 4.1), coreutils, iptables, iproute2, kmod, sed, gawk, grep, util-linux, ${misc:Depends}
 Recommends: cron, logrotate
 Suggests: ipset, curl
 Conflicts: apf-firewall

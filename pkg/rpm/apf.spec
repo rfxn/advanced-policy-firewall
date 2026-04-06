@@ -226,9 +226,30 @@ if [ -f "%{legacy_path}/apf" ] && [ ! -L "%{legacy_path}/internals/apf.lib.sh" ]
 fi
 
 %post
+# Auto-detect default network interface on fresh install
+if [ "$1" = "1" ] && [ ! -f %{legacy_path}/internals/.apf.restore ]; then
+    _detected=$(ip route show default 2>/dev/null | awk '{for(i=1;i<=NF;i++) if($i=="dev"){print $(i+1);exit}}')
+    if [ -n "$_detected" ] && [ "$_detected" != "eth0" ]; then
+        sed -i "s/^IFACE_UNTRUSTED=\"eth0\"/IFACE_UNTRUSTED=\"$_detected\"/" %{legacy_path}/conf.apf
+    fi
+fi
 # Run importconf if migrating from install.sh backup
 if [ -d "%{legacy_path}.bk.last" ] && [ -x /usr/lib/apf/extras/importconf ]; then
-    INSTALL_PATH="%{legacy_path}" /usr/lib/apf/extras/importconf || true  # importconf may fail on corrupt backup
+    BK_LAST="%{legacy_path}.bk.last" INSTALL_PATH="%{legacy_path}" /usr/lib/apf/extras/importconf || true  # importconf may fail on corrupt backup
+fi
+# Clean legacy artifacts from install.sh-based installations
+if [ -L "%{legacy_path}.bk.last" ]; then
+    # Pre-decomposition files (pre-2.0.2)
+    command rm -f %{legacy_path}/firewall 2>/dev/null || true  # may not exist
+    command rm -f %{legacy_path}/internals/functions.apf 2>/dev/null || true  # may not exist
+    command rm -f %{legacy_path}/internals/geoip.apf 2>/dev/null || true  # may not exist
+    command rm -f %{legacy_path}/internals/ctlimit.apf 2>/dev/null || true  # may not exist
+    # Legacy cron entries (replaced by consolidated cron.d.apf)
+    command rm -f /etc/cron.hourly/fw 2>/dev/null || true  # may not exist
+    command rm -f /etc/cron.daily/fw 2>/dev/null || true  # may not exist
+    command rm -f /etc/cron.d/refresh.apf 2>/dev/null || true  # may not exist
+    command rm -f /etc/cron.d/apf_develmode 2>/dev/null || true  # may not exist
+    command rm -f /etc/cron.d/ctlimit.apf 2>/dev/null || true  # may not exist
 fi
 # Reload systemd
 if command -v systemctl >/dev/null 2>&1; then
@@ -241,6 +262,12 @@ for _svc in firewalld ufw; do
         systemctl mask "$_svc" 2>/dev/null || true  # mask may fail on read-only fs
     fi
 done
+# NOTE: Service is intentionally NOT enabled at boot.
+# Fedora Packaging Guidelines recommend against auto-enabling services
+# that modify network access. User must run: systemctl enable apf.service
+#
+# NOTE: VNET generation deferred to first apf -s.
+# vnetgen requires a running network stack and configured interfaces.
 
 %preun
 if [ "$1" = "0" ]; then
@@ -280,6 +307,11 @@ if [ "$1" = "0" ]; then
     command rm -rf /etc/apf/geoip/ 2>/dev/null || true  # GeoIP cache may not exist
     # Clean lock/temp files
     command rm -rf /var/lib/apf/tmp/* 2>/dev/null || true  # tmp dir may be empty
+    # Clean runtime state files (iptables snapshots, change detection, cron templates)
+    command rm -f /etc/apf/internals/.apf.restore* 2>/dev/null || true  # snapshots may not exist
+    command rm -f /etc/apf/internals/.md5.cores* /etc/apf/internals/.last.vars* 2>/dev/null || true  # change markers may not exist
+    command rm -f /etc/apf/internals/cron.* 2>/dev/null || true  # runtime cron templates may not exist
+    command rm -f /etc/apf/lock.utime /etc/apf/.apf-* 2>/dev/null || true  # lock/temp files may not exist
 fi
 if command -v systemctl >/dev/null 2>&1; then
     systemctl daemon-reload 2>/dev/null || true  # systemd may not be running
