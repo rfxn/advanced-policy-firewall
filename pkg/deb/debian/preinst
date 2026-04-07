@@ -42,6 +42,7 @@ case "$1" in
                         # update-rc.d may fail if links already removed — safe to ignore
                         update-rc.d -f apf remove 2>/dev/null || true
                     fi
+                    break  # /etc/init.d is a symlink to /etc/rc.d/init.d on RHEL — stop after first hit
                 fi
             done
             # Stop systemd services before removing old install — service may

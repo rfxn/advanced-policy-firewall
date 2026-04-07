@@ -84,6 +84,20 @@
 
   -- Bug Fixes --
 
+[Fix] RPM: move install.sh migration from %pre to %pretrans. RPM locks
+      the %config(noreplace) extract-vs-.rpmnew decision before %pre runs,
+      so wiping the legacy /etc/apf in %pre still produced .rpmnew files
+      for any user-modified conffiles AND left no /etc/apf/conf.apf at
+      all (only conf.apf.rpmnew), which then broke importconf in %post
+      with "cp: cannot stat '/etc/apf/conf.apf'" and "pkg_config_merge:
+      new config not found". %pretrans runs before the conffile scan, so
+      RPM sees an empty /etc/apf and extracts cleanly with no .rpmnew.
+      Affects fresh rpm -ivh over an existing install.sh-based install
+      with locally-edited conf.apf or *_hosts.rules
+[Fix] RPM/DEB preinst: stop SysV init loop now breaks after the first
+      hit. /etc/init.d is a symlink to /etc/rc.d/init.d on RHEL, so the
+      previous loop invoked the same init script twice and printed
+      "Stopping APF: done" twice
 [Fix] importconf: guard vnet/*.rules glob; preserve custom files, hook
       permissions, and TCR_PORTS during upgrade; fix upgrade detection;
       rewrite config merge with pkg_config_merge() from pkg_lib;

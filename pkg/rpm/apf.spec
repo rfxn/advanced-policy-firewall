@@ -194,7 +194,16 @@ cat > %{buildroot}/usr/lib/apf/internals/.symlink-manifest <<'MANIFEST'
 /usr/local/sbin/fwmgr	/usr/sbin/apf
 MANIFEST
 
-%pre
+%pretrans
+# install.sh migration MUST run in %pretrans, not %pre. RPM scans existing
+# conffiles and locks in %config(noreplace) disposition (extract vs .rpmnew)
+# BEFORE %pre runs. If a user-modified conffile exists at that scan, RPM
+# decides to write the package version as .rpmnew and preserve the existing
+# file — even if %pre subsequently deletes it. The result is a missing
+# conffile (only .rpmnew on disk), which breaks importconf in %post.
+# %pretrans runs before the conffile scan, so wiping the legacy path here
+# lets RPM see "no existing file" and extract cleanly.
+#
 # Detect install.sh-based installation (binary is a regular file, not a symlink)
 if [ -f "%{legacy_path}/apf" ] && [ ! -L "%{legacy_path}/internals/apf.lib.sh" ] && [ ! -L "%{legacy_path}/apf" ]; then
     _bkdir="%{legacy_path}.bk.$(date +%%Y%%m%%d-%%s)"
@@ -219,6 +228,7 @@ if [ -f "%{legacy_path}/apf" ] && [ ! -L "%{legacy_path}/internals/apf.lib.sh" ]
             elif command -v update-rc.d >/dev/null 2>&1; then
                 update-rc.d -f apf remove 2>/dev/null || true  # links may already be removed
             fi
+            break  # /etc/init.d is a symlink to /etc/rc.d/init.d on RHEL — stop after first hit
         fi
     done
     if command -v systemctl >/dev/null 2>&1; then
@@ -290,6 +300,7 @@ if [ "$1" = "0" ]; then
             if command -v chkconfig >/dev/null 2>&1; then
                 chkconfig --del apf 2>/dev/null || true  # service may not be registered
             fi
+            break  # /etc/init.d is a symlink to /etc/rc.d/init.d on RHEL — stop after first hit
         fi
     done
     # Stop systemd
