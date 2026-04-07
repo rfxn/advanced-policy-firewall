@@ -199,7 +199,10 @@ MANIFEST
 if [ -f "%{legacy_path}/apf" ] && [ ! -L "%{legacy_path}/internals/apf.lib.sh" ] && [ ! -L "%{legacy_path}/apf" ]; then
     _bkdir="%{legacy_path}.bk.$(date +%%Y%%m%%d-%%s)"
     echo "Backing up existing install.sh installation to $_bkdir"
-    command cp -a "%{legacy_path}" "$_bkdir"
+    if ! command cp -a "%{legacy_path}" "$_bkdir"; then
+        echo "ERROR: backup of %{legacy_path} to $_bkdir failed; aborting install" >&2
+        exit 1
+    fi
     command rm -f "%{legacy_path}.bk.last"
     command ln -s "$_bkdir" "%{legacy_path}.bk.last"
     # Preserve state files

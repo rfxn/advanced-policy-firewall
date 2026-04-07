@@ -188,6 +188,14 @@
       /etc/apf/extras (cpio cannot replace directory with symlink), and
       conffiles were triggering .rpmnew on first install causing importconf
       to merge old config into old config instead of into the new template
+[Fix] RPM: %pre now aborts install on backup failure instead of silently
+      continuing to wipe; matches DEB preinst set -e behavior; prevents
+      data loss if cp -a fails (ENOSPC, EACCES, signal)
+[Fix] importconf: restore /etc/apf/internals/internals.conf via
+      pkg_config_merge from backup; the file is a %config(noreplace)
+      conffile in both RPM and DEB but was not in the restoration list,
+      so user customizations (path overrides, timeouts, IPT_FLAGS) were
+      silently lost during install.sh migration
 
   -- Changes --
 
