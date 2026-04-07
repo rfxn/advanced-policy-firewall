@@ -183,6 +183,11 @@
 [Fix] DEB: add util-linux to Depends for flock (consistent with RPM)
 [Fix] RPM: pass explicit BK_LAST to importconf instead of relying on fallback
       symlink resolution
+[Fix] RPM/DEB: wipe legacy install path after backup during install.sh
+      migration; package extraction was failing on /etc/apf/doc and
+      /etc/apf/extras (cpio cannot replace directory with symlink), and
+      conffiles were triggering .rpmnew on first install causing importconf
+      to merge old config into old config instead of into the new template
 
   -- Changes --
 

@@ -221,8 +221,15 @@ if [ -f "%{legacy_path}/apf" ] && [ ! -L "%{legacy_path}/internals/apf.lib.sh" ]
     if command -v systemctl >/dev/null 2>&1; then
         systemctl stop apf.service 2>/dev/null || true  # service may not exist
     fi
-    # Do NOT rm -rf %{legacy_path} — APF's legacy path IS the config dir;
-    # package overwrites files in place
+    # Wipe legacy path so RPM can extract cleanly. Required because:
+    #   1. install.sh creates /etc/apf/{doc,extras} as directories, but
+    #      RPM ships them as symlinks — cpio cannot replace dir with symlink
+    #   2. Existing conffiles trigger %config(noreplace) "user-modified"
+    #      handling, leaving .rpmnew files; importconf would then merge
+    #      old→old, losing new template options
+    # Backup at %{legacy_path}.bk.<ts> preserves all original content;
+    # importconf in %post merges backup values into fresh templates.
+    command rm -rf "%{legacy_path}" 2>/dev/null || true  # legacy path being wiped after backup
 fi
 
 %post
