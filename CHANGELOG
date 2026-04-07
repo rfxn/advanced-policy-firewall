@@ -84,6 +84,22 @@
 
   -- Bug Fixes --
 
+[Fix] importconf: drop pkg_config_merge call for internals.conf; the file
+      contains conditional assignments (if/else STATE_MATCH=, NET=,
+      IPT_FLAGS=) whose branches collapse to a single value under merge,
+      and shell conditionals like `[ "$X" = "1" ]` / `[[ "$Y" == "auto" ]]`
+      were corrupted into `[ "$X"= "1" ]` / `[[ "$Y"== "auto" ]]` by the
+      pre-1.0.9 merge function. New template is correct on its own —
+      most contents are auto-detected at runtime. Failure mode: every
+      smoke-test OS target reported "internals.conf: line N: conditional
+      binary operator expected" plus elog_init / mutex_unlock command
+      not found errors after a re-install over an existing /opt/apf
+[Fix] pkg_lib v1.0.9: pkg_config_merge anchors variable detection to a
+      real shell assignment regex (^[[:space:]]*[A-Za-z_][A-Za-z0-9_]*=).
+      Pre-1.0.9 the merge treated any line containing `=` as VAR=value,
+      stripping spaces from conditional expressions and producing
+      syntactically broken bash. Conditional and other shell-code lines
+      now pass through verbatim; regression test added in 09-config.bats
 [Fix] RPM: move install.sh migration from %pre to %pretrans. RPM locks
       the %config(noreplace) extract-vs-.rpmnew decision before %pre runs,
       so wiping the legacy /etc/apf in %pre still produced .rpmnew files

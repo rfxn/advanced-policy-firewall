@@ -70,16 +70,15 @@ case "$OV" in
 		;;
 esac
 
-# Restore internals.conf via merge — it is a %config(noreplace) conffile in
-# RPM and a Debian conffile, so user customizations (path overrides, timeouts,
-# IPT_FLAGS, MD5_FILES, etc.) must be preserved across upgrades.
-if [ -f "$BK_LAST/internals/internals.conf" ]; then
-	pkg_config_merge "$BK_LAST/internals/internals.conf" \
-		"$INSTALL_PATH/internals/internals.conf" \
-		"$INSTALL_PATH/internals/internals.conf.merged"
-	command mv -f "$INSTALL_PATH/internals/internals.conf.merged" \
-		"$INSTALL_PATH/internals/internals.conf"
-fi
+# Note: internals.conf is intentionally NOT merged or restored from backup.
+# It contains conditional assignments (if/else STATE_MATCH=..., NET=...,
+# IPT_FLAGS=...) that pkg_config_merge cannot handle — both branches collapse
+# to whichever value was last seen in the old file. Most contents are
+# auto-detected at runtime (binary discovery, network detection), so the new
+# template is correct on its own. RPM %config(noreplace) and DEB conffile
+# handling preserve direct user edits at the package-manager layer; users
+# migrating from install.sh-based installs can manually reapply any
+# customizations from $BK_LAST/internals/internals.conf.
 
 # Restore user's trust, rule, and hook files from backup
 command cp -f "$BK_LAST"/*_hosts.rules "$INSTALL_PATH/"
