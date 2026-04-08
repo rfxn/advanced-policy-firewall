@@ -1,3 +1,17 @@
+- 2.0.2 | Apr 08 2026:
+
+  [Fix] apf --cc <CC> and apf cc info <CC>: restore geoip_cc_known() function
+        via geoip_lib 1.0.5 -> 1.0.6 sync. The function was added to the APF
+        vendored copy in Mar 22 work without promotion to canonical, then
+        deleted by the Apr 5 canonical->vendored sync (commit 5e64a5e).
+        Production saw "geoip_cc_known: command not found" followed by
+        incorrect "Unknown country code: <CC>" output for every input.
+  [Change] geoip_lib 1.0.5 -> 1.0.6: restore geoip_cc_known() (see canonical
+           CHANGELOG for function details and test coverage)
+  [New] UAT: tests/uat/20-geoip-cli.bats — valid-CC detail test (UAT-GC06b)
+        and regression assertion on UAT-GC06 ZZ test guarding against the
+        "command not found" stderr leak reappearing.
+
 - 2.0.2 | Mar 08 2026:
 
   -- New Features --

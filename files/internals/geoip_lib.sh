@@ -29,7 +29,7 @@
 _GEOIP_LIB_LOADED=1
 
 # shellcheck disable=SC2034
-GEOIP_LIB_VERSION="1.0.5"
+GEOIP_LIB_VERSION="1.0.6"
 
 # ---------------------------------------------------------------------------
 # Module-level continent CC lists (ISO 3166 assignments per UN geoscheme)
@@ -206,6 +206,16 @@ geoip_all_cc() {
 			[[ -n "$_code" ]] && echo "$_code"
 		done <<< "${_cont//,/$'\n'}"
 	done
+}
+
+# ---------------------------------------------------------------------------
+# geoip_cc_known — Check if a country code exists in any continent list.
+# Returns 0 if CC is known (found in a continent), 1 if unknown.
+# Args: cc (2-letter uppercase code)
+# ---------------------------------------------------------------------------
+geoip_cc_known() {
+	local cc="$1"
+	[[ "$(geoip_cc_continent "$cc")" != "unknown" ]]
 }
 
 # ---------------------------------------------------------------------------

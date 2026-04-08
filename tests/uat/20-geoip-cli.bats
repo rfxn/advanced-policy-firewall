@@ -151,6 +151,32 @@ setup() {
     run apf --cc ZZ
     assert_failure
     assert_output --partial "Unknown country code"
+    # Regression guard (Apr 2026): prior bug emitted bash "command not found"
+    # from a missing geoip_cc_known definition; assert_failure happened to
+    # pass for the wrong reason and could not distinguish clean reject from
+    # broken call. Refute the stderr leak so the test actually means what it
+    # says.
+    refute_output --partial "command not found"
+}
+
+# =========================================================================
+# UAT-GC06b: --cc with valid CC shows country detail (regression for
+# Apr 2026 geoip_cc_known deletion)
+# Scenario: Sysadmin queries detail for a real country — must succeed and
+# display the country name and continent. Prior to fix, every valid CC
+# fell through "command not found" → "Unknown country code" because
+# geoip_cc_known was missing from vendored geoip_lib.
+# =========================================================================
+
+# bats test_tags=uat,uat:geoip
+@test "UAT: apf --cc US shows country detail (valid CC)" {
+    run apf --cc US
+    assert_success
+    assert_output --partial "Country Code Detail"
+    assert_output --partial "US (United States)"
+    assert_output --partial "Continent: @NA"
+    # Regression guard — same as UAT-GC06
+    refute_output --partial "command not found"
 }
 
 # =========================================================================
