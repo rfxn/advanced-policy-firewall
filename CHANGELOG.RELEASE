@@ -1,3 +1,16 @@
+- 2.0.2 | Apr 11 2026:
+
+  [Change] Vendored lib sync: elog_lib 1.0.5 → 1.0.6, pkg_lib 1.0.9 → 1.0.10,
+        geoip_lib 1.0.6 → 1.0.7. All three are comment-discipline cascade
+        bumps from canonical (banner separators removed, signature-restatement
+        prose deleted from function headers, prose config catalogues replaced
+        with README cross-references). Zero functional change in any of the
+        three libraries; load-bearing rationale (TLS posture, symlink-safety,
+        eval-guard validation, pkg_config_merge invariants, SIEM/CEF/GELF
+        contract docs) preserved intact. Byte-identical to canonical
+        elog_lib 7a60165 (v1.0.6), pkg_lib cdd0814 (v1.0.10),
+        geoip_lib cc9559f (v1.0.7).
+
 - 2.0.2 | Apr 08 2026:
 
   [Fix] apf --cc <CC> and apf cc info <CC>: restore geoip_cc_known() function

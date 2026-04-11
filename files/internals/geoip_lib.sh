@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# geoip_lib.sh — GeoIP Metadata Library 1.0.5
+# geoip_lib.sh — GeoIP Metadata Library 1.0.7
 ###
 # Copyright (C) 2026 R-fx Networks <proj@rfxn.com>
 #                     Ryan MacDonald <ryan@rfxn.com>
@@ -29,13 +29,11 @@
 _GEOIP_LIB_LOADED=1
 
 # shellcheck disable=SC2034
-GEOIP_LIB_VERSION="1.0.6"
+GEOIP_LIB_VERSION="1.0.7"
 
-# ---------------------------------------------------------------------------
 # Module-level continent CC lists (ISO 3166 assignments per UN geoscheme)
 # Defined once, used by geoip_cc_continent() and geoip_expand_codes().
 # Set at source time — inherited by subshells, never modified after init.
-# ---------------------------------------------------------------------------
 _GEOIP_CC_AF="AO,BF,BI,BJ,BW,CD,CF,CG,CI,CM,CV,DJ,DZ,EG,EH,ER,ET,GA,GH,GM,GN,GQ,GW,KE,KM,LR,LS,LY,MA,MG,ML,MR,MU,MW,MZ,NA,NE,NG,RE,RW,SC,SD,SH,SL,SN,SO,SS,ST,SZ,TD,TG,TN,TZ,UG,YT,ZA,ZM,ZW"
 _GEOIP_CC_AS="AE,AF,AM,AZ,BD,BH,BN,BT,CN,CY,GE,HK,ID,IL,IN,IQ,IR,JO,JP,KG,KH,KP,KR,KW,KZ,LA,LB,LK,MM,MN,MO,MV,MY,NP,OM,PH,PK,PS,QA,SA,SG,SY,TH,TJ,TL,TM,TR,TW,UZ,VN,YE"
 _GEOIP_CC_EU="AD,AL,AT,AX,BA,BE,BG,BY,CH,CZ,DE,DK,EE,ES,FI,FO,FR,GB,GG,GI,GR,HR,HU,IE,IM,IS,IT,JE,LI,LT,LU,LV,MC,MD,ME,MK,MT,NL,NO,PL,PT,RO,RS,RU,SE,SI,SK,SM,UA,VA,XK"
@@ -43,12 +41,8 @@ _GEOIP_CC_NA="AG,AI,AW,BB,BL,BM,BQ,BS,BZ,CA,CR,CU,CW,DM,DO,GD,GL,GP,GT,HN,HT,JM,
 _GEOIP_CC_SA="AR,BO,BR,CL,CO,EC,FK,GF,GY,PE,PY,SR,UY,VE"
 _GEOIP_CC_OC="AS,AU,CK,FJ,FM,GU,KI,MH,MP,NC,NF,NR,NU,NZ,PF,PG,PN,PW,SB,TK,TO,TV,VU,WF,WS"
 
-# ---------------------------------------------------------------------------
 # geoip_cc_name — Map ISO 3166-1 alpha-2 country code to country name.
 # Falls back to bare code for uncommon/unrecognized countries.
-# Args: cc (2-letter uppercase code)
-# Prints: country name string (or bare code on unknown)
-# ---------------------------------------------------------------------------
 geoip_cc_name() {
 	local cc="$1"
 	case "$cc" in
@@ -117,12 +111,8 @@ geoip_cc_name() {
 	esac
 }
 
-# ---------------------------------------------------------------------------
-# geoip_cc_continent — Map ISO 3166-1 country code to continent shorthand.
-# Uses module-level continent lists (no eval, case-based comma search).
-# Args: cc (2-letter uppercase code)
-# Prints: continent shorthand (@AF, @AS, @EU, @NA, @SA, @OC) or "unknown"
-# ---------------------------------------------------------------------------
+# geoip_cc_continent cc — map ISO 3166-1 country code to continent shorthand or "unknown"
+# Case-based comma search over module-level lists (no eval, no subshell).
 geoip_cc_continent() {
 	local cc="$1"
 	case ",$_GEOIP_CC_AF," in *,"$cc",*) echo "@AF"; return 0 ;; esac
@@ -134,11 +124,7 @@ geoip_cc_continent() {
 	echo "unknown"
 }
 
-# ---------------------------------------------------------------------------
-# geoip_continent_name — Map continent shorthand to full name.
-# Args: continent shorthand (@AF, @AS, @EU, @NA, @SA, @OC)
-# Prints: full name (e.g., "Africa") or passthrough on unknown
-# ---------------------------------------------------------------------------
+# geoip_continent_name shorthand — map @AF/@AS/... to full name, passthrough on unknown
 geoip_continent_name() {
 	case "$1" in
 		@AF) echo "Africa" ;; @AS) echo "Asia" ;; @EU) echo "Europe" ;;
@@ -147,11 +133,8 @@ geoip_continent_name() {
 	esac
 }
 
-# ---------------------------------------------------------------------------
 # geoip_expand_codes — Expand continent shorthand to comma-separated CC list.
 # Sets _GEOIP_VCC_CODES. Returns 1 for unknown continent.
-# Args: continent shorthand (@AF, @AS, @EU, @NA, @SA, @OC)
-# ---------------------------------------------------------------------------
 geoip_expand_codes() {
 	local input="$1"
 	case "$input" in
@@ -166,13 +149,8 @@ geoip_expand_codes() {
 	return 0
 }
 
-# ---------------------------------------------------------------------------
-# geoip_validate_cc — Validate ISO 3166-1 country code or continent shorthand.
-# Sets: _GEOIP_VCC_TYPE ("country" or "continent"), _GEOIP_VCC_CODES (CC list)
-# Accepts: XX (2-letter country code) or @XX (continent shorthand).
-# Returns 1 on invalid input.
-# Note: format validation only — unknown codes like "ZZ" pass as "country".
-# ---------------------------------------------------------------------------
+# geoip_validate_cc input — validate country code or continent shorthand, set _GEOIP_VCC_TYPE/_CODES
+# Format-only: unknown codes like "ZZ" pass as "country"; caller must cross-check against geoip_cc_known.
 geoip_validate_cc() {
 	local input="$1"
 	local _vcc_cc='^[A-Z]{2}$'
@@ -193,11 +171,7 @@ geoip_validate_cc() {
 	return 1
 }
 
-# ---------------------------------------------------------------------------
-# geoip_all_cc — emit all known ISO 3166-1 country codes (one per line).
-# Iterates the 6 continent CC lists from module-level variables.
-# Prints: one uppercase 2-letter CC per line to stdout
-# ---------------------------------------------------------------------------
+# geoip_all_cc — emit all known ISO 3166-1 country codes, one per line
 geoip_all_cc() {
 	local _cont _code
 	for _cont in "$_GEOIP_CC_AF" "$_GEOIP_CC_AS" "$_GEOIP_CC_EU" \
@@ -208,22 +182,14 @@ geoip_all_cc() {
 	done
 }
 
-# ---------------------------------------------------------------------------
-# geoip_cc_known — Check if a country code exists in any continent list.
-# Returns 0 if CC is known (found in a continent), 1 if unknown.
-# Args: cc (2-letter uppercase code)
-# ---------------------------------------------------------------------------
+# geoip_cc_known cc — return 0 if country code exists in any continent list
 geoip_cc_known() {
 	local cc="$1"
 	[[ "$(geoip_cc_continent "$cc")" != "unknown" ]]
 }
 
-# ---------------------------------------------------------------------------
 # _geoip_valid_ipv4 — validate IPv4 dotted-quad with octet range check.
 # Rejects octets >255 (e.g., 999.0.0.1) that a bare [0-9]+ regex would accept.
-# Args: IP
-# Returns: 0 if valid IPv4, 1 otherwise
-# ---------------------------------------------------------------------------
 _geoip_valid_ipv4() {
 	local ip="$1"
 	local _re='^([0-9]+)\.([0-9]+)\.([0-9]+)\.([0-9]+)$'
@@ -235,32 +201,20 @@ _geoip_valid_ipv4() {
 	return 0
 }
 
-# ===========================================================================
-# Download Layer — CIDR data download, staleness, and search
-# ===========================================================================
-
-# ---------------------------------------------------------------------------
 # Binary discovery at source time — allows env override for testing.
-# ---------------------------------------------------------------------------
 GEOIP_CURL_BIN="${GEOIP_CURL_BIN:-$(command -v curl 2>/dev/null || true)}"  # may be absent
 GEOIP_WGET_BIN="${GEOIP_WGET_BIN:-$(command -v wget 2>/dev/null || true)}"  # may be absent
 GEOIP_AWK_BIN="${GEOIP_AWK_BIN:-$(command -v awk 2>/dev/null || true)}"     # may be absent
 GEOIP_DL_TIMEOUT="${GEOIP_DL_TIMEOUT:-120}"
 
-# ---------------------------------------------------------------------------
-# _geoip_download_cmd — download URL to file via curl or wget.
-# Internal helper. Strict TLS by default. Set GEOIP_TLS_INSECURE=1 to allow
-# insecure fallback (analogous to curl --insecure) for legacy systems with
-# untrusted CA bundles or expired certificates.
-# Args: URL OUTPUT
-# Returns: 0 on success, 1 on failure (OUTPUT removed on failure)
-# ---------------------------------------------------------------------------
+# _geoip_download_cmd url output — fetch URL to file via curl or wget
+# Strict TLS by default; GEOIP_TLS_INSECURE=1 enables fallback for legacy systems
+# (untrusted CA bundles, expired certs). OUTPUT is removed on failure.
 _geoip_download_cmd() {
 	local url="$1" output="$2"
 	local rc=1
 
 	if [[ -n "$GEOIP_CURL_BIN" ]]; then
-		# Strict TLS first
 		"$GEOIP_CURL_BIN" -sfL --connect-timeout "$GEOIP_DL_TIMEOUT" \
 			--max-time "$GEOIP_DL_TIMEOUT" -o "$output" "$url" 2>/dev/null  # curl stderr noise suppressed
 		rc=$?
@@ -271,7 +225,6 @@ _geoip_download_cmd() {
 			rc=$?
 		fi
 	elif [[ -n "$GEOIP_WGET_BIN" ]]; then
-		# Strict TLS first
 		"$GEOIP_WGET_BIN" -q --timeout="$GEOIP_DL_TIMEOUT" -O "$output" "$url" 2>/dev/null  # wget stderr noise suppressed
 		rc=$?
 		if [[ "$rc" -ne 0 && "${GEOIP_TLS_INSECURE:-0}" == "1" ]]; then
@@ -292,14 +245,10 @@ _geoip_download_cmd() {
 	return 0
 }
 
-# ---------------------------------------------------------------------------
 # _geoip_validate_cidr_file — validate downloaded CIDR file content.
 # Checks that file has at least GEOIP_MIN_CIDR_LINES matching lines
 # in expected CIDR format. Default minimum is 3 to catch truncated or
 # near-empty files that happen to contain one valid-looking line.
-# Args: FILE FAMILY (4 or 6)
-# Returns: 0 if valid, 1 if empty/garbage/below minimum
-# ---------------------------------------------------------------------------
 _geoip_validate_cidr_file() {
 	local file="$1" family="$2"
 	local pat line_count
@@ -316,14 +265,8 @@ _geoip_validate_cidr_file() {
 	[[ "$line_count" -ge "${GEOIP_MIN_CIDR_LINES:-3}" ]]
 }
 
-# ---------------------------------------------------------------------------
 # _geoip_download_ipverse — download CIDR data from ipverse.net.
-# Args: CC FAMILY OUTPUT
-#   CC: 2-letter lowercase country code (ipverse uses lowercase)
-#   FAMILY: "4" or "6"
-#   OUTPUT: destination file path
-# Returns: 0 on success (valid CIDR), 1 on failure
-# ---------------------------------------------------------------------------
+# CC must be 2-letter lowercase (ipverse uses lowercase).
 _geoip_download_ipverse() {
 	local cc="$1" family="$2" output="$3"
 	local url tmpfile
@@ -350,14 +293,8 @@ _geoip_download_ipverse() {
 	return 0
 }
 
-# ---------------------------------------------------------------------------
 # _geoip_download_ipdeny — download CIDR data from ipdeny.com.
-# Args: CC FAMILY OUTPUT
-#   CC: 2-letter lowercase country code (ipdeny uses lowercase)
-#   FAMILY: "4" or "6"
-#   OUTPUT: destination file path
-# Returns: 0 on success (valid CIDR), 1 on failure
-# ---------------------------------------------------------------------------
+# CC must be 2-letter lowercase (ipdeny uses lowercase).
 _geoip_download_ipdeny() {
 	local cc="$1" family="$2" output="$3"
 	local url tmpfile
@@ -384,21 +321,12 @@ _geoip_download_ipdeny() {
 	return 0
 }
 
-# ---------------------------------------------------------------------------
-# geoip_download — download CIDR data for a country code.
-# Cascade: ipverse.net first, then ipdeny.com on failure.
-# Args: CC FAMILY OUTPUT [SOURCE]
-#   CC: 2-letter country code (uppercase accepted, lowercased internally)
-#   FAMILY: "4" or "6"
-#   OUTPUT: destination file path
-#   SOURCE: "ipverse", "ipdeny", or "auto" (default: "auto")
-# Returns: 0 on success, 1 on all sources failing
-# ---------------------------------------------------------------------------
+# geoip_download cc family output [source] — fetch CIDR data for country code
+# source: "ipverse", "ipdeny", or "auto" (default, cascades ipverse → ipdeny).
 geoip_download() {
 	local cc="$1" family="$2" output="$3" source="${4:-auto}"
 	local lc_cc
 
-	# Validate arguments
 	[[ -n "$cc" ]] || { echo "geoip_download: CC required" >&2; return 1; }
 	local _cc_re='^[A-Za-z]{2}$'
 	[[ "$cc" =~ $_cc_re ]] || { echo "geoip_download: invalid CC format: $cc" >&2; return 1; }
@@ -419,7 +347,6 @@ geoip_download() {
 			return $?
 			;;
 		auto)
-			# Cascade: ipverse first, ipdeny fallback
 			if _geoip_download_ipverse "$lc_cc" "$family" "$output"; then
 				return 0
 			fi
@@ -433,14 +360,8 @@ geoip_download() {
 	esac
 }
 
-# ---------------------------------------------------------------------------
-# geoip_is_stale — check if CIDR data in a directory is stale.
-# Reads .last_update file (epoch timestamp) and compares to current time.
-# Args: DATA_DIR [MAX_AGE_DAYS]
-#   DATA_DIR: directory containing .last_update file
-#   MAX_AGE_DAYS: age threshold in days (default: 30)
-# Returns: 0 if stale or missing, 1 if fresh
-# ---------------------------------------------------------------------------
+# geoip_is_stale data_dir [max_age_days=30] — check if CIDR data is older than max age
+# Reads .last_update file as epoch timestamp; missing/invalid stamp is treated as stale.
 geoip_is_stale() {
 	local data_dir="$1" max_age_days="${2:-30}"
 	local stamp_file="$data_dir/.last_update"
@@ -449,7 +370,6 @@ geoip_is_stale() {
 	[[ -f "$stamp_file" ]] || return 0
 
 	read -r stamp < "$stamp_file" || return 0
-	# Validate stamp is a numeric epoch
 	local _epoch_pat='^[0-9]+$'
 	[[ "$stamp" =~ $_epoch_pat ]] || return 0
 
@@ -460,11 +380,7 @@ geoip_is_stale() {
 	[[ "$age" -gt "$max_age_secs" ]]
 }
 
-# ---------------------------------------------------------------------------
 # geoip_mark_updated — write current epoch to .last_update in data directory.
-# Args: DATA_DIR
-# Returns: 0 on success, 1 on failure
-# ---------------------------------------------------------------------------
 geoip_mark_updated() {
 	local data_dir="$1"
 	local _stamp_file
@@ -478,14 +394,9 @@ geoip_mark_updated() {
 	date +%s > "$_stamp_file"
 }
 
-# ---------------------------------------------------------------------------
 # geoip_cidr_search — search an IPv4 address across CIDR data files.
 # Portable AWK CIDR containment — no grepcidr required.
 # Extracted from APF geoip.apf:_geoip_cidr4_search().
-# Args: IP FILE [FILE ...]
-# Prints: matching file path on stdout
-# Returns: 0 on match, 1 on no match
-# ---------------------------------------------------------------------------
 geoip_cidr_search() {
 	local qip="$1"
 	shift
@@ -515,17 +426,11 @@ geoip_cidr_search() {
 	' "$@"
 }
 
-# ===========================================================================
-# IP Database Layer — consolidated integer-range database build and lookup
-# ===========================================================================
-
-# ---------------------------------------------------------------------------
 # _GEOIP_V6_AWK — shared AWK functions for IPv6 hex normalization.
 # Set once at source time; embedded in AWK programs via string concatenation.
 # v6hex(addr): normalizes any IPv6 address to 32-char lowercase hex string.
 # Rejects dotted-quad (::ffff:a.b.c.d) — returns empty string.
 # mawk-compatible: no gensub, no strftime; uses index()+integer math.
-# ---------------------------------------------------------------------------
 # shellcheck disable=SC2034
 _GEOIP_V6_AWK='
 function _v6_hexval(c,    p) {
@@ -570,14 +475,9 @@ function v6hex(addr,    n, halves, lp, rp, nl, nr, full, zf, i, j, g, c, hex) {
 }
 '
 
-# ---------------------------------------------------------------------------
 # _geoip_cidr4_to_ranges — convert IPv4 CIDR file to integer-range format.
-# Input: CIDR_FILE CC
-#   CIDR_FILE: file with one IPv4 CIDR per line (comments/blanks skipped)
-#   CC: 2-letter country code tag for each range
 # Output: "START_INT END_INT CC" lines to stdout (unsorted).
 # mawk-compatible: no gensub, no strftime. 2^(32-n) safe in mawk.
-# ---------------------------------------------------------------------------
 _geoip_cidr4_to_ranges() {
 	local cidr_file="$1" cc="$2"
 
@@ -597,16 +497,11 @@ _geoip_cidr4_to_ranges() {
 }' "$cidr_file"
 }
 
-# ---------------------------------------------------------------------------
 # _geoip_cidr6_to_ranges — convert IPv6 CIDR file to hex-range format.
-# Input: CIDR_FILE CC
-#   CIDR_FILE: file with one IPv6 CIDR per line (comments/blanks skipped)
-#   CC: 2-letter country code tag for each range
 # Output: "START_HEX END_HEX CC" lines to stdout (unsorted).
 # START_HEX/END_HEX: 32-char lowercase hex strings (lexicographic = numeric).
 # Skips lines containing dots (mapped IPv4 CIDRs).
 # mawk-compatible: no gensub, no strftime. Uses _GEOIP_V6_AWK functions.
-# ---------------------------------------------------------------------------
 _geoip_cidr6_to_ranges() {
 	local cidr_file="$1" cc="$2"
 
@@ -653,25 +548,15 @@ _geoip_cidr6_to_ranges() {
 }' "$cidr_file"
 }
 
-# ---------------------------------------------------------------------------
-# geoip_ip_lookup — look up IPv4 address in integer-range database.
-# Searches a "START_INT END_INT CC" database file for containment.
-# Args: IP DB_FILE
-#   IP: IPv4 dotted-quad address
-#   DB_FILE: integer-range database (output of geoip_build_ipdb)
-# Prints: 2-letter country code on match (to stdout)
-# Returns: 0 on match, 1 on no match or invalid input
-# No caching — consumers implement their own caching strategy.
-# Complexity: O(N) linear scan; high-frequency callers should cache results.
-# ---------------------------------------------------------------------------
+# geoip_ip_lookup ip db_file — look up IPv4 in "START_INT END_INT CC" range database
+# No caching; O(N) linear scan — high-frequency callers should cache results themselves.
 geoip_ip_lookup() {
 	local ip="$1" db_file="$2"
 
 	[[ -n "$ip" ]] || return 1
 	[[ -n "$db_file" ]] || return 1
-	# IPv6 not supported
 	[[ "$ip" != *:* ]] || return 1
-	# Validate IPv4 dotted-quad format (including octet range)
+	# Validates octet range (>255 rejected) — regex alone would let 999.0.0.1 pass
 	_geoip_valid_ipv4 "$ip" || return 1
 	[[ -f "$db_file" ]] || return 1
 	[[ -s "$db_file" ]] || return 1
@@ -699,26 +584,15 @@ geoip_ip_lookup() {
 	return 1
 }
 
-# ---------------------------------------------------------------------------
-# geoip_ip6_lookup — look up IPv6 address in hex-range database.
-# Searches a "START_HEX END_HEX CC" database file for containment.
-# START_HEX/END_HEX: 32-char lowercase hex (output of geoip_build_ip6db).
-# Normalizes input via v6hex(), then lexicographic comparison on equal-length
-# hex strings (equivalent to numeric comparison, no 128-bit arithmetic).
-# Args: IP DB6_FILE
-#   IP: IPv6 address (any valid abbreviation)
-#   DB6_FILE: hex-range database file
-# Prints: 2-letter country code on match (to stdout)
-# Returns: 0 on match, 1 on no match or invalid input
-# Rejects IPv4 (no colon in input) and dotted-quad (::ffff:a.b.c.d).
-# No caching — consumers implement their own caching strategy.
-# Complexity: O(N) linear scan; high-frequency callers should cache results.
-# ---------------------------------------------------------------------------
+# geoip_ip6_lookup ip db_file — look up IPv6 in "START_HEX END_HEX CC" range database
+# Normalizes input via v6hex() to 32-char lowercase hex, then lexicographic compare
+# (equivalent to numeric, avoids 128-bit arithmetic). Rejects bare IPv4 and dotted-quad
+# mapped (::ffff:a.b.c.d) — caller should route those through geoip_ip_lookup.
+# No caching; O(N) linear scan — high-frequency callers should cache results themselves.
 geoip_ip6_lookup() {
 	local ip="$1" db_file="$2"
 
 	[[ -n "$ip" ]] || return 1
-	# Must be IPv6 (contains colon)
 	[[ "$ip" == *:* ]] || return 1
 	# Reject dotted-quad mapped addresses — caller should use IPv4 lookup
 	[[ "$ip" != *"."* ]] || return 1
@@ -747,14 +621,10 @@ geoip_ip6_lookup() {
 	return 1
 }
 
-# ---------------------------------------------------------------------------
 # _geoip_download_ipdeny_bulk — download ipdeny.com all-zones tarball.
 # Extracts per-country IPv4 zone files to OUTPUT_DIR/{CC}.zone.
 # Validates filenames and CIDR content before writing.
-# Args: OUTPUT_DIR
-# Returns: 0 on success (at least one valid zone file), 1 on failure
 # IPv4 only — no bulk IPv6 tarball available from ipdeny.
-# ---------------------------------------------------------------------------
 _geoip_download_ipdeny_bulk() {
 	local output_dir="$1"
 	local url="https://www.ipdeny.com/ipblocks/data/countries/all-zones.tar.gz"
@@ -800,23 +670,10 @@ _geoip_download_ipdeny_bulk() {
 	[[ "$count" -gt 0 ]]
 }
 
-# ---------------------------------------------------------------------------
-# geoip_build_ipdb — build consolidated IPv4 integer-range database.
-# Downloads CIDR data for all countries, converts to integer ranges,
-# sorts by start address, and writes to OUTPUT.
-# Uses ipdeny bulk tarball when available; falls back to per-country
-# cascade (ipverse → ipdeny) for any missing countries.
-# Locking: callers must hold their own lock if concurrent builds are possible.
-# The library does not implement internal locking — consumers (BFD, APF) use
-# their existing lock infrastructure (flock on their own lock files).
-# Args: OUTPUT [MIN_RANGES]
-#   OUTPUT: destination file path for the integer-range database
-#   MIN_RANGES: minimum expected range count (default: 1000; abort if below)
-# Returns: 0 on success, 1 on failure
-# Sets: _GEOIP_BUILD_COUNT  — countries successfully processed
-#       _GEOIP_BUILD_FAIL   — countries that failed download
-#       _GEOIP_BUILD_RANGES — total ranges in output
-# ---------------------------------------------------------------------------
+# geoip_build_ipdb output [min_ranges=1000] — build consolidated IPv4 integer-range database
+# Sets _GEOIP_BUILD_COUNT/_FAIL/_RANGES. Uses ipdeny bulk tarball when available,
+# falls back to per-country cascade (ipverse → ipdeny) for missing countries.
+# No internal locking — consumers (BFD, APF) must hold their own flock.
 geoip_build_ipdb() {
 	local output="$1" min_ranges="${2:-1000}"
 	local tmpdir count=0 fail_count=0
@@ -831,16 +688,15 @@ geoip_build_ipdb() {
 	local zones_dir="$tmpdir/zones"
 	mkdir -p "$zones_dir"
 
-	# Strategy 1: bulk tarball (~1MB, one download for all countries)
+	# Bulk tarball (~1MB) is preferred — one HTTP request vs ~240 serial downloads
 	local bulk_ok=0
 	if _geoip_download_ipdeny_bulk "$zones_dir"; then
 		bulk_ok=1
 	fi
 
-	# Strategy 2: per-country cascade for any CCs not covered by bulk
+	# Per-country cascade for any CCs missing from bulk (or if bulk failed entirely)
 	local cc cidr_file
 	while IFS= read -r cc; do
-		# Skip if bulk already provided this CC
 		if [[ "$bulk_ok" -eq 1 ]] && [[ -f "$zones_dir/${cc}.zone" ]]; then
 			count=$((count + 1))
 			continue
@@ -853,7 +709,6 @@ geoip_build_ipdb() {
 		fi
 	done < <(geoip_all_cc)
 
-	# Convert all zone files to integer ranges
 	local merged="$tmpdir/merged.dat"
 	: > "$merged"
 	local cc_base
@@ -863,7 +718,6 @@ geoip_build_ipdb() {
 		_geoip_cidr4_to_ranges "$cidr_file" "$cc_base" >> "$merged"
 	done
 
-	# Sort by start integer
 	sort -n -k1 "$merged" > "$tmpdir/sorted.dat"
 
 	local lines
@@ -886,22 +740,10 @@ geoip_build_ipdb() {
 	return 0
 }
 
-# ---------------------------------------------------------------------------
-# geoip_build_ip6db — build consolidated IPv6 hex-range database.
-# Downloads IPv6 CIDR data for all countries via per-country cascade
-# (no bulk IPv6 tarball available), converts to hex ranges, sorts
-# lexicographically, and writes to OUTPUT.
-# Expected: ~240 serial HTTP downloads, ~30K-60K ranges, ~2-4MB output.
-# Build time: ~2-5 minutes typical (120s timeout per download worst-case).
-# Locking: callers must hold their own lock if concurrent builds are possible.
-# Args: OUTPUT [MIN_RANGES]
-#   OUTPUT: destination file path for the hex-range database
-#   MIN_RANGES: minimum expected range count (default: 500; abort if below)
-# Returns: 0 on success, 1 on failure
-# Sets: _GEOIP_BUILD6_COUNT  — countries successfully processed
-#       _GEOIP_BUILD6_FAIL   — countries that failed download
-#       _GEOIP_BUILD6_RANGES — total ranges in output
-# ---------------------------------------------------------------------------
+# geoip_build_ip6db output [min_ranges=500] — build consolidated IPv6 hex-range database
+# Sets _GEOIP_BUILD6_COUNT/_FAIL/_RANGES. Per-country cascade only (no bulk IPv6 tarball).
+# Expected: ~240 serial downloads, ~30K-60K ranges, ~2-5 min build time.
+# No internal locking — consumers must hold their own flock.
 geoip_build_ip6db() {
 	local output="$1" min_ranges="${2:-500}"
 	local tmpdir count=0 fail_count=0
@@ -916,7 +758,6 @@ geoip_build_ip6db() {
 	local zones_dir="$tmpdir/zones"
 	mkdir -p "$zones_dir"
 
-	# Per-country cascade (no bulk IPv6 tarball available)
 	local cc cidr_file
 	while IFS= read -r cc; do
 		cidr_file="$zones_dir/${cc}.zone6"
@@ -927,7 +768,6 @@ geoip_build_ip6db() {
 		fi
 	done < <(geoip_all_cc)
 
-	# Convert all zone files to hex ranges
 	local merged="$tmpdir/merged.dat"
 	: > "$merged"
 	local cc_base
@@ -937,7 +777,7 @@ geoip_build_ip6db() {
 		_geoip_cidr6_to_ranges "$cidr_file" "$cc_base" >> "$merged"
 	done
 
-	# Sort lexicographically by start hex (LC_ALL=C for locale-safe ordering)
+	# LC_ALL=C ensures locale-safe lexicographic ordering of hex strings
 	LC_ALL=C sort -k1,1 "$merged" > "$tmpdir/sorted.dat"
 
 	local lines
