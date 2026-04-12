@@ -11,6 +11,12 @@
         lines per engineer judgment. Collapse marginal algorithm-restatement
         secondary lines in snapshot_save() and _ct_build_exempt() headers.
         Zero functional change.
+  [New] Governance: comment-discipline grep gate added to
+        .rdf/governance/verification.md and workspace parent CLAUDE.md.
+        Four patterns: signature-restatement (Args|Arguments|Parameters|
+        Params|Usage), banner separators, tombstones, and boilerplate
+        '# Returns 0 on success, 1 on failure.'. Reviewer sentinel enforces
+        on every shell-touching commit.
 
   [Change] Vendored lib sync: elog_lib 1.0.5 → 1.0.6, pkg_lib 1.0.9 → 1.0.10,
         geoip_lib 1.0.6 → 1.0.7. All three are comment-discipline cascade
