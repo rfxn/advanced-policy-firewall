@@ -610,8 +610,7 @@ fi
 ipt4 -A LMAC  -j REJECT --reject-with icmp-net-prohibited
 }
 
-# Log-then-drop helper: optional LOG rule followed by action rule.
-# Usage: _log_drop ipt_fn chain match_args log_prefix action [extra_action_flags]
+# _log_drop ipt_fn chain match log_prefix action [extra] — optional LOG rule followed by action rule
 # shellcheck disable=SC2086
 _log_drop() {
 	local ipt_fn="$1" chain="$2" match="$3" prefix="$4" action="$5" extra="$6"
@@ -622,8 +621,7 @@ _log_drop() {
 	$ipt_fn -A "$chain" $match $extra -j "$action"
 }
 
-# RAB hit log helper: emits LOG rule when RAB_LOG_HIT is enabled.
-# Usage: _rab_log ipt_fn chain match_args log_prefix
+# _rab_log ipt_fn chain match log_prefix — emit LOG rule when RAB_LOG_HIT is enabled
 # shellcheck disable=SC2086
 _rab_log() {
 	local ipt_fn="$1" chain="$2" match="$3" prefix="$4"
@@ -633,8 +631,7 @@ _rab_log() {
 	fi
 }
 
-## Packet sanity TCP flag checks — shared loop for IN/OUT chains.
-# Usage: pkt_sanity_flags chain ipt_fn log_prefix rab_prefix rab_mode
+## pkt_sanity_flags chain ipt_fn log_prefix rab_prefix rab_mode — packet sanity TCP flag checks
 # Iterates canonical flag pairs, applying LOG (if LOG_DROP), RAB LOG
 # (if rab_mode=1 and RAB_LOG_HIT), and DROP rules for each pair.
 pkt_sanity_flags() {

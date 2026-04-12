@@ -1,6 +1,5 @@
 # shellcheck shell=bash
-# Helper: port filter loop
-# Args: ports proto ipt_fn chain direction
+# _port_filter_loop ports proto ipt_fn chain direction — helper: port filter loop
 # shellcheck disable=SC2086
 _port_filter_loop() {
 	local ports="$1" proto="$2" ipt_fn="$3" chain="$4" direction="$5"
@@ -14,8 +13,7 @@ _port_filter_loop() {
 	done
 }
 
-# Helper: UID-based port filter loop
-# Args: entries proto
+# _uid_filter_loop entries proto — helper: UID-based port filter loop
 # shellcheck disable=SC2086
 _uid_filter_loop() {
 	local entries="$1" proto="$2"
@@ -60,8 +58,7 @@ fi
 [ -n "$IG_TCP_CPORTS" ] && _port_filter_loop "$IG_TCP_CPORTS" tcp ipt_dst INPUT inbound
 [ -n "$IG_UDP_CPORTS" ] && _port_filter_loop "$IG_UDP_CPORTS" udp ipt_dst INPUT inbound
 
-# Helper: apply ICMP/ICMPv6 type filtering rules
-# Args: types ipt_fn chain proto type_flag direction [addr_arg]
+# _icmp_filter types ipt_fn chain proto type_flag direction [addr_arg] — apply ICMP/ICMPv6 type filtering
 _icmp_filter() {
 	local types="$1" ipt_fn="$2" chain="$3" proto="$4" type_flag="$5" direction="$6" addr_arg="$7"
 	local i

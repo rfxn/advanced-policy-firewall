@@ -86,9 +86,7 @@ _cli_levenshtein() {
     echo "${prev_row[$t_len]}"
 }
 
-# Find closest match within threshold. Returns best match on stdout,
-# or empty string if no match within threshold.
-# Usage: _cli_did_you_mean "input" "word1 word2 word3" [threshold]
+# _cli_did_you_mean input candidates [threshold] — find closest match within edit distance
 _cli_did_you_mean() {
     local input="$1" candidates="$2" threshold="${3:-3}"
     local best="" best_dist=999 dist
@@ -105,8 +103,7 @@ _cli_did_you_mean() {
     fi
 }
 
-# Print targeted error for unknown command with optional suggestion.
-# Usage: _cli_unknown_command "apf" "$1" "trust cc config ..."
+# _cli_unknown_command prefix input candidates — print targeted error with optional suggestion
 _cli_unknown_command() {
     local prefix="$1" input="$2" candidates="$3"
     local suggestion
@@ -118,8 +115,7 @@ _cli_unknown_command() {
     fi
 }
 
-# Print targeted error for unknown verb with optional suggestion.
-# Usage: _cli_unknown_verb "apf trust" "$1" "add deny remove ..."
+# _cli_unknown_verb prefix input candidates — print targeted error for unknown verb
 _cli_unknown_verb() {
     local prefix="$1" input="$2" candidates="$3"
     local suggestion

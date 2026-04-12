@@ -60,8 +60,7 @@ fi
 command rm -f "$tmp"
 }
 
-## Shared ipset populate helper: filter data file into restore format and load.
-# Usage: ipset_populate_set set_name ipset_maxelem data_file
+## ipset_populate_set set_name maxelem data_file — filter data file into restore format and load
 # Sets _IPSET_COUNT global with the number of entries loaded (avoids subshell).
 ipset_populate_set() {
 	local _ips_set="$1" _ips_max="$2" _ips_data="$3"

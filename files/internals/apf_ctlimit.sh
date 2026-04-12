@@ -26,9 +26,7 @@ APF_CTLIMIT_VERSION="1.0.0"
 
 # --- Private helpers (prefix: _ct_) ---
 
-## Build exemption file from loopback, trusted IPs, allow_hosts, and CT_SKIP.
-# Writes one IP/CIDR per line to the given file path.
-# Args: exempt_file
+## _ct_build_exempt exempt_file — build exemption file from loopback, trusted IPs, allow_hosts, and CT_SKIP
 _ct_build_exempt() {
 	local exempt_file="$1"
 	true > "$exempt_file"
@@ -92,10 +90,9 @@ _ct_read_conntrack() {
 	fi
 }
 
-## Count connections per source IP via single awk pass.
+## _ct_count_ips exempt_file threshold [ports] [states] [skip_time_wait] — count connections per source IP
 # Reads conntrack data from stdin, applies port/state/exempt filters.
 # Outputs "count IP" pairs (descending by count) for IPs exceeding threshold.
-# Args: exempt_file threshold [ports] [states] [skip_time_wait]
 _ct_count_ips() {
 	local exempt_file="$1"
 	local threshold="$2"

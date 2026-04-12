@@ -36,9 +36,8 @@ _GEOIP_DL_COUNT=0
 
 # --- Private helpers (prefix: _geoip_) ---
 
-## Validate that a config variable is a non-negative integer, resetting
-# to a default value if not. Uses indirect expansion (bash 4.0+).
-# Args: var_name default_value
+## _geoip_validate_int varname default — reset var to default if not a non-negative integer
+# Uses indirect expansion (bash 4.0+).
 _geoip_validate_int() {
 	local _vname="$1" _vdefault="$2"
 	local _vval="${!_vname:-$_vdefault}"
@@ -48,8 +47,7 @@ _geoip_validate_int() {
 	fi
 }
 
-## Validate prerequisites for GeoIP operations.
-# Returns 1 with error message if requirements not met.
+## geoip_validate_config — verify GeoIP prerequisites are met (USE_IPSET, ipset binary, data dir)
 geoip_validate_config() {
 	if [ "$USE_IPSET" != "1" ] || [ -z "$IPSET" ]; then
 		echo "Error: GeoIP country filtering requires ipset." >&2
@@ -64,15 +62,12 @@ geoip_validate_config() {
 	return 0
 }
 
-## Download country IP data using geoip_lib vendor cascade.
+## geoip_download cc family — download country IP data using geoip_lib vendor cascade
 # Wrapper: calls geoip_lib's internal download helpers (_geoip_download_ipverse,
 # _geoip_download_ipdeny) directly to avoid name collision with this function.
 # Note: geoip_lib's download path includes TLS fallback (--insecure) for
 # CentOS 6 and other systems with outdated CA bundles, which differs from
 # APF's download_url() that only logs a diagnostic hint on TLS failure.
-# Caches to $CC_DATA_DIR/{CC}.{4,6}
-# Args: cc family(4|6)
-# Returns 0 on success (data cached), 1 on failure.
 geoip_download() {
 	local cc="$1" family="$2"
 	local cache_file="$CC_DATA_DIR/${cc}.${family}"
@@ -147,8 +142,7 @@ geoip_download() {
 	return 0
 }
 
-## Collect country codes from a single CC rules file.
-# Args: $1=file $2=include_advanced (1=include entries with '=', 0=skip)
+## _geoip_collect_ccs_from_file file include_advanced — collect country codes from a single CC rules file
 # Sets _GAC_CODES to comma-separated CC list (may have leading comma).
 _geoip_collect_ccs_from_file() {
 	local file="$1" _gac_include_adv="${2:-1}"
@@ -173,8 +167,7 @@ _geoip_collect_ccs_from_file() {
 	done < "$file"
 }
 
-## Collect country codes from both CC deny and allow rules files.
-# Args: $1=include_advanced (1=include entries with '=', 0=skip)
+## _geoip_collect_active_ccs include_advanced — collect country codes from both CC deny and allow rules files
 # Sets _GAC_CODES to combined comma-separated CC list.
 _geoip_collect_active_ccs() {
 	local _gac_all="" _gac_adv="${1:-1}"
@@ -245,9 +238,8 @@ geoip_download_all() {
 	_GEOIP_DL_COUNT=$((_dl_count + _bulk_downloaded))
 }
 
-## Populate an ipset from cached country data using atomic swap.
+## geoip_populate_set cc family — populate an ipset from cached country data using atomic swap
 # Creates apf_cc4_{CC} or apf_cc6_{CC} sets (hash:net).
-# Args: cc family(4|6)
 # Returns 0 on success, 1 if no data.
 geoip_populate_set() {
 	local cc="$1" family="$2"
@@ -404,10 +396,9 @@ cc_rules_load() {
 	fi
 }
 
-## Append the CC_ALLOW implicit deny-all tail rules (log + drop/reject).
+## _geoip_default_deny_tail chain — append the CC_ALLOW implicit deny-all tail rules (log + drop/reject)
 # Called at the end of cc_rules_load() when CC_ALLOW has entries.
 # Handles both IPv4 and IPv6 stacks, audit mode, and log toggle.
-# Args: chain
 _geoip_default_deny_tail() {
 	local chain="$1"
 	if [ "$CC_LOG_ONLY" = "1" ]; then
@@ -434,9 +425,8 @@ _geoip_default_deny_tail() {
 	fi
 }
 
-## Ensure a CC chain exists and has INPUT/OUTPUT jumps.
+## _geoip_ensure_cc_chain action — ensure a CC chain exists and has INPUT/OUTPUT jumps
 # Creates the chain if needed and adds jump rules for both stacks.
-# Args: action (DENY or ALLOW)
 # Sets: _EGCC_CHAIN to the resolved chain name
 _geoip_ensure_cc_chain() {
 	local action="$1"
@@ -457,9 +447,8 @@ _geoip_ensure_cc_chain() {
 	fi
 }
 
-## Add simple (bare CC) iptables rules for a country.
+## _geoip_add_simple_rules cc chain action — add simple (bare CC) iptables rules for a country
 # Creates ipset match rules in the specified chain.
-# Args: cc chain action
 _geoip_add_simple_rules() {
 	# Reset IFS defensively — callers (cc_rules_load, cli_cc_trust,
 	# cli_cc_trust_temp) may have IFS=',' active, which breaks unquoted
@@ -510,9 +499,8 @@ _geoip_add_simple_rules() {
 	fi
 }
 
-## Add advanced (proto:flow:port:CC) iptables rule.
+## _geoip_add_advanced_rule entry cc chain action — add advanced (proto:flow:port:CC) iptables rule
 # Uses trust_parse_fields() from apf_trust.sh for parsing.
-# Args: entry cc chain action
 _geoip_add_advanced_rule() {
 	# Reset IFS defensively — prevents future regressions if callers
 	# set IFS=',' before calling (same rationale as _geoip_add_simple_rules)
@@ -708,11 +696,9 @@ geoip_update() {
 	fi
 }
 
-## Download IPv4 CIDR data for all countries from ipdeny.com all-zones tarball.
+## _geoip_world_fetch overwrite — download IPv4 CIDR data for all countries from ipdeny.com all-zones tarball
 # Populates $CC_DATA_DIR with CC.4 files for all countries in the tarball.
-# Args: overwrite(0|1) — 0 (default) preserves existing files; 1 overwrites all
 # Sets .world_cached marker on success.
-# Returns 0 on success, 1 on failure.
 _geoip_world_fetch() {
 	local _overwrite="${1:-0}"
 	local url="https://www.ipdeny.com/ipblocks/data/countries/all-zones.tar.gz"
@@ -763,10 +749,9 @@ _geoip_world_fetch() {
 	return 0
 }
 
-## Look up which country an IP or CIDR belongs to from cached GeoIP data.
+## _geoip_lookup_ip ip_or_cidr — look up which country an IP or CIDR belongs to from cached GeoIP data
 # Searches all cached {CC}.4 / {CC}.6 data files for a match.
 # On first IPv4 miss with no world data cached, downloads all-zones and retries.
-# Args: ip_or_cidr
 # Prints matching country info; returns 1 if no data or no match.
 _geoip_lookup_ip() {
 	local query="$1"
@@ -890,8 +875,7 @@ _geoip_rules_status() {
 	fi
 }
 
-## Display GeoIP status and per-country statistics.
-# Args: optional argument — country code, continent shorthand, or IP/CIDR to look up
+## geoip_info [cc_or_ip] — display GeoIP status and per-country statistics
 geoip_info() {
 	local cc_arg="${1:-}"
 
@@ -1064,9 +1048,8 @@ geoip_info() {
 	fi
 }
 
-## CLI handler for bare country code trust (apf -d CN, apf -a US).
+## cli_cc_trust host chain action file comment — CLI handler for bare country code trust
 # Routes to CC rules files, downloads data, populates ipsets, creates rules.
-# Args: host chain action file comment
 # Note: $file unused — CC entries route to CC_DENY_HOSTS/CC_ALLOW_HOSTS based on $action
 cli_cc_trust() {
 	local host="$1" chain="$2" action="$3" file="$4" comment="$5"
@@ -1182,8 +1165,7 @@ cli_cc_trust() {
 	done
 }
 
-## CLI handler for advanced syntax CC trust (e.g., tcp:in:d=22:s=CN).
-# Args: entry chain action file comment
+## cli_cc_trust_advanced entry chain action file comment — CLI handler for advanced syntax CC trust
 # Note: $file unused — CC entries route to CC_DENY_HOSTS/CC_ALLOW_HOSTS based on $action
 cli_cc_trust_advanced() {
 	local entry="$1" chain="$2" action="$3" file="$4" comment="$5"
@@ -1262,8 +1244,7 @@ cli_cc_trust_advanced() {
 	fi
 }
 
-## CLI handler for temporary CC trust entries.
-# Args: host chain action file ttl_str comment
+## cli_cc_trust_temp host chain action file ttl_str comment — CLI handler for temporary CC trust entries
 # Note: $file unused — CC entries route to CC_DENY_HOSTS/CC_ALLOW_HOSTS based on $action
 cli_cc_trust_temp() {
 	local host="$1" chain="$2" action="$3" file="$4" ttl_str="$5" comment="$6"
@@ -1372,11 +1353,10 @@ cli_cc_trust_temp() {
 	done
 }
 
-## Remove a single advanced CC entry from rules files and iptables.
+## cli_cc_remove_entry entry cc — remove a single advanced CC entry from rules files and iptables
 # SYNC: parsing mirrors _geoip_add_advanced_rule:518-542
 # Handles both CC_DENY and CC_ALLOW paths. If no entries remain for
 # the CC after removal, delegates to cli_cc_remove() for full cleanup.
-# Args: entry cc
 # Returns 0 if found/removed, 1 if not found.
 cli_cc_remove_entry() {
 	local IFS=$' \t\n'
@@ -1504,9 +1484,8 @@ cli_cc_remove_entry() {
 	return 0
 }
 
-## Remove a country code from trust system.
+## cli_cc_remove cc — remove a country code from trust system
 # Removes from CC rules files, destroys ipsets, removes chain rules.
-# Args: cc
 # Returns 0 if found/removed, 1 if not found.
 cli_cc_remove() {
 	local cc="$1"
@@ -1599,11 +1578,10 @@ cli_cc_remove() {
 	return 1
 }
 
-## Check if any entry (bare or advanced) exists for CC in either CC rules file.
+## _geoip_cc_has_entries cc — check if any entry (bare or advanced) exists for CC in either CC rules file
 # Returns 0 if any entry exists, 1 if none.
 # Used by _expire_cc_temp_entry() and cli_cc_remove_entry() to decide
 # whether full cleanup (ipsets, cache) is warranted after targeted removal.
-# Args: cc
 _geoip_cc_has_entries() {
 	local IFS=$' \t\n'
 	local cc="$1"
@@ -1623,13 +1601,11 @@ _geoip_cc_has_entries() {
 	return 1
 }
 
-## Expire a single temporary CC entry without destroying permanent entries.
+## _expire_cc_temp_entry cc file — expire a single temporary CC entry without destroying permanent entries
 # Removes the temp metadata comment line and the bare CC entry line that
 # immediately follows it. If no permanent (non-temp) entry for that CC
 # remains in any CC rules file, performs full removal (iptables rules,
 # ipsets, cached data) via cli_cc_remove().
-# Args: cc file
-# Returns: 0 on success, 1 if entry not found
 _expire_cc_temp_entry() {
 	local cc="$1" file="$2"
 	local tmpfile

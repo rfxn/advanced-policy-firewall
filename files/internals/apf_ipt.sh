@@ -27,12 +27,9 @@ detect_ipt_backend() {
 	fi
 }
 
-## Snapshot save: atomic write with integrity validation
-# Writes iptables-save output to temp file, validates it, then atomically
-# moves into place. Handles both IPv4 and IPv6 (when USE_IPV6=1).
+## snapshot_save — atomic iptables-save snapshot with integrity validation
 # Also writes the backend marker (.apf.restore.backend).
-# Returns 0 on success, 1 on failure (IPv4 failure is fatal to caller;
-# IPv6 failure logs warning but does not fail the function).
+# IPv4 failure is fatal to caller; IPv6 failure logs warning but does not fail the function.
 snapshot_save() {
 	local snap_dir="$INSTALL_PATH/internals"
 	local snap_tmp snap_rc

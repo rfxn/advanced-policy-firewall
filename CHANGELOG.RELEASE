@@ -1,5 +1,17 @@
 - 2.0.2 | Apr 11 2026:
 
+  [Change] Comment discipline cleanup (APF-owned shell source): delete 27
+        '# Args:'/'# Arguments:'/'# Parameters:'/'# Params:' signature-
+        restatement blocks and 9 '# Usage:' function-signature lines across
+        apf_geoip.sh (19 Args), apf_cli.sh (3 Usage), apf_core.sh (3 Usage),
+        apf_trust.sh (3 Args), cports.common (3 Args), apf_ctlimit.sh (2 Args),
+        apf_dlist.sh (2 Usage), apf_ipset.sh (1 Usage). Prune 2 exact-match
+        boilerplate '# Returns 0 on success, 1 on failure.' lines
+        (apf_dlist.sh, apf_geoip.sh) plus 5 near-boilerplate Returns
+        lines per engineer judgment. Collapse marginal algorithm-restatement
+        secondary lines in snapshot_save() and _ct_build_exempt() headers.
+        Zero functional change.
+
   [Change] Vendored lib sync: elog_lib 1.0.5 → 1.0.6, pkg_lib 1.0.9 → 1.0.10,
         geoip_lib 1.0.6 → 1.0.7. All three are comment-discipline cascade
         bumps from canonical (banner separators removed, signature-restatement

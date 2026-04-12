@@ -92,9 +92,8 @@ _trust_unpack_fields() {
 	return 0
 }
 
-# Validate an advanced trust entry (contains '=') or delegate to valid_host().
+# valid_trust_entry entry — validate advanced trust entry or delegate to valid_host()
 # Sets _VTE_IP to the extracted IP for local-addr checks.
-# Returns 0 on valid, 1 on invalid.
 valid_trust_entry() {
 	local entry="$1"
 	if [[ "$entry" != *=* ]]; then
@@ -132,8 +131,7 @@ valid_trust_entry() {
 	return 0
 }
 
-# Generate iptables rule(s) for an advanced trust entry.
-# Args: $1=entry $2=chain $3=action(ALLOW/DENY) $4=mode(-I/-A/-D)
+# trust_entry_rule entry chain action mode — generate iptables rule(s) for an advanced trust entry
 # Sets _TER_IP (extracted IP) and _TER_DESC (description for logging).
 # Returns 1 on parse failure.
 trust_entry_rule() {
@@ -466,10 +464,7 @@ _trust_action_target() {
 	fi
 }
 
-# Write a trust entry (comment + data line) to a trust file.
-# Centralizes the comment format for cli_trust() and cli_trust_temp().
-# Args: host file comment [extra_key=val ...]
-# Extra args are appended to metadata (e.g., ttl=N expire=E resolved=IPs).
+# _cli_trust_write_entry host file comment [extra_key=val ...] — write a trust entry to a trust file
 _cli_trust_write_entry() {
 	local host="$1" file="$2" comment="$3"
 	shift 3
@@ -509,9 +504,8 @@ _cli_trust_resolve_fqdn() {
 	return 0
 }
 
-## Check if a trust entry already exists in any trust file.
+## _trust_check_duplicate host_entry — check if a trust entry already exists in any trust file
 # Sets caller's $tlist to space-separated list of files containing the entry.
-# Args: host_entry
 _trust_check_duplicate() {
 	local _tcd_host="$1" _tcd_f
 	tlist=""

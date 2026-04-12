@@ -17,10 +17,9 @@ _APF_VALIDATE_LOADED=1
 # shellcheck disable=SC2034
 APF_VALIDATE_VERSION="1.0.0"
 
-# Parse human-readable TTL string into seconds.
+# parse_ttl val — parse human-readable TTL string into seconds
 # Sets _TTL_SECONDS (variable-return, no subshell).
 # Accepts: bare seconds (300), or suffix: s/m/h/d (300s, 5m, 1h, 7d).
-# Returns 1 on invalid or zero input.
 parse_ttl() {
 	local val="$1"
 	local num factor=1
@@ -93,11 +92,10 @@ is_fqdn() {
 	[[ "$1" =~ $_if_fqdn ]]
 }
 
-# Validate ISO 3166-1 country code or continent shorthand.
+# valid_cc input — validate ISO 3166-1 country code or continent shorthand
 # Thin wrapper: delegates to geoip_validate_cc() then bridges output variables.
 # Sets: _VCC_TYPE ("country" or "continent"), _VCC_CODES (comma-separated CCs)
 # Accepts: XX (2-letter country code) or @XX (continent shorthand).
-# Returns 1 on invalid input.
 valid_cc() {
 	if ! geoip_validate_cc "$1"; then
 		_VCC_TYPE=""
