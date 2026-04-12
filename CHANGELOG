@@ -1,50 +1,5 @@
 - 2.0.2 | Apr 11 2026:
 
-  [Change] Comment discipline cleanup (APF-owned shell source): delete 27
-        '# Args:'/'# Arguments:'/'# Parameters:'/'# Params:' signature-
-        restatement blocks and 9 '# Usage:' function-signature lines across
-        apf_geoip.sh (19 Args), apf_cli.sh (3 Usage), apf_core.sh (3 Usage),
-        apf_trust.sh (3 Args), cports.common (3 Args), apf_ctlimit.sh (2 Args),
-        apf_dlist.sh (2 Usage), apf_ipset.sh (1 Usage). Prune 2 exact-match
-        boilerplate '# Returns 0 on success, 1 on failure.' lines
-        (apf_dlist.sh, apf_geoip.sh) plus 5 near-boilerplate Returns
-        lines per engineer judgment. Collapse marginal algorithm-restatement
-        secondary lines in snapshot_save() and _ct_build_exempt() headers.
-        Zero functional change.
-  [New] Governance: comment-discipline grep gate added to
-        .rdf/governance/verification.md and workspace parent CLAUDE.md.
-        Four patterns: signature-restatement (Args|Arguments|Parameters|
-        Params|Usage), banner separators, tombstones, and boilerplate
-        '# Returns 0 on success, 1 on failure.'. Reviewer sentinel enforces
-        on every shell-touching commit.
-
-  [Change] Vendored lib sync: elog_lib 1.0.5 → 1.0.6, pkg_lib 1.0.9 → 1.0.10,
-        geoip_lib 1.0.6 → 1.0.7. All three are comment-discipline cascade
-        bumps from canonical (banner separators removed, signature-restatement
-        prose deleted from function headers, prose config catalogues replaced
-        with README cross-references). Zero functional change in any of the
-        three libraries; load-bearing rationale (TLS posture, symlink-safety,
-        eval-guard validation, pkg_config_merge invariants, SIEM/CEF/GELF
-        contract docs) preserved intact. Byte-identical to canonical
-        elog_lib 7a60165 (v1.0.6), pkg_lib cdd0814 (v1.0.10),
-        geoip_lib cc9559f (v1.0.7).
-
-- 2.0.2 | Apr 08 2026:
-
-  [Fix] apf --cc <CC> and apf cc info <CC>: restore geoip_cc_known() function
-        via geoip_lib 1.0.5 -> 1.0.6 sync. The function was added to the APF
-        vendored copy in Mar 22 work without promotion to canonical, then
-        deleted by the Apr 5 canonical->vendored sync (commit 5e64a5e).
-        Production saw "geoip_cc_known: command not found" followed by
-        incorrect "Unknown country code: <CC>" output for every input.
-  [Change] geoip_lib 1.0.5 -> 1.0.6: restore geoip_cc_known() (see canonical
-           CHANGELOG for function details and test coverage)
-  [New] UAT: tests/uat/20-geoip-cli.bats — valid-CC detail test (UAT-GC06b)
-        and regression assertion on UAT-GC06 ZZ test guarding against the
-        "command not found" stderr leak reappearing.
-
-- 2.0.2 | Mar 08 2026:
-
   -- New Features --
 
 [New] Connection tracking limit (CT_LIMIT): global per-IP connection limit via
@@ -108,9 +63,11 @@
       each resolves at startup based on system capabilities; CentOS 6
       (iptables 1.4.7, no -w) safely degrades; replaces hardcoded defaults
       with "auto" (upgrade-safe)
-[New] install.sh: auto-detect default network interface on fresh install;
-      auto-detect and disable conflicting firewall services (firewalld, ufw);
-      structured output via pkg_lib; post-install dependency warnings
+[New] install.sh: auto-detect default network interface and conflicting
+      firewall services (firewalld, ufw); structured output via pkg_lib;
+      post-install dependency warnings; fix directory permissions (750/640);
+      verify source files; prevent backup collision; re-create periodic cron
+      entries on upgrade
 [New] Unified download helper: curl primary with wget fallback, redirect
       following, timeouts, retries; TLS diagnostic hints on failure
 [New] uninstall.sh: removes all system-wide artifacts including cron, man
@@ -126,47 +83,29 @@
       (RPM el7/el9, DEB Debian 12); package install verification test suite;
       migration from install.sh via importconf; 11 RPM conffiles with
       %config(noreplace)
+[New] RPM/DEB: auto-detect default network interface via ip route on fresh
+      install; sets IFACE_UNTRUSTED in conf.apf when system default differs
+      from eth0
+[New] Man page (apf.8) and README restructure with complete CLI, trust
+      system, GeoIP, and configuration reference
 
   -- Bug Fixes --
 
-[Fix] importconf: drop pkg_config_merge call for internals.conf; the file
-      contains conditional assignments (if/else STATE_MATCH=, NET=,
-      IPT_FLAGS=) whose branches collapse to a single value under merge,
-      and shell conditionals like `[ "$X" = "1" ]` / `[[ "$Y" == "auto" ]]`
-      were corrupted into `[ "$X"= "1" ]` / `[[ "$Y"== "auto" ]]` by the
-      pre-1.0.9 merge function. New template is correct on its own —
-      most contents are auto-detected at runtime. Failure mode: every
-      smoke-test OS target reported "internals.conf: line N: conditional
-      binary operator expected" plus elog_init / mutex_unlock command
-      not found errors after a re-install over an existing /opt/apf
-[Fix] pkg_lib v1.0.9: pkg_config_merge anchors variable detection to a
-      real shell assignment regex (^[[:space:]]*[A-Za-z_][A-Za-z0-9_]*=).
-      Pre-1.0.9 the merge treated any line containing `=` as VAR=value,
-      stripping spaces from conditional expressions and producing
-      syntactically broken bash. Conditional and other shell-code lines
-      now pass through verbatim; regression test added in 09-config.bats
-[Fix] RPM: move install.sh migration from %pre to %pretrans. RPM locks
-      the %config(noreplace) extract-vs-.rpmnew decision before %pre runs,
-      so wiping the legacy /etc/apf in %pre still produced .rpmnew files
-      for any user-modified conffiles AND left no /etc/apf/conf.apf at
-      all (only conf.apf.rpmnew), which then broke importconf in %post
-      with "cp: cannot stat '/etc/apf/conf.apf'" and "pkg_config_merge:
-      new config not found". %pretrans runs before the conffile scan, so
-      RPM sees an empty /etc/apf and extracts cleanly with no .rpmnew.
-      Affects fresh rpm -ivh over an existing install.sh-based install
-      with locally-edited conf.apf or *_hosts.rules
-[Fix] RPM/DEB preinst: stop SysV init loop now breaks after the first
-      hit. /etc/init.d is a symlink to /etc/rc.d/init.d on RHEL, so the
-      previous loop invoked the same init script twice and printed
-      "Stopping APF: done" twice
-[Fix] importconf: guard vnet/*.rules glob; preserve custom files, hook
-      permissions, and TCR_PORTS during upgrade; fix upgrade detection;
-      rewrite config merge with pkg_config_merge() from pkg_lib;
-      migrate DOCKER_COMPAT, USE_IPSET, IPT_LOCK_SUPPORT from "0" to "auto"
-      on upgrade so upgraders get runtime auto-detection defaults
-[Fix] install.sh: fix directory permissions (dirs=750, files=640); verify
-      source files before install; prevent backup collision; add root check;
-      re-create periodic cron entries (refresh, CT scan) on upgrade
+[Fix] apf --cc <CC> and apf cc info <CC>: restore geoip_cc_known() function
+      deleted by canonical lib sync; production saw "command not found" for
+      every country code input
+[Fix] importconf: fix config merge corruption on reinstall; drop
+      pkg_config_merge for internals.conf (conditional syntax was mangled);
+      guard vnet/*.rules glob; preserve hook permissions and TCR_PORTS during
+      upgrade; restore internals.conf from backup; migrate DOCKER_COMPAT,
+      USE_IPSET, IPT_LOCK_SUPPORT to "auto"
+[Fix] RPM: move install.sh migration from %pre to %pretrans to prevent
+      .rpmnew conffile conflicts; abort on backup failure; pass explicit
+      BK_LAST to importconf
+[Fix] RPM/DEB: wipe legacy install path after backup to prevent cpio
+      dir-to-symlink extraction failure; clean pre-decomposition files and
+      runtime state on removal; fix SysV init double-stop on RHEL; DEB adds
+      util-linux dependency for flock
 [Fix] Trust validation: anchor grep/sed patterns to prevent IP substring
       collisions; glob expansion protection in trust_parse_fields(); control
       character and metacharacter rejection in valid_trust_entry(); add hint
@@ -203,8 +142,9 @@
 [Fix] GeoIP: fix IPv4-as-FQDN false positive in --cc IP lookup; fix IFS
       leak corrupting LOG rules; fix --cc-update timestamp tracking; fix temp
       CC expiry destroying permanent entries; harden eval in LOG rule removal;
-      reject unknown country codes in --cc detail display; add duplicate
-      check to cli_cc_trust_temp() preventing duplicate iptables rules
+      reject unknown country codes in --cc detail display; prevent duplicate
+      temp CC iptables rules; temp-to-perm upgrade preserves entry and strips
+      ttl/expire markers instead of silently skipping
 [Fix] ipset_migrate_rules(): add 5-field (v2.0.1) to 7-field migration;
       5-field entries were silently dropped on upgrade
 [Fix] glob_allow/deny_download(): validate entries with valid_host() instead
@@ -228,53 +168,25 @@
       duplicate config entries
 [Fix] --help: detect minimized Ubuntu/Debian man stub and fall back to
       built-in help instead of displaying "unminimize" advisory
-[Fix] GeoIP CC trust: temp→perm upgrade preserves entry when adding a CC
-      permanently that already exists as temporary; strips ttl/expire markers
-      instead of silently skipping
 [Fix] refresh: REFRESH_TEMP now includes IPs from advanced trust entries
       (proto:flow:d=port:s=FQDN); previously skipped all entries containing
       '=' leaving advanced FQDN rules unprotected during refresh
-[Fix] pkg_lib 1.0.7 → 1.0.8: process substitution broke sh install.sh on
+[Fix] pkg_lib 1.0.7 -> 1.0.8: process substitution broke sh install.sh on
       bash 4.2 POSIX mode (CentOS 7/6); ln -sfn symlink-to-directory safety
 [Fix] CT_LIMIT: IPv6 conntrack offenders were silently dropped at validation
-      gate (valid_ip_cidr rejects IPv6); IPv6 CIDRs in exempt list were silently
-      ignored by IPv4-only awk parser; now uses valid_host() and awk IPv6 CIDR
-      prefix matching
+      gate (valid_ip_cidr rejects IPv6); IPv6 CIDRs in exempt list were
+      silently ignored by IPv4-only awk parser; now uses valid_host() and awk
+      IPv6 CIDR prefix matching
 [Fix] gretunnel: default keepalive retries to 3 when GRE_KEEPALIVE contains
       only an interval value; single-field input caused silent ip tunnel failure
 [Fix] bash-completion: apf cc <TAB> now shows verbs and country codes together;
       _apf_complete_cc() was overwriting the verb COMPREPLY array
 [Fix] mutex_lock: detect and remove empty lock files left by flock wrapper;
       noclobber fallback timed out after 60s instead of acquiring the lock
-[New] RPM/DEB: auto-detect default network interface via ip route on fresh
-      install; sets IFACE_UNTRUSTED in conf.apf when system default differs
-      from eth0
-[Fix] RPM/DEB: remove iptables snapshots, change-detection markers, runtime
-      cron templates, and lock files during package removal; orphan files were
-      preventing /etc/apf/internals/ directory cleanup
-[Fix] RPM/DEB: remove pre-decomposition files (firewall, functions.apf,
-      geoip.apf, ctlimit.apf) and legacy cron entries during migration from
-      install.sh-based installations
-[Fix] DEB: add util-linux to Depends for flock (consistent with RPM)
-[Fix] RPM: pass explicit BK_LAST to importconf instead of relying on fallback
-      symlink resolution
-[Fix] RPM/DEB: wipe legacy install path after backup during install.sh
-      migration; package extraction was failing on /etc/apf/doc and
-      /etc/apf/extras (cpio cannot replace directory with symlink), and
-      conffiles were triggering .rpmnew on first install causing importconf
-      to merge old config into old config instead of into the new template
-[Fix] RPM: %pre now aborts install on backup failure instead of silently
-      continuing to wipe; matches DEB preinst set -e behavior; prevents
-      data loss if cp -a fails (ENOSPC, EACCES, signal)
-[Fix] importconf: restore /etc/apf/internals/internals.conf via
-      pkg_config_merge from backup; the file is a %config(noreplace)
-      conffile in both RPM and DEB but was not in the restoration list,
-      so user customizations (path overrides, timeouts, IPT_FLAGS) were
-      silently lost during install.sh migration
 
   -- Changes --
 
-[Change] Vendored lib sync: elog_lib 1.0.5, pkg_lib 1.0.8, geoip_lib 1.0.5
+[Change] Vendored libraries: elog_lib 1.0.6, pkg_lib 1.0.10, geoip_lib 1.0.7
 [Change] Documentation: add VNET section to man page; add logrotate to FILES;
       add -ta/-td to bash completion; add CentOS 6 and Ubuntu 12.04 to
       README platforms; add ctlimit cron to README key files; expose
@@ -298,11 +210,6 @@
       variable, dead UNAME/LSM/RMM/KREL binary discovery, and unimplemented
       trust flush --deny/--allow stubs; eliminates 5 unnecessary subshell
       forks at startup
-
-  -- Documentation --
-
-[New] Man page (apf.8) and README restructure with complete CLI, trust
-      system, GeoIP, and configuration reference
 
 - 2.0.1 | Feb 20 2026:
 
