@@ -14,9 +14,6 @@
 [[ -n "${_APF_CLI_LOADED:-}" ]] && return 0 2>/dev/null
 _APF_CLI_LOADED=1
 
-# shellcheck disable=SC2034
-APF_CLI_VERSION="1.0.0"
-
 # --- CLI color helpers ---
 # Respects NO_COLOR (https://no-color.org/) and non-TTY output.
 # Called once at source time; functions are no-ops when color is off.

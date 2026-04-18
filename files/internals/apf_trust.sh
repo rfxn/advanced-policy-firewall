@@ -15,9 +15,6 @@
 [[ -n "${_APF_TRUST_LOADED:-}" ]] && return 0 2>/dev/null  # safe: return outside function context is benign
 _APF_TRUST_LOADED=1
 
-# shellcheck disable=SC2034
-APF_TRUST_VERSION="1.0.0"
-
 ## Trust parsing and rule generation
 
 trust_protect_ipv6() {

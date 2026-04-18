@@ -13,8 +13,6 @@
 # Source guard: prevent double-sourcing
 [[ -n "${_APF_CTLIMIT_LOADED:-}" ]] && return 0
 _APF_CTLIMIT_LOADED=1
-# shellcheck disable=SC2034
-APF_CTLIMIT_VERSION="1.0.0"
 
 # --- Public API ---
 # ct_scan()           — run conntrack scan and block offenders

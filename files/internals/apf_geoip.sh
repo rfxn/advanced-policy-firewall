@@ -13,8 +13,6 @@
 # Source guard: prevent double-sourcing from multiple paths
 [[ -n "${_APF_GEOIP_LOADED:-}" ]] && return 0
 _APF_GEOIP_LOADED=1
-# shellcheck disable=SC2034
-APF_GEOIP_VERSION="1.0.0"
 
 # --- Public API ---
 # geoip_load()         — main entry point (validate, download, build chains)

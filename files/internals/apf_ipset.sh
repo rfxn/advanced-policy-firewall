@@ -14,9 +14,6 @@
 [[ -n "${_APF_IPSET_LOADED:-}" ]] && return 0 2>/dev/null
 _APF_IPSET_LOADED=1
 
-# shellcheck disable=SC2034
-APF_IPSET_VERSION="1.0.0"
-
 ipset_migrate_rules() {
 local ipset_rules="$INSTALL_PATH/ipset.rules"
 [ -f "$ipset_rules" ] || return 0

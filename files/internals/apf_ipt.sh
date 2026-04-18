@@ -14,9 +14,6 @@
 [[ -n "${_APF_IPT_LOADED:-}" ]] && return 0 2>/dev/null
 _APF_IPT_LOADED=1
 
-# shellcheck disable=SC2034
-APF_IPT_VERSION="1.0.0"
-
 ## Detect iptables backend (nft vs legacy)
 # Sets global IPT_BACKEND to "nft" or "legacy" based on iptables --version output.
 # Called by snapshot_save() and fast load path to avoid duplicated detection.

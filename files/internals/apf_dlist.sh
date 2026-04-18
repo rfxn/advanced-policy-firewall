@@ -14,9 +14,6 @@
 [[ -n "${_APF_DLIST_LOADED:-}" ]] && return 0 2>/dev/null
 _APF_DLIST_LOADED=1
 
-# shellcheck disable=SC2034
-APF_DLIST_VERSION="1.0.0"
-
 # download_url url output_file — try curl first (better TLS 1.2 on CentOS 6), fall back to wget
 download_url() {
     local url="$1" output="$2"

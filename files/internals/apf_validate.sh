@@ -14,9 +14,6 @@
 [[ -n "${_APF_VALIDATE_LOADED:-}" ]] && return 0 2>/dev/null
 _APF_VALIDATE_LOADED=1
 
-# shellcheck disable=SC2034
-APF_VALIDATE_VERSION="1.0.0"
-
 # parse_ttl val — parse human-readable TTL string into seconds
 # Sets _TTL_SECONDS (variable-return, no subshell).
 # Accepts: bare seconds (300), or suffix: s/m/h/d (300s, 5m, 1h, 7d).

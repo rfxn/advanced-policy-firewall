@@ -15,9 +15,6 @@
 [[ -n "${_APF_CORE_LOADED:-}" ]] && return 0 2>/dev/null
 _APF_CORE_LOADED=1
 
-# shellcheck disable=SC2034
-APF_CORE_VERSION="1.0.0"
-
 check_rab() {
  ml xt_recent
  ml ipt_recent

@@ -15,9 +15,6 @@
 [[ -n "${_APF_LIB_LOADED:-}" ]] && return 0 2>/dev/null
 _APF_LIB_LOADED=1
 
-# shellcheck disable=SC2034
-APF_LIB_VERSION="1.0.0"
-
 # Resolve internals directory from this file's location
 _internals_dir="${BASH_SOURCE[0]%/*}"
 
