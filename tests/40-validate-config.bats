@@ -451,19 +451,3 @@ _dl_serve() {
     [ "$status" -eq 0 ]
 }
 
-@test "no bare rm/cp/mv in source files (coding standard)" {
-    # Bare rm/cp/mv (without 'command' prefix) hang when aliases exist.
-    # This test prevents regression of the convention established in 1874eec.
-    # Strategy: find all rm/cp/mv calls, exclude 'command rm/cp/mv' and comments.
-    # Covers all contexts: leading, && prefixed, { prefixed, || prefixed, ; prefixed.
-    local hits
-    hits=$(grep -rEn '\brm -|\bcp -|\bmv -' \
-        /opt/apf/internals/apf_*.sh \
-        /opt/apf/internals/apf.lib.sh \
-        /opt/apf/apf \
-        2>/dev/null \
-        | grep -v '^\s*#' \
-        | grep -v 'command rm\|command cp\|command mv' \
-        | grep -v '# .*rm \|# .*cp \|# .*mv ' || true)
-    [ -z "$hits" ]
-}

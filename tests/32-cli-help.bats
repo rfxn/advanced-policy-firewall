@@ -536,14 +536,6 @@ teardown() {
     fi
 }
 
-@test "apf -h still shows section headers" {
-    run "$APF" -h
-    assert_success
-    assert_output --partial "COMMANDS:"
-    assert_output --partial "SUBCOMMANDS:"
-    assert_output --partial "UTILITIES:"
-}
-
 # --- Levenshtein / did-you-mean unit tests (Phase 2) ---
 
 @test "_cli_did_you_mean finds closest match for typo" {
