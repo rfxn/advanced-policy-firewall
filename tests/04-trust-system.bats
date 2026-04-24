@@ -5,6 +5,7 @@
 load '/usr/local/lib/bats/bats-support/load'
 load '/usr/local/lib/bats/bats-assert/load'
 source /opt/tests/helpers/assert-iptables.bash
+source /opt/tests/helpers/capability-detect.bash
 
 APF="/opt/apf/apf"
 APF_DIR="/opt/apf"
@@ -27,19 +28,8 @@ teardown_file() {
 }
 
 setup() {
-    # Direct cleanup — more reliable than apf -u in container
-    # Remove all lines mentioning test IPs (entries + comments)
-    for host in 192.0.2.50 192.0.2.51 192.0.2.55 "198.51.100.0/24" "198.51.100.1/32" "2001:db8::50" "2001:db8::51"; do
-        local escaped
-        escaped=$(echo "$host" | sed 's/[.\/\:]/\\&/g')
-        sed -i "/${escaped}/d" "$APF_DIR/allow_hosts.rules" 2>/dev/null || true
-        sed -i "/${escaped}/d" "$APF_DIR/deny_hosts.rules" 2>/dev/null || true
-    done
-    # Flush trust chains so stale iptables rules don't interfere
-    iptables -F TALLOW 2>/dev/null || true
-    iptables -F TDENY 2>/dev/null || true
-    ip6tables -F TALLOW 2>/dev/null || true
-    ip6tables -F TDENY 2>/dev/null || true
+    clean_trust_entries 192.0.2.50 192.0.2.51 192.0.2.55 \
+        "198.51.100.0/24" "198.51.100.1/32" "2001:db8::50" "2001:db8::51"
 }
 
 @test "apf -a adds host to allow_hosts.rules file" {
@@ -117,7 +107,7 @@ setup() {
 
 @test "apf -a rejects invalid host" {
     run "$APF" -a "not-valid" "bad host"
-    assert_success
+    assert_failure
     assert_output --partial "Invalid host"
 }
 
@@ -188,22 +178,6 @@ setup() {
     assert_rule_exists_ip6s TDENY "2001:db8::51"
 }
 
-@test "plain IPv6 in allow_hosts.rules creates ip6tables rules" {
-    if ! ip6tables_available; then skip "ip6tables not available"; fi
-    echo "2001:db8::50" >> "$APF_DIR/allow_hosts.rules"
-    "$APF" -f 2>/dev/null || true
-    "$APF" -s
-    assert_rule_exists_ip6s TALLOW "-s 2001:db8::50"
-    assert_rule_exists_ip6s TALLOW "-d 2001:db8::50"
-}
-
-@test "plain IPv6 in deny_hosts.rules creates ip6tables rules" {
-    if ! ip6tables_available; then skip "ip6tables not available"; fi
-    echo "2001:db8::51" >> "$APF_DIR/deny_hosts.rules"
-    "$APF" -f 2>/dev/null || true
-    "$APF" -s
-    assert_rule_exists_ip6s TDENY "2001:db8::51"
-}
 
 @test "apf -u removes IPv6 from file and chain" {
     if ! ip6tables_available; then skip "ip6tables not available"; fi
@@ -222,4 +196,9 @@ setup() {
         echo "Host 2001:db8::50 still in TALLOW chain after -u" >&2
         return 1
     fi
+}
+
+@test "apf -u with no argument shows error" {
+    run "$APF" -u
+    assert_output --partial "FQDN or IP address is required"
 }

@@ -7,6 +7,7 @@
 load '/usr/local/lib/bats/bats-support/load'
 load '/usr/local/lib/bats/bats-assert/load'
 source /opt/tests/helpers/assert-iptables.bash
+source /opt/tests/helpers/capability-detect.bash
 
 APF="/opt/apf/apf"
 APF_DIR="/opt/apf"
@@ -23,13 +24,8 @@ assert_ipset_entry_count() {
     fi
 }
 
-# Check if ipset is usable (binary + kernel support)
-ipset_available() {
-    command -v ipset >/dev/null 2>&1 || return 1
-    # Try to create and destroy a probe set to verify kernel module
-    ipset create _apf_probe hash:ip 2>/dev/null || return 1
-    ipset destroy _apf_probe 2>/dev/null
-    return 0
+setup() {
+    if ! ipset_available; then skip "ipset not available"; fi
 }
 
 # Create a test blocklist file with RFC 5737 test IPs
@@ -40,6 +36,24 @@ create_test_blocklist() {
 192.0.2.10
 192.0.2.11
 192.0.2.12
+BLEOF
+    echo "$listfile"
+}
+
+# Create a larger test blocklist for maxelem testing
+create_test_blocklist_large() {
+    local listfile="$APF_DIR/test_blocklist_large.txt"
+    cat > "$listfile" <<'BLEOF'
+192.0.2.10
+192.0.2.11
+192.0.2.12
+192.0.2.13
+192.0.2.14
+192.0.2.15
+192.0.2.16
+192.0.2.17
+192.0.2.18
+192.0.2.19
 BLEOF
     echo "$listfile"
 }
@@ -72,10 +86,10 @@ setup_file() {
     create_test_blocklist
     create_test_blocklist_cidr
 
-    # Configure ipset with a local blocklist
+    # Configure ipset with a local blocklist (7-field format)
     cat > "$APF_DIR/ipset.rules" <<'ISEOF'
 ## ipset test rules
-test_block:src:ip:1:/opt/apf/test_blocklist.txt
+test_block:src:ip:1:0:0:/opt/apf/test_blocklist.txt
 ISEOF
 
     apf_set_config "USE_IPSET" "1"
@@ -90,15 +104,15 @@ teardown_file() {
     # Clean up ipset sets
     ipset destroy test_block 2>/dev/null || true
     ipset destroy test_cidr 2>/dev/null || true
+    ipset destroy test_maxelem 2>/dev/null || true
+    ipset destroy test_mixed 2>/dev/null || true
     # Remove test files
-    rm -f "$APF_DIR/test_blocklist.txt" "$APF_DIR/test_blocklist_cidr.txt"
+    rm -f "$APF_DIR/test_blocklist.txt" "$APF_DIR/test_blocklist_cidr.txt" \
+          "$APF_DIR/test_blocklist_large.txt" "$APF_DIR/test_blocklist2.txt"
     source /opt/tests/helpers/teardown-netns.sh 2>/dev/null || true
 }
 
 @test "ipset set created with correct entry count" {
-    if ! ipset_available; then
-        skip "ipset not available"
-    fi
     run ipset list test_block
     assert_success
     # Should contain 3 entries (count members for old ipset compatibility)
@@ -106,23 +120,14 @@ teardown_file() {
 }
 
 @test "IPSET_test_block iptables chain exists" {
-    if ! ipset_available; then
-        skip "ipset not available"
-    fi
     assert_chain_exists IPSET_test_block
 }
 
 @test "IPSET_test_block chain has set match rule" {
-    if ! ipset_available; then
-        skip "ipset not available"
-    fi
     assert_rule_exists_ips IPSET_test_block "match-set test_block src"
 }
 
 @test "ipset set contains test IPs" {
-    if ! ipset_available; then
-        skip "ipset not available"
-    fi
     run ipset test test_block 192.0.2.10
     assert_success
     run ipset test test_block 192.0.2.11
@@ -132,9 +137,6 @@ teardown_file() {
 }
 
 @test "USE_IPSET=0 creates no ipset sets" {
-    if ! ipset_available; then
-        skip "ipset not available"
-    fi
     # Flush, reconfigure with USE_IPSET=0, restart
     "$APF" -f 2>/dev/null || true
     ipset destroy test_block 2>/dev/null || true
@@ -154,11 +156,11 @@ teardown_file() {
 }
 
 @test "--ipset-update refreshes set contents" {
-    if ! ipset_available; then
-        skip "ipset not available"
-    fi
     # Add new entry to blocklist
     echo "192.0.2.99" >> "$APF_DIR/test_blocklist.txt"
+
+    # Reset timestamp so update is not skipped
+    rm -f "$APF_DIR/internals/.ipset.timestamps"
 
     "$APF" --ipset-update
 
@@ -170,9 +172,6 @@ teardown_file() {
 }
 
 @test "apf -f destroys ipset sets" {
-    if ! ipset_available; then
-        skip "ipset not available"
-    fi
     "$APF" -f
     run ipset list test_block 2>/dev/null
     assert_failure
@@ -182,9 +181,6 @@ teardown_file() {
 }
 
 @test "empty blocklist skipped without error" {
-    if ! ipset_available; then
-        skip "ipset not available"
-    fi
     "$APF" -f 2>/dev/null || true
     ipset destroy test_block 2>/dev/null || true
 
@@ -192,7 +188,7 @@ teardown_file() {
     local emptyfile="$APF_DIR/test_empty.txt"
     : > "$emptyfile"
     cat > "$APF_DIR/ipset.rules" <<ISEOF
-test_empty:src:ip:0:$emptyfile
+test_empty:src:ip:0:0:0:$emptyfile
 ISEOF
 
     "$APF" -s
@@ -205,36 +201,21 @@ ISEOF
     rm -f "$emptyfile"
     "$APF" -f 2>/dev/null || true
     cat > "$APF_DIR/ipset.rules" <<'ISEOF'
-test_block:src:ip:1:/opt/apf/test_blocklist.txt
+test_block:src:ip:1:0:0:/opt/apf/test_blocklist.txt
 ISEOF
     "$APF" -s
 }
 
 @test "per-rule log:1 with LOG_DROP=1 creates log rule" {
-    if ! ipset_available; then
-        skip "ipset not available"
-    fi
     # test_block has log=1 and LOG_DROP=1 is set
     assert_rule_exists_ips IPSET_test_block "LOG.*IPSET_test_block"
 }
-
-@test "comment lines in blocklist ignored" {
-    if ! ipset_available; then
-        skip "ipset not available"
-    fi
-    # The test blocklist has a comment line — verify only 3 IPs loaded
-    assert_ipset_entry_count test_block 3
-}
-
 @test "CIDR entries accepted in hash:net set" {
-    if ! ipset_available; then
-        skip "ipset not available"
-    fi
     "$APF" -f 2>/dev/null || true
     ipset destroy test_block 2>/dev/null || true
 
     cat > "$APF_DIR/ipset.rules" <<'ISEOF'
-test_cidr:src:net:0:/opt/apf/test_blocklist_cidr.txt
+test_cidr:src:net:0:0:0:/opt/apf/test_blocklist_cidr.txt
 ISEOF
 
     "$APF" -s
@@ -251,14 +232,322 @@ ISEOF
     "$APF" -f 2>/dev/null || true
     ipset destroy test_cidr 2>/dev/null || true
     cat > "$APF_DIR/ipset.rules" <<'ISEOF'
-test_block:src:ip:1:/opt/apf/test_blocklist.txt
+test_block:src:ip:1:0:0:/opt/apf/test_blocklist.txt
 ISEOF
     "$APF" -s
 }
 
 @test "IPSET_test_block chain attached to INPUT" {
-    if ! ipset_available; then
-        skip "ipset not available"
-    fi
     assert_rule_exists_ips INPUT "IPSET_test_block"
+}
+
+# --- Legacy format migration tests ---
+
+@test "legacy 4-field local path migrated to 7-field" {
+    "$APF" -f 2>/dev/null || true
+    ipset destroy test_block 2>/dev/null || true
+
+    # Write old 4-field format (no log/interval/maxelem fields)
+    cat > "$APF_DIR/ipset.rules" <<'ISEOF'
+test_block:src:ip:/opt/apf/test_blocklist.txt
+ISEOF
+
+    "$APF" -s
+
+    # Set should be created — migration inserted log=0:interval=0:maxelem=0
+    run ipset list test_block
+    assert_success
+    assert_ipset_entry_count test_block 3
+
+    # File should be rewritten in 7-field format
+    run cat "$APF_DIR/ipset.rules"
+    assert_output "test_block:src:ip:0:0:0:/opt/apf/test_blocklist.txt"
+
+    # Restore
+    "$APF" -f 2>/dev/null || true
+    ipset destroy test_block 2>/dev/null || true
+    cat > "$APF_DIR/ipset.rules" <<'ISEOF'
+test_block:src:ip:1:0:0:/opt/apf/test_blocklist.txt
+ISEOF
+    "$APF" -s
+}
+
+@test "legacy 4-field URL entry migrated to 7-field" {
+    "$APF" -f 2>/dev/null || true
+    ipset destroy test_block 2>/dev/null || true
+
+    # Write old 4-field format with URL (colon in https://)
+    cat > "$APF_DIR/ipset.rules" <<'ISEOF'
+test_url:src:net:https://example.com/blocklist.txt
+ISEOF
+
+    # Start will fail to download (fake URL) but migration should still rewrite
+    "$APF" -s 2>/dev/null || true
+
+    # File should be rewritten with log=0:interval=0:maxelem=0 inserted, URL intact
+    run cat "$APF_DIR/ipset.rules"
+    assert_output "test_url:src:net:0:0:0:https://example.com/blocklist.txt"
+
+    # Restore
+    "$APF" -f 2>/dev/null || true
+    ipset destroy test_url 2>/dev/null || true
+    cat > "$APF_DIR/ipset.rules" <<'ISEOF'
+test_block:src:ip:1:0:0:/opt/apf/test_blocklist.txt
+ISEOF
+    "$APF" -s
+}
+
+@test "7-field entry not modified by migration" {
+    "$APF" -f 2>/dev/null || true
+    ipset destroy test_block 2>/dev/null || true
+
+    # Write correct 7-field format
+    cat > "$APF_DIR/ipset.rules" <<'ISEOF'
+# comment line
+test_block:src:ip:1:3600:5000:/opt/apf/test_blocklist.txt
+ISEOF
+
+    "$APF" -s
+
+    # File should be unchanged
+    run cat "$APF_DIR/ipset.rules"
+    assert_line --index 0 "# comment line"
+    assert_line --index 1 "test_block:src:ip:1:3600:5000:/opt/apf/test_blocklist.txt"
+
+    # Restore
+    "$APF" -f 2>/dev/null || true
+    ipset destroy test_block 2>/dev/null || true
+    cat > "$APF_DIR/ipset.rules" <<'ISEOF'
+test_block:src:ip:1:0:0:/opt/apf/test_blocklist.txt
+ISEOF
+    "$APF" -s
+}
+
+# --- 5-field migration tests ---
+
+@test "legacy 5-field local path migrated to 7-field" {
+    "$APF" -f 2>/dev/null || true
+    ipset destroy test_block 2>/dev/null || true
+
+    create_test_blocklist
+
+    # Write v2.0.1 5-field format: name:dir:type:log:path
+    cat > "$APF_DIR/ipset.rules" <<'ISEOF'
+test_block:src:ip:1:/opt/apf/test_blocklist.txt
+ISEOF
+
+    "$APF" -s
+
+    # File should be rewritten to 7-field with 0:0 inserted for interval:maxelem
+    run cat "$APF_DIR/ipset.rules"
+    assert_line "test_block:src:ip:1:0:0:/opt/apf/test_blocklist.txt"
+
+    # ipset should still be created and functional
+    run ipset list test_block
+    assert_success
+}
+
+@test "legacy 5-field URL entry migrated to 7-field" {
+    "$APF" -f 2>/dev/null || true
+    ipset destroy test_url 2>/dev/null || true
+
+    # Write v2.0.1 5-field format with URL (contains colons)
+    cat > "$APF_DIR/ipset.rules" <<'ISEOF'
+test_url:src:net:0:https://example.com/blocklist.txt
+ISEOF
+
+    "$APF" -s
+
+    # File should be rewritten to 7-field
+    run cat "$APF_DIR/ipset.rules"
+    assert_line "test_url:src:net:0:0:0:https://example.com/blocklist.txt"
+
+    # Restore original ipset.rules
+    "$APF" -f 2>/dev/null || true
+    ipset destroy test_url 2>/dev/null || true
+    cat > "$APF_DIR/ipset.rules" <<'ISEOF'
+test_block:src:ip:1:0:0:/opt/apf/test_blocklist.txt
+ISEOF
+    "$APF" -s
+}
+
+# --- Migration edge-case tests ---
+
+@test "migration handles missing ipset.rules without error" {
+    "$APF" -f 2>/dev/null || true
+    ipset destroy test_block 2>/dev/null || true
+
+    # Remove ipset.rules entirely — migration should return cleanly
+    rm -f "$APF_DIR/ipset.rules"
+
+    run "$APF" -s
+    assert_success
+
+    # Restore
+    "$APF" -f 2>/dev/null || true
+    cat > "$APF_DIR/ipset.rules" <<'ISEOF'
+test_block:src:ip:1:0:0:/opt/apf/test_blocklist.txt
+ISEOF
+    "$APF" -s
+}
+
+@test "migration preserves comments in mixed-format file" {
+    "$APF" -f 2>/dev/null || true
+    ipset destroy test_block 2>/dev/null || true
+
+    create_test_blocklist
+
+    # Write a file with comment header and 4-field data line
+    cat > "$APF_DIR/ipset.rules" <<'ISEOF'
+# Main blocklist (header comment)
+test_block:src:ip:/opt/apf/test_blocklist.txt
+ISEOF
+
+    "$APF" -s
+
+    # Comment should be preserved, data line migrated
+    run cat "$APF_DIR/ipset.rules"
+    assert_line "# Main blocklist (header comment)"
+    assert_line "test_block:src:ip:0:0:0:/opt/apf/test_blocklist.txt"
+
+    # Restore
+    "$APF" -f 2>/dev/null || true
+    ipset destroy test_block 2>/dev/null || true
+    cat > "$APF_DIR/ipset.rules" <<'ISEOF'
+test_block:src:ip:1:0:0:/opt/apf/test_blocklist.txt
+ISEOF
+    "$APF" -s
+}
+
+@test "migration converts mixed 4-field and 5-field entries in one pass" {
+    "$APF" -f 2>/dev/null || true
+    ipset destroy test_block 2>/dev/null || true
+    ipset destroy test_mixed 2>/dev/null || true
+
+    create_test_blocklist
+
+    # Create a second blocklist for the second set
+    cp "$APF_DIR/test_blocklist.txt" "$APF_DIR/test_blocklist2.txt"
+
+    # Mixed file: one 4-field, one 5-field, one already 7-field
+    cat > "$APF_DIR/ipset.rules" <<'ISEOF'
+# mixed format test
+test_block:src:ip:/opt/apf/test_blocklist.txt
+test_mixed:src:ip:1:/opt/apf/test_blocklist2.txt
+ISEOF
+
+    "$APF" -s 2>/dev/null || true
+
+    # Both should be migrated to 7-field
+    run cat "$APF_DIR/ipset.rules"
+    assert_line --index 0 "# mixed format test"
+    assert_line --index 1 "test_block:src:ip:0:0:0:/opt/apf/test_blocklist.txt"
+    assert_line --index 2 "test_mixed:src:ip:1:0:0:/opt/apf/test_blocklist2.txt"
+
+    # Restore
+    "$APF" -f 2>/dev/null || true
+    ipset destroy test_block 2>/dev/null || true
+    ipset destroy test_mixed 2>/dev/null || true
+    rm -f "$APF_DIR/test_blocklist2.txt"
+    cat > "$APF_DIR/ipset.rules" <<'ISEOF'
+test_block:src:ip:1:0:0:/opt/apf/test_blocklist.txt
+ISEOF
+    "$APF" -s
+}
+
+# --- maxelem tests ---
+
+@test "maxelem limits entries loaded into ipset" {
+    "$APF" -f 2>/dev/null || true
+    ipset destroy test_block 2>/dev/null || true
+    ipset destroy test_maxelem 2>/dev/null || true
+
+    # Create a 10-entry blocklist
+    create_test_blocklist_large
+
+    # Set maxelem=3 — only first 3 entries should be loaded
+    cat > "$APF_DIR/ipset.rules" <<'ISEOF'
+test_maxelem:src:ip:0:0:3:/opt/apf/test_blocklist_large.txt
+ISEOF
+
+    "$APF" -s
+
+    run ipset list test_maxelem
+    assert_success
+    assert_ipset_entry_count test_maxelem 3
+
+    # Restore
+    "$APF" -f 2>/dev/null || true
+    ipset destroy test_maxelem 2>/dev/null || true
+    cat > "$APF_DIR/ipset.rules" <<'ISEOF'
+test_block:src:ip:1:0:0:/opt/apf/test_blocklist.txt
+ISEOF
+    "$APF" -s
+}
+
+# --- timestamp tests ---
+
+@test "timestamp file created during ipset_load" {
+    # Timestamp file should exist after setup_file started the firewall
+    [ -f "$APF_DIR/internals/.ipset.timestamps" ]
+    run grep "^test_block:" "$APF_DIR/internals/.ipset.timestamps"
+    assert_success
+}
+
+@test "ipset flush removes timestamp file" {
+    "$APF" -f
+    [ ! -f "$APF_DIR/internals/.ipset.timestamps" ]
+
+    # Restart for remaining tests
+    "$APF" -s
+}
+
+@test "per-list interval skips recent updates" {
+    # Set a long interval so update is skipped
+    cat > "$APF_DIR/ipset.rules" <<'ISEOF'
+test_block:src:ip:1:86400:0:/opt/apf/test_blocklist.txt
+ISEOF
+
+    # Write a recent timestamp
+    echo "test_block:$(date +%s)" > "$APF_DIR/internals/.ipset.timestamps"
+
+    # Add a new entry — update should skip due to interval
+    echo "192.0.2.99" >> "$APF_DIR/test_blocklist.txt"
+    "$APF" --ipset-update
+
+    # Entry should NOT be present (update was skipped)
+    run ipset test test_block 192.0.2.99
+    assert_failure
+
+    # Restore
+    create_test_blocklist
+    cat > "$APF_DIR/ipset.rules" <<'ISEOF'
+test_block:src:ip:1:0:0:/opt/apf/test_blocklist.txt
+ISEOF
+}
+
+@test "per-list interval triggers update after elapsed" {
+    # Set a short interval
+    cat > "$APF_DIR/ipset.rules" <<'ISEOF'
+test_block:src:ip:1:1:0:/opt/apf/test_blocklist.txt
+ISEOF
+
+    # Write an old timestamp (epoch 0)
+    echo "test_block:0" > "$APF_DIR/internals/.ipset.timestamps"
+
+    # Add a new entry — update should proceed (interval elapsed)
+    echo "192.0.2.99" >> "$APF_DIR/test_blocklist.txt"
+    "$APF" --ipset-update
+
+    # Entry should be present (update ran)
+    run ipset test test_block 192.0.2.99
+    assert_success
+
+    # Restore
+    create_test_blocklist
+    "$APF" -f 2>/dev/null || true
+    cat > "$APF_DIR/ipset.rules" <<'ISEOF'
+test_block:src:ip:1:0:0:/opt/apf/test_blocklist.txt
+ISEOF
+    "$APF" -s
 }

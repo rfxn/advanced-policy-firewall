@@ -1,0 +1,11 @@
+# Reduce Docker build context — exclude files not needed inside containers
+.git
+.github
+.claude
+audit-output
+CLAUDE.md
+PLAN.md
+PLAN-csf.md
+AUDIT.md
+MEMORY.md
+*.md.bak

@@ -1,4 +1,14 @@
 /var/log/apf_log {
+    copytruncate
+    weekly
+    rotate 4
+    compress
+    missingok
+    notifempty
+}
+
+/var/log/apf/audit.log {
+    copytruncate
     weekly
     rotate 4
     compress

@@ -1,12 +1,13 @@
+# shellcheck shell=bash
 eout "{glob} loading log.rules"
 
 # Log NEW interactive access (SSH/telnet) reaching INPUT — requires LOG_DROP=1
 if [ "$LOG_DROP" == "1" ]; then
  if [ "$LOG_IA" == "1" ]; then
 	ipt -N TELNET_LOG
-	ipt -A TELNET_LOG -p tcp --dport 23 -m state --state NEW -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** TELNET ** "
+	ipt -A TELNET_LOG -p tcp --dport 23 $STATE_MATCH NEW -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** TELNET ** "
 	ipt -N SSH_LOG
-	ipt -A SSH_LOG -p tcp --dport $HELPER_SSH_PORT -m state --state NEW -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** SSH ** "
+	ipt -A SSH_LOG -p tcp --dport $HELPER_SSH_PORT $STATE_MATCH NEW -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix "** SSH ** "
 	ipt -A INPUT -j TELNET_LOG
 	ipt -A INPUT -j SSH_LOG
  fi

@@ -1,0 +1,161 @@
+# shellcheck shell=bash
+# bash completion for apf (Advanced Policy Firewall)
+# Installed to /etc/bash_completion.d/apf by install.sh
+#
+# Copyright (C) 2002-2026, R-fx Networks <proj@rfxn.com>
+# Licensed under the GNU General Public License v2
+
+# Context helpers — extracted for reuse across groups
+_apf_complete_hosts() {
+	local allow_file="/etc/apf/allow_hosts.rules"
+	local deny_file="/etc/apf/deny_hosts.rules"
+	local ips=""
+	if [ -f "$allow_file" ]; then
+		ips="$ips $(grep -v '^#' "$allow_file" 2>/dev/null | grep -v '^$' | sed 's/ .*//')"  # safe: file existence checked
+	fi
+	if [ -f "$deny_file" ]; then
+		ips="$ips $(grep -v '^#' "$deny_file" 2>/dev/null | grep -v '^$' | sed 's/ .*//')"  # safe: file existence checked
+	fi
+	[ -n "$ips" ] && COMPREPLY=( $(compgen -W "$ips" -- "$cur") )
+}
+
+_apf_complete_ttl() {
+	COMPREPLY=( $(compgen -W "5m 15m 30m 1h 2h 6h 12h 1d 7d 30d" -- "$cur") )
+}
+
+_apf_complete_cc() {
+	local cc_deny="/etc/apf/cc_deny.rules"
+	local cc_allow="/etc/apf/cc_allow.rules"
+	local ccs=""
+	if [ -f "$cc_deny" ]; then
+		ccs="$ccs $(grep -v '^#' "$cc_deny" 2>/dev/null | grep -v '^$' | sed 's/ .*//')"  # safe: file existence checked
+	fi
+	if [ -f "$cc_allow" ]; then
+		ccs="$ccs $(grep -v '^#' "$cc_allow" 2>/dev/null | grep -v '^$' | sed 's/ .*//')"  # safe: file existence checked
+	fi
+	[ -n "$ccs" ] && COMPREPLY=( $(compgen -W "$ccs" -- "$cur") )
+}
+
+# Per-group verb completers
+_apf_complete_trust() {
+	local pos=$(( COMP_CWORD - 2 ))
+	case "$pos" in
+	0)
+		COMPREPLY=( $(compgen -W "add deny remove list lookup refresh flush temp" -- "$cur") )
+		;;
+	*)
+		local verb="${COMP_WORDS[2]}"
+		case "$verb" in
+		add|deny|remove)
+			[ "$pos" -eq 1 ] && _apf_complete_hosts
+			;;
+		list)
+			[ "$pos" -eq 1 ] && COMPREPLY=( $(compgen -W "--allow --deny --temp" -- "$cur") )
+			;;
+		flush)
+			[ "$pos" -eq 1 ] && COMPREPLY=( $(compgen -W "--deny --allow --temp" -- "$cur") )
+			;;
+		temp)
+			if [ "$pos" -eq 1 ]; then
+				COMPREPLY=( $(compgen -W "add deny remove list flush" -- "$cur") )
+			else
+				local temp_verb="${COMP_WORDS[3]}"
+				case "$temp_verb" in
+				add|deny)
+					[ "$pos" -eq 2 ] && _apf_complete_hosts
+					[ "$pos" -eq 3 ] && _apf_complete_ttl
+					;;
+				remove)
+					[ "$pos" -eq 2 ] && _apf_complete_hosts
+					;;
+				esac
+			fi
+			;;
+		esac
+		;;
+	esac
+}
+
+_apf_complete_cc_group() {
+	local pos=$(( COMP_CWORD - 2 ))
+	case "$pos" in
+	0)
+		_apf_complete_cc
+		COMPREPLY+=( $(compgen -W "info lookup update" -- "$cur") )
+		;;
+	1)
+		local verb="${COMP_WORDS[2]}"
+		case "$verb" in
+		info)    _apf_complete_cc ;;
+		esac
+		;;
+	esac
+}
+
+_apf_completions() {
+	local cur prev
+	cur="${COMP_WORDS[COMP_CWORD]}"
+	prev="${COMP_WORDS[COMP_CWORD-1]}"
+
+	# Position 1: flags + subcommand nouns
+	if [ "$COMP_CWORD" -eq 1 ]; then
+		local flags="-s -f -r -a -d -u -g -e -l -t -o -v -h -ta -td"
+		local nouns="help trust status cc ct config ipset gre"
+		if [[ "$cur" == -* ]]; then
+			local long="--start --restart --stop --flush --help --version"
+			long="$long --allow --deny --remove --unban --lookup"
+			long="$long --validate --check --rules --info --dump-config --ovars"
+			long="$long --la --list-allow --ld --list-deny"
+			long="$long --temp-allow --temp-deny --temp-list --temp-flush"
+			long="$long --cc --cc-update --ct-scan --ct-status --csf-help"
+			long="$long --gre-up --gre-down --gre-status --ipset-update"
+			COMPREPLY=( $(compgen -W "$flags $long" -- "$cur") )
+		else
+			COMPREPLY=( $(compgen -W "$flags $nouns" -- "$cur") )
+		fi
+		return 0
+	fi
+
+	# Position 2+: subcommand verb dispatch
+	local noun="${COMP_WORDS[1]}"
+	case "$noun" in
+	trust)
+		_apf_complete_trust
+		;;
+	cc)
+		_apf_complete_cc_group
+		;;
+	config)
+		[ "$COMP_CWORD" -eq 2 ] && COMPREPLY=( $(compgen -W "dump validate" -- "$cur") )
+		;;
+	status)
+		[ "$COMP_CWORD" -eq 2 ] && COMPREPLY=( $(compgen -W "rules log" -- "$cur") )
+		;;
+	gre)
+		[ "$COMP_CWORD" -eq 2 ] && COMPREPLY=( $(compgen -W "up down status" -- "$cur") )
+		;;
+	ipset)
+		[ "$COMP_CWORD" -eq 2 ] && COMPREPLY=( $(compgen -W "update status" -- "$cur") )
+		;;
+	ct)
+		[ "$COMP_CWORD" -eq 2 ] && COMPREPLY=( $(compgen -W "scan status" -- "$cur") )
+		;;
+	help)
+		[ "$COMP_CWORD" -eq 2 ] && COMPREPLY=( $(compgen -W "trust status cc ct config ipset gre" -- "$cur") )
+		;;
+	# Legacy flag context completions
+	-a|--allow|-d|--deny|-u|--remove|--unban|--lookup|-ar|-dr|-tr)
+		[ "$COMP_CWORD" -eq 2 ] && _apf_complete_hosts
+		;;
+	-ta|--temp-allow|-td|--temp-deny)
+		local pos=$(( COMP_CWORD - 1 ))
+		[ "$pos" -eq 1 ] && _apf_complete_hosts
+		[ "$pos" -eq 2 ] && _apf_complete_ttl
+		;;
+	--cc|-i)
+		[ "$COMP_CWORD" -eq 2 ] && _apf_complete_cc
+		;;
+	esac
+}
+
+complete -F _apf_completions apf

@@ -1,4 +1,4 @@
-cat > /etc/apf/vnet/$addr.rules <<EOF
+command cat > /etc/apf/vnet/$addr.rules <<EOF
 eout "{glob} loading $addr.rules"
 
 # $addr.rules
@@ -10,12 +10,18 @@ VNET="$addr"
 # You can either define CPORT vars such as:
 # IG_TCP_CPORTS="21,22,25,53,80,443,110,143,6000_7000"
 # IG_UDP_CPORTS="53"
+# IG_TCP_CLIMIT="80:50,443:100"
+# IG_UDP_CLIMIT=""
 # IG_ICMP_TYPES="3,5,11,0,30,8"
 # EG_TCP_CPORTS="21,25,80,443,43"
 # EG_UDP_CPORTS="20,21,53"
 # EG_ICMP_TYPES="all"
 # EG_TCP_UID="0:22"
 # EG_UDP_UID="0:53"
+# SMTP_BLOCK="1"           (system-wide scope, not per-IP)
+# SMTP_ALLOWUSER="cpanel"
+# SMTP_ALLOWGROUP="mail"
+# CT_LIMIT="500"           (per-IP override for connection tracking limit)
 #
 # Or you can define standard iptables rules such as:
 # \$IPT -A INPUT -p tcp -s 192.0.2.1 -d \$VNET --dport 10024 -j ACCEPT
@@ -25,5 +31,5 @@ VNET="$addr"
 
 #
 # conf.apf configurable common ports
-. $INSTALL_PATH/internals/cports.common
+. "\$INSTALL_PATH/internals/cports.common"
 EOF

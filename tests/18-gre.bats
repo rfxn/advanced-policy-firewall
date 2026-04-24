@@ -8,17 +8,10 @@
 load '/usr/local/lib/bats/bats-support/load'
 load '/usr/local/lib/bats/bats-assert/load'
 source /opt/tests/helpers/assert-iptables.bash
+source /opt/tests/helpers/capability-detect.bash
 
 APF="/opt/apf/apf"
 APF_DIR="/opt/apf"
-
-# Check if GRE tunnel support is available in this container
-gre_available() {
-    command -v ip >/dev/null 2>&1 || return 1
-    ip tunnel add gretest mode gre remote 192.0.2.1 local 127.0.0.1 ttl 255 2>/dev/null || return 1
-    ip tunnel del gretest 2>/dev/null
-    return 0
-}
 
 setup_file() {
     if ! gre_available; then
@@ -120,6 +113,16 @@ setup() {
     assert_output --partial "198.51.100.12"
 }
 
+# --- Status Tests ---
+
+@test "--gre-status shows tunnel section headers" {
+    run "$APF" --gre-status
+    assert_success
+    assert_output --partial "GRE Tunnel Interfaces"
+    assert_output --partial "GRE Routes"
+    assert_output --partial "GRE Firewall Rules"
+}
+
 # --- Disable / Flush Tests ---
 
 @test "USE_GRE=0 creates no tunnels or chains" {
@@ -165,6 +168,32 @@ setup() {
     assert_failure
 
     # Restart to restore
+    "$APF" -s
+}
+
+@test "Non-numeric linkid rejected with error" {
+    # Write a gre.rules with non-numeric linkid to exercise integer validation
+    cat > "$APF_DIR/gre.rules" <<'GRECONF'
+#!/bin/bash
+role="source"
+create_gretun abc 203.0.113.2 192.0.2.1
+GRECONF
+
+    "$APF" -f
+    ip tunnel del gre1 2>/dev/null || true
+    "$APF" -s
+
+    # Should hit the regex check (not a valid integer), not the range check
+    run grep "not a valid integer" /var/log/apf_log
+    assert_success
+
+    # Restore valid config
+    cat > "$APF_DIR/gre.rules" <<'GRECONF'
+#!/bin/bash
+role="source"
+create_gretun 1 203.0.113.2 192.0.2.1 /opt/apf/gre.ips.test
+GRECONF
+    "$APF" -f
     "$APF" -s
 }
 

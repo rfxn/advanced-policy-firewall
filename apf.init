@@ -1,6 +1,6 @@
 #!/bin/bash
 ##
-# Advanced Policy Firewall (APF) v2.0.1
+# Advanced Policy Firewall (APF) v2.0.2
 #             (C) 2002-2026, R-fx Networks <proj@rfxn.com>
 #             (C) 2026, Ryan MacDonald <ryan@rfxn.com>
 # This program may be freely redistributed under the terms of the GNU GPL v2
@@ -23,12 +23,12 @@ INSTALL_PATH="/etc/apf"
 case "$1" in
 start)
 	echo -n "Starting APF: "
-	$INSTALL_PATH/apf --start >> /dev/null 2>&1
+	"$INSTALL_PATH/apf" --start >> /dev/null 2>&1
 	echo "done"
 	;;
 stop)
 	echo -n "Stopping APF: "
-	$INSTALL_PATH/apf --stop >> /dev/null 2>&1
+	"$INSTALL_PATH/apf" --stop >> /dev/null 2>&1
 	echo "done"
 	;;
 restart)
@@ -36,8 +36,8 @@ restart)
 	$0 start
 	;;
 status)
-	. $INSTALL_PATH/conf.apf
-	. $INSTALL_PATH/internals/internals.conf
+	. "$INSTALL_PATH/conf.apf"
+	. "$INSTALL_PATH/internals/internals.conf"
 	if $IPT $IPT_FLAGS -n -L TALLOW > /dev/null 2>&1; then
 		echo "APF is running."
 	else

@@ -1,215 +1,73 @@
 #!/bin/bash
 #
 ##
-# Advanced Policy Firewall (APF) v2.0.1
+# Advanced Policy Firewall (APF) v2.0.2
 #             (C) 2002-2026, R-fx Networks <proj@rfxn.com>
 #             (C) 2026, Ryan MacDonald <ryan@rfxn.com>
 # This program may be freely redistributed under the terms of the GNU GPL v2
 ##
 #
-VER="2.0.1"
+VER="2.0.2"
 CNF="/etc/apf/conf.apf"
 
-head() {
+apf_banner() {
 	echo "Advanced Policy Firewall (APF) v$VER <proj@rfxn.com>"
 	echo "      Copyright (C) 2002-2026, R-fx Networks <proj@rfxn.com>"
 	echo "      Copyright (C) 2026, Ryan MacDonald <ryan@rfxn.com>"
-	echo "This program may be freely redistributed under the terms of the GNU GPL"
+	echo "This program may be freely redistributed under the terms of the GNU GPL v2"
 	echo ""
 }
 
-if [ -f "$CNF" ] && [ ! "$CNF" == "" ]; then
-   source $CNF
+if [ -f "$CNF" ]; then
+   source "$CNF"
 else
-   head
-   echo "\$CNF not found, aborting."
+   apf_banner
+   echo "$CNF not found, aborting." >&2
    exit 1
 fi
 
+# Initialize log environment (creates dirs, files, enables output modules)
+# ELOG_LOG_DIR/ELOG_AUDIT_FILE are set in internals.conf
+if ! elog_init; then
+	echo "warning: elog_init failed; structured event logging may be unavailable" >&2
+fi
+# elog_init enables file/audit_file but NOT stdout — enable it for eout() compat
+elog_output_enable "stdout" 2>/dev/null || true  # safe: stdout always registered in elog_lib.sh
+# Restrict stdout to elog() calls only — elog_event() output goes to audit/SIEM,
+# not the terminal. Without this, eout+elog_event pairs duplicate on screen.
+if _elog_output_find "stdout"; then
+	_ELOG_OUTPUT_SOURCES[$_ELOG_OUTPUT_IDX]="elog"
+fi
+
 if [ ! -f "$LOG_APF" ]; then
-        touch "$LOG_APF"
-        chmod 600 "$LOG_APF"
+        command touch "$LOG_APF"
+        command chmod 640 "$LOG_APF"
         eout "{glob} status log not found, created"
 fi
 
-start() {
-check_deps
-##
-# Fast Load
-##
-if [ "$SET_FASTLOAD" == "1" ] && [ "$DOCKER_COMPAT" != "1" ]; then
-# is this our first startup?
-# if so we certainly do not want fast load
-if [ ! -f "$INSTALL_PATH/internals/.last.full" ]; then
-	SKIP_FASTLOAD_FIRSTRUN=1
-fi
-# Is our last full load more than 12h ago?
-# if so we are going to full load
-if [ -f "$INSTALL_PATH/internals/.last.full" ]; then
- LAST_FULL=$(cat $INSTALL_PATH/internals/.last.full)
- CURRENT_LOAD=$(date +"%s")
- LOAD_DIFF=$(($CURRENT_LOAD-$LAST_FULL))
- if [ ! "$LOAD_DIFF" -lt "43200" ]; then
-	SKIP_FASTLOAD_EXPIRED=1
- fi
-fi
+# Clean up mutex lock on unexpected termination
+trap '_apf_cleanup_tmp; mutex_unlock' EXIT
 
-# has our configuration changed since full load?
-# if so full we go
-if [ ! -f "$INSTALL_PATH/internals/.md5.cores" ]; then
-        SKIP_FASTLOAD_VARS=1
-	MD5_FIRSTRUN=1
-else
-        EMPTY_MD5=$(cat $INSTALL_PATH/internals/.md5.cores)
-        if [ "$EMPTY_MD5" == "" ]; then
-                $MD5 $MD5_FILES > $INSTALL_PATH/internals/.md5.cores 2> /dev/null
-        fi
-	$MD5 $MD5_FILES > $INSTALL_PATH/internals/.md5.cores.new 2> /dev/null 
-        VARS_DIFF=$($DIFF $INSTALL_PATH/internals/.md5.cores.new $INSTALL_PATH/internals/.md5.cores)
-        if [ ! "$VARS_DIFF" == "" ]; then
-		$MD5 $MD5_FILES > $INSTALL_PATH/internals/.md5.cores 2> /dev/null
-                SKIP_FASTLOAD_VARS=1
-        fi
+# Acquire exclusive lock for mutating operations via file-based flock.
+# Re-invokes this script under flock; child sees _APF_LOCKED=1 and skips gate.
+# Read-only ops (-l, -t, -o, -v, -g, -h, --help, help, --templ, --gre-status, --la, --ld, --validate, --rules, --info, --lookup, --cc, --ct-status) excluded.
+# Restart (-r) excluded — sub-invocations lock individually to avoid deadlock.
+if [ "$_APF_LOCKED" != "1" ]; then
+  case "$1" in
+    -s|--start|-f|--stop|--flush|-e|--refresh|\
+    -a|-d|-u|--allow|--deny|--remove|--unban|\
+    -ta|--temp-allow|-td|--temp-deny|\
+    --tempf|--temp-flush|--temp-expire|\
+    --ipset-update|--gre-up|--gre-down|--cc-update|--ct-scan|\
+    -ar|-dr|-tr|\
+    trust)
+      if command -v flock >/dev/null 2>&1; then
+        _APF_LOCKED=1 flock -w "$ENTER_LOCK_TIMEOUT" "$LOCK_FILE" "$0" "$@"
+        exit $?
+      fi
+      ;;
+  esac
 fi
-if [ "$DEVEL_MODE" == "1" ]; then
-	SKIP_FASTLOAD_VARS=1
-fi
-if [ ! -f "$INSTALL_PATH/internals/.md5.cores.new" ] && [ -f "$INSTALL_PATH/internals/.md5.cores" ]; then
-	cp $INSTALL_PATH/internals/.md5.cores $INSTALL_PATH/internals/.md5.cores.new
-fi
-
-if [ ! -f "$INSTALL_PATH/internals/.last.vars" ]; then
-	$INSTALL_PATH/apf -o > $INSTALL_PATH/internals/.last.vars
-	SKIP_FASTLOAD_VARS=1
-else
-	$INSTALL_PATH/apf -o > $INSTALL_PATH/internals/.last.vars.new
-	VARS_DIFF=$($DIFF $INSTALL_PATH/internals/.last.vars.new $INSTALL_PATH/internals/.last.vars)
-	if [ ! "$VARS_DIFF" == "" ]; then
-	        $INSTALL_PATH/apf -o > $INSTALL_PATH/internals/.last.vars
-		SKIP_FASTLOAD_VARS=1
-	fi
-fi
-
-# check uptime is greater than 5 minutes (300s)
- UPSEC=$(cat /proc/uptime  | tr '.' ' ' | awk '{print$1}')
- if [ "$UPSEC" -lt "300" ]; then
-	SET_FASTLOAD_UPSEC=1
- fi
-
-# check if we are flagged to skip fast load, otherwise off we go
-if [ "$SKIP_FASTLOAD_FIRSTRUN" == "" ] && [ "$SKIP_FASTLOAD_EXPIRED" == "" ] && [ "$SKIP_FASTLOAD_VARS" == "" ] && [ "$SET_FASTLOAD_UPSEC" == "" ]; then
-	# Verify snapshot backend matches current iptables backend
-	IPT_BACKEND_CURRENT="legacy"
-	if $IPT --version 2>&1 | grep -q nf_tables; then
-		IPT_BACKEND_CURRENT="nft"
-	fi
-	if [ -f "$INSTALL_PATH/internals/.apf.restore.backend" ]; then
-		IPT_BACKEND_SAVED=$(cat "$INSTALL_PATH/internals/.apf.restore.backend")
-		if [ "$IPT_BACKEND_SAVED" != "$IPT_BACKEND_CURRENT" ]; then
-			SKIP_FASTLOAD_BACKEND=1
-		fi
-	fi
-	if [ ! "$SKIP_FASTLOAD_BACKEND" == "1" ]; then
-		devm
-		eout "{glob} activating firewall, fast load ($IPT_BACKEND_CURRENT)"
-		if ! $IPTR $IPT_FLAGS $INSTALL_PATH/internals/.apf.restore 2>/dev/null; then
-			eout "{glob} fast load failed (iptables-restore error), going full load"
-		elif [ "$USE_IPV6" == "1" ] && [ -z "$IP6TR" ]; then
-			eout "{glob} fast load incomplete (ip6tables-restore not found), going full load"
-			flush
-		elif [ "$USE_IPV6" == "1" ] && [ -n "$IP6TR" ] && [ ! -f "$INSTALL_PATH/internals/.apf6.restore" ]; then
-			eout "{glob} fast load incomplete (IPv6 enabled but no IPv6 snapshot), going full load"
-			flush
-		elif [ "$USE_IPV6" == "1" ] && [ -n "$IP6TR" ] && [ -f "$INSTALL_PATH/internals/.apf6.restore" ]; then
-			if ! $IP6TR $IPT_FLAGS $INSTALL_PATH/internals/.apf6.restore 2>/dev/null; then
-				eout "{glob} fast load failed (ip6tables-restore error), going full load"
-				flush
-			else
-				eout "{glob} firewall initialized"
-				if [ "$SET_VERBOSE" == "1" ] && [ "$DEVEL_ON" == "1" ]; then
-					eout "{glob} !!DEVELOPMENT MODE ENABLED!! - firewall will flush every 5 minutes."
-				fi
-				mutex_unlock
-				exit 0
-			fi
-		else
-			eout "{glob} firewall initialized"
-			if [ "$SET_VERBOSE" == "1" ] && [ "$DEVEL_ON" == "1" ]; then
-				eout "{glob} !!DEVELOPMENT MODE ENABLED!! - firewall will flush every 5 minutes."
-			fi
-			mutex_unlock
-			exit 0
-		fi
-	else
-		eout "{glob} fast load snapshot backend mismatch ($IPT_BACKEND_SAVED vs $IPT_BACKEND_CURRENT), going full load"
-	fi
- elif [ "$SKIP_FASTLOAD_FIRSTRUN" == "1" ]; then
-	eout "{glob} first run? fast load skipped [internals/.last.full not present]"
- elif [ "$SKIP_FASTLOAD_EXPIRED" == "1" ]; then
-	eout "{glob} fast load snapshot more than 12h old, going full load"
- elif [ "$SKIP_FASTLOAD_VARS" == "1" ]; then
-	eout "{glob} config. or .rule file has changed since last full load, going full load"
- elif [ "$SET_FASTLOAD_UPSEC" == "1" ]; then
-	eout "{glob} uptime less than 5 minutes, going full load"
-fi
-
-fi
-##
-# Full Load
-##
-eout "{glob} activating firewall"
-# record our last full load
-date +"%s" > "$INSTALL_PATH/internals/.last.full"
-if [ ! -f "$DS_HOSTS" ]; then
-	touch "$DS_HOSTS"
-	chmod 600 "$DS_HOSTS"
-fi
-if [ ! -f "$DENY_HOSTS" ]; then
-        touch "$DENY_HOSTS"
-        chmod 600 "$DENY_HOSTS"
-fi
-if [ ! -f "$ALLOW_HOSTS" ]; then
-        touch "$ALLOW_HOSTS"
-        chmod 600 "$ALLOW_HOSTS"
-fi
-# check dev mode
-devm
-# generate vnet rules
-$INSTALL_PATH/vnet/vnetgen
-# start main firewall script
-$INSTALL_PATH/firewall
-# check for/load bandmin
-LOAD=$(cat /proc/loadavg | tr '.' ' ' | awk '{print$1}')
- if [ ! "$LOAD" -gt "10" ]; then
-	bandmin
- fi
-eout "{glob} firewall initialized"
-if [ "$MD5_FIRSTRUN" == "1" ]; then
-        $MD5 $MD5_FILES > $INSTALL_PATH/internals/.md5.cores 2> /dev/null
-fi
-
-firewall_on=$($IPT $IPT_FLAGS -L --numeric | grep -vE "Chain|destination")
-if [ ! "$DEVEL_ON" == "1" ] && [ "$DOCKER_COMPAT" != "1" ] && [ ! "$firewall_on" == "" ]; then
-	$IPTS > $INSTALL_PATH/internals/.apf.restore
-	if [ "$USE_IPV6" == "1" ] && [ -n "$IP6TS" ]; then
-		$IP6TS > $INSTALL_PATH/internals/.apf6.restore
-	fi
-	# Save backend marker for snapshot compatibility detection
-	IPT_BACKEND_CURRENT="legacy"
-	if $IPT --version 2>&1 | grep -q nf_tables; then
-		IPT_BACKEND_CURRENT="nft"
-	fi
-	echo "$IPT_BACKEND_CURRENT" > $INSTALL_PATH/internals/.apf.restore.backend
-	eout "{glob} fast load snapshot saved (backend: $IPT_BACKEND_CURRENT)"
-fi
-if [ "$SET_VERBOSE" == "1" ] && [ "$DEVEL_ON" == "1" ]; then
-	eout "{glob} !!DEVELOPMENT MODE ENABLED!! - firewall will flush every 5 minutes."
-fi
-
-if [ "$SET_REFRESH_MD5" == "1" ] && [ "$MD5" ]; then
-	$MD5 $DENY_HOSTS $GDENY_HOSTS $ALLOW_HOSTS $GALLOW_HOSTS | $MD5 | awk '{print$1}' > $INSTALL_PATH/internals/.trusts.md5
-fi
-}
 
 case "$1" in
 -s|--start)
@@ -219,6 +77,7 @@ case "$1" in
 -f|--flush|--stop)
 	mutex_lock
 	flush
+	elog_event "service_state" "info" "APF firewall stopped"
 	;;
 -l|--list)
 	list
@@ -228,64 +87,211 @@ case "$1" in
 	;;
 
 -r|--restart)
-	$0 --flush
+	$0 --flush || exit $?
 	sleep 2
-	$0 --start
+	$0 --start || exit $?
 	;;
--a|--allow)
-	cli_trust "TALLOW" "ALLOW" "$ALLOW_HOSTS" "$2" "$3"
+-a)
+	mutex_lock
+	# Propagate exit code: invalid host, duplicate, or rule failure → exit 1
+	cli_trust "TALLOW" "ALLOW" "$ALLOW_HOSTS" "$2" "$3" || exit 1
 	;;
--d|--deny)
-	cli_trust "TDENY" "DENY" "$DENY_HOSTS" "$2" "$3"
+-d)
+	mutex_lock
+	# Propagate exit code: invalid host, duplicate, or rule failure → exit 1
+	cli_trust "TDENY" "DENY" "$DENY_HOSTS" "$2" "$3" || exit 1
 	;;
--u|--remove|--unban)
-	if cli_trust_remove "$2"; then
-		eout "{trust} removed $2 from trust system"
-		if [ "$SET_VERBOSE" != "1" ]; then
-			echo "Removed $2 from trust system."
-		fi
-	else
-		eout "{trust} $2 not found in trust system"
-		if [ "$SET_VERBOSE" != "1" ]; then
-			echo "$2 not found in trust system."
-		fi
-	fi
+-u)
+	mutex_lock
+	_cli_trust_remove_with_output "$2" || exit 1
 	;;
 -e|--refresh)
 	mutex_lock
 	refresh
 	;;
--o|--ovars)
-	head
+-o)
+	apf_banner
 	ovars
 	;;
 -v|--version)
 	echo "$VER"
 	;;
---ipset-update)
-	if [ "$USE_IPSET" == "1" ]; then
-		mutex_lock
-		ipset_update
+-g|--search)
+	search "$2"
+	;;
+-h)
+	apf_banner
+	help
+	;;
+--help)
+	# Progressive disclosure: --help opens the full man page
+	# Guard: minimized Ubuntu/Debian Docker images replace man(1) with a
+	# stub that prints an "unminimize" advisory instead of rendering pages
+	if command -v man >/dev/null 2>&1 && \
+	   man -w apf >/dev/null 2>&1 && \
+	   ! man apf 2>&1 | command head -1 | command grep -q "minimized"; then  # safe: detect man stub
+		man apf
+	else
+		apf_banner
+		help
 	fi
+	;;
+
+help)
+	case "${2:-}" in
+	"")     apf_banner; help ;;
+	trust)  _dispatch_trust --help ;;
+	cc)
+		# shellcheck disable=SC1090,SC1091
+		. "$INSTALL_PATH/internals/apf_geoip.sh"
+		_dispatch_cc --help
+		;;
+	config) _dispatch_config --help ;;
+	status) _dispatch_status --help ;;
+	gre)    _dispatch_gre --help ;;
+	ipset)  _dispatch_ipset --help ;;
+	ct)
+		# shellcheck disable=SC1090,SC1091
+		. "$INSTALL_PATH/internals/apf_ctlimit.sh"
+		_dispatch_ct --help
+		;;
+	*)
+		echo "apf: unknown topic '${2}'. See 'apf help'." >&2
+		exit 1
+		;;
+	esac
+	;;
+
+# --- Tier 2: Subcommand noun dispatch ---
+trust)
+	_dispatch_trust "${@:2}" || exit $?
+	;;
+cc)
+	# shellcheck disable=SC1090,SC1091
+	. "$INSTALL_PATH/internals/apf_geoip.sh"
+	_dispatch_cc "${@:2}" || exit $?
+	;;
+config)
+	_dispatch_config "${@:2}" || exit $?
+	;;
+status)
+	_dispatch_status "${@:2}" || exit $?
+	;;
+gre)
+	_dispatch_gre "${@:2}" || exit $?
+	;;
+ipset)
+	_dispatch_ipset "${@:2}" || exit $?
+	;;
+ct)
+	# shellcheck disable=SC1090,SC1091
+	. "$INSTALL_PATH/internals/apf_ctlimit.sh"
+	_dispatch_ct "${@:2}" || exit $?
+	;;
+
+# --- Tier 3: Legacy 2.0.x aliases (silent, route through dispatch) ---
+--allow)
+	_dispatch_trust add "${@:2}"
+	;;
+--deny)
+	_dispatch_trust deny "${@:2}"
+	;;
+--remove|--unban)
+	_dispatch_trust remove "${@:2}"
+	;;
+-ta|--temp-allow)
+	_dispatch_trust temp add "${@:2}"
+	;;
+-td|--temp-deny)
+	_dispatch_trust temp deny "${@:2}"
+	;;
+--templ|--temp-list)
+	_dispatch_trust temp list
+	;;
+--tempf|--temp-flush)
+	_dispatch_trust temp flush
+	;;
+--temp-expire)
+	_dispatch_trust temp expire
+	;;
+--la|--list-allow)
+	_dispatch_trust list --allow
+	;;
+--ld|--list-deny)
+	_dispatch_trust list --deny
+	;;
+--lookup)
+	_dispatch_trust lookup "${@:2}"
+	;;
+--validate|--check)
+	_dispatch_config validate
+	;;
+--dump-config|--ovars)
+	_dispatch_config dump
+	;;
+--rules)
+	_dispatch_status rules
+	;;
+--info)
+	_dispatch_status
+	;;
+--ct-scan)
+	# shellcheck disable=SC1090,SC1091
+	. "$INSTALL_PATH/internals/apf_ctlimit.sh"
+	_dispatch_ct scan
+	;;
+--ct-status)
+	# shellcheck disable=SC1090,SC1091
+	. "$INSTALL_PATH/internals/apf_ctlimit.sh"
+	_dispatch_ct status
+	;;
+--cc)
+	# shellcheck disable=SC1090,SC1091
+	. "$INSTALL_PATH/internals/apf_geoip.sh"
+	_dispatch_cc info "${@:2}"
+	;;
+--cc-update)
+	# shellcheck disable=SC1090,SC1091
+	. "$INSTALL_PATH/internals/apf_geoip.sh"
+	_dispatch_cc update
+	;;
+--ipset-update)
+	_dispatch_ipset update
 	;;
 --gre-up)
-	if [ "$USE_GRE" == "1" ]; then
-		mutex_lock
-		gre_init
-	fi
+	_dispatch_gre up
 	;;
 --gre-down)
-	if [ "$USE_GRE" == "1" ]; then
-		mutex_lock
-		gre_teardown
-	fi
+	_dispatch_gre down
 	;;
 --gre-status)
-	gre_status
+	_dispatch_gre status
+	;;
+--csf-help)
+	_csf_help
+	;;
+
+# --- Tier 4: CSF compat aliases (silent) ---
+-ar|-dr)
+	_dispatch_trust remove "${@:2}"
+	;;
+-tr)
+	_dispatch_trust temp remove "${@:2}"
+	;;
+-i)
+	# shellcheck disable=SC1090,SC1091
+	. "$INSTALL_PATH/internals/apf_geoip.sh"
+	_dispatch_cc lookup "${@:2}"
+	;;
+"")
+	apf_banner
+	help
+	exit 1
 	;;
 *)
-	head
-	help
+	_cli_unknown_command "apf" "$1" "trust status cc ct config ipset gre help -s -f -r -a -d -u -g -e -l -t -o -v -h"
+	exit 1
+	;;
 esac
 mutex_unlock
 exit 0

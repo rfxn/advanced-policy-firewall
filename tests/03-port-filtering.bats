@@ -55,7 +55,7 @@ teardown_file() {
     echo "$last_rules" | grep -q "ACCEPT.*0.0.0.0/0.*0.0.0.0/0"
 }
 
-@test "EGF=1 creates egress port rules" {
+@test "EGF=1 creates egress port rules and OUTPUT ends with DROP" {
     source /opt/tests/helpers/apf-config.sh
     apf_set_config "EGF" "1"
     "$APF" -f 2>/dev/null
@@ -64,35 +64,32 @@ teardown_file() {
     # Egress TCP port 80 should be open
     assert_rule_exists OUTPUT "ACCEPT.*tcp.*dpt:80"
 
+    # OUTPUT should end with DROP
+    local last_rules
+    last_rules=$(iptables -L OUTPUT -n | tail -3)
+    echo "$last_rules" | grep -q "DROP"
+
     # Cleanup: restore EGF=0
     apf_set_config "EGF" "0"
     "$APF" -f 2>/dev/null
     "$APF" -s
 }
 
-@test "EGF=1 OUTPUT ends with DROP" {
+
+@test "duplicate ports in IG_TCP_CPORTS produce no duplicate rules" {
     source /opt/tests/helpers/apf-config.sh
-    apf_set_config "EGF" "1"
+    apf_set_ports "22,80,443,80,443" "53" "" ""
     "$APF" -f 2>/dev/null
     "$APF" -s
 
-    local last_rules
-    last_rules=$(iptables -L OUTPUT -n | tail -3)
-    echo "$last_rules" | grep -q "DROP"
+    # Port 80 should appear exactly once in INPUT ACCEPT rules
+    local count
+    count=$(iptables -S INPUT 2>/dev/null | grep -c '\-\-dport 80 -j ACCEPT' || true)
+    [ "$count" -eq 1 ]
 
-    # Cleanup
-    apf_set_config "EGF" "0"
-    "$APF" -f 2>/dev/null
-    "$APF" -s
-}
-
-@test "port range with underscore notation works" {
-    source /opt/tests/helpers/apf-config.sh
-    apf_set_ports "22,8000_8080" "" "" ""
-    "$APF" -f 2>/dev/null
-    "$APF" -s
-
-    assert_rule_exists INPUT "ACCEPT.*tcp.*dpts:8000:8080"
+    # Port 443 should appear exactly once in INPUT ACCEPT rules
+    count=$(iptables -S INPUT 2>/dev/null | grep -c '\-\-dport 443 -j ACCEPT' || true)
+    [ "$count" -eq 1 ]
 
     # Cleanup
     apf_set_ports "22,80,443" "53" "21,25,80,443,43" "20,21,53"

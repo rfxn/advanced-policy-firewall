@@ -12,6 +12,14 @@ apf_set_config() {
     sed -i "s/^${var}=.*/${var}=\"${val}\"/" "$APF_INSTALL/conf.apf"
 }
 
+# Set config variable using % delimiter (safe for values containing /)
+# Usage: apf_set_config_safe VAR VALUE
+apf_set_config_safe() {
+    local var="$1"
+    local val="$2"
+    sed -i "s%^${var}=.*%${var}=\"${val}\"%" "$APF_INSTALL/conf.apf"
+}
+
 # Set the untrusted/trusted interfaces
 # Usage: apf_set_interface IFACE_UNTRUSTED [IFACE_TRUSTED]
 apf_set_interface() {
@@ -32,4 +40,11 @@ apf_set_ports() {
     if [ -n "$4" ]; then
         apf_set_config "EG_UDP_CPORTS" "$4"
     fi
+}
+
+# Set a URL config variable (uses % delimiter to avoid sed / conflicts)
+# Usage: apf_set_url VAR VALUE
+apf_set_url() {
+    local var="$1" val="$2"
+    sed -i "s%^${var}=.*%${var}=\"${val}\"%" "${APF_INSTALL:-/opt/apf}/conf.apf"
 }

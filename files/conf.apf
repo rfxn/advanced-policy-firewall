@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 ##
-# Advanced Policy Firewall (APF) v2.0.1
+# Advanced Policy Firewall (APF) v2.0.2
 #             (C) 2002-2026, R-fx Networks <proj@rfxn.com>
 #             (C) 2026, Ryan MacDonald <ryan@rfxn.com>
 # This program may be freely redistributed under the terms of the GNU GPL v2
@@ -40,16 +40,19 @@ USE_IPV6="0"
 SET_VERBOSE="1"
 
 # The fast load feature makes use of the iptables-save/restore facilities to do
-# a snapshot save of the current firewall rules on an APF stop then when APF is
-# instructed to start again it will restore the snapshot. This feature allows
+# a snapshot save of the current firewall rules after a full start and before a
+# flush, then when APF is instructed to start again it will restore the snapshot. This feature allows
 # APF to load hundreds of rules back into the firewall without the need to
 # regenerate every firewall entry. 
-# Note: a) if system uptime is below 5 minutes, the snapshot is expired
+# Note: a) if system uptime is 10 minutes or less, the snapshot is expired
 #       b) if snapshot age exceeds 12 hours, the snapshot is expired
 #       c) if conf or a .rule has changed since last load, snapshot is expired
-#       d) if it is your first run of APF since install, snapshot is generated
+#       d) if it is your first run since install, fast load is skipped (no
+#          prior snapshot exists); a snapshot is saved after the full load
 #       e) if DEVEL_MODE is enabled, the snapshot is bypassed
-#       - an expired snapshot means APF will do a full start rule-by-rule
+#       f) if the iptables backend has changed since the snapshot was saved
+#          (legacy vs nft), the snapshot is discarded
+#       - an expired/discarded snapshot means APF will do a full start
 SET_FASTLOAD="0"
 
 # Virtual Network Sub-System (VNET) creates independent policy rule set for
@@ -77,16 +80,31 @@ SET_MONOKERN="0"
 # Docker/container compatibility mode. When enabled, APF will only flush its
 # own chains during start/restart/stop, preserving chains and rules created
 # by Docker, containerd, Kubernetes, Podman, or other software that manages
-# iptables. External rules in INPUT, OUTPUT, FORWARD, and nat are preserved.
+# the FORWARD chain and nat table.
 # This also disables fast load, since iptables-restore would overwrite
 # external chains.
-DOCKER_COMPAT="0"
+# "auto" = detect at startup (checks for DOCKER-USER chain in iptables)
+# "1"    = force enable
+# "0"    = force disable
+DOCKER_COMPAT="auto"
 
 # The expiry interval, in seconds, that bans will be expired out of the trust
 # system. This only applies to local bans from deny_hosts.rules and not global
-# import rules. Must not be less than SET_REFRESH in seconds (e.g., 10 min = 600s).
+# import rules. If less than SET_REFRESH (in seconds), the effective value is
+# automatically raised to match (e.g., 10 min = 600s).
+# Entries with "static" or "noexpire" in their comment are exempt from expiry.
 # [value in seconds, 0 to disable, recommended 600]
 SET_EXPIRE="0"
+
+# Block Escalation — auto-promote repeat temporary denies to permanent.
+# When an IP is temp-denied PERMBLOCK_COUNT times within PERMBLOCK_INTERVAL
+# seconds, it is auto-promoted to a permanent deny entry.
+# [value is count threshold, 0 to disable]
+PERMBLOCK_COUNT="0"
+
+# Time window (seconds) for counting repeat temp denies.
+# [value in seconds, default 86400 = 24 hours]
+PERMBLOCK_INTERVAL="86400"
 
 # This controls how often, if at all, the trust system refreshes rules.
 # The firewall will flush & reload trust chains (TALLOW/TDENY/TGALLOW/TGDENY),
@@ -101,6 +119,14 @@ SET_REFRESH="10"
 # rules, which require regular DNS refreshes, you should keep this disabled.
 # [value 1 to enable, 0 to disable]
 SET_REFRESH_MD5="0"
+
+# Timeout in seconds for FQDN (hostname) resolution in trust rules.
+# When an FQDN is used in allow/deny/temp rules, APF resolves it to IP
+# addresses before loading iptables rules. If DNS is unreachable, the
+# resolution attempt is abandoned after this many seconds.
+# Requires 'getent' (glibc) and 'timeout' (coreutils), both standard.
+# [value in seconds, default 10]
+FQDN_TIMEOUT="10"
 
 # This is the total amount of rules allowed inside of the deny trust system.
 # When this limit is reached, the deny rule files will begin to purge older
@@ -237,14 +263,41 @@ TOS_16="25,110,143"
 
 # Allow traceroute requests on the defined range of ports. This feature
 # is not required for normal operations and some even prefer it disabled.
-# Enable Traceroute 	# Traceroute ports
-TCR_PASS="1"		TCR_PORTS="33434:33534"
+# Enable Traceroute
+TCR_PASS="1"
+# Traceroute ports
+TCR_PORTS="33434:33534"
 
 # Set a reasonable packet/time ratio for ICMP packets, exceeding this flow
 # will result in dropped ICMP packets. Supported values are in the form of: 
 # pkt/s (packets/seconds), pkt/m (packets/minutes)
 # Set value to 0 for unlimited, anything above is enabled.
 ICMP_LIM="30/s"
+
+# Per-port concurrent connection limit using the connlimit module. Connections
+# exceeding the limit from a single source IP are rejected. Format is
+# port:limit pairs, comma separated. Port ranges use underscore notation.
+# Example: IG_TCP_CLIMIT="80:50,443:100,8080_8090:25"
+# Set empty to disable (default).
+IG_TCP_CLIMIT=""
+
+# Per-port concurrent connection limit for inbound UDP
+IG_UDP_CLIMIT=""
+
+# SYN flood protection via iptables rate limiting. When enabled, inbound TCP
+# SYN packets are rate-limited using the limit module. Packets exceeding the
+# rate are dropped. This complements kernel-level SYN protection (SYSCTL_SYN,
+# SYSCTL_SYNCOOKIES) with iptables-level enforcement.
+# 0 = disabled (default), 1 = enabled
+SYNFLOOD="0"
+
+# Maximum rate of SYN packets to accept. Format: packets/unit where unit is
+# s (seconds), m (minutes), h (hours). Uses same format as ICMP_LIM.
+SYNFLOOD_RATE="100/s"
+
+# Initial burst allowance before rate limiting kicks in. Allows short traffic
+# spikes (e.g., page load with many connections) without triggering the limit.
+SYNFLOOD_BURST="150"
 
 # Creates firewall rules based on the local name servers as defined in the
 # /etc/resolv.conf file. This is the preferred secure method for client side
@@ -488,6 +541,36 @@ EG_UDP_UID=""
 # CMD-Match outbound (egress) denied applications
 EG_DROP_CMD="eggdrop,psybnc,bitchx,BitchX,init,udp.pl"
 
+# Block outbound SMTP for all users except whitelisted UIDs and GIDs.
+# When enabled, only root (always allowed), users listed in SMTP_ALLOWUSER,
+# and members of groups listed in SMTP_ALLOWGROUP can send outbound SMTP.
+# All other processes attempting to connect on SMTP ports are blocked.
+# This works independently of EGF (outbound filtering toggle).
+# Note: if EGF=1, ensure SMTP ports (25,465,587) are NOT listed in
+# EG_TCP_CPORTS, as the per-port ACCEPT rule takes precedence over
+# SMTP_BLOCK and would bypass the restriction.
+#
+# This forces web applications and user scripts to use the local MTA
+# (/usr/sbin/sendmail, mail command, etc.) instead of opening direct SMTP
+# connections, reducing spam relay abuse from compromised accounts.
+#
+# Panel examples:
+#   InterWorx:   SMTP_ALLOWUSER="iworx"       SMTP_ALLOWGROUP="mail"
+#   cPanel/WHM:  SMTP_ALLOWUSER="cpanel"       SMTP_ALLOWGROUP="mail,mailman"
+#   Plesk:       SMTP_ALLOWUSER="postfix"      SMTP_ALLOWGROUP="postfix,mail"
+SMTP_BLOCK="0"
+
+# SMTP ports to block. Standard: 25 (SMTP), 465 (SMTPS), 587 (submission).
+SMTP_PORTS="25,465,587"
+
+# Comma-separated list of usernames allowed to send outbound SMTP.
+# Root (UID 0) is always allowed regardless of this setting.
+SMTP_ALLOWUSER=""
+
+# Comma-separated list of group names allowed to send outbound SMTP.
+# Processes whose primary or supplementary GID matches are allowed.
+SMTP_ALLOWGROUP=""
+
 ##
 # [Remote Rule Imports]
 ##
@@ -546,12 +629,121 @@ GD_URL="https://yourhost.com/glob_deny.rules"
 # and matched with a single iptables rule per list instead of one rule per IP.
 # Requires the 'ipset' utility (apt-get install ipset / yum install ipset).
 # When disabled or ipset is not installed, ipset.rules is ignored.
-USE_IPSET="0"
+# "auto" = detect at startup (checks for ipset binary + ip_set kernel module)
+# "1"    = force enable
+# "0"    = force disable
+USE_IPSET="auto"
 
 # Default log rate limit for ipset blocklist matches (per minute per list).
 # Individual lists control logging via the log field in ipset.rules (0=off, 1=on).
 # Requires LOG_DROP="1" to be globally enabled.
 IPSET_LOG_RATE="30"
+
+# Default refresh interval (seconds) for ipset lists during --ipset-update.
+# Lists with interval=0 in ipset.rules use this value. Default: 21600 (6 hours).
+# The ipset cron job runs hourly; minimum effective interval is 1 hour (3600s).
+IPSET_REFRESH="21600"
+
+##
+# [Country Code Filtering]
+##
+# GeoIP-based country blocking/allowing using ipset hash tables for
+# high-performance matching. Countries are specified in cc_deny.rules
+# and cc_allow.rules using ISO 3166-1 alpha-2 codes (e.g., CN, RU, US)
+# or continent shorthand (@EU, @AS, @NA, @SA, @AF, @OC).
+#
+# Requires ipset (USE_IPSET="auto" or "1"). Country IP data is downloaded
+# from public registries and cached locally in the geoip/ directory.
+#
+# When cc_deny.rules has entries, those countries are blocked.
+#
+# WARNING: cc_allow.rules operates as a strict allowlist — when it has ANY
+# entries, ALL countries NOT listed are implicitly DENIED. This is a
+# whole-server lockdown to only the specified countries. Ensure your
+# admin IPs are in allow_hosts.rules (apf -a YOUR_IP) BEFORE enabling,
+# or use DEVEL_MODE="1" for auto-flush safety during testing.
+#
+# When both files have entries, deny takes precedence (a country in both
+# cc_deny.rules and cc_allow.rules is blocked).
+
+# Log country-blocked packets. Requires LOG_DROP="1" to be globally enabled.
+# Uses the global LOG_RATE for rate limiting.
+CC_LOG="1"
+
+# Audit mode: LOG blocked packets without actually dropping them.
+# Useful for measuring impact before enforcing. When enabled, rules use
+# LOG target with [CC_AUDIT:{CC}] prefix instead of DROP.
+CC_LOG_ONLY="0"
+
+# Data source for country IP blocks.
+# "auto"    = try ipverse.net first, fall back to ipdeny.com (recommended)
+# "ipverse" = ipverse.net only
+# "ipdeny"  = ipdeny.com only
+CC_SRC="auto"
+
+# Hours before re-downloading cached country data on firewall start.
+# Country IP allocations change infrequently; 24h avoids redundant downloads.
+# Set to 0 to always download fresh data (previous behavior).
+# Distinct from CC_INTERVAL (days between explicit --cc-update runs).
+CC_CACHE_TTL="24"
+
+# Minimum days between GeoIP data refreshes via apf --cc-update. Country IP
+# allocations change infrequently; 7 days is a good balance. Set 0 to always
+# refresh.
+CC_INTERVAL="7"
+
+# Include IPv6 country blocks when USE_IPV6="1". Requires ip6tables and
+# ipset family inet6 support. When disabled, only IPv4 country data is used.
+CC_IPV6="1"
+
+##
+# [Connection Tracking Limit]
+##
+# Global per-IP connection limit via periodic conntrack table scanning.
+# Unlike IG_TCP_CLIMIT (per-port inline connlimit), CT_LIMIT counts ALL
+# connections from each source IP across all ports and protocols. IPs
+# exceeding the limit are temporarily blocked via the trust system
+# (apf -td). This is the CSF CT_LIMIT equivalent.
+#
+# Data source: conntrack -L (preferred), fallback to /proc/net/nf_conntrack.
+# Blocking: uses temp deny (apf -td) with CT_BLOCK_TIME TTL; supports
+# PERMBLOCK_COUNT escalation when CT_PERMANENT="1".
+#
+# Set CT_LIMIT to 0 to disable (default). Recommended starting values:
+# CT_LIMIT="200" for web servers, CT_LIMIT="100" for mail servers.
+
+# Maximum connections per source IP before blocking. 0 = disabled.
+CT_LIMIT="0"
+
+# Scan interval in seconds. Minimum effective interval is 60s (cron).
+# Recommended: 30-120 seconds.
+CT_INTERVAL="30"
+
+# Duration (seconds) to temp-block offending IPs. Default: 1800 (30 min).
+CT_BLOCK_TIME="1800"
+
+# Only count connections to these ports (comma-separated). Empty = all ports.
+# Example: CT_PORTS="80,443,25" to only count web/mail connections.
+CT_PORTS=""
+
+# Only count connections in these states (comma-separated). Empty = all states.
+# Valid states: ESTABLISHED, SYN_SENT, SYN_RECV, FIN_WAIT, CLOSE_WAIT,
+# LAST_ACK, TIME_WAIT, CLOSE, LISTEN, CLOSING.
+CT_STATES=""
+
+# Exclude TIME_WAIT connections from count. TIME_WAIT connections are
+# already closed and waiting for cleanup; counting them can cause false
+# positives on busy web servers. 0 = count all, 1 = skip TIME_WAIT.
+CT_SKIP_TIME_WAIT="0"
+
+# Count CT_LIMIT blocks toward PERMBLOCK escalation. When enabled and
+# PERMBLOCK_COUNT > 0, repeat CT_LIMIT violations auto-promote to permanent.
+CT_PERMANENT="0"
+
+# Exempt IPs/CIDRs from CT_LIMIT scanning (comma-separated). Use for CDNs,
+# monitoring systems, load balancers, or other known-high-connection sources.
+# Example: CT_SKIP="10.0.0.0/8,192.168.1.100"
+CT_SKIP=""
 
 ##
 # [GRE Tunnels]
@@ -591,7 +783,8 @@ LOG_LEVEL="crit"
 
 # Where should all the logging data be sent?
 # LOG (Default; sends logging to kernel log)
-# ULOG (deprecated; use NFLOG with ulogd2 on modern kernels)
+# NFLOG (sends logging to ulogd2 via nfnetlink on modern kernels)
+# ULOG (deprecated; use NFLOG with ulogd2 instead)
 LOG_TARGET="LOG"
 
 # Log interactive access over telnet & ssh; uses
@@ -615,9 +808,18 @@ LOG_RATE="30"
 # sends outputs to this file
 LOG_APF="/var/log/apf_log"
 
-# Adds -w flag to iptables to enable locking support. This is only available
-# on iptables >= 1.4.20, but if supported you probably want this.
-IPT_LOCK_SUPPORT="0"
+# Location of the structured JSONL audit log. Records config changes, service
+# state transitions, trust operations, and firewall events. Leave commented to
+# use the default (ELOG_LOG_DIR/audit.log, i.e., /var/log/apf/audit.log).
+#ELOG_AUDIT_FILE="/var/log/apf/audit.log"
+
+# iptables locking support (-w flag). Prevents lock contention when
+# multiple processes issue iptables commands concurrently.
+# "auto" = detect at startup (recommended; probes iptables --help for -w)
+# "1"    = force enable (fails on iptables < 1.4.20, e.g., CentOS 6)
+# "0"    = force disable (no -w flag added)
+IPT_LOCK_SUPPORT="auto"
+# Seconds to wait for iptables lock before giving up
 IPT_LOCK_TIMEOUT="3"
 
 ##
@@ -625,4 +827,4 @@ IPT_LOCK_TIMEOUT="3"
 ##
 # Internal variable file
 CNFINT="$INSTALL_PATH/internals/internals.conf"
-. $CNFINT
+. "$CNFINT"

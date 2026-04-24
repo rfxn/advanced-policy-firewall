@@ -1,26 +1,28 @@
 #
 ##
-# Advanced Policy Firewall (APF) v2.0.1
+# Advanced Policy Firewall (APF) v2.0.2
 #             (C) 2002-2026, R-fx Networks <proj@rfxn.com>
 #             (C) 2026, Ryan MacDonald <ryan@rfxn.com>
 # This program may be freely redistributed under the terms of the GNU GPL v2
 ##
 #
-INSTALL_PATH="/etc/apf"
+INSTALL_PATH="${INSTALL_PATH:-/etc/apf}"
 if [ "$SET_VNET" == "1" ]; then
         eout "{glob} virtual network enabled, loading vnet rules."
-for i in $(ls $INSTALL_PATH/vnet/ | grep .rules); do
-        VALIP=$(echo $i | sed 's/.rules//')
+for i in "$INSTALL_PATH/vnet/"*.rules; do
+        [ -f "$i" ] || continue
+        VALIP="${i##*/}"
+        VALIP="${VALIP%.rules}"
         if [ -n "$ip" ]; then
                 IFVALIP=$($ip addr show 2>/dev/null | grep -w "$VALIP")
-        elif [ -n "$ifconfig" ] && [ -f "$ifconfig" ]; then
-                IFVALIP=$(ifconfig 2>/dev/null | grep -w "$VALIP")
+        elif [ -n "$ifconfig" ]; then
+                IFVALIP=$($ifconfig 2>/dev/null | grep -w "$VALIP")
         else
                 IFVALIP=""
         fi
-        if [ ! "$IFVALIP" == "" ]; then
-                source $INSTALL_PATH/conf.apf
-                source $INSTALL_PATH/vnet/$i
+        if [ -n "$IFVALIP" ]; then
+                source "$INSTALL_PATH/conf.apf"
+                source "$INSTALL_PATH/vnet/$VALIP.rules"
         else
                 eout "{glob} $VALIP not bound, skipping $VALIP.rules"
         fi

@@ -8,7 +8,7 @@ APF_INSTALL="/opt/apf"
 
 install_apf() {
     cd "$APF_SRC"
-    INSTALL_PATH="$APF_INSTALL" sh install.sh
+    INSTALL_PATH="$APF_INSTALL" bash install.sh
 
     # Prevent cross-test contamination: importconf copies old *_hosts.rules
     # from backup, which may contain entries from previous test runs.
@@ -65,10 +65,14 @@ install_apf() {
     chmod 600 /var/log/apf_log
 
     # Save clean state for reset-apf.sh (used by subsequent test files)
-    for rf in "$APF_INSTALL/allow_hosts.rules" "$APF_INSTALL/deny_hosts.rules"; do
+    for rf in "$APF_INSTALL/allow_hosts.rules" "$APF_INSTALL/deny_hosts.rules" \
+             "$APF_INSTALL/cc_deny.rules" "$APF_INSTALL/cc_allow.rules"; do
         sed '/^[^#]/d' "$rf" > "$rf.clean"
     done
     cp "$APF_INSTALL/conf.apf" "$APF_INSTALL/conf.apf.clean"
+    cp "$APF_INSTALL/hook_pre.sh" "$APF_INSTALL/hook_pre.sh.clean"
+    cp "$APF_INSTALL/hook_post.sh" "$APF_INSTALL/hook_post.sh.clean"
+    cp "$APF_INSTALL/silent_ips.rules" "$APF_INSTALL/silent_ips.rules.clean"
 }
 
 install_apf

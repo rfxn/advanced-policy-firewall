@@ -1,0 +1,14 @@
+# Exclude dev/CI/AI artifacts from git archive and GitHub downloads
+tests/              export-ignore
+pkg/                export-ignore
+audit-output/       export-ignore
+docs/               export-ignore
+reference/          export-ignore
+.github/            export-ignore
+.claude/            export-ignore
+.rdf/               export-ignore
+CLAUDE.md           export-ignore
+PLAN*.md            export-ignore
+AUDIT.md            export-ignore
+MEMORY.md           export-ignore
+REGR.md             export-ignore

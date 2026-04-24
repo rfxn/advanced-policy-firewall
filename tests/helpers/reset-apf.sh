@@ -10,12 +10,23 @@ reset_apf() {
     cp "$APF_INSTALL/conf.apf.clean" "$APF_INSTALL/conf.apf"
     cp "$APF_INSTALL/allow_hosts.rules.clean" "$APF_INSTALL/allow_hosts.rules"
     cp "$APF_INSTALL/deny_hosts.rules.clean" "$APF_INSTALL/deny_hosts.rules"
+    cp "$APF_INSTALL/cc_deny.rules.clean" "$APF_INSTALL/cc_deny.rules" 2>/dev/null || true  # may not exist on pre-geoip images
+    cp "$APF_INSTALL/cc_allow.rules.clean" "$APF_INSTALL/cc_allow.rules" 2>/dev/null || true  # may not exist on pre-geoip images
     rm -f "$APF_INSTALL/internals/.apf.restore" \
           "$APF_INSTALL/internals/.apf6.restore" \
           "$APF_INSTALL/internals/.last.full" \
           "$APF_INSTALL/internals/.apf.restore.backend" \
           "$APF_INSTALL/internals/.localaddrs" \
-          "$APF_INSTALL/internals/.localaddrs6"
+          "$APF_INSTALL/internals/.localaddrs6" \
+          "$APF_INSTALL/internals/.ipset.timestamps" \
+          "$APF_INSTALL/internals/.block_history"
+    rm -rf "$APF_INSTALL/geoip" 2>/dev/null || true  # clean GeoIP cache
+    # Reset hook scripts and silent IPs to pristine state
+    cp "$APF_INSTALL/hook_pre.sh.clean" "$APF_INSTALL/hook_pre.sh" 2>/dev/null || true
+    chmod 640 "$APF_INSTALL/hook_pre.sh" 2>/dev/null || true
+    cp "$APF_INSTALL/hook_post.sh.clean" "$APF_INSTALL/hook_post.sh" 2>/dev/null || true
+    chmod 640 "$APF_INSTALL/hook_post.sh" 2>/dev/null || true
+    cp "$APF_INSTALL/silent_ips.rules.clean" "$APF_INSTALL/silent_ips.rules" 2>/dev/null || true
     touch /var/log/apf_log
     chmod 600 /var/log/apf_log
 }

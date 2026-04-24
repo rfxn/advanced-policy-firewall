@@ -87,10 +87,11 @@ teardown_file() {
 }
 
 @test "default INPUT ends with DROP" {
-    # The last rule(s) should be DROP targets
-    local rules
-    rules=$(iptables -L INPUT -n | tail -3)
-    echo "$rules" | grep -q "DROP"
+    # Verify the last appended rule in INPUT is a DROP target (iptables -S
+    # format is consistent across nft and legacy backends)
+    local last_rule
+    last_rule=$(iptables -S INPUT | tail -1)
+    [[ "$last_rule" == *"DROP"* ]]
 }
 
 @test "default OUTPUT has ACCEPT when EGF=0" {

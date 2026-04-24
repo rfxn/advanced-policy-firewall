@@ -1,0 +1,50 @@
+# APF (Advanced Policy Firewall) — Package Manifest
+# Used by pkg_gen.sh to generate RPM spec, DEB debian/, Docker, CI artifacts.
+
+PKG_NAME="apf"
+PKG_VERSION="2.0.2"
+PKG_RELEASE="1"
+PKG_SUMMARY="Advanced Policy Firewall — iptables/netfilter firewall management"
+PKG_DESCRIPTION="Advanced Policy Firewall (APF) is an iptables/netfilter-based firewall management system for Linux servers. It provides stateful packet filtering, trust-based allow/deny host management, Reactive Address Blocking (RAB), and a Virtual Network (VNET) subsystem for per-IP policies."
+PKG_LICENSE="GPLv2+"
+PKG_URL="https://github.com/rfxn/advanced-policy-firewall"
+PKG_MAINTAINER="R-fx Networks <proj@rfxn.com>"
+PKG_INSTALL_PATH="/etc/apf"
+PKG_BIN_NAME="apf"
+PKG_BIN_PATH="/usr/local/sbin/apf"
+PKG_BIN_LEGACY="/usr/local/sbin/fwmgr"
+PKG_SECTION="8"
+PKG_COPYRIGHT_START="2002"
+PKG_VERSION_CMD="awk '/version/ {print \$2}' /etc/apf/VERSION"
+PKG_GROUP="System Environment/Base"
+
+# Feature flags for conditional template blocks
+PKG_HAS_SYSTEMD_SERVICE="1"
+PKG_HAS_SYSV_INIT="1"
+PKG_HAS_CRON_D="1"
+PKG_HAS_LOGROTATE="1"
+PKG_HAS_MAN_PAGE="1"
+PKG_HAS_BASH_COMPLETION="1"
+PKG_COMPLETION_FILE="apf.bash-completion"
+
+# Dependencies
+PKG_DEP_RPM="iptables iproute kmod bash coreutils"
+PKG_DEP_DEB="iptables iproute2 kmod bash coreutils"
+
+# Conflicts
+PKG_CONFLICTS_RPM="apf-firewall"
+PKG_CONFLICTS_DEB="apf-firewall"
+
+# Service files (relative to source root)
+PKG_SERVICE_FILE="apf.service"
+PKG_INIT_FILE="apf.init"
+PKG_CRON_FILE="cron.d.apf"
+PKG_LOGROTATE_FILE="logrotate.d.apf"
+PKG_MAN_FILE="apf.8"
+
+# Supplementary source files
+PKG_EXTRAS="importconf"
+PKG_DOCS="README.md CHANGELOG COPYING.GPL FLOW"
+
+# Docker build flags (APF requires --privileged for iptables)
+PKG_DOCKER_FLAGS="--privileged"

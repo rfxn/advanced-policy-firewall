@@ -1,25 +1,29 @@
 #!/bin/bash
 #
 ##
-# Advanced Policy Firewall (APF) v2.0.1
+# Advanced Policy Firewall (APF) v2.0.2
 #             (C) 2002-2026, R-fx Networks <proj@rfxn.com>
 #             (C) 2026, Ryan MacDonald <ryan@rfxn.com>
 # This program may be freely redistributed under the terms of the GNU GPL v2
 ##
 #
+# Fallback stubs when run standalone (outside install.sh context)
+command -v pkg_warn >/dev/null 2>&1 || pkg_warn() { echo "  Warning: $1"; }
+command -v pkg_item >/dev/null 2>&1 || pkg_item() { echo "  $1: $2"; }
+
 tcp_ports=""
 udp_ports=""
 
 if command -v ss > /dev/null 2>&1; then
 	for ptcp in $(ss -tlnp 2>/dev/null | tail -n +2 | awk '{print $4}' | grep -vE '^127\.|^\[::1\]' | sed 's/.*://' | sort -nu); do
-		if [ "$tcp_ports" == "" ]; then
+		if [ -z "$tcp_ports" ]; then
 			tcp_ports="$ptcp"
 		else
 			tcp_ports="$tcp_ports,$ptcp"
 		fi
 	done
 	for pudp in $(ss -ulnp 2>/dev/null | tail -n +2 | awk '{print $4}' | grep -vE '^127\.|^\[::1\]' | sed 's/.*://' | sort -nu); do
-		if [ "$udp_ports" == "" ]; then
+		if [ -z "$udp_ports" ]; then
 			udp_ports="$pudp"
 		else
 			udp_ports="$udp_ports,$pudp"
@@ -27,22 +31,22 @@ if command -v ss > /dev/null 2>&1; then
 	done
 elif command -v netstat > /dev/null 2>&1; then
 	for ptcp in $(netstat -tlnp 2>/dev/null | awk '/^tcp/ && !/127\.0\.0\.1/ && !/::1/' | awk '{print $4}' | sed 's/.*://' | sort -nu); do
-		if [ "$tcp_ports" == "" ]; then
+		if [ -z "$tcp_ports" ]; then
 			tcp_ports="$ptcp"
 		else
 			tcp_ports="$tcp_ports,$ptcp"
 		fi
 	done
 	for pudp in $(netstat -ulnp 2>/dev/null | awk '/^udp/ && !/127\.0\.0\.1/ && !/::1/' | awk '{print $4}' | sed 's/.*://' | sort -nu); do
-		if [ "$udp_ports" == "" ]; then
+		if [ -z "$udp_ports" ]; then
 			udp_ports="$pudp"
 		else
 			udp_ports="$udp_ports,$pudp"
 		fi
 	done
 else
-	echo "  Warning: neither ss nor netstat found"
+	pkg_warn "neither ss nor netstat found"
 fi
 
-echo "  Listening TCP ports: $tcp_ports"
-echo "  Listening UDP ports: $udp_ports"
+pkg_item "Listening TCP ports" "$tcp_ports"
+pkg_item "Listening UDP ports" "$udp_ports"

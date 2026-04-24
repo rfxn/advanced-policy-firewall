@@ -1,0 +1,12 @@
+usr/sbin
+usr/lib/apf/internals
+usr/lib/apf/extras
+usr/lib/apf/vnet
+etc/apf
+etc/apf/internals
+etc/apf/vnet
+etc/apf/geoip
+var/lib/apf/tmp
+var/log/apf
+usr/share/doc/apf
+usr/local/sbin

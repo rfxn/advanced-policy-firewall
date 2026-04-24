@@ -247,3 +247,17 @@ teardown() {
     mangle_rules=$(iptables -t mangle -S PREROUTING | grep -c '^-A' || true)
     [ "$mangle_rules" -eq 0 ]
 }
+
+@test "DOCKER_COMPAT=1 start creates baseline files" {
+    source /opt/tests/helpers/apf-config.sh
+    apf_set_config "DOCKER_COMPAT" "1"
+    local bdir="/opt/apf/internals"
+
+    # Remove any pre-existing baselines
+    rm -f "$bdir/.apf.input.baseline" "$bdir/.apf.output.baseline"
+
+    "$APF" -s
+
+    [ -f "$bdir/.apf.input.baseline" ]
+    [ -f "$bdir/.apf.output.baseline" ]
+}

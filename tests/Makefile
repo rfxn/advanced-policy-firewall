@@ -1,91 +1,43 @@
-.PHONY: test test-verbose \
-       test-centos6 test-centos7 test-rocky8 test-rocky9 test-rocky10 \
-       test-ubuntu1204 test-ubuntu2004 test-ubuntu2204 test-ubuntu2404 \
-       test-all test-modern test-legacy test-deep-legacy \
-       test-modern-parallel test-legacy-parallel test-deep-legacy-parallel test-all-parallel
+BATSMAN_OS_MODERN := debian12 rocky9 ubuntu2404
+BATSMAN_OS_LEGACY := centos7 rocky8 ubuntu2004
+BATSMAN_OS_DEEP   := centos6 ubuntu1204
+BATSMAN_OS_EXTRA  := rocky10
+BATSMAN_OS_ALL    := $(BATSMAN_OS_MODERN) $(BATSMAN_OS_LEGACY) $(BATSMAN_OS_DEEP) $(BATSMAN_OS_EXTRA)
+BATSMAN_RUN_TESTS := ./run-tests.sh
+BATSMAN_PROJECT   := apf
 
-HALF_CORES := $(shell echo $$(( $$(nproc) / 2 )) | awk '{ print ($$1 < 1) ? 1 : $$1 }')
+# Cap cross-OS parallelism: 3 OS targets × 6 groups = 18 privileged containers.
+# Higher values exhaust iptables kernel state and cause group timeouts.
+PARALLEL_JOBS := 3
 
-# Default: Debian 12
-test:
-	./run-tests.sh
+include infra/include/Makefile.tests
 
-test-verbose:
-	./run-tests.sh --formatter pretty
+# ---------------------------------------------------------------------------
+# Override sequential tier targets to continue on failure (report at end)
+# ---------------------------------------------------------------------------
+# The batsman defaults use || exit 1 which stops on first failure.
+# For CI visibility we want all targets to run and report a combined exit.
 
-# Individual OS targets (matches CI matrix)
-test-centos7:
-	./run-tests.sh --os centos7
-
-test-rocky8:
-	./run-tests.sh --os rocky8
-
-test-rocky9:
-	./run-tests.sh --os rocky9
-
-# Rocky 10 — not in CI matrix (pending stable image), manual only
-test-rocky10:
-	./run-tests.sh --os rocky10
-
-test-ubuntu2004:
-	./run-tests.sh --os ubuntu2004
-
-test-ubuntu2204:
-	./run-tests.sh --os ubuntu2204
-
-test-ubuntu2404:
-	./run-tests.sh --os ubuntu2404
-
-# Deep legacy OS targets (EOL, in CI matrix)
-test-centos6:
-	./run-tests.sh --os centos6
-
-test-ubuntu1204:
-	./run-tests.sh --os ubuntu1204
-
-# Modern OS targets (active support) — sequential
 test-modern:
-	./run-tests.sh --os debian12
-	./run-tests.sh --os rocky9
-	./run-tests.sh --os ubuntu2204
-	./run-tests.sh --os ubuntu2404
+	@rc=0; for os in $(BATSMAN_OS_MODERN); do $(BATSMAN_RUN_TESTS) --os $$os --parallel || rc=1; done; exit $$rc
 
-# Legacy OS targets (EOL but still in production) — sequential
 test-legacy:
-	./run-tests.sh --os centos7
-	./run-tests.sh --os rocky8
-	./run-tests.sh --os ubuntu2004
+	@rc=0; for os in $(BATSMAN_OS_LEGACY); do $(BATSMAN_RUN_TESTS) --os $$os --parallel || rc=1; done; exit $$rc
 
-# Deep legacy OS targets (very old EOL, vault/old-releases repos) — sequential
 test-deep-legacy:
-	./run-tests.sh --os centos6
-	./run-tests.sh --os ubuntu1204
+	@if [ -n "$(BATSMAN_OS_DEEP)" ]; then \
+		rc=0; for os in $(BATSMAN_OS_DEEP); do $(BATSMAN_RUN_TESTS) --os $$os --parallel || rc=1; done; exit $$rc; \
+	fi
 
-# Full matrix (all CI targets) — sequential
 test-all:
-	./run-tests.sh --os debian12
-	./run-tests.sh --os centos6
-	./run-tests.sh --os centos7
-	./run-tests.sh --os rocky8
-	./run-tests.sh --os rocky9
-	./run-tests.sh --os ubuntu1204
-	./run-tests.sh --os ubuntu2004
-	./run-tests.sh --os ubuntu2204
-	./run-tests.sh --os ubuntu2404
+	@rc=0; for os in $(BATSMAN_OS_ALL); do $(BATSMAN_RUN_TESTS) --os $$os --parallel || rc=1; done; exit $$rc
 
-# Parallel targets — run multiple OS tests concurrently
-test-modern-parallel:
-	printf '%s\n' debian12 rocky9 ubuntu2204 ubuntu2404 | \
-	  xargs -P $(HALF_CORES) -I{} ./run-tests.sh --os {}
+# ---------------------------------------------------------------------------
+# Dev iteration: abort on first failure (local use — not CI)
+# ---------------------------------------------------------------------------
+test-fast:
+	$(BATSMAN_RUN_TESTS) --abort --parallel
 
-test-legacy-parallel:
-	printf '%s\n' centos7 rocky8 ubuntu2004 | \
-	  xargs -P $(HALF_CORES) -I{} ./run-tests.sh --os {}
-
-test-deep-legacy-parallel:
-	printf '%s\n' centos6 ubuntu1204 | \
-	  xargs -P $(HALF_CORES) -I{} ./run-tests.sh --os {}
-
-test-all-parallel:
-	printf '%s\n' debian12 centos6 centos7 rocky8 rocky9 ubuntu1204 ubuntu2004 ubuntu2204 ubuntu2404 | \
-	  xargs -P $(HALF_CORES) -I{} ./run-tests.sh --os {}
+# UAT override: --privileged required for iptables access in UAT scenarios
+uat:
+	BATSMAN_DOCKER_FLAGS="--privileged" $(BATSMAN_RUN_TESTS) -- $(BATSMAN_UAT_PATH)

@@ -1,0 +1,7 @@
+apf (2.0.2-1) unstable; urgency=medium
+
+  * Initial Debian package for APF 2.0.2
+  * FHS-compliant layout with backward-compatible symlink farm
+  * Migration support from install.sh-based installations via importconf
+
+ -- R-fx Networks <proj@rfxn.com>  Thu, 26 Mar 2026 12:00:00 +0000

@@ -43,14 +43,18 @@ hide_bin() {
     done
 }
 
-# Restore all hidden binaries
+# Restore all hidden binaries.
+# Uses -e/-L to handle symlinks on merged-usr systems (Debian 12+) where
+# /sbin/ip is a symlink to /bin/ip — when hidden, the symlink dangles and
+# [ -f ] would fail to detect it.
 restore_bins() {
     for bin_path in $HIDDEN_BINS; do
-        if [ -f "${bin_path}.__hidden" ]; then
+        if [ -f "${bin_path}.__hidden" ] || [ -L "${bin_path}.__hidden" ]; then
             mv "${bin_path}.__hidden" "$bin_path"
         fi
     done
     HIDDEN_BINS=""
+    hash -r
 }
 
 teardown() {
@@ -87,15 +91,16 @@ teardown() {
     "$APF" -f 2>/dev/null || true
 }
 
-@test "warns on missing wget when DLIST enabled" {
+@test "warns on missing curl and wget when DLIST enabled" {
     source /opt/tests/helpers/apf-config.sh
     apf_set_config "DLIST_PHP" "1"
+    hide_bin curl
     hide_bin wget
     run "$APF" -s
     # Should still succeed (warning, not critical)
     assert_success
     # Check log for warning
-    run grep "missing optional dependencies.*wget" /var/log/apf_log
+    run grep "missing optional dependencies.*curl|wget" /var/log/apf_log
     assert_success
     "$APF" -f 2>/dev/null || true
     source /opt/tests/helpers/reset-apf.sh

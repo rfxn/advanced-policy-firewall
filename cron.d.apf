@@ -1,0 +1,8 @@
+# APF scheduled maintenance — all periodic tasks in one file
+SHELL=/bin/bash
+# Daily restart (full rule reload)
+0 0 * * * root [ -x /etc/apf/apf ] && /etc/apf/apf -r >> /dev/null 2>&1
+# Hourly ipset block list refresh (per-list intervals in ipset.rules)
+15 * * * * root [ -x /etc/apf/apf ] && /etc/apf/apf --ipset-update >> /dev/null 2>&1
+# Temporary trust entry expiry (fast-exits when no temp entries exist)
+* * * * * root [ -x /etc/apf/apf ] && /etc/apf/apf --temp-expire >> /dev/null 2>&1

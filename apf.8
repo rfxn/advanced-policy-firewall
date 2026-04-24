@@ -1,0 +1,857 @@
+.\" Advanced Policy Firewall (APF) v2.0.2
+.\"             (C) 2002-2026, R-fx Networks <proj@rfxn.com>
+.\"             (C) 2026, Ryan MacDonald <ryan@rfxn.com>
+.\" This program may be freely redistributed under the terms of the GNU GPL v2
+.\"
+.TH APF 8 "April 2026" "APF 2.0.2" "System Administration"
+.SH NAME
+apf \- Advanced Policy Firewall
+.SH SYNOPSIS
+.B apf
+.RB [ \-s | \-r | \-f | \-l | \-t | \-e | \-o | \-v | \-h | \-\-rules | \-\-info | \-\-validate | \-\-la | \-\-ld ]
+.br
+.B apf
+.RB { \-a | \-d }
+.IR HOST\  [ COMMENT ]
+.br
+.B apf
+.B \-u
+.I HOST
+.br
+.B apf
+.RB { \-ta | \-td }
+.IR HOST\  TTL\  [ COMMENT ]
+.br
+.B apf
+.RB [ \-\-templ | \-\-tempf ]
+.br
+.B apf
+.B \-\-lookup
+.I HOST
+.br
+.B apf
+.RB { \-g | \-\-search }
+.I PATTERN
+.br
+.B apf
+.RB [ \-\-cc " [\fICC\fR | \fIIP\fR]] | " \-\-cc\-update ]
+.br
+.B apf
+.RB [ \-\-ct\-scan | \-\-ct\-status ]
+.br
+.B apf
+.RB [ \-\-ipset\-update | \-\-gre\-up | \-\-gre\-down | \-\-gre\-status ]
+.br
+.B apf
+.B help
+.RI [ topic ]
+.br
+.B apf
+.RB { trust | status | cc | ct | config | ipset | gre }
+.RI [ verb ]
+.RI [ args ]
+.SH DESCRIPTION
+Advanced Policy Firewall (APF) is an iptables/netfilter\-based firewall
+management system for Linux servers.
+It provides three approaches to network filtering:
+stateful packet inspection policies,
+trust\-based allow/deny host management with automatic DNS resolution,
+and Reactive Address Blocking (RAB) for runtime policy violation tracking.
+APF supports both IPv4 and IPv6, ipset\-based block lists, GRE tunnel
+management, per\-IP virtual network policies, and temporary trust entries
+with automatic expiry.
+.SH OPTIONS
+.SS Core Operations
+.TP
+.BR \-s ", " \-\-start
+Load all firewall rules.
+Uses fast load (iptables\-restore from snapshot) when available,
+otherwise performs a full load.
+.TP
+.BR \-r ", " \-\-restart
+Stop (flush) and reload all firewall rules.
+.TP
+.BR \-f ", " \-\-stop ", " \-\-flush
+Stop (flush) all firewall rules and reset chains to ACCEPT.
+.TP
+.B \-\-rules
+Dump all active iptables rules to stdout in
+.BR iptables (8)
+.B \-S
+format (IPv4 + IPv6 when USE_IPV6=1).
+Output is suitable for piping and scripting:
+.B apf \-\-rules | grep DROP
+.TP
+.BR \-l ", " \-\-list
+View all firewall rules in an editor (pico, nano, vi).
+.TP
+.B \-\-info
+Show firewall status summary: active state, rule/chain counts, trust
+system statistics (allow/deny/temp entries, ban expiry, block escalation,
+FQDN resolution), filtering configuration (stop targets, port lists,
+packet sanity, connlimit, SYN flood, SMTP blocking), subsystem status
+(fast load, RAB, VNET, Docker compat, ipset, GRE, remote block lists),
+logging settings, and recent log entries.
+.TP
+.BR \-t ", " \-st ", " \-\-status
+Page through the full firewall status log.
+.TP
+.BR \-e ", " \-\-refresh
+Refresh and re\-resolve DNS names in trust rules.
+.SS Trust Management
+.TP
+.BR \-a " \fIHOST\fR [\fICOMMENT\fR], " \-\-allow " \fIHOST\fR [\fICOMMENT\fR]"
+Add
+.I HOST
+(IPv4, IPv6, CIDR, FQDN, or country code) to
+.I allow_hosts.rules
+and immediately load the rule into the live firewall.
+.I HOST
+may also be an advanced trust expression (see
+.B TRUST SYSTEM
+below) or a country code (see
+.B COUNTRY CODE FILTERING
+below):
+.RS
+.nf
+apf \-a "tcp:in:d=22:s=10.0.0.0/8"
+apf \-a "d=3306:s=192.168.1.5"
+apf \-a US              # allow United States
+apf \-a @EU             # allow all of Europe
+apf \-d "tcp:in:d=22:s=CN"  # deny SSH from China
+.fi
+.RE
+.TP
+.BR \-d " \fIHOST\fR [\fICOMMENT\fR], " \-\-deny " \fIHOST\fR [\fICOMMENT\fR]"
+Add
+.I HOST
+to
+.I deny_hosts.rules
+and immediately load the rule into the live firewall.
+Also accepts advanced trust syntax and country codes.
+.TP
+.BR \-u " \fIHOST\fR, " \-\-remove " \fIHOST\fR, " \-\-unban " \fIHOST\fR"
+Remove
+.I HOST
+(or country code) from all trust files (allow, deny, global, CC) and immediately
+remove matching rules from the live firewall.
+Accepts both bare hosts and advanced trust syntax.
+Removing a bare IP also removes any advanced trust entries containing that IP.
+.TP
+.BR \-\-la ", " \-\-list\-allow
+Display entries in
+.IR allow_hosts.rules
+(comments and blank lines excluded).
+.TP
+.BR \-\-ld ", " \-\-list\-deny
+Display entries in
+.IR deny_hosts.rules
+(comments and blank lines excluded).
+.TP
+.BR \-\-lookup " \fIHOST\fR"
+Check if
+.I HOST
+exists in any trust file (allow, deny, global allow, global deny, CC deny, CC allow).
+Searches are case\-insensitive with line numbers shown.
+Exits 0 if found, 1 if not found.
+.SS Temporary Trust
+.TP
+.BR \-ta " \fIHOST\fR \fITTL\fR [\fICOMMENT\fR], " \-\-temp\-allow " \fIHOST\fR \fITTL\fR [\fICOMMENT\fR]"
+Temporarily allow
+.I HOST
+with a time\-to\-live of
+.IR TTL .
+TTL may be in seconds or with a suffix:
+.BR 5m " (minutes), " 1h " (hours), " 7d " (days)."
+The entry is automatically removed when the TTL expires.
+Also accepts advanced trust syntax.
+.TP
+.BR \-td " \fIHOST\fR \fITTL\fR [\fICOMMENT\fR], " \-\-temp\-deny " \fIHOST\fR \fITTL\fR [\fICOMMENT\fR]"
+Temporarily deny
+.I HOST
+with a time\-to\-live of
+.IR TTL .
+Also accepts advanced trust syntax.
+.TP
+.BR \-\-templ ", " \-\-temp\-list
+List all temporary trust entries with remaining TTL.
+.TP
+.BR \-\-tempf ", " \-\-temp\-flush
+Remove all temporary trust entries.
+.SS Diagnostics
+.TP
+.BR \-g " \fIPATTERN\fR, " \-\-search " \fIPATTERN\fR"
+Search iptables rules (IPv4 and IPv6), ipset sets, and trust files for
+.IR PATTERN .
+Case\-insensitive.
+.TP
+.BR \-\-validate ", " \-\-check
+Validate configuration without starting the firewall.
+Checks stop targets, rate formats, connlimit syntax, and other settings.
+Exits 0 on success, 1 on error with a diagnostic message.
+.TP
+.BR \-\-dump\-config ", " \-o ", " \-\-ovars
+Output all configuration variables.
+.TP
+.BR \-v ", " \-\-version
+Output the version number.
+.TP
+.BR \-h ", " \-\-help
+Show usage help and exit.
+.TP
+.B \-\-csf\-help
+Show CSF\-to\-APF command mapping for users migrating from ConfigServer
+Security & Firewall.
+.SS Country Code Filtering
+.TP
+.BR \-\-cc " [\fICC\fR | \fIIP\fR]"
+Show GeoIP country code filtering status. Without arguments, displays an
+overview of all active country blocks with CIDR counts. With a country code
+argument (e.g.,
+.BR "apf \-\-cc CN" ),
+shows detailed information for that country including continent, rules
+status, cached data stats, and live ipset counts. Country detail works
+even when filtering is inactive (no entries in rules files).
+.IP
+With an IP address or CIDR argument (e.g.,
+.BR "apf \-\-cc 8.8.8.8" ),
+looks up which country the address belongs to using cached GeoIP data.
+Uses portable awk\-based CIDR containment for accurate matching.
+On first lookup, downloads comprehensive world data (~1MB) for full coverage.
+.TP
+.B \-\-cc\-update
+Refresh GeoIP data from upstream sources and atomically update all active
+ipsets with zero downtime. Respects the
+.B CC_INTERVAL
+setting.
+.SS Connection Tracking Limit
+.TP
+.B \-\-ct\-scan
+Run a CT_LIMIT scan: read the conntrack table, count connections per source IP,
+and temp\-block any IP exceeding the
+.B CT_LIMIT
+threshold. Requires CT_LIMIT > 0 in
+.IR conf.apf .
+Uses
+.B conntrack \-L
+when available, falling back to
+.IR /proc/net/nf_conntrack .
+Blocked IPs are added via
+.BR "apf \-td" .
+.TP
+.B \-\-ct\-status
+Show CT_LIMIT configuration, last scan timestamp, data source, and count of
+active CT_LIMIT blocks. Does not require CT_LIMIT to be enabled.
+.SS ipset Block Lists
+.TP
+.B \-\-ipset\-update
+Hot\-reload ipset block lists from
+.IR ipset.rules .
+Lists are refreshed per their configured interval.
+.SS GRE Tunnels
+.TP
+.B \-\-gre\-up
+Bring up GRE tunnels defined in
+.IR gre.rules .
+.TP
+.B \-\-gre\-down
+Tear down GRE tunnels.
+.TP
+.B \-\-gre\-status
+Show GRE tunnel status.
+.SH SUBCOMMANDS
+APF supports a structured
+.B apf \fInoun\fR \fIverb\fR
+syntax for grouping related operations.
+All existing single\-letter and long\-option flags continue to work as before;
+subcommands provide an alternative interface.
+Run
+.B apf \fInoun\fR \-\-help
+for verb\-level usage of any group.
+.SS help \(em Built\-in Help
+.TP
+.B apf help
+Show brief command reference (equivalent to
+.BR "apf \-h" ).
+.TP
+.B apf help \fItopic\fR
+Show help for a specific subcommand group (e.g.,
+.BR "apf help trust" ).
+Available topics:
+.BR trust ", " status ", " cc ", " ct ", " config ", " ipset ", " gre .
+.SS trust \(em Trust System Management
+.TP
+.B apf trust add \fIHOST\fR [\fICOMMENT\fR]
+Allow a host (equivalent to
+.BR "apf \-a" ).
+.TP
+.B apf trust deny \fIHOST\fR [\fICOMMENT\fR]
+Deny a host (equivalent to
+.BR "apf \-d" ).
+.TP
+.B apf trust remove \fIHOST\fR
+Remove host from all trust lists (equivalent to
+.BR "apf \-u" ).
+.TP
+.B apf trust list \fR[\fB\-\-allow\fR | \fB\-\-deny\fR | \fB\-\-temp\fR]
+Show trust entries. Without a flag, shows all entries.
+.B \-\-allow
+and
+.B \-\-deny
+show only allow or deny entries;
+.B \-\-temp
+shows temporary entries with remaining TTL.
+.TP
+.B apf trust lookup \fIHOST\fR
+Check if host exists in the trust system (equivalent to
+.BR "\-\-lookup" ).
+.TP
+.B apf trust refresh
+Re\-resolve FQDNs in trust rules (equivalent to
+.BR "apf \-e" ).
+.TP
+.B apf trust flush \-\-temp
+Remove all temporary trust entries (equivalent to
+.BR "\-\-tempf" ).
+.TP
+.B apf trust temp add \fIHOST\fR \fITTL\fR [\fICOMMENT\fR]
+Temporarily allow a host (equivalent to
+.BR "apf \-ta" ).
+.TP
+.B apf trust temp deny \fIHOST\fR \fITTL\fR [\fICOMMENT\fR]
+Temporarily deny a host (equivalent to
+.BR "apf \-td" ).
+.TP
+.B apf trust temp remove \fIHOST\fR
+Remove a temporary trust entry (equivalent to
+.BR "apf \-u" ).
+.TP
+.B apf trust temp list
+List temporary entries with remaining TTL (equivalent to
+.BR "\-\-templ" ).
+.TP
+.B apf trust temp flush
+Remove all temporary entries (equivalent to
+.BR "\-\-tempf" ).
+.SS status \(em Firewall Status and Diagnostics
+.TP
+.B apf status
+Show firewall status summary (equivalent to
+.BR "\-\-info" ).
+.TP
+.B apf status rules
+Dump active iptables rules to stdout (equivalent to
+.BR "\-\-rules" ).
+.TP
+.B apf status log
+Page through the full status log (equivalent to
+.BR "apf \-t" ).
+.SS cc \(em Country Code / GeoIP Operations
+.TP
+.B apf cc
+Show GeoIP country code filtering overview (equivalent to
+.BR "\-\-cc" ).
+.TP
+.B apf cc info \fR[\fICC\fR | \fIIP\fR]
+Show detail for a country code or look up the country for an IP address
+(equivalent to
+.BR "\-\-cc CC" " or " "\-\-cc IP" ).
+.TP
+.B apf cc lookup \fIIP\fR
+Look up which country an IP address belongs to.
+.TP
+.B apf cc update
+Refresh GeoIP data and rebuild ipsets (equivalent to
+.BR "\-\-cc\-update" ).
+.SS ct \(em Connection Tracking Limit
+.TP
+.B apf ct scan
+Run a CT_LIMIT scan and block offenders (equivalent to
+.BR "\-\-ct\-scan" ).
+.TP
+.B apf ct status
+Show CT_LIMIT configuration and last scan info (equivalent to
+.BR "\-\-ct\-status" ).
+.SS config \(em Configuration and Validation
+.TP
+.B apf config dump
+Output all configuration variables (equivalent to
+.BR "apf \-o" ).
+.TP
+.B apf config validate
+Validate configuration without starting the firewall (equivalent to
+.BR "\-\-validate" ).
+.SS ipset \(em ipset Block List Management
+.TP
+.B apf ipset update
+Hot\-reload ipset block lists (equivalent to
+.BR "\-\-ipset\-update" ).
+.TP
+.B apf ipset status
+Show ipset list names and status.
+.SS gre \(em GRE Tunnel Management
+.TP
+.B apf gre up
+Bring up GRE tunnels (equivalent to
+.BR "\-\-gre\-up" ).
+.TP
+.B apf gre down
+Tear down GRE tunnels (equivalent to
+.BR "\-\-gre\-down" ).
+.TP
+.B apf gre status
+Show GRE tunnel status (equivalent to
+.BR "\-\-gre\-status" ).
+.SH TRUST SYSTEM
+APF uses file\-based trust lists for allow and deny rules:
+.TP
+.I allow_hosts.rules
+Local allow list (one entry per line).
+.TP
+.I deny_hosts.rules
+Local deny list (one entry per line).
+.TP
+.I glob_allow.rules / glob_deny.rules
+Downloaded global allow/deny lists.
+.PP
+Each entry may be an IPv4 address, IPv6 address, CIDR block, or FQDN.
+FQDNs are pre\-resolved to IP addresses (IPv4 and IPv6 when USE_IPV6=1)
+via
+.B getent
+before loading into iptables. Resolved IPs are stored in trust file
+comments as
+.B resolved=
+metadata for efficient removal. Resolution timeout is controlled by
+.B FQDN_TIMEOUT
+(default 10 seconds). On refresh
+.RB ( \-e ),
+FQDNs are re\-resolved to pick up DNS changes.
+Comments are supported as full lines beginning with
+.BR # .
+Inline comments on the same line as an address are not supported and will
+cause that entry to be silently skipped.
+The
+.B apf \-a
+and
+.B apf \-d
+commands automatically prepend a structured
+.B # added ...
+comment on the line before each entry.
+.PP
+Advanced trust syntax allows protocol, direction, and port filtering:
+.PP
+.RS
+.B proto:flow:[s/d]=port:[s/d]=ip(/mask)
+.RE
+.PP
+Both
+.B proto
+and
+.B flow
+are independently optional.
+When proto is omitted, rules apply to both TCP and UDP.
+When flow is omitted, rules apply to both inbound and outbound.
+.PP
+Examples:
+.B tcp:in:d=22:s=10.0.0.0/8
+(5\-field, inbound TCP 22 from 10.0.0.0/8),
+.B in:d=443:s=192.168.1.0/24
+(4\-field, inbound TCP+UDP 443),
+.B d=3306:s=192.168.1.5
+(3\-field, both directions, both protocols).
+.PP
+Temporary entries (added via
+.B \-ta
+or
+.BR \-td )
+include TTL and expiry metadata and are automatically removed by cron.
+.SH COUNTRY CODE FILTERING
+APF supports GeoIP\-based country blocking using ipset hash tables for
+high\-performance matching. Country codes are specified in
+.I cc_deny.rules
+(block) and
+.I cc_allow.rules
+(permit), using ISO 3166\-1 alpha\-2 codes.
+.PP
+Continent shorthand expands to all countries in a continent:
+.B @AF
+(Africa),
+.B @AS
+(Asia),
+.B @EU
+(Europe),
+.B @NA
+(North America),
+.B @SA
+(South America),
+.B @OC
+(Oceania).
+.PP
+Simple entries block/allow all traffic from/to a country:
+.PP
+.RS
+.nf
+# cc_deny.rules
+CN
+RU
+@EU
+.fi
+.RE
+.PP
+Advanced entries filter specific protocol/port/direction:
+.PP
+.RS
+.nf
+tcp:in:d=22:s=CN        # deny inbound SSH from China
+tcp:in:d=25:s=RU        # deny inbound SMTP from Russia
+tcp:in:d=22:s=*          # deny SSH from ALL denied countries
+.fi
+.RE
+.PP
+.B WARNING:
+When
+.I cc_allow.rules
+has entries, it operates as a strict allowlist \(em
+.B all countries NOT listed are implicitly blocked.
+Adding even one country code locks the server to traffic from only the listed
+countries. Ensure admin IPs are in
+.I allow_hosts.rules
+.RB ( "apf \-a YOUR_IP" )
+before enabling, or use
+.B DEVEL_MODE="1"
+for auto\-flush safety during testing.
+When both files have entries, deny takes precedence.
+.PP
+Country IP data is downloaded from public registries (ipverse.net, ipdeny.com)
+and cached locally in the
+.I geoip/
+directory. Data is refreshed per
+.B CC_INTERVAL
+(default 7 days).
+.PP
+Configuration variables in
+.I conf.apf:
+.TP
+.B CC_LOG
+Log country\-blocked packets (requires LOG_DROP=1).
+.TP
+.B CC_LOG_ONLY
+Audit mode: LOG without DROP. Useful for measuring impact before enforcing.
+.TP
+.B CC_SRC
+Data source:
+.B auto
+(ipverse then ipdeny),
+.BR ipverse ,
+.BR ipdeny .
+.TP
+.B CC_CACHE_TTL
+Hours before re-downloading cached country data on firewall start (default 24).
+Set 0 to always download fresh data. Distinct from CC_INTERVAL (days).
+.TP
+.B CC_INTERVAL
+Days between automatic data refresh via \-\-cc\-update (0 to disable).
+.TP
+.B CC_IPV6
+Include IPv6 country blocks when USE_IPV6=1.
+.SH VIRTUAL NETWORK (VNET)
+The VNET subsystem creates per\-IP firewall policies for systems with multiple
+IP addresses. When
+.B SET_VNET=1
+is set in
+.IR conf.apf ,
+APF detects aliased IPs on the untrusted interface and generates a
+.I vnet/IP.rules
+file for each one. These rule files can override global port filtering
+variables (e.g., IG_TCP_CPORTS, EG_TCP_CPORTS) and include custom
+iptables entries for that specific IP.
+.PP
+VNET is IPv4\-only. When the firewall starts with SET_VNET=1, vnetgen
+creates a default rules file for each detected IP. To customize a
+per\-IP policy, edit the generated file and restart:
+.PP
+.in +4
+.nf
+vi /etc/apf/vnet/192.168.1.10.rules
+apf \-r
+.fi
+.in
+.PP
+The connection tracking limit scanner (CT_LIMIT) also supports per\-IP
+overrides: set
+.B CT_LIMIT=\(dq500\(dq
+in a VNET rules file for a different threshold on that IP.
+.PP
+See
+.B SET_VNET
+and
+.B SET_ADDIFACE
+in
+.I conf.apf
+for configuration.
+.SH CONFIGURATION
+All configuration is in a single file,
+.IR conf.apf ,
+organized into sections:
+.TP
+.B Main Config
+Development mode, install path, interfaces, IPv6 toggle, fast load, VNET,
+FQDN resolution timeout, block escalation
+.RB ( PERMBLOCK_COUNT / PERMBLOCK_INTERVAL ),
+Docker/container compatibility mode
+.RB ( DOCKER_COMPAT ).
+.TP
+.B Reactive Address Blocking
+RAB enable/disable, sanity and port\-scan triggers, thresholds, timers.
+.TP
+.B Packet Filtering
+TCP/UDP/ALL stop targets, packet sanity checks, INVALID state blocking.
+.TP
+.B Port & ICMP Filtering
+Inbound/outbound TCP/UDP/ICMP ports, connection limits, SYN flood protection,
+DNS resolution, P2P, multicast.
+.TP
+.B User & Application Filtering
+UID\-based egress, command\-owner blocking, SMTP outbound restrictions.
+.TP
+.B Remote Lists & ipset
+DShield, Spamhaus DROP, Project Honey Pot, ECN, global trust, ipset lists.
+.TP
+.B Country Code Filtering
+CC_LOG, CC_LOG_ONLY, CC_SRC, CC_CACHE_TTL, CC_INTERVAL, CC_IPV6.
+.TP
+.B Connection Tracking Limit
+CT_LIMIT (max connections per IP, 0=disabled), CT_INTERVAL (scan interval
+seconds), CT_BLOCK_TIME (temp\-block duration), CT_PORTS (port filter),
+CT_STATES (state filter), CT_SKIP_TIME_WAIT, CT_PERMANENT, CT_SKIP
+(exempt IPs/CIDRs). VNET per\-IP overrides supported.
+.TP
+.B GRE Tunnels
+USE_GRE, GRE_PERSIST, GRE_KEEPALIVE, GRE_MTU, GRE_TTL.
+.TP
+.B Logging & Kernel Tuning
+Log targets (LOG, NFLOG, or deprecated ULOG), rate limits, sysctl tunables,
+conntrack, helper chains.
+.SH ENVIRONMENT
+.TP
+.B INSTALL_PATH
+Override default install path
+.RB ( /etc/apf ).
+Must be set before running
+.BR install.sh .
+.TP
+.B DEVEL_MODE
+When set to
+.B 1
+in
+.IR conf.apf ,
+a cron job automatically flushes the firewall every 5 minutes to prevent
+lockout during testing.
+.TP
+.B NO_COLOR
+When set to any non\-empty value, disables ANSI color output in help and
+error messages.
+See
+.UR https://no\-color.org/
+no\-color.org
+.UE .
+.TP
+.B TERM
+If set to
+.BR dumb ,
+color output is also suppressed.
+.SH FILES
+.TP
+.I /etc/apf/conf.apf
+Main configuration file.
+.TP
+.I /etc/apf/allow_hosts.rules
+Local allow trust list.
+.TP
+.I /etc/apf/deny_hosts.rules
+Local deny trust list.
+.TP
+.I /etc/apf/glob_allow.rules
+Global (downloaded) allow list.
+.TP
+.I /etc/apf/glob_deny.rules
+Global (downloaded) deny list.
+.TP
+.I /etc/apf/cc_deny.rules
+Country code deny list (ISO 3166\-1 alpha\-2 codes and continent shorthand).
+.TP
+.I /etc/apf/cc_allow.rules
+Country code allow list.
+.TP
+.I /etc/apf/geoip/
+Cached GeoIP country IP data (downloaded from public registries).
+.TP
+.I /etc/apf/ipset.rules
+ipset block list definitions.
+.TP
+.I /etc/apf/gre.rules
+GRE tunnel definitions.
+.TP
+.I /etc/apf/hook_pre.sh
+Pre\-configuration hook script (inactive when permissions are 640).
+.TP
+.I /etc/apf/hook_post.sh
+Post\-configuration hook script (inactive when permissions are 640).
+.TP
+.I /etc/apf/silent_ips.rules
+Silent IP blocking list; drops all traffic to/from listed addresses with no logging.
+.TP
+.I /etc/apf/preroute.rules
+Pre\-routing custom rules, sourced early in the firewall chain.
+.TP
+.I /etc/apf/postroute.rules
+Post\-routing custom rules.
+.TP
+.I /etc/apf/vnet/
+Per\-IP virtual network policy files.
+.TP
+.I /etc/apf/internals/apf_ctlimit.sh
+Connection tracking limit internal library (sourced on demand).
+.TP
+.I /etc/cron.d/ctlimit.apf
+CT_LIMIT scan cron job (created when CT_LIMIT > 0).
+.TP
+.I /etc/cron.d/apf
+Consolidated cron: daily restart, hourly ipset refresh, per\-minute temp expiry.
+.TP
+.I /etc/logrotate.d/apf
+Log rotation configuration for APF status and audit logs.
+.TP
+.I /etc/bash_completion.d/apf
+Bash tab completion for apf command\-line options.
+.TP
+.I /var/log/apf_log
+Default status log location.
+.TP
+.I /var/log/apf/audit.log
+Structured JSONL audit log (config, service state, rule events).
+.SH EXIT STATUS
+.TP
+.B 0
+Success.
+.TP
+.B 1
+Error (missing dependency, invalid argument, lock contention, iptables failure).
+.SH EXAMPLES
+Start the firewall:
+.PP
+.RS
+.B apf \-s
+.RE
+.PP
+Allow a host with a comment:
+.PP
+.RS
+.B apf \-a 192.168.1.100 "office gateway"
+.RE
+.PP
+Temporarily deny a host for 1 hour:
+.PP
+.RS
+.B apf \-td 203.0.113.50 1h "brute force"
+.RE
+.PP
+Allow inbound TCP port 22 from a subnet:
+.PP
+.RS
+.B apf \-a "tcp:in:d=22:s=10.0.0.0/8"
+.RE
+.PP
+Deny inbound port 3306 (both TCP and UDP) from a host:
+.PP
+.RS
+.B apf \-d "d=3306:s=203.0.113.50"
+.RE
+.PP
+Temporarily allow inbound TCP port 443 for 1 hour:
+.PP
+.RS
+.B apf \-ta "tcp:in:d=443:s=192.168.1.100" 1h
+.RE
+.PP
+Remove an advanced trust entry:
+.PP
+.RS
+.B apf \-u "tcp:in:d=22:s=10.0.0.0/8"
+.RE
+.PP
+Search rules for an IP address:
+.PP
+.RS
+.B apf \-g 10.0.0.1
+.RE
+.PP
+Dump rules to stdout (pipeable):
+.PP
+.RS
+.B apf \-\-rules | grep DROP
+.RE
+.PP
+Show firewall status summary:
+.PP
+.RS
+.B apf \-\-info
+.RE
+.PP
+Check if a host is in the trust system:
+.PP
+.RS
+.B apf \-\-lookup 192.168.1.100
+.RE
+.PP
+Restart the firewall after configuration changes:
+.PP
+.RS
+.B apf \-r
+.RE
+.PP
+Using subcommand syntax to manage trust:
+.PP
+.RS
+.B apf trust add 192.168.1.100 "office gateway"
+.RE
+.PP
+.RS
+.B apf trust deny CN
+.RE
+.PP
+.RS
+.B apf trust temp deny 203.0.113.50 1h "brute force"
+.RE
+.PP
+.RS
+.B apf trust list \-\-temp
+.RE
+.PP
+Using subcommand syntax for GeoIP and diagnostics:
+.PP
+.RS
+.B apf cc info CN
+.RE
+.PP
+.RS
+.B apf cc lookup 8.8.8.8
+.RE
+.PP
+.RS
+.B apf status rules | grep DROP
+.RE
+.PP
+.RS
+.B apf config validate
+.RE
+.SH SEE ALSO
+.BR iptables (8),
+.BR ip6tables (8),
+.BR ipset (8),
+.BR iptables\-save (8),
+.BR iptables\-restore (8)
+.SH AUTHORS
+Ryan MacDonald <ryan@rfxn.com>, R-fx Networks <proj@rfxn.com>
+.PP
+https://github.com/rfxn/advanced\-policy\-firewall

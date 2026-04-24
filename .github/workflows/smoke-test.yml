@@ -8,30 +8,44 @@ on:
 
 jobs:
   smoke-test:
+    uses: rfxn/batsman/.github/workflows/test.yml@v1.4.2
+    with:
+      project-name: apf
+      os-matrix: '["debian12","centos6","centos7","rocky8","rocky9","ubuntu1204","ubuntu2004","ubuntu2404"]'
+      docker-run-flags: '--privileged'
+      file-groups: 2
+      timeout: 10
+
+  uat:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
-
-    strategy:
-      matrix:
-        os: [debian12, centos6, centos7, rocky8, rocky9, ubuntu1204, ubuntu2004, ubuntu2204, ubuntu2404]
-      fail-fast: false
-
+    timeout-minutes: 10
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build test image
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: docker/setup-buildx-action@v3
+      - name: Build base image
         uses: docker/build-push-action@v6
         with:
-          context: .
-          file: ${{ matrix.os == 'debian12' && 'tests/Dockerfile' || format('tests/Dockerfile.{0}', matrix.os) }}
-          tags: apf-test-${{ matrix.os }}
+          context: tests/infra
+          file: tests/infra/dockerfiles/Dockerfile.debian12
+          tags: apf-base-debian12
           load: true
-          cache-from: type=gha,scope=${{ matrix.os }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.os }}
-
-      - name: Run smoke tests (${{ matrix.os }})
-        run: docker run --rm --privileged apf-test-${{ matrix.os }}
+          cache-from: type=gha,scope=base-debian12
+          cache-to: type=gha,mode=max,scope=base-debian12
+      - name: Build test image
+        run: |
+          docker build \
+            --build-arg BASE_IMAGE=apf-base-debian12 \
+            -f tests/Dockerfile \
+            -t apf-test-debian12 .
+      - name: Run UAT scenarios
+        run: make -C tests uat
+      - name: Upload UAT results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: uat-results
+          path: /tmp/uat-*.log
+          retention-days: 14
+          if-no-files-found: ignore

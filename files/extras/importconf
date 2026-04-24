@@ -1,30 +1,104 @@
 #!/bin/bash
 #
 ##
-# Advanced Policy Firewall (APF) v2.0.1
+# Advanced Policy Firewall (APF) v2.0.2
 #             (C) 2002-2026, R-fx Networks <proj@rfxn.com>
 #             (C) 2026, Ryan MacDonald <ryan@rfxn.com>
 # This program may be freely redistributed under the terms of the GNU GPL v2
 ##
 #
-INSTALL_PATH="/etc/apf"
-DEF=".ca.def"
-DOUT=".conf.apf"
+INSTALL_PATH=${INSTALL_PATH:-"/etc/apf"}
 
-if [ -d "/etc/apf.bk.last" ]; then
-# get all the vars from current release
-. /etc/apf/conf.apf
-# replace with any vars old release had
-. /etc/apf.bk.last/conf.apf
-# generate new conf
-. $DEF
+# BK_LAST is set by install.sh via pkg_backup_path(); fall back to legacy
+# path for backward compatibility with manual invocation or DEB packaging
+BK_LAST=${BK_LAST:-"${INSTALL_PATH}.bk.last"}
 
-cp -f $INSTALL_PATH/conf.apf $INSTALL_PATH/conf.apf.orig
-cp -f $DOUT $INSTALL_PATH/conf.apf
-cp -f /etc/apf.bk.last/*_hosts.rules /etc/apf/
-cp -f /etc/apf.bk.last/vnet/*.rules /etc/apf/vnet/
+if [ -d "$BK_LAST" ]; then
 
-OV=$(cat /etc/apf.bk.last/VERSION | awk '{print$2}')
-NV=$(cat /etc/apf/VERSION | awk '{print$2}')
+# Source shared packaging library for config merge
+# shellcheck disable=SC1090,SC1091
+. "$INSTALL_PATH/internals/pkg_lib.sh"
+
+# Back up current (new install) conf.apf before merge
+command cp -f "$INSTALL_PATH/conf.apf" "$INSTALL_PATH/conf.apf.orig"
+
+# Merge old config values into new config template
+# Output to temp path — pkg_config_merge truncates output before awk reads,
+# so output must differ from new_conf to avoid reading an empty file
+pkg_config_merge "$BK_LAST/conf.apf" "$INSTALL_PATH/conf.apf" "$INSTALL_PATH/conf.apf.merged"
+command mv -f "$INSTALL_PATH/conf.apf.merged" "$INSTALL_PATH/conf.apf"
+
+# Migrate EG_DROP_CMD from space-separated (pre-2.0.2) to comma-separated
+_eg_val=$(pkg_config_get "$INSTALL_PATH/conf.apf" "EG_DROP_CMD") || _eg_val=""
+if [ -n "$_eg_val" ] && [[ "$_eg_val" == *" "* ]] && [[ "$_eg_val" != *","* ]]; then
+	_eg_val="${_eg_val// /,}"
+	pkg_config_set "$INSTALL_PATH/conf.apf" "EG_DROP_CMD" "$_eg_val"
+fi
+
+# Read old version early — needed for version-gated migrations below
+OV=$(awk '{print$2}' "$BK_LAST/VERSION")
+
+# Migrate auto-detect variables from hardcoded "0" (pre-2.0.2 default) to "auto"
+# which detects at runtime — "auto" won't enable a feature if unavailable.
+# Only run when upgrading from pre-2.0.2 where "0" was the default; on 2.0.2+
+# a user setting "0" means explicitly disabled and must not be overwritten.
+case "$OV" in
+	""|1.*|2.0.0|2.0.1)
+		for _auto_var in DOCKER_COMPAT USE_IPSET IPT_LOCK_SUPPORT; do
+			_auto_val=$(pkg_config_get "$INSTALL_PATH/conf.apf" "$_auto_var") || _auto_val=""
+			if [ "$_auto_val" = "0" ]; then
+				pkg_config_set "$INSTALL_PATH/conf.apf" "$_auto_var" "auto"
+			fi
+		done
+
+		# Fix TCR_PASS/TCR_PORTS combined-line format from pre-2.0.2.
+		# In 2.0.1 and earlier, both variables shared a single line:
+		#   TCR_PASS="1"		TCR_PORTS="33434:33534"
+		# pkg_config_merge treats the entire line as TCR_PASS's value,
+		# losing the user's TCR_PORTS customization. Extract and fix.
+		_tcr_line=$(grep '^TCR_PASS=' "$INSTALL_PATH/conf.apf" 2>/dev/null) || _tcr_line=""
+		if [[ "$_tcr_line" == *TCR_PORTS=* ]]; then
+			_tcr_ports_val="${_tcr_line##*TCR_PORTS=}"
+			_tcr_ports_val="${_tcr_ports_val//\"/}"
+			_tcr_ports_val="${_tcr_ports_val%%[[:space:]]*}"
+			_tcr_pass_val="${_tcr_line#TCR_PASS=}"
+			_tcr_pass_val="${_tcr_pass_val%%[[:space:]]*}"
+			_tcr_pass_val="${_tcr_pass_val//\"/}"
+			pkg_config_set "$INSTALL_PATH/conf.apf" "TCR_PASS" "$_tcr_pass_val"
+			pkg_config_set "$INSTALL_PATH/conf.apf" "TCR_PORTS" "$_tcr_ports_val"
+		fi
+		;;
+esac
+
+# Note: internals.conf is intentionally NOT merged or restored from backup.
+# It contains conditional assignments (if/else STATE_MATCH=..., NET=...,
+# IPT_FLAGS=...) that pkg_config_merge cannot handle — both branches collapse
+# to whichever value was last seen in the old file. Most contents are
+# auto-detected at runtime (binary discovery, network detection), so the new
+# template is correct on its own. RPM %config(noreplace) and DEB conffile
+# handling preserve direct user edits at the package-manager layer; users
+# migrating from install.sh-based installs can manually reapply any
+# customizations from $BK_LAST/internals/internals.conf.
+
+# Restore user's trust, rule, and hook files from backup
+command cp -f "$BK_LAST"/*_hosts.rules "$INSTALL_PATH/"
+command cp -f "$BK_LAST"/glob_allow.rules "$INSTALL_PATH/" 2>/dev/null || true  # may not exist in old installs
+command cp -f "$BK_LAST"/glob_deny.rules "$INSTALL_PATH/" 2>/dev/null || true   # may not exist in old installs
+command cp -f "$BK_LAST"/vnet/*.rules "$INSTALL_PATH/vnet/" 2>/dev/null || true  # empty vnet dir is valid
+command cp -f "$BK_LAST"/ipset.rules "$INSTALL_PATH/" 2>/dev/null || true       # may not exist in old installs
+command cp -f "$BK_LAST"/gre.rules "$INSTALL_PATH/" 2>/dev/null || true         # may not exist in old installs
+command cp -f "$BK_LAST"/cc_deny.rules "$INSTALL_PATH/" 2>/dev/null || true     # may not exist in old installs
+command cp -f "$BK_LAST"/cc_allow.rules "$INSTALL_PATH/" 2>/dev/null || true    # may not exist in old installs
+command cp -pf "$BK_LAST"/hook_pre.sh "$INSTALL_PATH/" 2>/dev/null || true      # -p preserves executable bit
+command cp -pf "$BK_LAST"/hook_post.sh "$INSTALL_PATH/" 2>/dev/null || true     # -p preserves executable bit
+command cp -f "$BK_LAST"/silent_ips.rules "$INSTALL_PATH/" 2>/dev/null || true  # may not exist in old installs
+command cp -f "$BK_LAST"/preroute.rules "$INSTALL_PATH/" 2>/dev/null || true    # may not exist in old installs
+command cp -f "$BK_LAST"/postroute.rules "$INSTALL_PATH/" 2>/dev/null || true   # may not exist in old installs
+
+NV=$(awk '{print$2}' "$INSTALL_PATH/VERSION")
+if [ "$OV" = "$NV" ]; then
+        echo "  Restored configuration from backup ($NV reinstall)."
+else
         echo "  Imported options from $OV to $NV."
+fi
 fi

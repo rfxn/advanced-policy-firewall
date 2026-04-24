@@ -1,20 +1,21 @@
 #!/usr/bin/env bats
 #
-# 10: Input validation functions — valid_host(), valid_ip_cidr()
+# 10: Input validation functions — valid_host(), valid_ip_cidr(), is_fqdn()
 #
 # These are security-gate functions. They require no firewall startup;
-# we source functions.apf directly and test return codes.
+# we source apf_validate.sh directly and test return codes.
 
 load '/usr/local/lib/bats/bats-support/load'
 load '/usr/local/lib/bats/bats-assert/load'
 
 setup_file() {
     # Source the validation functions directly — they have no dependencies
-    # We only need the two functions, extracted inline to avoid sourcing
-    # the full functions.apf which requires conf.apf variables.
-    eval "$(sed -n '/^valid_ip_cidr()/,/^}/p' /opt/apf/internals/functions.apf)"
-    eval "$(sed -n '/^valid_host()/,/^}/p' /opt/apf/internals/functions.apf)"
-    export -f valid_ip_cidr valid_host
+    # We only need the functions, extracted inline to avoid sourcing
+    # the full apf_validate.sh which requires conf.apf variables.
+    eval "$(sed -n '/^valid_ip_cidr()/,/^}/p' /opt/apf/internals/apf_validate.sh)"
+    eval "$(sed -n '/^valid_host()/,/^}/p' /opt/apf/internals/apf_validate.sh)"
+    eval "$(sed -n '/^is_fqdn()/,/^}/p' /opt/apf/internals/apf_validate.sh)"
+    export -f valid_ip_cidr valid_host is_fqdn
 }
 
 # --- valid_ip_cidr ---
@@ -168,5 +169,52 @@ setup_file() {
 
 @test "valid_host rejects 2001:db8::/999 (IPv6 CIDR mask > 128)" {
     run valid_host "2001:db8::/999"
+    assert_failure
+}
+
+# --- is_fqdn ---
+
+@test "is_fqdn accepts example.com" {
+    run is_fqdn "example.com"
+    assert_success
+}
+
+@test "is_fqdn accepts sub.example.com" {
+    run is_fqdn "sub.example.com"
+    assert_success
+}
+
+@test "is_fqdn accepts numeric-prefix FQDN 1.2.3.4.xip.io (5 labels, not IPv4)" {
+    run is_fqdn "1.2.3.4.xip.io"
+    assert_success
+}
+
+@test "is_fqdn rejects IPv4 47.221.144.145" {
+    run is_fqdn "47.221.144.145"
+    assert_failure
+}
+
+@test "is_fqdn rejects IPv4 1.2.3.4" {
+    run is_fqdn "1.2.3.4"
+    assert_failure
+}
+
+@test "is_fqdn rejects IPv4 CIDR 10.0.0.0/8" {
+    run is_fqdn "10.0.0.0/8"
+    assert_failure
+}
+
+@test "is_fqdn rejects IPv6 2001:db8::1" {
+    run is_fqdn "2001:db8::1"
+    assert_failure
+}
+
+@test "is_fqdn rejects single-label localhost (no dot)" {
+    run is_fqdn "localhost"
+    assert_failure
+}
+
+@test "is_fqdn rejects empty string" {
+    run is_fqdn ""
     assert_failure
 }
