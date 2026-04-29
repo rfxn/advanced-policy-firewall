@@ -106,6 +106,13 @@
       dir-to-symlink extraction failure; clean pre-decomposition files and
       runtime state on removal; fix SysV init double-stop on RHEL; DEB adds
       util-linux dependency for flock
+[Fix] install.sh: graceful migration from RPM/DEB FHS symlink farm. Detects
+      and removes /etc/apf/{extras,doc} dir symlinks plus per-file symlinks
+      under internals/ and vnet/vnetgen pointing into /usr/lib/apf or
+      /usr/share/doc/apf before pkg_copy_tree. Without this, install.sh over
+      a package-managed install failed with "cp: cannot overwrite
+      non-directory" and would silently write through per-file symlinks into
+      package-managed paths. User-created symlinks are preserved.
 [Fix] Trust validation: anchor grep/sed patterns to prevent IP substring
       collisions; glob expansion protection in trust_parse_fields(); control
       character and metacharacter rejection in valid_trust_entry(); add hint

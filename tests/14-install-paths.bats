@@ -419,3 +419,52 @@ teardown_file() {
     [[ "$output" =~ "Default interface:" ]]
     _clean_test_backup
 }
+
+# =====================================================================
+# RPM/DEB FHS symlink farm migration
+#
+# Simulates an existing package-managed install where /etc/apf/{extras,doc}
+# are dir-level symlinks into /usr/lib/apf and /usr/share/doc/apf, plus
+# per-file symlinks in internals/ and vnet/vnetgen. install.sh must convert
+# these to real directories/files before pkg_copy_tree runs.
+# =====================================================================
+
+@test "install.sh converts RPM/DEB FHS symlink farm to flat layout" {
+    _clean_test_backup
+    # Replace install.sh-created dirs/files with RPM-style symlinks
+    rm -rf "$APF_DIR/extras" "$APF_DIR/doc"
+    rm -f "$APF_DIR/vnet/vnetgen" "$APF_DIR/internals/apf_core.sh"
+    ln -s /usr/lib/apf/extras "$APF_DIR/extras"
+    ln -s /usr/share/doc/apf "$APF_DIR/doc"
+    ln -s /usr/lib/apf/vnet/vnetgen "$APF_DIR/vnet/vnetgen"
+    ln -s /usr/lib/apf/internals/apf_core.sh "$APF_DIR/internals/apf_core.sh"
+    # User-created symlink pointing inside the install must be preserved
+    ln -s /tmp/user-target "$APF_DIR/internals/user-symlink"
+    [ -L "$APF_DIR/extras" ]
+    [ -L "$APF_DIR/internals/apf_core.sh" ]
+
+    cd /opt/apf-src
+    local output
+    output=$(INSTALL_PATH="$APF_DIR" bash install.sh 2>&1)
+    [[ "$output" =~ "Migrated RPM/DEB symlink farm" ]]
+
+    # FHS symlinks replaced with real files/dirs
+    [ -d "$APF_DIR/extras" ] && [ ! -L "$APF_DIR/extras" ]
+    [ -d "$APF_DIR/doc" ] && [ ! -L "$APF_DIR/doc" ]
+    [ -f "$APF_DIR/vnet/vnetgen" ] && [ ! -L "$APF_DIR/vnet/vnetgen" ]
+    [ -f "$APF_DIR/internals/apf_core.sh" ] && [ ! -L "$APF_DIR/internals/apf_core.sh" ]
+    # User symlink preserved
+    [ -L "$APF_DIR/internals/user-symlink" ]
+
+    rm -f "$APF_DIR/internals/user-symlink"
+    _clean_test_backup
+}
+
+@test "install.sh on flat layout emits no migration message" {
+    _clean_test_backup
+    cd /opt/apf-src
+    local output
+    output=$(INSTALL_PATH="$APF_DIR" bash install.sh 2>&1)
+    [[ ! "$output" =~ "Migrated RPM/DEB symlink farm" ]]
+    _clean_test_backup
+}
