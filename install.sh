@@ -31,6 +31,14 @@ PKG_BACKUP_METHOD="copy"
 install() {
 	command mkdir -p "$INSTALL_PATH" || { pkg_error "cannot create $INSTALL_PATH"; exit 1; }
 
+	# Convert RPM/DEB FHS symlink farm to flat layout before copying:
+	# RPM/DEB ship extras/doc as dir symlinks into /usr/lib/apf and
+	# /usr/share/doc/apf, plus per-file symlinks in internals/ and
+	# vnet/vnetgen. cp -pR cannot overwrite a symlink-to-dir with a
+	# directory; per-file symlinks would silently write through and
+	# corrupt the package-managed copies under /usr/lib/apf.
+	_migrate_fhs_symlinks "$INSTALL_PATH"
+
 	# Copy source files to install path
 	pkg_copy_tree "files" "$INSTALL_PATH" || { pkg_error "file copy failed"; exit 1; }
 
@@ -135,6 +143,40 @@ install() {
 	"$INSTALL_PATH/vnet/vnetgen" 2>/dev/null  # safe: may fail in containers without interfaces
 
 	command chmod 750 "$INSTALL_PATH"
+}
+
+# _migrate_fhs_symlinks path — remove RPM/DEB FHS symlink farm under path
+# Targets only symlinks pointing into /usr/lib/apf or /usr/share/doc/apf,
+# leaving any user-created symlinks intact.
+_migrate_fhs_symlinks() {
+	local _root="$1"
+	local _migrated=0
+	local _entry _path _target _link
+	for _entry in extras doc vnet/vnetgen; do
+		_path="${_root}/${_entry}"
+		[ -L "$_path" ] || continue
+		_target=$(readlink "$_path" 2>/dev/null)  # readlink may fail on broken symlinks
+		case "$_target" in
+			/usr/lib/apf/*|/usr/share/doc/apf*)
+				command rm -f "$_path"
+				_migrated=1
+				;;
+		esac
+	done
+	if [ -d "${_root}/internals" ]; then
+		while IFS= read -r _link; do
+			_target=$(readlink "$_link" 2>/dev/null)  # readlink may fail on broken symlinks
+			case "$_target" in
+				/usr/lib/apf/*)
+					command rm -f "$_link"
+					_migrated=1
+					;;
+			esac
+		done < <(find "${_root}/internals" -maxdepth 1 -type l)
+	fi
+	if [ "$_migrated" = "1" ]; then
+		pkg_info "Migrated RPM/DEB symlink farm to install.sh layout"
+	fi
 }
 
 # _disable_conflicting_service name — stop and disable a conflicting service
