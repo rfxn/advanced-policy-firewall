@@ -589,7 +589,7 @@ apf -u CN
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `CC_LOG` | `1` | Log country-blocked packets (requires `LOG_DROP="1"`) |
+| `CC_LOG` | `1` | Log country-blocked packets (per-feature opt-in, independent of `LOG_DROP`) |
 | `CC_LOG_ONLY` | `0` | Audit mode: LOG without DROP (measure impact first) |
 | `CC_SRC` | `auto` | Data source: `auto`, `ipverse`, `ipdeny` |
 | `CC_CACHE_TTL` | `24` | Hours before re-downloading cached data on start (0 = always) |
@@ -682,10 +682,10 @@ APF provides configurable logging of filtered packets through the `LOG_*` variab
 
 | Variable | Purpose |
 |----------|---------|
-| `LOG_DROP` | Master toggle for firewall packet logging |
+| `LOG_DROP` | Log the end-of-chain default-drop catchall (`** IN_TCP DROP **` etc.); per-feature opt-ins (`CC_LOG`, `LOG_IA`, ipset `log`) are independent |
 | `LOG_LEVEL` | Syslog level for log entries (default: `crit`) |
 | `LOG_TARGET` | `LOG` (kernel syslog), `NFLOG` (ulogd2/nfnetlink), or `ULOG` (deprecated) |
-| `LOG_IA` | Log interactive access (SSH/Telnet, requires `LOG_DROP="1"`) |
+| `LOG_IA` | Log interactive access (SSH/Telnet, per-feature opt-in, independent of `LOG_DROP`) |
 | `LOG_LGATE` | Log foreign gateway traffic |
 | `LOG_EXT` | Extended logging (TCP/IP options in output) |
 | `LOG_RATE` | Max logged events per minute (default: 30) |

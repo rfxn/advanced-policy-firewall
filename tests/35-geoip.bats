@@ -295,6 +295,52 @@ _source_funcs='source '"$APF_DIR"'/internals/apf.lib.sh; CC_DENY_HOSTS='"$APF_DI
     clean_cc_state
 }
 
+@test "CC_DENY has LOG rule when CC_LOG=1 and LOG_DROP=0" {
+    # Regression: CC_LOG=1 is a per-feature opt-in and must install LOG rule
+    # regardless of global LOG_DROP. Prior gating on LOG_DROP=1 silently
+    # suppressed per-feature logging the user explicitly opted into.
+    clean_cc_state
+    create_cc_fixture_v4 "ZZ"
+    source /opt/tests/helpers/apf-config.sh
+    apf_set_config "LOG_DROP" "0"
+    apf_set_config "CC_LOG" "1"
+    "$APF" -f 2>/dev/null || true
+    "$APF" -s
+    "$APF" -d ZZ "test log decoupled"
+
+    assert_rule_exists_ips CC_DENY "LOG.*CC_DENY:ZZ"
+
+    # Clean up
+    "$APF" -u ZZ 2>/dev/null || true
+    apf_set_config "LOG_DROP" "1"
+    clean_cc_state
+}
+
+@test "CC_DENY has no LOG rule when CC_LOG=0" {
+    # Negative control: with CC_LOG=0 there should be no LOG rule even with
+    # LOG_DROP=1 (LOG_DROP only governs the end-of-chain default-drop catchall).
+    clean_cc_state
+    create_cc_fixture_v4 "ZZ"
+    source /opt/tests/helpers/apf-config.sh
+    apf_set_config "LOG_DROP" "1"
+    apf_set_config "CC_LOG" "0"
+    "$APF" -f 2>/dev/null || true
+    "$APF" -s
+    "$APF" -d ZZ "test no log"
+
+    run iptables -S CC_DENY 2>/dev/null
+    if echo "$output" | grep -qE "LOG.*CC_DENY:ZZ"; then
+        echo "expected no LOG rule for CC_LOG=0; got:" >&2
+        echo "$output" >&2
+        return 1
+    fi
+
+    # Clean up
+    "$APF" -u ZZ 2>/dev/null || true
+    apf_set_config "CC_LOG" "1"
+    clean_cc_state
+}
+
 @test "CC entry persisted to cc_deny.rules" {
     clean_cc_state
     create_cc_fixture_v4 "ZZ"

@@ -666,7 +666,7 @@ IPSET_REFRESH="21600"
 # When both files have entries, deny takes precedence (a country in both
 # cc_deny.rules and cc_allow.rules is blocked).
 
-# Log country-blocked packets. Requires LOG_DROP="1" to be globally enabled.
+# Log country-blocked packets. Per-feature opt-in independent of LOG_DROP.
 # Uses the global LOG_RATE for rate limiting.
 CC_LOG="1"
 
@@ -788,9 +788,9 @@ LOG_LEVEL="crit"
 LOG_TARGET="LOG"
 
 # Log interactive access over telnet & ssh; uses
-# custom log prefix of ** SSH ** & ** TELNET **
-# Note: requires LOG_DROP="1" to be enabled. Only logs NEW connections
-# that reach INPUT chain (i.e., not already accepted by port rules).
+# custom log prefix of ** SSH ** & ** TELNET **. Per-feature opt-in
+# independent of LOG_DROP. Only logs NEW connections that reach INPUT
+# chain (i.e., not already accepted by port rules).
 LOG_IA="1"
 
 # Log all foreign gateway traffic

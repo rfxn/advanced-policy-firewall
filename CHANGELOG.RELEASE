@@ -196,6 +196,12 @@
       --ipset-update warns when an entry references a set not yet loaded
       instead of skipping silently (user must run 'apf -s' to install
       newly added entries)
+[Fix] CC_LOG, LOG_IA: per-feature LOG opt-ins now install LOG rules
+      independent of global LOG_DROP; LOG_DROP is the catchall toggle
+      for end-of-chain default-drop logging only and must not silently
+      suppress per-feature opt-ins; affects geoip CC_DENY/CC_ALLOW/CC_DENYP
+      LOG rules (apf_geoip.sh, 6 sites) and SSH_LOG/TELNET_LOG chains
+      (log.rules); doc sync in conf.apf, apf.8, README.md
 
   -- Changes --
 

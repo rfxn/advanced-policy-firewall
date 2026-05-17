@@ -102,3 +102,31 @@ teardown_file() {
 @test "MSS clamping rule in OUTPUT" {
     assert_rule_exists OUTPUT "TCPMSS.*clamp"
 }
+
+@test "LOG_IA=1 creates SSH_LOG/TELNET_LOG chains with LOG_DROP=0" {
+    # Regression: LOG_IA is a per-feature opt-in independent of LOG_DROP.
+    # Default conf.apf has LOG_IA=1, LOG_DROP=0; setup_file does not change either.
+    # Prior gating on LOG_DROP=1 silently suppressed SSH/Telnet logging the
+    # user explicitly opted into.
+    assert_chain_exists SSH_LOG
+    assert_chain_exists TELNET_LOG
+    assert_rule_exists_ips INPUT "SSH_LOG"
+    assert_rule_exists_ips INPUT "TELNET_LOG"
+}
+
+@test "LOG_IA=0 does not create SSH_LOG/TELNET_LOG chains" {
+    source /opt/tests/helpers/apf-config.sh
+    apf_set_config "LOG_IA" "0"
+    "$APF" -f 2>/dev/null || true
+    "$APF" -s
+
+    run iptables -L SSH_LOG -n 2>/dev/null
+    assert_failure
+    run iptables -L TELNET_LOG -n 2>/dev/null
+    assert_failure
+
+    # Restore
+    apf_set_config "LOG_IA" "1"
+    "$APF" -f 2>/dev/null || true
+    "$APF" -s
+}

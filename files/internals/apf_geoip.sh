@@ -403,7 +403,7 @@ _geoip_default_deny_tail() {
 		ipt4 -A "$chain" -m limit --limit="$LOG_RATE/minute" \
 			-j "$LOG_TARGET" --log-level="$LOG_LEVEL" $LEXT --log-prefix="** CC_AUDIT:DEFAULT ** "
 	else
-		if [ "$CC_LOG" = "1" ] && [ "$LOG_DROP" = "1" ]; then
+		if [ "$CC_LOG" = "1" ]; then
 			ipt4 -A "$chain" -m limit --limit="$LOG_RATE/minute" \
 				-j "$LOG_TARGET" --log-level="$LOG_LEVEL" $LEXT --log-prefix="** CC_DENY:DEFAULT ** "
 		fi
@@ -414,7 +414,7 @@ _geoip_default_deny_tail() {
 			ipt6 -A "$chain" -m limit --limit="$LOG_RATE/minute" \
 				-j "$LOG_TARGET" --log-level="$LOG_LEVEL" $LEXT --log-prefix="** CC_AUDIT:DEFAULT ** "
 		else
-			if [ "$CC_LOG" = "1" ] && [ "$LOG_DROP" = "1" ]; then
+			if [ "$CC_LOG" = "1" ]; then
 				ipt6 -A "$chain" -m limit --limit="$LOG_RATE/minute" \
 					-j "$LOG_TARGET" --log-level="$LOG_LEVEL" $LEXT --log-prefix="** CC_DENY:DEFAULT ** "
 			fi
@@ -465,7 +465,7 @@ _geoip_add_simple_rules() {
 				--limit="$LOG_RATE/minute" -j "$LOG_TARGET" --log-level="$LOG_LEVEL" \
 				$LEXT --log-prefix="** CC_AUDIT:${cc} ** "
 		else
-			if [ "$CC_LOG" = "1" ] && [ "$LOG_DROP" = "1" ]; then
+			if [ "$CC_LOG" = "1" ]; then
 				ipt4 -A "$chain" -m set --match-set "$set4" src -m limit \
 					--limit="$LOG_RATE/minute" -j "$LOG_TARGET" --log-level="$LOG_LEVEL" \
 					$LEXT --log-prefix="** CC_${chain#CC_}:${cc} ** "
@@ -485,7 +485,7 @@ _geoip_add_simple_rules() {
 					--limit="$LOG_RATE/minute" -j "$LOG_TARGET" --log-level="$LOG_LEVEL" \
 					$LEXT --log-prefix="** CC_AUDIT:${cc} ** "
 			else
-				if [ "$CC_LOG" = "1" ] && [ "$LOG_DROP" = "1" ]; then
+				if [ "$CC_LOG" = "1" ]; then
 					ipt6 -A "$chain" -m set --match-set "$set6" src -m limit \
 						--limit="$LOG_RATE/minute" -j "$LOG_TARGET" --log-level="$LOG_LEVEL" \
 						$LEXT --log-prefix="** CC_${chain#CC_}:${cc} ** "
@@ -567,7 +567,7 @@ _geoip_add_advanced_rule() {
 				-m limit --limit="$LOG_RATE/minute" -j "$LOG_TARGET" \
 				--log-level="$LOG_LEVEL" $LEXT --log-prefix="** CC_AUDIT:${cc} ** "
 		else
-			if [ "$CC_LOG" = "1" ] && [ "$LOG_DROP" = "1" ]; then
+			if [ "$CC_LOG" = "1" ]; then
 				ipt4 -A "$chain" $match -m set --match-set "$set4" "$ipset_dir" \
 					-m limit --limit="$LOG_RATE/minute" -j "$LOG_TARGET" \
 					--log-level="$LOG_LEVEL" $LEXT --log-prefix="** CC_${chain#CC_}:${cc} ** "
@@ -586,7 +586,7 @@ _geoip_add_advanced_rule() {
 					-m limit --limit="$LOG_RATE/minute" -j "$LOG_TARGET" \
 					--log-level="$LOG_LEVEL" $LEXT --log-prefix="** CC_AUDIT:${cc} ** "
 			else
-				if [ "$CC_LOG" = "1" ] && [ "$LOG_DROP" = "1" ]; then
+				if [ "$CC_LOG" = "1" ]; then
 					ipt6 -A "$chain" $match -m set --match-set "$set6" "$ipset_dir" \
 						-m limit --limit="$LOG_RATE/minute" -j "$LOG_TARGET" \
 						--log-level="$LOG_LEVEL" $LEXT --log-prefix="** CC_${chain#CC_}:${cc} ** "
