@@ -774,7 +774,9 @@ GRE_TTL="255"
 ##
 # [Logging and control settings]
 ##
-# Log all traffic that is dropped/rejected by the firewall
+# Log the end-of-chain default-drop catchall (** IN_TCP DROP ** etc.).
+# Per-feature LOG opt-ins (CC_LOG, LOG_IA, ipset per-list log=1) are
+# independent and do NOT require this knob.
 LOG_DROP="0"
 
 # What log level should all log data be sent to?

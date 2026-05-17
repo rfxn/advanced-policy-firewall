@@ -213,7 +213,7 @@ teardown() {
     # Logging section
     assert_output --partial "Logging:"
     assert_output --partial "Log file:"
-    assert_output --partial "Log drops:"
+    assert_output --partial "Default-drop log:"
     assert_output --partial "Recent log:"
 }
 

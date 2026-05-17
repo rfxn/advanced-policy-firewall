@@ -502,7 +502,7 @@ firewall_info() {
 	echo ""
 	echo "Logging:"
 	echo "  Log file:         ${LOG_APF:-/var/log/apf_log}"
-	echo "  Log drops:        $([ "$LOG_DROP" == "1" ] && echo "enabled" || echo "disabled")"
+	echo "  Default-drop log: $([ "$LOG_DROP" == "1" ] && echo "enabled" || echo "disabled")"
 	echo "  Log target:       ${LOG_TARGET:-LOG}"
 	if [ -n "$SET_TRIM" ] && [ "$SET_TRIM" != "0" ]; then
 		echo "  Log trim:         ${SET_TRIM} lines"

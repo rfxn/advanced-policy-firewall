@@ -636,6 +636,17 @@ USE_GRE, GRE_PERSIST, GRE_KEEPALIVE, GRE_MTU, GRE_TTL.
 .B Logging & Kernel Tuning
 Log targets (LOG, NFLOG, or deprecated ULOG), rate limits, sysctl tunables,
 conntrack, helper chains.
+.TP
+.B LOG_DROP
+Log the end\-of\-chain default\-drop catchall (\*\* IN_TCP DROP \*\*,
+\*\* IN_UDP DROP \*\*, etc. \(em packets that fell through all explicit rules).
+Per\-feature LOG opt\-ins (CC_LOG, LOG_IA, ipset per\-list
+.B log
+field) are independent and do not require this knob.
+.TP
+.B LOG_IA
+Log NEW interactive access (SSH/Telnet) reaching INPUT (per\-feature opt\-in,
+independent of LOG_DROP).
 .SH ENVIRONMENT
 .TP
 .B INSTALL_PATH

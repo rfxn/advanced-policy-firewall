@@ -198,22 +198,21 @@ validate_config() {
         err="${err}ICMP_LIM='$ICMP_LIM' is invalid (must be 0 or number/s, number/m, or number/h); "
     fi
  fi
- # Validate LOG_LEVEL (only when LOG_DROP is enabled)
- if [ "$LOG_DROP" == "1" ] && [ -n "$LOG_LEVEL" ]; then
+ # LOG_LEVEL / LOG_TARGET / LOG_RATE are consumed by LOG_DROP catchall AND
+ # per-feature opt-ins (CC_LOG, LOG_IA, ipset per-list log) — validate whenever set.
+ if [ -n "$LOG_LEVEL" ]; then
     case "$LOG_LEVEL" in
         emerg|alert|crit|err|warning|notice|info|debug) ;;
         *) err="${err}LOG_LEVEL='$LOG_LEVEL' is invalid (must be emerg, alert, crit, err, warning, notice, info, or debug); " ;;
     esac
  fi
- # Validate LOG_TARGET (only when LOG_DROP is enabled)
- if [ "$LOG_DROP" == "1" ] && [ -n "$LOG_TARGET" ]; then
+ if [ -n "$LOG_TARGET" ]; then
     case "$LOG_TARGET" in
         LOG|ULOG|NFLOG) ;;
         *) err="${err}LOG_TARGET='$LOG_TARGET' is invalid (must be LOG, ULOG, or NFLOG); " ;;
     esac
  fi
- # Validate LOG_RATE (only when LOG_DROP is enabled)
- if [ "$LOG_DROP" == "1" ] && [ -n "$LOG_RATE" ]; then
+ if [ -n "$LOG_RATE" ]; then
     if [[ ! "$LOG_RATE" =~ $_vc_int ]]; then
         err="${err}LOG_RATE='$LOG_RATE' is invalid (must be a positive integer); "
     elif [ "$LOG_RATE" == "0" ]; then

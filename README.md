@@ -370,7 +370,7 @@ This section will cover some of the basic configuration options found inside of 
 | `EG_ICMP_TYPES` | Outbound ICMP types (see `internals/icmp.types`) |
 | `EG_ICMPV6_TYPES` | Outbound ICMPv6 types (requires `USE_IPV6="1"`); NDP types 133-136 always permitted |
 
-**`LOG_DROP`** - Enable detailed firewall packet logging. Typically left disabled on production systems due to log volume and disk I/O impact.
+**`LOG_DROP`** - Log the end-of-chain default-drop catchall (`** IN_TCP DROP **`, `** IN_UDP DROP **`, etc. — packets that fell through all explicit rules). Per-feature LOG opt-ins (`CC_LOG`, `LOG_IA`, ipset per-list `log`) are independent and do not require `LOG_DROP`. Typically left disabled on production systems due to log volume and disk I/O impact.
 
 ### 3.2 Outbound Filtering & Rate Limiting
 

@@ -374,11 +374,12 @@ so they fall through to the sanity checks as before.
 
 ### Step 20: Log Rules — `log.rules`
 
-When `LOG_DROP=1` and `LOG_IA=1`, creates SSH_LOG and TELNET_LOG chains
-to log new interactive access attempts.
+When `LOG_IA=1`, creates SSH_LOG and TELNET_LOG chains to log new
+interactive access attempts. Per-feature opt-in independent of `LOG_DROP`
+(which gates only the end-of-chain default-drop catchall).
 
 - **Source:** `log.rules`
-- **Config:** `LOG_DROP`, `LOG_IA`, `HELPER_SSH_PORT`
+- **Config:** `LOG_IA`, `HELPER_SSH_PORT`
 - **Chains:** INPUT
 
 ### Step 21: VNET Per-IP Policies — `main.vnet`

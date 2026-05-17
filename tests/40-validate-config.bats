@@ -86,6 +86,46 @@ teardown() {
     apf_set_config "LOG_DROP" "0"
 }
 
+@test "validate_config rejects invalid LOG_TARGET when LOG_DROP=0 (per-feature consumers)" {
+    # Regression: LOG_LEVEL/LOG_TARGET/LOG_RATE are consumed by per-feature
+    # LOG opt-ins (CC_LOG, LOG_IA, ipset per-list log) even when LOG_DROP=0.
+    # Validator previously gated on LOG_DROP=1, silently letting invalid
+    # values through and producing broken iptables -j BOGUS rules.
+    source /opt/tests/helpers/apf-config.sh
+    apf_set_config "LOG_DROP" "0"
+    apf_set_config "LOG_TARGET" "BADTARGET"
+
+    run "$APF" --validate
+    assert_failure
+    [[ "$output" == *"LOG_TARGET"*"invalid"* ]]
+
+    apf_set_config "LOG_TARGET" "LOG"
+}
+
+@test "validate_config rejects invalid LOG_LEVEL when LOG_DROP=0" {
+    source /opt/tests/helpers/apf-config.sh
+    apf_set_config "LOG_DROP" "0"
+    apf_set_config "LOG_LEVEL" "badlevel"
+
+    run "$APF" --validate
+    assert_failure
+    [[ "$output" == *"LOG_LEVEL"*"invalid"* ]]
+
+    apf_set_config "LOG_LEVEL" "crit"
+}
+
+@test "validate_config rejects non-numeric LOG_RATE when LOG_DROP=0" {
+    source /opt/tests/helpers/apf-config.sh
+    apf_set_config "LOG_DROP" "0"
+    apf_set_config "LOG_RATE" "abc"
+
+    run "$APF" --validate
+    assert_failure
+    [[ "$output" == *"LOG_RATE"*"invalid"* ]]
+
+    apf_set_config "LOG_RATE" "30"
+}
+
 @test "validate_config rejects non-numeric SYSCTL_CONNTRACK" {
     source /opt/tests/helpers/apf-config.sh
     apf_set_config "SYSCTL_CONNTRACK" "notanum"

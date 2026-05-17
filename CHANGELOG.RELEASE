@@ -202,6 +202,18 @@
       suppress per-feature opt-ins; affects geoip CC_DENY/CC_ALLOW/CC_DENYP
       LOG rules (apf_geoip.sh, 6 sites) and SSH_LOG/TELNET_LOG chains
       (log.rules); doc sync in conf.apf, apf.8, README.md
+[Fix] validate_config: LOG_LEVEL, LOG_TARGET, and LOG_RATE are now
+      validated whenever set (previously gated on LOG_DROP=1); after the
+      CC_LOG/LOG_IA/ipset decoupling, per-feature consumers use these
+      vars even when LOG_DROP=0, so invalid LOG_TARGET="BOGUS" silently
+      produced broken iptables -j BOGUS rules
+[Change] apf --info dashboard renames "Log drops:" to "Default-drop log:"
+      to match the clarified LOG_DROP semantic (end-of-chain catchall only,
+      not a global packet-logging master switch)
+[Change] Docs: LOG_DROP own-block comment in conf.apf, README.md prose
+      entry, FLOW.md Step 20, and apf.8 (new LOG_DROP + LOG_IA entries)
+      all aligned to the catchall-only semantic with per-feature
+      independence callout
 
   -- Changes --
 
