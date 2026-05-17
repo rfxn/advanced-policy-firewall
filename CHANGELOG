@@ -190,6 +190,12 @@
       _apf_complete_cc() was overwriting the verb COMPREPLY array
 [Fix] mutex_lock: detect and remove empty lock files left by flock wrapper;
       noclobber fallback timed out after 60s instead of acquiring the lock
+[Fix] ipset: per-list log=1 now installs LOG rule independent of global
+      LOG_DROP; previously gated on LOG_DROP=1 (default 0), silently
+      suppressing per-list logging the user explicitly opted into;
+      --ipset-update warns when an entry references a set not yet loaded
+      instead of skipping silently (user must run 'apf -s' to install
+      newly added entries)
 
   -- Changes --
 

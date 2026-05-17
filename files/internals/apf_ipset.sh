@@ -195,8 +195,8 @@ while IFS= read -r line; do
 	ipset_update_timestamp "$_IPE_NAME" "$(date +%s)"
 
 	# Create iptables chain (IPv4 only — ipset entries are IPv4-filtered)
-	ipt4 -N "IPSET_${_IPE_NAME}" 2>/dev/null
-	if [ "$_IPE_LOGFLAG" == "1" ] && [ "$LOG_DROP" == "1" ]; then
+	ipt4 -N "IPSET_${_IPE_NAME}" 2>/dev/null  # safe: chain may already exist on fast-load reentry
+	if [ "$_IPE_LOGFLAG" == "1" ]; then
 		ipt4 -A "IPSET_${_IPE_NAME}" -m set --match-set "$_IPE_NAME" "$_IPE_FLOW" -m limit --limit="${IPSET_LOG_RATE}/minute" -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** IPSET_${_IPE_NAME} ** "
 	fi
 	ipt4 -A "IPSET_${_IPE_NAME}" -m set --match-set "$_IPE_NAME" "$_IPE_FLOW" -j $ALL_STOP
@@ -237,8 +237,10 @@ while IFS= read -r line; do
 
 	_ipset_parse_entry "$line" || continue
 
-	# Only update sets that already exist (created during full load)
+	# Only update sets that already exist (created during full load).
+	# New entries added since last full load require 'apf -s' to install the chain + jumps.
 	if ! $IPSET list "$_IPE_NAME" > /dev/null 2>&1; then
+		eout "{ipset} skipping $_IPE_NAME: set not loaded, run 'apf -s' to install new entries"
 		continue
 	fi
 

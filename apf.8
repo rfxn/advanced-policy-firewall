@@ -248,6 +248,10 @@ active CT_LIMIT blocks. Does not require CT_LIMIT to be enabled.
 Hot\-reload ipset block lists from
 .IR ipset.rules .
 Lists are refreshed per their configured interval.
+Only refreshes sets already loaded by the firewall;
+newly added entries require
+.B apf \-s
+to install the chain and iptables jumps.
 .SS GRE Tunnels
 .TP
 .B \-\-gre\-up

@@ -536,7 +536,7 @@ Where:
 - `name` - unique list name (used for ipset set and iptables chain naming)
 - `flow` - `src` or `dst` (match source or destination address)
 - `ipset_type` - `ip` or `net` (`hash:ip` for single addresses, `hash:net` for CIDR blocks)
-- `log` - `0` or `1` (per-list logging, rate governed by `IPSET_LOG_RATE`)
+- `log` - `0` or `1` (per-list logging, rate governed by `IPSET_LOG_RATE`, independent of global `LOG_DROP`)
 - `interval` - refresh interval in seconds for `--ipset-update` (`0` = use `IPSET_REFRESH`; minimum effective is 1 hour)
 - `maxelem` - max entries to load (`0` = unlimited, capped at 1048576)
 - `file_or_url` - local file path or URL (`https://` for remote download)
@@ -546,7 +546,7 @@ Example:
 firehol_level2:src:net:1:0:0:https://iplists.firehol.org/files/firehol_level2.netset
 ```
 
-Run `apf --ipset-update` to hot-reload all ipset block lists without restarting the firewall. A cron job (`cron.d/apf`) runs hourly; actual refresh timing is governed by per-list intervals and `IPSET_REFRESH`.
+Run `apf --ipset-update` to hot-reload all ipset block lists without restarting the firewall. A cron job (`cron.d/apf`) runs hourly; actual refresh timing is governed by per-list intervals and `IPSET_REFRESH`. **Newly added entries** are not installed by `--ipset-update` — it only refreshes sets already loaded. Run `apf -s` to install new entries (the firewall restart picks up the changed `ipset.rules` automatically).
 
 ### 3.11 Country Code Filtering (GeoIP)
 

@@ -210,6 +210,52 @@ ISEOF
     # test_block has log=1 and LOG_DROP=1 is set
     assert_rule_exists_ips IPSET_test_block "LOG.*IPSET_test_block"
 }
+
+@test "per-rule log:1 with LOG_DROP=0 still creates log rule" {
+    # Regression: per-list log=1 must install LOG rule regardless of global LOG_DROP.
+    # Without this, users who set log=1 saw no logs because LOG_DROP defaults to 0.
+    source /opt/tests/helpers/apf-config.sh
+    "$APF" -f 2>/dev/null || true
+    ipset destroy test_block 2>/dev/null || true
+    apf_set_config "LOG_DROP" "0"
+    cat > "$APF_DIR/ipset.rules" <<'ISEOF'
+test_block:src:ip:1:0:0:/opt/apf/test_blocklist.txt
+ISEOF
+    "$APF" -s
+
+    assert_rule_exists_ips IPSET_test_block "LOG.*IPSET_test_block"
+
+    # Restore
+    "$APF" -f 2>/dev/null || true
+    ipset destroy test_block 2>/dev/null || true
+    apf_set_config "LOG_DROP" "1"
+    "$APF" -s
+}
+
+@test "--ipset-update warns when set not yet loaded" {
+    # Regression: ipset_update() previously skipped unloaded sets silently.
+    # Newly added entries require apf -s, but the user must see why nothing happened.
+    cat > "$APF_DIR/ipset.rules" <<'ISEOF'
+test_block:src:ip:1:0:0:/opt/apf/test_blocklist.txt
+test_new:src:ip:1:0:0:/opt/apf/test_blocklist.txt
+ISEOF
+    rm -f "$APF_DIR/internals/.ipset.timestamps"
+    ipset destroy test_new 2>/dev/null || true
+
+    run "$APF" --ipset-update
+    assert_success
+    [[ "$output" == *"test_new"*"set not loaded"* ]] || {
+        echo "expected skip warning for test_new, got: $output" >&2
+        return 1
+    }
+
+    # Restore
+    cat > "$APF_DIR/ipset.rules" <<'ISEOF'
+test_block:src:ip:1:0:0:/opt/apf/test_blocklist.txt
+ISEOF
+    "$APF" -s
+}
+
 @test "CIDR entries accepted in hash:net set" {
     "$APF" -f 2>/dev/null || true
     ipset destroy test_block 2>/dev/null || true
