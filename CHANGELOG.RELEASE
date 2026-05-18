@@ -221,6 +221,10 @@
       LOG_DROP=1 to force RAB logging must now set RAB_LOG_HIT=1 and/or
       RAB_LOG_TRIP=1 explicitly; affects apf_core.sh:882 (RABTRIP) and
       :915 (RABHIT) with doc sync in conf.apf, README.md, apf.8
+[Change] Doc drift fixups from QA pass: apf_validate.sh comment now
+      lists RAB_LOG_HIT/TRIP among consumers of LOG_LEVEL/LOG_TARGET/
+      LOG_RATE; README.md --info prose updated from "log drops" to
+      "default-drop log state" to match the renamed dashboard label
 
   -- Changes --
 

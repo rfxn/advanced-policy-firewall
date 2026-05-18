@@ -907,7 +907,7 @@ Subsystems:
 
 The **`--rules`** option dumps all active iptables rules to stdout in `iptables -S` format, suitable for piping (e.g., `apf --rules | grep DROP`). The **`-l|--list`** option opens rules in an editor for browsing.
 
-The **`--info`** option shows a firewall status summary organized into sections: status (active state, rule/chain counts), trust system (allow/deny/temp entry counts, ban expiry, block escalation, FQDN resolution), filtering (stop targets, port lists, packet sanity, connlimit, SYN flood, SMTP blocking), subsystems (fast load, RAB, VNET, Docker compat, ipset, GRE, remote lists), and logging (log file, log drops, recent entries). The **`-t|--status`** option pages through the full APF status log at `/var/log/apf_log`.
+The **`--info`** option shows a firewall status summary organized into sections: status (active state, rule/chain counts), trust system (allow/deny/temp entry counts, ban expiry, block escalation, FQDN resolution), filtering (stop targets, port lists, packet sanity, connlimit, SYN flood, SMTP blocking), subsystems (fast load, RAB, VNET, Docker compat, ipset, GRE, remote lists), and logging (log file, default-drop log state, recent entries). The **`-t|--status`** option pages through the full APF status log at `/var/log/apf_log`.
 
 The **`-e|--refresh`** option flushes trust chains and reloads them from rule files, re-resolving any DNS names. Useful for dynamic DNS entries in the trust system.
 

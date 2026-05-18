@@ -198,8 +198,9 @@ validate_config() {
         err="${err}ICMP_LIM='$ICMP_LIM' is invalid (must be 0 or number/s, number/m, or number/h); "
     fi
  fi
- # LOG_LEVEL / LOG_TARGET / LOG_RATE are consumed by LOG_DROP catchall AND
- # per-feature opt-ins (CC_LOG, LOG_IA, ipset per-list log) — validate whenever set.
+ # LOG_LEVEL / LOG_TARGET / LOG_RATE are consumed by LOG_DROP-gated paths AND
+ # per-feature opt-ins (CC_LOG, LOG_IA, RAB_LOG_HIT, RAB_LOG_TRIP, ipset per-list log);
+ # validate whenever set.
  if [ -n "$LOG_LEVEL" ]; then
     case "$LOG_LEVEL" in
         emerg|alert|crit|err|warning|notice|info|debug) ;;
