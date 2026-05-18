@@ -181,12 +181,12 @@ RAB_TIMER="300"
 RAB_TRIP="1"
 
 # This controls if the firewall should log all violation hits from an address.
-# LOG_DROP=1 overrides this to force logging.
+# Per-feature opt-in independent of LOG_DROP.
 RAB_LOG_HIT="1"
 
 # This controls if the firewall should log all subsequent traffic from an address
 # that is already blocked for a violation hit, this can generate a lot of logs.
-# LOG_DROP=1 overrides this to force logging.
+# Per-feature opt-in independent of LOG_DROP.
 RAB_LOG_TRIP="0"
 
 ##
@@ -775,8 +775,8 @@ GRE_TTL="255"
 # [Logging and control settings]
 ##
 # Log the end-of-chain default-drop catchall (** IN_TCP DROP ** etc.).
-# Per-feature LOG opt-ins (CC_LOG, LOG_IA, ipset per-list log=1) are
-# independent and do NOT require this knob.
+# Per-feature LOG opt-ins (CC_LOG, LOG_IA, RAB_LOG_HIT, RAB_LOG_TRIP,
+# ipset per-list log=1) are independent and do NOT require this knob.
 LOG_DROP="0"
 
 # What log level should all log data be sent to?

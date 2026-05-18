@@ -640,7 +640,8 @@ conntrack, helper chains.
 .B LOG_DROP
 Log the end\-of\-chain default\-drop catchall (\*\* IN_TCP DROP \*\*,
 \*\* IN_UDP DROP \*\*, etc. \(em packets that fell through all explicit rules).
-Per\-feature LOG opt\-ins (CC_LOG, LOG_IA, ipset per\-list
+Per\-feature LOG opt\-ins (CC_LOG, LOG_IA, RAB_LOG_HIT, RAB_LOG_TRIP,
+ipset per\-list
 .B log
 field) are independent and do not require this knob.
 .TP

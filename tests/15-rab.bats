@@ -96,3 +96,48 @@ teardown_file() {
     fi
     assert_rule_exists_ips INPUT "LOG.*RABTRIP"
 }
+
+@test "RAB_LOG_HIT=1 installs RABHIT rule with LOG_DROP=0 (decoupled)" {
+    # Regression: RAB_LOG_HIT is a per-feature opt-in independent of LOG_DROP.
+    # Prior OR-gate (LOG_DROP=1 || RAB_LOG_HIT=1) was structurally similar
+    # but kept LOG_DROP entangled; explicit decoupling confirms LOG_DROP=0
+    # does not silently force-suppress when per-feature flag is on.
+    if ! rab_available; then
+        skip "xt_recent module not available"
+    fi
+    source /opt/tests/helpers/apf-config.sh
+    apf_set_config "LOG_DROP" "0"
+    apf_set_config "RAB_LOG_HIT" "1"
+    "$APF" -f 2>/dev/null || true
+    "$APF" -s
+
+    assert_rule_exists_ips RABPSCAN "LOG.*RABHIT"
+}
+
+@test "RAB_LOG_HIT=0 LOG_DROP=1 no longer installs RABHIT rule (was OR-gated)" {
+    # Behavior change: previously LOG_DROP=1 force-enabled RAB logs even with
+    # RAB_LOG_HIT=0 (documented as "LOG_DROP=1 overrides to force logging").
+    # Now per-feature opt-in is the sole gate. Operators relying on the prior
+    # OR-semantic must set RAB_LOG_HIT=1 explicitly.
+    if ! rab_available; then
+        skip "xt_recent module not available"
+    fi
+    source /opt/tests/helpers/apf-config.sh
+    apf_set_config "LOG_DROP" "1"
+    apf_set_config "RAB_LOG_HIT" "0"
+    "$APF" -f 2>/dev/null || true
+    "$APF" -s
+
+    run iptables -S RABPSCAN 2>/dev/null
+    if echo "$output" | grep -qE "LOG.*RABHIT"; then
+        echo "expected no RABHIT LOG rule with RAB_LOG_HIT=0; got:" >&2
+        echo "$output" >&2
+        return 1
+    fi
+
+    # Restore for any subsequent tests
+    apf_set_config "RAB_LOG_HIT" "1"
+    apf_set_config "LOG_DROP" "0"
+    "$APF" -f 2>/dev/null || true
+    "$APF" -s
+}

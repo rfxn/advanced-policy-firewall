@@ -879,7 +879,7 @@ if [ "$RAB" == "1" ]; then
 	RAB_TRIP_FLAGS="--update"
  fi
 
- if [ "$LOG_DROP" == "1" ] || [ "$RAB_LOG_TRIP" == "1" ]; then
+ if [ "$RAB_LOG_TRIP" == "1" ]; then
 	ipt -A INPUT -p all -m recent --rcheck --hitcount $RAB_HITCOUNT --seconds $RAB_TIMER -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** RABTRIP ** "
  fi
  ipt -A INPUT -p all -m recent $RAB_TRIP_FLAGS --hitcount $RAB_HITCOUNT --seconds $RAB_TIMER -j $ALL_STOP
@@ -912,7 +912,7 @@ if [ "$RAB" == "1" ]; then
 	done
   fi
   for i in ${RAB_PSCAN_PORTS//,/ }; do
-   if [ "$LOG_DROP" == "1" ] || [ "$RAB_LOG_HIT" == "1" ]; then
+   if [ "$RAB_LOG_HIT" == "1" ]; then
 	   ipt -A RABPSCAN -p tcp --dport $i -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** RABHIT ** "
 	   ipt -A RABPSCAN -p udp --dport $i -m limit --limit=$LOG_RATE/minute -j $LOG_TARGET --log-level=$LOG_LEVEL $LEXT --log-prefix="** RABHIT ** "
    fi

@@ -370,7 +370,7 @@ This section will cover some of the basic configuration options found inside of 
 | `EG_ICMP_TYPES` | Outbound ICMP types (see `internals/icmp.types`) |
 | `EG_ICMPV6_TYPES` | Outbound ICMPv6 types (requires `USE_IPV6="1"`); NDP types 133-136 always permitted |
 
-**`LOG_DROP`** - Log the end-of-chain default-drop catchall (`** IN_TCP DROP **`, `** IN_UDP DROP **`, etc. — packets that fell through all explicit rules). Per-feature LOG opt-ins (`CC_LOG`, `LOG_IA`, ipset per-list `log`) are independent and do not require `LOG_DROP`. Typically left disabled on production systems due to log volume and disk I/O impact.
+**`LOG_DROP`** - Log the end-of-chain default-drop catchall (`** IN_TCP DROP **`, `** IN_UDP DROP **`, etc. — packets that fell through all explicit rules). Per-feature LOG opt-ins (`CC_LOG`, `LOG_IA`, `RAB_LOG_HIT`, `RAB_LOG_TRIP`, ipset per-list `log`) are independent and do not require `LOG_DROP`. Typically left disabled on production systems due to log volume and disk I/O impact.
 
 ### 3.2 Outbound Filtering & Rate Limiting
 
@@ -472,9 +472,9 @@ The Reactive Address Blocking (RAB) system provides in-line intrusion prevention
 
 **`RAB_TRIP`** - Resets the block timer to 0 if a blocked address attempts ANY subsequent communication. This cuts off attacks at the legs before they mount into something tangible.
 
-**`RAB_LOG_HIT`** - Log all violation hits. Recommended for insightful log data on probing attempts. `LOG_DROP=1` overrides this to force logging.
+**`RAB_LOG_HIT`** - Log all violation hits. Recommended for insightful log data on probing attempts. Per-feature opt-in, independent of `LOG_DROP`.
 
-**`RAB_LOG_TRIP`** - Log all subsequent traffic from blocked addresses. Can generate a lot of logs but provides valuable information about attacker intent. `LOG_DROP=1` overrides this to force logging.
+**`RAB_LOG_TRIP`** - Log all subsequent traffic from blocked addresses. Can generate a lot of logs but provides valuable information about attacker intent. Per-feature opt-in, independent of `LOG_DROP`.
 
 ### 3.5 Virtual Network Files
 
@@ -682,7 +682,7 @@ APF provides configurable logging of filtered packets through the `LOG_*` variab
 
 | Variable | Purpose |
 |----------|---------|
-| `LOG_DROP` | Log the end-of-chain default-drop catchall (`** IN_TCP DROP **` etc.); per-feature opt-ins (`CC_LOG`, `LOG_IA`, ipset `log`) are independent |
+| `LOG_DROP` | Log the end-of-chain default-drop catchall (`** IN_TCP DROP **` etc.); per-feature opt-ins (`CC_LOG`, `LOG_IA`, `RAB_LOG_HIT`, `RAB_LOG_TRIP`, ipset `log`) are independent |
 | `LOG_LEVEL` | Syslog level for log entries (default: `crit`) |
 | `LOG_TARGET` | `LOG` (kernel syslog), `NFLOG` (ulogd2/nfnetlink), or `ULOG` (deprecated) |
 | `LOG_IA` | Log interactive access (SSH/Telnet, per-feature opt-in, independent of `LOG_DROP`) |

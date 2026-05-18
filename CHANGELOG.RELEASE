@@ -214,6 +214,13 @@
       entry, FLOW.md Step 20, and apf.8 (new LOG_DROP + LOG_IA entries)
       all aligned to the catchall-only semantic with per-feature
       independence callout
+[Change] RAB_LOG_HIT, RAB_LOG_TRIP: per-feature LOG opt-ins now install
+      LOG rules independent of global LOG_DROP; previously OR-gated
+      (LOG_DROP=1 force-enabled RAB logging even with per-feature flag
+      off) per documentation. Behavior change: operators relying on
+      LOG_DROP=1 to force RAB logging must now set RAB_LOG_HIT=1 and/or
+      RAB_LOG_TRIP=1 explicitly; affects apf_core.sh:882 (RABTRIP) and
+      :915 (RABHIT) with doc sync in conf.apf, README.md, apf.8
 
   -- Changes --
 
