@@ -10,7 +10,7 @@
 
 <p align="center">
   <a href="https://github.com/rfxn/advanced-policy-firewall/actions/workflows/smoke-test.yml"><img src="https://img.shields.io/github/actions/workflow/status/rfxn/advanced-policy-firewall/smoke-test.yml?branch=master&style=flat-square&label=CI" alt="CI"></a>
-  <a href="CHANGELOG"><img src="https://img.shields.io/badge/version-2.0.2-blue.svg?style=flat-square" alt="Version"></a>
+  <a href="CHANGELOG"><img src="https://img.shields.io/badge/version-2.0.3-blue.svg?style=flat-square" alt="Version"></a>
   <a href="COPYING.GPL"><img src="https://img.shields.io/badge/license-GPL_v2-green.svg?style=flat-square" alt="License: GPL v2"></a>
   <a href="#11-supported-systems--requirements"><img src="https://img.shields.io/badge/platform-Linux-orange.svg?style=flat-square" alt="Platform: Linux"></a>
 </p>
@@ -24,13 +24,12 @@ trust-based host management, reactive address blocking, and per-IP virtual netwo
 
 ---
 
-## What's New in 2.0.2
+## What's New in 2.0.3
 
-- **GeoIP country blocking** — ipset-based country filtering with ISO 3166-1 codes, continent shorthand (`@EU`, `@AS`), dual-stack IPv4/IPv6, advanced per-port/protocol syntax, audit mode, and tiered data sources with local caching
-- **Connection tracking limit** — global per-IP connection limit via periodic conntrack scanning with configurable thresholds, port/state filters, CIDR exemptions, and PERMBLOCK escalation
-- **Temporary trust with TTL** — `apf -ta`/`-td` with per-entry time-to-live (5m, 1h, 7d), automatic cron expiry, and block escalation for repeat offenders
-- **Structured event logging** — dual log model via elog_lib.sh with JSONL audit trail at `/var/log/apf/audit.log` covering trust mutations, config events, and service state
-- **SYN flood protection** — iptables-level rate limiting with configurable rate/burst, complementing kernel sysctl protection
+- **LOG_DROP semantics clarified** — `LOG_DROP` now governs only the end-of-chain default-drop catchall (`** IN_TCP DROP **` etc.); per-feature LOG opt-ins (`CC_LOG`, `LOG_IA`, `RAB_LOG_HIT`, `RAB_LOG_TRIP`, ipset per-list `log`) install LOG rules independently. Setting a per-feature LOG knob now does what it says without requiring `LOG_DROP=1`. *Behavior change*: `LOG_DROP=1` no longer force-enables RAB logging when `RAB_LOG_HIT`/`RAB_LOG_TRIP` are 0.
+- **ipset per-list logging fixed** — `log=1` in `ipset.rules` installs the LOG rule regardless of `LOG_DROP`; `--ipset-update` now warns when an entry references a set not yet loaded (run `apf -s` to install newly added entries) instead of skipping silently.
+- **Validator hardening** — `LOG_LEVEL`, `LOG_TARGET`, `LOG_RATE` are validated whenever set; previously gated on `LOG_DROP=1`, which let invalid values produce broken iptables rules under per-feature LOG paths.
+- **`apf --info` label rename** — "Log drops:" → "Default-drop log:" to match the clarified LOG_DROP scope.
 
 See [CHANGELOG](CHANGELOG) for the complete release notes.
 

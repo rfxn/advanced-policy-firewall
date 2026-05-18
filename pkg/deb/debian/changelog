@@ -1,3 +1,13 @@
+apf (2.0.3-1) unstable; urgency=medium
+
+  * Decouple per-feature LOG opt-ins (CC_LOG, LOG_IA, RAB_LOG_HIT,
+    RAB_LOG_TRIP, ipset per-list log) from global LOG_DROP; LOG_DROP
+    now governs only the end-of-chain default-drop catchall
+  * validate_config: validate LOG_LEVEL/LOG_TARGET/LOG_RATE whenever set
+  * apf --info: rename "Log drops:" label to "Default-drop log:"
+
+ -- R-fx Networks <proj@rfxn.com>  Sun, 17 May 2026 12:00:00 +0000
+
 apf (2.0.2-1) unstable; urgency=medium
 
   * Initial Debian package for APF 2.0.2

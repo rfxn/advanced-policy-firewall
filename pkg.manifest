@@ -2,7 +2,7 @@
 # Used by pkg_gen.sh to generate RPM spec, DEB debian/, Docker, CI artifacts.
 
 PKG_NAME="apf"
-PKG_VERSION="2.0.2"
+PKG_VERSION="2.0.3"
 PKG_RELEASE="1"
 PKG_SUMMARY="Advanced Policy Firewall — iptables/netfilter firewall management"
 PKG_DESCRIPTION="Advanced Policy Firewall (APF) is an iptables/netfilter-based firewall management system for Linux servers. It provides stateful packet filtering, trust-based allow/deny host management, Reactive Address Blocking (RAB), and a Virtual Network (VNET) subsystem for per-IP policies."

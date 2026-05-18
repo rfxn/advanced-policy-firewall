@@ -1,3 +1,42 @@
+- 2.0.3 | May 17 2026:
+
+  -- Bug Fixes --
+
+[Fix] ipset: per-list log=1 now installs LOG rule independent of global
+      LOG_DROP; previously gated on LOG_DROP=1 (default 0), silently
+      suppressing per-list logging the user explicitly opted into;
+      --ipset-update warns when an entry references a set not yet loaded
+      instead of skipping silently (user must run 'apf -s' to install
+      newly added entries)
+[Fix] CC_LOG, LOG_IA: per-feature LOG opt-ins now install LOG rules
+      independent of global LOG_DROP; affects geoip CC_DENY/CC_ALLOW/CC_DENYP
+      LOG rules (apf_geoip.sh, 6 sites) and SSH_LOG/TELNET_LOG chains
+      (log.rules)
+[Fix] validate_config: LOG_LEVEL, LOG_TARGET, and LOG_RATE are now
+      validated whenever set (previously gated on LOG_DROP=1); after the
+      per-feature LOG decoupling, consumers use these vars even when
+      LOG_DROP=0, so invalid LOG_TARGET="BOGUS" silently produced broken
+      iptables -j BOGUS rules
+
+  -- Changes --
+
+[Change] LOG_DROP semantic clarified across all surfaces: now governs only
+      the end-of-chain default-drop catchall (** IN_TCP DROP ** etc.);
+      per-feature LOG opt-ins (CC_LOG, LOG_IA, RAB_LOG_HIT, RAB_LOG_TRIP,
+      ipset per-list log) are independent and do not require LOG_DROP=1;
+      doc sync in conf.apf, README.md, FLOW.md, apf.8 (new LOG_DROP +
+      LOG_IA entries), and apf_validate.sh comment
+[Change] RAB_LOG_HIT, RAB_LOG_TRIP: per-feature LOG opt-ins now install
+      LOG rules independent of global LOG_DROP; previously OR-gated
+      (LOG_DROP=1 force-enabled RAB logging even with per-feature flag
+      off) per documentation. Behavior change: operators relying on
+      LOG_DROP=1 to force RAB logging must now set RAB_LOG_HIT=1 and/or
+      RAB_LOG_TRIP=1 explicitly; affects apf_core.sh:882 (RABTRIP) and
+      :915 (RABHIT)
+[Change] apf --info dashboard renames "Log drops:" to "Default-drop log:"
+      to match the clarified LOG_DROP semantic (end-of-chain catchall only,
+      not a global packet-logging master switch)
+
 - 2.0.2 | Apr 11 2026:
 
   -- New Features --
@@ -190,41 +229,6 @@
       _apf_complete_cc() was overwriting the verb COMPREPLY array
 [Fix] mutex_lock: detect and remove empty lock files left by flock wrapper;
       noclobber fallback timed out after 60s instead of acquiring the lock
-[Fix] ipset: per-list log=1 now installs LOG rule independent of global
-      LOG_DROP; previously gated on LOG_DROP=1 (default 0), silently
-      suppressing per-list logging the user explicitly opted into;
-      --ipset-update warns when an entry references a set not yet loaded
-      instead of skipping silently (user must run 'apf -s' to install
-      newly added entries)
-[Fix] CC_LOG, LOG_IA: per-feature LOG opt-ins now install LOG rules
-      independent of global LOG_DROP; LOG_DROP is the catchall toggle
-      for end-of-chain default-drop logging only and must not silently
-      suppress per-feature opt-ins; affects geoip CC_DENY/CC_ALLOW/CC_DENYP
-      LOG rules (apf_geoip.sh, 6 sites) and SSH_LOG/TELNET_LOG chains
-      (log.rules); doc sync in conf.apf, apf.8, README.md
-[Fix] validate_config: LOG_LEVEL, LOG_TARGET, and LOG_RATE are now
-      validated whenever set (previously gated on LOG_DROP=1); after the
-      CC_LOG/LOG_IA/ipset decoupling, per-feature consumers use these
-      vars even when LOG_DROP=0, so invalid LOG_TARGET="BOGUS" silently
-      produced broken iptables -j BOGUS rules
-[Change] apf --info dashboard renames "Log drops:" to "Default-drop log:"
-      to match the clarified LOG_DROP semantic (end-of-chain catchall only,
-      not a global packet-logging master switch)
-[Change] Docs: LOG_DROP own-block comment in conf.apf, README.md prose
-      entry, FLOW.md Step 20, and apf.8 (new LOG_DROP + LOG_IA entries)
-      all aligned to the catchall-only semantic with per-feature
-      independence callout
-[Change] RAB_LOG_HIT, RAB_LOG_TRIP: per-feature LOG opt-ins now install
-      LOG rules independent of global LOG_DROP; previously OR-gated
-      (LOG_DROP=1 force-enabled RAB logging even with per-feature flag
-      off) per documentation. Behavior change: operators relying on
-      LOG_DROP=1 to force RAB logging must now set RAB_LOG_HIT=1 and/or
-      RAB_LOG_TRIP=1 explicitly; affects apf_core.sh:882 (RABTRIP) and
-      :915 (RABHIT) with doc sync in conf.apf, README.md, apf.8
-[Change] Doc drift fixups from QA pass: apf_validate.sh comment now
-      lists RAB_LOG_HIT/TRIP among consumers of LOG_LEVEL/LOG_TARGET/
-      LOG_RATE; README.md --info prose updated from "log drops" to
-      "default-drop log state" to match the renamed dashboard label
 
   -- Changes --
 

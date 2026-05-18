@@ -2,7 +2,7 @@
 #
 # Placeholders (substituted by pkg_gen.sh from project manifest):
 #   apf             — package name (e.g., bfd, apf, maldet)
-#   2.0.2          — version string (e.g., 2.0.1)
+#   2.0.3          — version string (e.g., 2.0.1)
 #   Advanced Policy Firewall — iptables/netfilter firewall management          — one-line package summary
 #   Advanced Policy Firewall (APF) is an iptables/netfilter-based firewall management system for Linux servers. It provides stateful packet filtering, trust-based allow/deny host management, Reactive Address Blocking (RAB), and a Virtual Network (VNET) subsystem for per-IP policies.      — multi-line package description
 #   GPLv2+           — license identifier (e.g., GPLv2+)
@@ -15,7 +15,7 @@
 #   2002  — copyright start year (e.g., 1999, 2002)
 #
 %define name    apf
-%define version 2.0.2
+%define version 2.0.3
 %define release 1%{?dist}
 
 # Legacy install path used by install.sh — symlink farm target
@@ -473,6 +473,12 @@ fi
 %doc /usr/share/doc/apf/FLOW
 
 %changelog
+* Sun May 17 2026 R-fx Networks <proj@rfxn.com> - 2.0.3-1
+- Decouple per-feature LOG opt-ins (CC_LOG, LOG_IA, RAB_LOG_HIT,
+  RAB_LOG_TRIP, ipset per-list log) from global LOG_DROP; LOG_DROP
+  now governs only the end-of-chain default-drop catchall
+- validate_config: validate LOG_LEVEL/LOG_TARGET/LOG_RATE whenever set
+- apf --info: rename "Log drops:" label to "Default-drop log:"
 * Thu Mar 26 2026 R-fx Networks <proj@rfxn.com> - 2.0.2-1
 - Initial RPM package for APF 2.0.2
 - FHS-compliant layout with backward-compatible symlink farm

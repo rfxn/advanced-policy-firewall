@@ -10,7 +10,7 @@
 #
 # Placeholders:
 #   apf            — package name
-#   2.0.2         — version string for execution test
+#   2.0.3         — version string for execution test
 #   apf        — binary name in /usr/sbin
 #   /usr/local/sbin/fwmgr      — legacy binary path
 #   /etc/apf    — legacy install path
@@ -180,13 +180,13 @@ echo ""
 # --- Test: Execution ---
 echo "--- Test: apf execution ---"
 ver_out=$(/usr/local/sbin/fwmgr --version 2>&1 || true)
-if echo "$ver_out" | grep -q '2.0.2'; then
+if echo "$ver_out" | grep -q '2.0.3'; then
 	pass "apf --version via /usr/local/sbin/fwmgr works"
 else
 	fail "apf --version output: $ver_out"
 fi
 ver_out2=$(/usr/sbin/apf --version 2>&1 || true)
-if echo "$ver_out2" | grep -q '2.0.2'; then
+if echo "$ver_out2" | grep -q '2.0.3'; then
 	pass "apf --version via /usr/sbin/apf works"
 else
 	fail "apf --version via /usr/sbin/apf output: $ver_out2"
