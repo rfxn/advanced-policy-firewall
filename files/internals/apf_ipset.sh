@@ -221,7 +221,9 @@ command chmod 600 "$ts_file"
 command rm -f "$ts_tmp"
 }
 
+## ipset_update [force] — refresh ipset block lists; force=1 bypasses per-list interval
 ipset_update() {
+local force="${1:-0}"
 if [ "$USE_IPSET" != "1" ] || [ -z "$IPSET" ]; then
 	return
 fi
@@ -229,7 +231,11 @@ local ipset_rules="$INSTALL_PATH/ipset.rules"
 if [ ! -f "$ipset_rules" ]; then
 	return
 fi
-eout "{ipset} updating ipset block lists"
+if [ "$force" == "1" ]; then
+	eout "{ipset} updating ipset block lists (forced; ignoring per-list intervals)"
+else
+	eout "{ipset} updating ipset block lists"
+fi
 while IFS= read -r line; do
 	case "$line" in
 		\#*|"") continue ;;
@@ -244,21 +250,23 @@ while IFS= read -r line; do
 		continue
 	fi
 
-	# Check per-list interval before downloading
-	local eff_interval="$_IPE_INTERVAL"
-	[ "$eff_interval" -eq 0 ] && eff_interval="${IPSET_REFRESH:-21600}"
-	local ts_file="$INSTALL_PATH/internals/.ipset.timestamps"
-	if [ -f "$ts_file" ]; then
-		local last_ts
-		last_ts=$(grep "^${_IPE_NAME}:" "$ts_file" 2>/dev/null | tail -1)
-		if [ -n "$last_ts" ]; then
-			local last_epoch="${last_ts#*:}"
-			local now_epoch
-			now_epoch=$(date +%s)
-			local elapsed=$((now_epoch - last_epoch))
-			if [ "$elapsed" -lt "$eff_interval" ]; then
-				eout "{ipset} skipping $_IPE_NAME (refreshes in $((eff_interval - elapsed))s)"
-				continue
+	if [ "$force" != "1" ]; then
+		# Check per-list interval before downloading
+		local eff_interval="$_IPE_INTERVAL"
+		[ "$eff_interval" -eq 0 ] && eff_interval="${IPSET_REFRESH:-21600}"
+		local ts_file="$INSTALL_PATH/internals/.ipset.timestamps"
+		if [ -f "$ts_file" ]; then
+			local last_ts
+			last_ts=$(grep "^${_IPE_NAME}:" "$ts_file" 2>/dev/null | tail -1)
+			if [ -n "$last_ts" ]; then
+				local last_epoch="${last_ts#*:}"
+				local now_epoch
+				now_epoch=$(date +%s)
+				local elapsed=$((now_epoch - last_epoch))
+				if [ "$elapsed" -lt "$eff_interval" ]; then
+					eout "{ipset} skipping $_IPE_NAME (refreshes in $((eff_interval - elapsed))s)"
+					continue
+				fi
 			fi
 		fi
 	fi
@@ -318,8 +326,15 @@ _dispatch_ipset() {
 		fi
 		;;
 	update)
+		shift
+		local _ips_force=0
+		case "${1:-}" in
+			"") ;;
+			--force) _ips_force=1 ;;
+			*) _cli_unknown_verb "apf ipset update" "$1" "--force"; return 1 ;;
+		esac
 		if [ "$USE_IPSET" == "1" ]; then
-			mutex_lock; ipset_update
+			mutex_lock; ipset_update "$_ips_force"
 		else
 			echo "ipset not enabled (USE_IPSET=0 in conf.apf)"
 		fi
@@ -331,9 +346,11 @@ _dispatch_ipset() {
 _ipset_help() {
 	echo "usage: apf ipset <command>"
 	echo ""
-	echo "  update                 hot-reload ipset block lists"
+	echo "  update [--force]       hot-reload ipset block lists"
+	echo "                         --force bypasses per-list refresh interval"
 	echo "  status                 show ipset list names"
 	echo ""
 	echo "  Examples:  apf ipset update"
+	echo "             apf ipset update --force"
 	echo "             apf ipset status"
 }

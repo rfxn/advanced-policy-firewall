@@ -256,7 +256,7 @@ ct)
 	_dispatch_cc update
 	;;
 --ipset-update)
-	_dispatch_ipset update
+	_dispatch_ipset update "${@:2}"
 	;;
 --gre-up)
 	_dispatch_gre up

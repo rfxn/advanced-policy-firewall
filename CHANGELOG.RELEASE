@@ -1,5 +1,12 @@
 - 2.0.3 | May 17 2026:
 
+  -- New Features --
+
+[New] ipset: --force flag on 'apf ipset update' and '--ipset-update' bypasses
+      per-list refresh intervals and IPSET_REFRESH, refreshing every loaded
+      set immediately; useful for iterating on ipset.rules or pulling upstream
+      list updates ahead of the next cron cycle
+
   -- Bug Fixes --
 
 [Fix] ipset: per-list log=1 now installs LOG rule independent of global

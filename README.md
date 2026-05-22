@@ -545,7 +545,7 @@ Example:
 firehol_level2:src:net:1:0:0:https://iplists.firehol.org/files/firehol_level2.netset
 ```
 
-Run `apf --ipset-update` to hot-reload all ipset block lists without restarting the firewall. A cron job (`cron.d/apf`) runs hourly; actual refresh timing is governed by per-list intervals and `IPSET_REFRESH`. **Newly added entries** are not installed by `--ipset-update` — it only refreshes sets already loaded. Run `apf -s` to install new entries (the firewall restart picks up the changed `ipset.rules` automatically).
+Run `apf --ipset-update` (or `apf ipset update`) to hot-reload all ipset block lists without restarting the firewall. A cron job (`cron.d/apf`) runs hourly; actual refresh timing is governed by per-list intervals and `IPSET_REFRESH`. Pass `--force` (`apf --ipset-update --force` or `apf ipset update --force`) to bypass the interval check and refresh every list immediately — useful when iterating on `ipset.rules` or after upstream list updates. **Newly added entries** are not installed by `--ipset-update` — it only refreshes sets already loaded. Run `apf -s` to install new entries (the firewall restart picks up the changed `ipset.rules` automatically).
 
 ### 3.11 Country Code Filtering (GeoIP)
 

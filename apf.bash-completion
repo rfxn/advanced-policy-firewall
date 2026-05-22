@@ -136,6 +136,9 @@ _apf_completions() {
 		;;
 	ipset)
 		[ "$COMP_CWORD" -eq 2 ] && COMPREPLY=( $(compgen -W "update status" -- "$cur") )
+		if [ "$COMP_CWORD" -eq 3 ] && [ "${COMP_WORDS[2]}" = "update" ]; then
+			COMPREPLY=( $(compgen -W "--force" -- "$cur") )
+		fi
 		;;
 	ct)
 		[ "$COMP_CWORD" -eq 2 ] && COMPREPLY=( $(compgen -W "scan status" -- "$cur") )
@@ -146,6 +149,9 @@ _apf_completions() {
 	# Legacy flag context completions
 	-a|--allow|-d|--deny|-u|--remove|--unban|--lookup|-ar|-dr|-tr)
 		[ "$COMP_CWORD" -eq 2 ] && _apf_complete_hosts
+		;;
+	--ipset-update)
+		[ "$COMP_CWORD" -eq 2 ] && COMPREPLY=( $(compgen -W "--force" -- "$cur") )
 		;;
 	-ta|--temp-allow|-td|--temp-deny)
 		local pos=$(( COMP_CWORD - 1 ))

@@ -597,3 +597,49 @@ test_block:src:ip:1:0:0:/opt/apf/test_blocklist.txt
 ISEOF
     "$APF" -s
 }
+
+@test "--ipset-update --force bypasses per-list interval" {
+    # Long interval that would normally skip the update
+    cat > "$APF_DIR/ipset.rules" <<'ISEOF'
+test_block:src:ip:1:86400:0:/opt/apf/test_blocklist.txt
+ISEOF
+
+    # Recent timestamp — without --force, update is skipped
+    echo "test_block:$(date +%s)" > "$APF_DIR/internals/.ipset.timestamps"
+
+    # Add a new entry — --force should refresh despite recent timestamp
+    echo "192.0.2.99" >> "$APF_DIR/test_blocklist.txt"
+    "$APF" --ipset-update --force
+
+    # Entry must be present (force bypassed the interval check)
+    run ipset test test_block 192.0.2.99
+    assert_success
+
+    # Restore
+    create_test_blocklist
+    cat > "$APF_DIR/ipset.rules" <<'ISEOF'
+test_block:src:ip:1:0:0:/opt/apf/test_blocklist.txt
+ISEOF
+}
+
+@test "apf ipset update --force bypasses per-list interval" {
+    # Same as above but via the noun-verb form
+    cat > "$APF_DIR/ipset.rules" <<'ISEOF'
+test_block:src:ip:1:86400:0:/opt/apf/test_blocklist.txt
+ISEOF
+
+    echo "test_block:$(date +%s)" > "$APF_DIR/internals/.ipset.timestamps"
+
+    echo "192.0.2.88" >> "$APF_DIR/test_blocklist.txt"
+    "$APF" ipset update --force
+
+    run ipset test test_block 192.0.2.88
+    assert_success
+
+    create_test_blocklist
+    "$APF" -f 2>/dev/null || true
+    cat > "$APF_DIR/ipset.rules" <<'ISEOF'
+test_block:src:ip:1:0:0:/opt/apf/test_blocklist.txt
+ISEOF
+    "$APF" -s
+}

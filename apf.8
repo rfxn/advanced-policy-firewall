@@ -40,7 +40,7 @@ apf \- Advanced Policy Firewall
 .RB [ \-\-ct\-scan | \-\-ct\-status ]
 .br
 .B apf
-.RB [ \-\-ipset\-update | \-\-gre\-up | \-\-gre\-down | \-\-gre\-status ]
+.RB [ \-\-ipset\-update " [" \-\-force "] | " \-\-gre\-up | \-\-gre\-down | \-\-gre\-status ]
 .br
 .B apf
 .B help
@@ -244,10 +244,15 @@ Show CT_LIMIT configuration, last scan timestamp, data source, and count of
 active CT_LIMIT blocks. Does not require CT_LIMIT to be enabled.
 .SS ipset Block Lists
 .TP
-.B \-\-ipset\-update
+.BR \-\-ipset\-update " [" \-\-force ]
 Hot\-reload ipset block lists from
 .IR ipset.rules .
-Lists are refreshed per their configured interval.
+Lists are refreshed per their configured interval; pass
+.B \-\-force
+to bypass the interval check and refresh every list immediately
+(treats all per\-list intervals and
+.B IPSET_REFRESH
+as zero).
 Only refreshes sets already loaded by the firewall;
 newly added entries require
 .B apf \-s
@@ -387,9 +392,12 @@ Validate configuration without starting the firewall (equivalent to
 .BR "\-\-validate" ).
 .SS ipset \(em ipset Block List Management
 .TP
-.B apf ipset update
+.BR "apf ipset update" " [" \-\-force ]
 Hot\-reload ipset block lists (equivalent to
 .BR "\-\-ipset\-update" ).
+With
+.BR \-\-force ,
+bypass per\-list refresh intervals and refresh every list immediately.
 .TP
 .B apf ipset status
 Show ipset list names and status.
